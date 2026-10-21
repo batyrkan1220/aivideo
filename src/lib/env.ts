@@ -7,7 +7,8 @@ const schema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+  // Optional so login/signup work without it; supabaseAdmin() fails loudly if missing.
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   PAYMENT_PROVIDER: z.string().default("sandbox"),
   AI_PROVIDER: z.string().default("dev"),
   UPLOAD_MAX_BYTES: z.coerce.number().int().positive().default(10 * 1024 * 1024),
