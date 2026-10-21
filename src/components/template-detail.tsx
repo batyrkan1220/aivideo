@@ -4,7 +4,7 @@ import type { TemplateDetail } from "@/lib/templates/queries";
 import { calculatePrice, formatKzt } from "@/lib/pricing";
 import { FaceMap } from "@/components/face-map";
 
-export function TemplateDetailView({ t }: { t: TemplateDetail }) {
+export function TemplateDetailView({ t, cta }: { t: TemplateDetail; cta?: React.ReactNode }) {
   const available = t.qualities.filter((q) => q.available);
 
   return (
@@ -73,14 +73,8 @@ export function TemplateDetailView({ t }: { t: TemplateDetail }) {
           </ul>
         </section>
 
-        <div className="mt-8 rounded-card bg-brand-soft p-5">
-          <button
-            disabled
-            className="h-13 w-full rounded-full bg-brand px-7 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {kk.catalog.create}
-          </button>
-          <p className="mt-3 text-center text-sm text-muted">{kk.template.uploadSoon}</p>
+        <div className="mt-10">
+          {cta ?? <p className="rounded-card bg-brand-soft p-5 text-sm text-muted">{kk.template.uploadSoon}</p>}
         </div>
       </div>
     </div>

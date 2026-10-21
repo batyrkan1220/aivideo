@@ -1,5 +1,8 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
+import { supabaseServer } from "@/lib/supabase/server";
+import { formatKzt } from "@/lib/pricing";
 import { logoutAction } from "@/app/(auth)/actions";
 import { kk } from "@/lib/i18n/kk";
 
@@ -39,9 +42,37 @@ async function AccountDetails() {
         </dl>
       </section>
       <section className="rounded-card border border-line bg-white p-6">
-        <h2 className="mb-2 font-semibold">{kk.nav.myOrders}</h2>
-        <p className="text-sm text-muted">{kk.account.ordersEmpty}</p>
+        <h2 className="mb-3 font-semibold">{kk.nav.myOrders}</h2>
+        <OrdersList />
       </section>
     </div>
+  );
+}
+
+async function OrdersList() {
+  // RLS limits this to the signed-in user's own orders.
+  const sb = await supabaseServer();
+  const { data: orders } = await sb.from("orders")
+    .select("id,public_order_number,created_at,amount_kzt,payment_status,template_snapshot_json")
+    .order("created_at", { ascending: false }).limit(50);
+  if (!orders?.length) return <p className="text-sm text-muted">{kk.account.ordersEmpty}</p>;
+  const fmt = new Intl.DateTimeFormat("kk-KZ", { dateStyle: "medium", timeZone: "Asia/Almaty" });
+  return (
+    <ul className="divide-y divide-line">
+      {orders.map((o) => (
+        <li key={o.id}>
+          <Link href={`/orders/${o.id}`} className="flex items-center justify-between gap-4 py-3 hover:text-brand">
+            <span className="min-w-0">
+              <span className="block truncate font-medium">{(o.template_snapshot_json as { title_kk?: string }).title_kk}</span>
+              <span className="block text-xs text-muted">{o.public_order_number}, {fmt.format(new Date(o.created_at))}</span>
+            </span>
+            <span className="shrink-0 text-right text-sm">
+              <span className="block font-semibold">{formatKzt(o.amount_kzt)}</span>
+              <span className="block text-xs text-muted">{kk.order.payment[o.payment_status as keyof typeof kk.order.payment]}</span>
+            </span>
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }

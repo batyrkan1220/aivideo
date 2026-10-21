@@ -1,0 +1,212 @@
+"use server";
+import { randomUUID } from "node:crypto";
+import { imageSize } from "image-size";
+import { z } from "zod";
+import { getSessionUser } from "@/lib/auth/session";
+import { supabaseAdmin } from "@/lib/supabase/server";
+import { env } from "@/lib/env";
+import { calculatePrice } from "@/lib/pricing";
+import { faceSlotSchema, qualitySchema, pricingConfigSchema } from "@/lib/templates/schema";
+import { PHOTO_EXT, sniffImageType, validatePhotoMeta, type PhotoError, type PhotoType } from "@/lib/uploads/validate";
+import { track } from "@/lib/analytics";
+
+type Fail<E extends string> = { ok: false; error: E | "unauthorized" | "generic" };
+const BUCKET = "user-uploads";
+const UPLOADS_PER_HOUR = 60;
+
+/** Loads a published template's *current version* — orders are always priced from the snapshot. */
+async function loadPublishedVersion(templateId: string) {
+  if (!z.string().uuid().safeParse(templateId).success) return null;
+  const db = supabaseAdmin();
+  const { data: t } = await db.from("templates")
+    .select("id,title_kk,status,current_version_id,cover_asset_path").eq("id", templateId).maybeSingle();
+  if (!t || t.status !== "published" || !t.current_version_id) return null;
+  const { data: v } = await db.from("template_versions")
+    .select("id,configuration_snapshot").eq("id", t.current_version_id).single();
+  if (!v) return null;
+  const snap = v.configuration_snapshot as Record<string, unknown>;
+  const slots = z.array(faceSlotSchema).safeParse(snap.face_slots_json);
+  const qualities = z.array(qualitySchema).safeParse(snap.supported_qualities_json);
+  const pricing = pricingConfigSchema.safeParse(snap.pricing_config_json);
+  if (!slots.success || !qualities.success || !pricing.success) return null;
+  return {
+    template: t, versionId: v.id, snapshot: snap,
+    slots: slots.data, qualities: qualities.data, pricing: pricing.data,
+    maxUploadBytes: Number(snap.max_upload_bytes) || env().UPLOAD_MAX_BYTES,
+  };
+}
+
+const limits = (maxBytes: number) => ({
+  maxBytes: Math.min(maxBytes, env().UPLOAD_MAX_BYTES),
+  minDimension: env().UPLOAD_MIN_DIMENSION,
+  maxDimension: env().UPLOAD_MAX_DIMENSION,
+});
+
+// ---------------------------------------------------------------- uploads
+
+const requestSchema = z.object({
+  templateId: z.string().uuid(),
+  slotKey: z.string().regex(/^[a-z0-9_]+$/),
+  contentType: z.string(),
+  size: z.number().int().positive(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+});
+
+export async function requestPhotoUpload(raw: unknown): Promise<
+  { ok: true; assetId: string; path: string; token: string } | Fail<PhotoError | "rate_limited" | "template_unavailable">
+> {
+  const user = await getSessionUser();
+  if (!user) return { ok: false, error: "unauthorized" };
+  const p = requestSchema.safeParse(raw);
+  if (!p.success) return { ok: false, error: "generic" };
+  const tv = await loadPublishedVersion(p.data.templateId);
+  if (!tv || !tv.slots.some((s) => s.key === p.data.slotKey)) return { ok: false, error: "template_unavailable" };
+
+  const problem = validatePhotoMeta(p.data, limits(tv.maxUploadBytes));
+  if (problem) return { ok: false, error: problem };
+
+  const db = supabaseAdmin();
+  const since = new Date(Date.now() - 3600_000).toISOString();
+  const { count } = await db.from("order_assets").select("id", { count: "exact", head: true })
+    .eq("user_id", user.id).gte("created_at", since);
+  if ((count ?? 0) >= UPLOADS_PER_HOUR) return { ok: false, error: "rate_limited" };
+
+  const path = `${user.id}/${randomUUID()}.${PHOTO_EXT[p.data.contentType as PhotoType]}`;
+  const { data: signed, error: sErr } = await db.storage.from(BUCKET).createSignedUploadUrl(path);
+  if (sErr || !signed) { console.error("[upload.sign]", sErr?.message); return { ok: false, error: "generic" }; }
+
+  const expires = new Date(Date.now() + env().UPLOAD_RETENTION_DAYS * 86400_000).toISOString();
+  const { data: asset, error } = await db.from("order_assets").insert({
+    user_id: user.id, template_id: tv.template.id, face_slot_key: p.data.slotKey,
+    private_storage_path: path, mime_type: p.data.contentType, file_size: p.data.size,
+    width: p.data.width, height: p.data.height, expires_at: expires,
+  }).select("id").single();
+  if (error) { console.error("[upload.row]", error.code); return { ok: false, error: "generic" }; }
+
+  await track("upload_started", { userId: user.id, templateId: tv.template.id });
+  return { ok: true, assetId: asset.id, path: signed.path, token: signed.token };
+}
+
+/** Re-validates the stored bytes (real type + dimensions). Invalid files are deleted. */
+export async function confirmPhotoUpload(assetId: string): Promise<{ ok: true } | Fail<PhotoError>> {
+  const user = await getSessionUser();
+  if (!user) return { ok: false, error: "unauthorized" };
+  if (!z.string().uuid().safeParse(assetId).success) return { ok: false, error: "generic" };
+  const db = supabaseAdmin();
+  const { data: a } = await db.from("order_assets").select("*")
+    .eq("id", assetId).eq("user_id", user.id).is("order_id", null).maybeSingle();
+  if (!a) return { ok: false, error: "generic" };
+
+  const reject = async (error: PhotoError) => {
+    await db.storage.from(BUCKET).remove([a.private_storage_path]);
+    await db.from("order_assets").delete().eq("id", a.id);
+    return { ok: false as const, error };
+  };
+
+  const { data: blob, error } = await db.storage.from(BUCKET).download(a.private_storage_path);
+  if (error || !blob) return reject("unreadable");
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const realType = sniffImageType(bytes);
+  if (!realType) return reject("bad_type");
+  let dims: { width?: number; height?: number };
+  try { dims = imageSize(bytes); } catch { return reject("unreadable"); }
+
+  const tv = await loadPublishedVersion(a.template_id);
+  if (!tv) return reject("unreadable");
+  const problem = validatePhotoMeta({ contentType: realType, size: bytes.byteLength, width: dims.width, height: dims.height }, limits(tv.maxUploadBytes));
+  if (problem) return reject(problem);
+
+  await db.from("order_assets").update({
+    verified_at: new Date().toISOString(), mime_type: realType, file_size: bytes.byteLength,
+    width: dims.width, height: dims.height,
+  }).eq("id", a.id);
+  await track("upload_completed", { userId: user.id, templateId: a.template_id });
+  return { ok: true };
+}
+
+export async function removePhotoUpload(assetId: string): Promise<{ ok: boolean }> {
+  const user = await getSessionUser();
+  if (!user || !z.string().uuid().safeParse(assetId).success) return { ok: false };
+  const db = supabaseAdmin();
+  const { data: a } = await db.from("order_assets").select("id,private_storage_path")
+    .eq("id", assetId).eq("user_id", user.id).is("order_id", null).maybeSingle();
+  if (!a) return { ok: false };
+  await db.storage.from(BUCKET).remove([a.private_storage_path]);
+  await db.from("order_assets").delete().eq("id", a.id);
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------- orders
+
+const orderSchema = z.object({
+  templateId: z.string().uuid(),
+  quality: z.string().regex(/^[a-z0-9_]+$/),
+  assets: z.record(z.string(), z.string().uuid()),
+  consent: z.literal(true),
+});
+
+export async function createOrder(raw: unknown): Promise<
+  { ok: true; orderId: string } |
+  Fail<"consent_required" | "template_unavailable" | "quality_unavailable" | "photos_missing" | "photos_expired">
+> {
+  const user = await getSessionUser();
+  if (!user) return { ok: false, error: "unauthorized" };
+  const p = orderSchema.safeParse(raw);
+  if (!p.success) {
+    const consentMissing = typeof raw === "object" && raw !== null && (raw as { consent?: unknown }).consent !== true;
+    return { ok: false, error: consentMissing ? "consent_required" : "generic" };
+  }
+  const tv = await loadPublishedVersion(p.data.templateId);
+  if (!tv) return { ok: false, error: "template_unavailable" };
+
+  const quality = tv.qualities.find((q) => q.key === p.data.quality && q.available);
+  if (!quality) return { ok: false, error: "quality_unavailable" };
+
+  // Every slot must have exactly one verified, unattached, unexpired photo owned by this user.
+  const slotKeys = tv.slots.map((s) => s.key);
+  const ids = slotKeys.map((k) => p.data.assets[k]);
+  if (ids.some((x) => !x) || Object.keys(p.data.assets).length !== slotKeys.length) {
+    return { ok: false, error: "photos_missing" };
+  }
+  const db = supabaseAdmin();
+  const { data: assets } = await db.from("order_assets")
+    .select("id,face_slot_key,verified_at,expires_at,template_id")
+    .in("id", ids).eq("user_id", user.id).is("order_id", null);
+  const now = Date.now();
+  for (const k of slotKeys) {
+    const a = assets?.find((x) => x.id === p.data.assets[k]);
+    if (!a || a.face_slot_key !== k || a.template_id !== tv.template.id || !a.verified_at) {
+      return { ok: false, error: "photos_missing" };
+    }
+    if (new Date(a.expires_at).getTime() < now) return { ok: false, error: "photos_expired" };
+  }
+
+  // Price is computed here, from the version snapshot — never taken from the browser.
+  const breakdown = calculatePrice(tv.pricing, quality, tv.slots.length);
+  const { data: order, error } = await db.from("orders").insert({
+    user_id: user.id,
+    template_id: tv.template.id,
+    template_version_id: tv.versionId,
+    template_snapshot_json: { ...tv.snapshot, quality },
+    quality: quality.key,
+    face_count: tv.slots.length,
+    pricing_breakdown_json: breakdown,
+    amount_kzt: breakdown.totalKzt,
+    currency: "KZT",
+    consent_accepted_at: new Date().toISOString(),
+  }).select("id").single();
+  if (error || !order) { console.error("[order.create]", error?.code, error?.message); return { ok: false, error: "generic" }; }
+
+  // Attach photos atomically-enough: only rows still unattached are claimed; on mismatch, roll back.
+  const { data: claimed } = await db.from("order_assets").update({ order_id: order.id })
+    .in("id", ids).eq("user_id", user.id).is("order_id", null).select("id");
+  if ((claimed?.length ?? 0) !== ids.length) {
+    await db.from("order_assets").update({ order_id: null }).eq("order_id", order.id);
+    await db.from("orders").delete().eq("id", order.id);
+    return { ok: false, error: "photos_missing" };
+  }
+
+  await track("checkout_initiated", { userId: user.id, templateId: tv.template.id, orderId: order.id, props: { quality: quality.key } });
+  return { ok: true, orderId: order.id };
+}
