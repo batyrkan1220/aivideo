@@ -30,7 +30,8 @@ create table profiles (
 create function handle_new_user() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  insert into profiles (id, email, phone) values (new.id, new.email, new.phone);
+  insert into profiles (id, email, phone, display_name)
+  values (new.id, new.email, new.phone, nullif(new.raw_user_meta_data->>'display_name', ''));
   return new;
 end $$;
 create trigger on_auth_user_created after insert on auth.users
