@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { calculatePrice, startingPrice, formatKzt } from "../pricing";
-import { validateFaceSlots, orderedSlots, pricingConfigSchema, type Quality, type FaceSlot } from "../templates/schema";
+import { validateFaceSlots, orderedSlots, autoFaceSlots, pricingConfigSchema, type Quality, type FaceSlot } from "../templates/schema";
 
 const std: Quality = { key: "standard", labelKk: "Стандарт", providerQuality: "std", surchargeKzt: 0, available: true };
 const hd: Quality = { key: "high", labelKk: "Жоғары сапа", providerQuality: "hd", surchargeKzt: 1000, available: true };
@@ -56,5 +56,19 @@ describe("face slots", () => {
   });
   it("orders deterministically by admin order", () => {
     expect(orderedSlots(slots).map((s) => s.key)).toEqual(["left", "center", "right"]);
+  });
+});
+
+describe("autoFaceSlots", () => {
+  it("labels by count", () => {
+    expect(autoFaceSlots(1).map((s) => s.labelKk)).toEqual(["Бет фотосын жүктеңіз"]);
+    expect(autoFaceSlots(2).map((s) => s.labelKk)).toEqual(["1-бет — сол жақ", "2-бет — оң жақ"]);
+    expect(autoFaceSlots(5).map((s) => s.labelKk)).toEqual(["1-бет — ең сол жақ", "2-бет", "3-бет", "4-бет", "5-бет — ең оң жақ"]);
+  });
+  it("is valid, evenly spaced and clamped to 1..10", () => {
+    expect(validateFaceSlots(autoFaceSlots(4), 4)).toEqual([]);
+    expect(autoFaceSlots(3).map((s) => s.position.x)).toEqual([0.25, 0.5, 0.75]);
+    expect(autoFaceSlots(0)).toHaveLength(1);
+    expect(autoFaceSlots(99)).toHaveLength(10);
   });
 });

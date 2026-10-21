@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { faceSlotSchema, qualitySchema, pricingConfigSchema, validateFaceSlots } from "./schema";
+import { faceSlotSchema, qualitySchema, pricingConfigSchema, validateFaceSlots, autoFaceSlots } from "./schema";
 
 /** Everything an admin can edit on a template. Validated on the server on every save. */
 export const templateInputSchema = z.object({
@@ -49,7 +49,7 @@ export function emptyTemplate(): TemplateInput {
     sortOrder: 0,
     coverAssetPath: null,
     previewVideoPath: null,
-    faceSlots: [{ key: "face_1", labelKk: "Бет фотосын жүктеңіз", position: { x: 0.5, y: 0.4 }, providerInput: "face_1", order: 0 }],
+    faceSlots: autoFaceSlots(1),
     qualities: [{ key: "standard", labelKk: "Стандарт", resolution: "720x1280", fps: 30, providerQuality: "standard", surchargeKzt: 0, available: true }],
     pricing: { basePriceKzt: 1990, chargeExtraFaces: false, extraFacePriceKzt: 0, includedFaces: 1, platformFeeKzt: 0, minPriceKzt: 0 },
     providerKey: "dev",
@@ -89,7 +89,8 @@ export function rowToInput(r: {
 
 /** Input → DB columns. Face count is always derived from the slot list. */
 export function inputToRow(t: TemplateInput) {
-  const slots = t.faceSlots.map((s, i) => ({ ...s, order: i }));
+  // Layout is always automatic: left → right, face_1..face_N.
+  const slots = autoFaceSlots(t.faceSlots.length);
   return {
     title_kk: t.titleKk,
     description_kk: t.descriptionKk,

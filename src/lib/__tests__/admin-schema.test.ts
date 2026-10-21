@@ -33,7 +33,7 @@ describe("template publishing rules", () => {
 });
 
 describe("inputToRow", () => {
-  it("derives face count from slots and renumbers order", () => {
+  it("always lays faces out automatically left → right", () => {
     const t = emptyTemplate();
     t.faceSlots = [
       { key: "l", labelKk: "1-бет — сол жақ", position: { x: 0.2, y: 0.4 }, providerInput: "f1", order: 5 },
@@ -42,7 +42,13 @@ describe("inputToRow", () => {
     ];
     const row = inputToRow(t);
     expect(row.required_face_count).toBe(3);
-    expect(row.face_slots_json.map((s) => [s.key, s.order])).toEqual([["l", 0], ["c", 1], ["r", 2]]);
+    expect(row.face_slots_json.map((s) => [s.key, s.providerInput, s.labelKk])).toEqual([
+      ["face_1", "face_1", "1-бет — сол жақ"],
+      ["face_2", "face_2", "2-бет — ортада"],
+      ["face_3", "face_3", "3-бет — оң жақ"],
+    ]);
+    const xs = row.face_slots_json.map((s) => s.position.x);
+    expect(xs).toEqual([...xs].sort((a, b) => a - b));
   });
 
   it("schema rejects a too-short title and >10 MB user upload limit", () => {

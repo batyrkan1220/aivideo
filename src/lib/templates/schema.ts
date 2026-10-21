@@ -55,6 +55,32 @@ export function validateFaceSlots(slots: FaceSlot[], requiredCount: number): str
   return errs;
 }
 
+/** Kazakh slot label by position: left → right. */
+export function autoFaceLabel(i: number, n: number): string {
+  if (n === 1) return "Бет фотосын жүктеңіз";
+  const num = `${i + 1}-бет`;
+  if (n === 2) return `${num} — ${i === 0 ? "сол жақ" : "оң жақ"}`;
+  if (n === 3) return `${num} — ${["сол жақ", "ортада", "оң жақ"][i]}`;
+  if (i === 0) return `${num} — ең сол жақ`;
+  if (i === n - 1) return `${num} — ең оң жақ`;
+  return num;
+}
+
+/**
+ * Faces are placed side by side, evenly from left to right. Slot i always maps to
+ * provider input `face_{i+1}`, so the mapping is deterministic and needs no manual setup.
+ */
+export function autoFaceSlots(n: number): FaceSlot[] {
+  const count = Math.min(10, Math.max(1, Math.round(n)));
+  return Array.from({ length: count }, (_, i) => ({
+    key: `face_${i + 1}`,
+    labelKk: autoFaceLabel(i, count),
+    position: { x: (i + 1) / (count + 1), y: 0.42 },
+    providerInput: `face_${i + 1}`,
+    order: i,
+  }));
+}
+
 /** Slots always rendered and sent in admin-defined order — never reordered implicitly. */
 export function orderedSlots(slots: FaceSlot[]): FaceSlot[] {
   return [...slots].sort((a, b) => a.order - b.order);

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { kk } from "@/lib/i18n/kk";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import type { TemplateInput, PublishProblem } from "@/lib/templates/admin-schema";
-import type { FaceSlot, Quality } from "@/lib/templates/schema";
+import { autoFaceSlots, type Quality } from "@/lib/templates/schema";
 import { calculatePrice, formatKzt } from "@/lib/pricing";
 import { FaceMap } from "@/components/face-map";
 import { saveTemplate, changeStatus, createUploadUrl } from "./actions";
@@ -56,19 +56,9 @@ export function TemplateEditor({
   const [configText, setConfigText] = useState(JSON.stringify(initial.providerConfig, null, 2));
 
   const set = <K extends keyof TemplateInput>(k: K, v: TemplateInput[K]) => { setT((p) => ({ ...p, [k]: v })); setDirty(true); };
-  const setSlot = (i: number, patch: Partial<FaceSlot>) =>
-    set("faceSlots", t.faceSlots.map((s, j) => (j === i ? { ...s, ...patch } : s)));
   const setQuality = (i: number, patch: Partial<Quality>) =>
     set("qualities", t.qualities.map((q, j) => (j === i ? { ...q, ...patch } : q)));
   const setPricing = (patch: Partial<TemplateInput["pricing"]>) => set("pricing", { ...t.pricing, ...patch });
-
-  const moveSlot = (i: number, d: -1 | 1) => {
-    const arr = [...t.faceSlots];
-    const j = i + d;
-    if (j < 0 || j >= arr.length) return;
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-    set("faceSlots", arr.map((s, k) => ({ ...s, order: k })));
-  };
 
   /** Validates and saves; returns the template id or null on failure. */
   const persist = async (): Promise<string | null> => {
@@ -161,55 +151,33 @@ export function TemplateEditor({
       </Section>
 
       <Section title={e.sections.faces}>
-        <p className="mb-4 text-sm text-muted">{e.faceHint}</p>
         <div className="grid gap-6 lg:grid-cols-[1fr_minmax(0,320px)]">
-          <ol className="space-y-4">
-            {t.faceSlots.map((s, i) => (
-              <li key={i} className="rounded-xl border border-line p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="font-display font-bold text-brand">{i + 1}</span>
-                  <div className="flex gap-1 text-xs">
-                    <button type="button" className="rounded-full px-2 py-1 hover:bg-brand-soft disabled:opacity-30" disabled={i === 0} onClick={() => moveSlot(i, -1)}>{e.moveUp}</button>
-                    <button type="button" className="rounded-full px-2 py-1 hover:bg-brand-soft disabled:opacity-30" disabled={i === t.faceSlots.length - 1} onClick={() => moveSlot(i, 1)}>{e.moveDown}</button>
-                    <button type="button" className="rounded-full px-2 py-1 text-danger hover:bg-red-50 disabled:opacity-30" disabled={t.faceSlots.length === 1} onClick={() => set("faceSlots", t.faceSlots.filter((_, j) => j !== i))}>{e.removeFace}</button>
-                  </div>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label={e.faceLabel} className="sm:col-span-2">
-                    <input className={inputCls} value={s.labelKk} onChange={(ev) => setSlot(i, { labelKk: ev.target.value })} />
-                  </Field>
-                  <Field label={e.faceKey}>
-                    <input className={inputCls} value={s.key} pattern="[a-z0-9_]+" onChange={(ev) => setSlot(i, { key: ev.target.value.toLowerCase() })} />
-                  </Field>
-                  <Field label={e.faceInput}>
-                    <input className={inputCls} value={s.providerInput} onChange={(ev) => setSlot(i, { providerInput: ev.target.value })} />
-                  </Field>
-                  <Field label={e.posX}>
-                    <input type="range" min={0} max={100} className="w-full accent-brand" value={Math.round(s.position.x * 100)} onChange={(ev) => setSlot(i, { position: { ...s.position, x: Number(ev.target.value) / 100 } })} />
-                  </Field>
-                  <Field label={e.posY}>
-                    <input type="range" min={0} max={100} className="w-full accent-brand" value={Math.round(s.position.y * 100)} onChange={(ev) => setSlot(i, { position: { ...s.position, y: Number(ev.target.value) / 100 } })} />
-                  </Field>
-                </div>
-              </li>
-            ))}
-            <li>
+          <div>
+            <span className={labelCls}>{e.peopleCount}</span>
+            <div className="flex items-center gap-3">
               <button
                 type="button"
-                disabled={t.faceSlots.length >= 10}
-                className="rounded-full border border-dashed border-brand px-4 py-2 text-sm font-semibold text-brand hover:bg-brand-soft disabled:opacity-40"
-                onClick={() => {
-                  const n = t.faceSlots.length + 1;
-                  set("faceSlots", [...t.faceSlots, { key: `face_${n}`, labelKk: `${n}-бет`, position: { x: 0.5, y: 0.4 }, providerInput: `face_${n}`, order: n - 1 }]);
-                }}
+                aria-label={e.fewer}
+                disabled={t.faceSlots.length <= 1}
+                onClick={() => set("faceSlots", autoFaceSlots(t.faceSlots.length - 1))}
+                className="h-11 w-11 rounded-full border border-line text-xl font-semibold hover:border-ink disabled:opacity-30"
               >
-                + {e.addFace}
+                −
               </button>
-            </li>
-          </ol>
-          <div className="lg:sticky lg:top-24 lg:self-start">
-            <FaceMap slots={t.faceSlots} />
+              <output className="w-10 text-center font-display text-3xl font-bold" aria-live="polite">{t.faceSlots.length}</output>
+              <button
+                type="button"
+                aria-label={e.more}
+                disabled={t.faceSlots.length >= 10}
+                onClick={() => set("faceSlots", autoFaceSlots(t.faceSlots.length + 1))}
+                className="h-11 w-11 rounded-full border border-line text-xl font-semibold hover:border-ink disabled:opacity-30"
+              >
+                +
+              </button>
+            </div>
+            <p className="mt-4 max-w-md text-sm text-muted">{e.faceHint}</p>
           </div>
+          <FaceMap slots={t.faceSlots} />
         </div>
       </Section>
 
