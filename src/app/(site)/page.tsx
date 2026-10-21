@@ -4,6 +4,7 @@ import { kk } from "@/lib/i18n/kk";
 import { listCategories, listNewest, listPopular, listTrending } from "@/lib/templates/queries";
 import { CategoryChips, GridSkeleton, SectionHeading, TemplateGrid } from "@/components/catalog-bits";
 import { HeroShowcase } from "@/components/hero-showcase";
+import { resolveShowcase } from "@/lib/templates/showcase";
 
 export default function HomePage({ searchParams }: { searchParams: Promise<{ account?: string }> }) {
   return (
@@ -110,9 +111,6 @@ async function Notice({ searchParams }: { searchParams: Promise<{ account?: stri
 }
 
 async function Showcase() {
-  const [trending, latest] = await Promise.all([listTrending(3), listNewest(3)]);
-  const pick = [...trending, ...latest.filter((t) => !trending.some((x) => x.id === t.id))]
-    .filter((t) => t.coverUrl || t.previewUrl).slice(0, 3)
-    .map(({ id, title, coverUrl, previewUrl }) => ({ id, title, coverUrl, previewUrl }));
-  return <HeroShowcase items={pick} />;
+  const items = (await resolveShowcase()).map(({ id, title, coverUrl, previewUrl }) => ({ id, title, coverUrl, previewUrl }));
+  return <HeroShowcase items={items} />;
 }
