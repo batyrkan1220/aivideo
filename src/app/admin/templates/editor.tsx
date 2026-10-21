@@ -271,6 +271,7 @@ export function TemplateEditor({
           <Field label={e.providerKey}>
             <select className={inputCls} value={t.providerKey ?? ""} onChange={(ev) => set("providerKey", ev.target.value || null)}>
               <option value="dev">dev (демо)</option>
+              <option value="wavespeed">WaveSpeed AI — video face swap</option>
             </select>
           </Field>
           <Field label={e.maxUpload}>
@@ -279,6 +280,22 @@ export function TemplateEditor({
           <Field label={e.providerConfig} className="sm:col-span-2">
             <textarea className={`${inputCls} min-h-28 font-mono text-xs`} value={configText} onChange={(ev) => { setConfigText(ev.target.value); setDirty(true); }} />
           </Field>
+          {t.providerKey === "wavespeed" && (
+            <div className="rounded-xl bg-brand-soft p-4 text-sm sm:col-span-2">
+              <p>{e.wavespeedHint}</p>
+              <button
+                type="button"
+                className="mt-3 rounded-full border border-brand px-4 py-1.5 text-sm font-semibold text-brand hover:bg-white"
+                onClick={() => {
+                  const n = t.faceSlots.length;
+                  setConfigText(JSON.stringify({ targetIndexBySlot: Array.from({ length: n }, (_, i) => i), videoSeconds: 10, targetGender: "all" }, null, 2));
+                  setDirty(true);
+                }}
+              >
+                {e.wavespeedFill}
+              </button>
+            </div>
+          )}
         </div>
       </Section>
 

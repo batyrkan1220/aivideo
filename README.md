@@ -15,7 +15,7 @@
 | Фондық жұмыстар | БД-кезек `generation_jobs` + `pg_cron`/`pg_net` → `/api/worker/tick` |
 | Хостинг | Render (web service, `main` тармағынан авто-деплой) |
 | Төлем | `PaymentProvider` интерфейсі: `sandbox` (дайын), `kaspi` (мерчант құжаттамасын күтуде) |
-| AI генерация | `GenerationProvider` интерфейсі: `dev` демо адаптері (видео жасамайды) |
+| AI генерация | `GenerationProvider` интерфейсі: `wavespeed` (WaveSpeed AI video face swap), `dev` демо адаптері (видео жасамайды) |
 
 ```
 src/
@@ -103,7 +103,15 @@ Kaspi интернет-эквайринг API құжаттамасы мен кі
 
 Webhook-тан кейінгі өңдеу (idempotency, сома/валюта тексерісі, қос төлемнен қорғау) провайдерге тәуелсіз — `src/lib/payments/process.ts` және `apply_payment_event` SQL функциясы.
 
-## AI провайдерін қосу
+## WaveSpeed AI (қосылған)
+
+- Модель: `wavespeed-ai/video-face-swap` — бір сұраныста **бір** бет, `target_index` беттерді **көлемі бойынша** санайды (0 = ең үлкен).
+- Бірнеше адам: видео кезекпен өңделеді (1-бет → нәтиже → 2-бет …); баға мен уақыт адам санына көбейеді.
+- Әр үлгінің «Провайдер баптауы (JSON)»: `{"targetIndexBySlot": [1,0,2], "videoSeconds": 12, "targetGender": "all"}` — слот (солдан оңға) → WaveSpeed индексі.
+- Render-ге `WAVESPEED_API_KEY` қойыңыз. Баға (құжат бойынша): $0.01/сек, кемінде 3 сек, әр бетке.
+- Қауіпсіздік: sandbox арқылы төленген тапсырыс нақты провайдерге тек әкімші үшін жіберіледі.
+
+## Басқа AI провайдерін қосу
 
 1. Провайдер **бар видеодағы бірнеше бетті ауыстыруды** шынымен қолдайтынын, коммерциялық лицензиясын, лимиттері мен бағасын тексеріңіз.
 2. `src/lib/generation/<name>.ts` — `GenerationProvider` интерфейсін іске асырыңыз (`capabilities`, `validateInputs`, `submit`, `getStatus`, қажет болса `cancel`). Сәтсіздікте `ProviderError(code, retryable)` лақтырыңыз; `retryable=true` тек провайдер тапсырманы қабылдамаған (ақы алынбаған) жағдайда.

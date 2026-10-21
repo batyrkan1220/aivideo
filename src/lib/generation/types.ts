@@ -21,8 +21,16 @@ export type SubmitInput = {
   config: Record<string, unknown>;
 };
 
+/** Opaque provider-owned state persisted between polls (multi-step providers). */
+export type ProviderState = Record<string, unknown> | null;
+
 export type ProviderJobStatus =
-  | { state: "queued" | "processing"; progress?: number }
+  | {
+      state: "queued" | "processing";
+      progress?: number;
+      /** Multi-step providers: the next step was submitted — track this id/state from now on. */
+      next?: { providerJobId: string; state: ProviderState; cost?: number };
+    }
   | { state: "succeeded"; outputUrl: string; cost?: number }
   | { state: "failed"; errorCode: string; retryable: boolean; cost?: number };
 
@@ -38,7 +46,7 @@ export interface GenerationProvider {
   capabilities(): ProviderCapabilities;
   /** Returns problem codes; empty = inputs acceptable. */
   validateInputs(input: Omit<SubmitInput, "jobId">): string[];
-  submit(input: SubmitInput): Promise<{ providerJobId: string; cost?: number }>;
-  getStatus(providerJobId: string, ctx: { startedAt: Date | null }): Promise<ProviderJobStatus>;
+  submit(input: SubmitInput): Promise<{ providerJobId: string; cost?: number; state?: ProviderState }>;
+  getStatus(providerJobId: string, ctx: { startedAt: Date | null; state: ProviderState }): Promise<ProviderJobStatus>;
   cancel?(providerJobId: string): Promise<void>;
 }

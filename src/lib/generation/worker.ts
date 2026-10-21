@@ -13,6 +13,7 @@ import { ProviderError } from "./types";
 type Job = {
   id: string; order_id: string; provider: string; provider_job_id: string | null; status: string;
   attempt_count: number; started_at: string | null; provider_cost: number | null;
+  provider_state: Record<string, unknown> | null;
 };
 
 const POLL_EVERY_MS = 5_000;
@@ -83,6 +84,17 @@ async function submitJob(job: Job) {
   const provider = generationProvider(job.provider);
   if (!provider) return failJob(job, "provider_not_configured");
 
+  // Safety rail: a sandbox (test) payment must never spend real provider money for regular
+  // users. Staff may still run real generations on sandbox orders to test the pipeline.
+  if (provider.capabilities().producesRealVideo) {
+    const { data: pay } = await db.from("payments").select("provider")
+      .eq("order_id", order.id).eq("status", "succeeded").maybeSingle();
+    if (pay?.provider === "sandbox") {
+      const { data: prof } = await db.from("profiles").select("role").eq("id", order.user_id).maybeSingle();
+      if (!prof || prof.role === "user") return failJob(job, "sandbox_payment_real_provider");
+    }
+  }
+
   // Concurrency and spending limits: wait, don't fail.
   const { count: running } = await db.from("generation_jobs").select("id", { count: "exact", head: true })
     .eq("status", "processing");
@@ -104,7 +116,7 @@ async function submitJob(job: Job) {
   for (const s of ordered) {
     const a = assets?.find((x) => x.face_slot_key === s.key && x.verified_at);
     if (!a) return failJob(job, "missing_inputs");
-    const { data: signed } = await db.storage.from("user-uploads").createSignedUrl(a.private_storage_path, 3600);
+    const { data: signed } = await db.storage.from("user-uploads").createSignedUrl(a.private_storage_path, 24 * 3600);
     if (!signed) return delay(job, backoffMs(job.attempt_count));
     faces.push({ slotKey: s.key, providerInput: s.providerInput, imageUrl: signed.signedUrl });
   }
@@ -119,7 +131,7 @@ async function submitJob(job: Job) {
     const res = await provider.submit({ jobId: job.id, ...input });
     const now = new Date().toISOString();
     await db.from("generation_jobs").update({
-      status: "processing", provider_job_id: res.providerJobId, started_at: now,
+      status: "processing", provider_job_id: res.providerJobId, provider_state: res.state ?? null, started_at: now,
       attempt_count: job.attempt_count + 1, provider_cost: res.cost ?? null, progress: 0,
       next_attempt_at: new Date(Date.now() + POLL_EVERY_MS).toISOString(),
     }).eq("id", job.id);
@@ -144,7 +156,10 @@ async function pollJob(job: Job) {
 
   let st;
   try {
-    st = await provider.getStatus(job.provider_job_id, { startedAt: job.started_at ? new Date(job.started_at) : null });
+    st = await provider.getStatus(job.provider_job_id, {
+      startedAt: job.started_at ? new Date(job.started_at) : null,
+      state: job.provider_state,
+    });
   } catch (err) {
     console.error("[worker.poll]", job.id, err instanceof Error ? err.message : err);
     return delay(job, 30_000); // polling is free to retry
@@ -152,7 +167,14 @@ async function pollJob(job: Job) {
   const polled = { last_polled_at: new Date().toISOString() };
 
   if (st.state === "queued" || st.state === "processing") {
-    return delay(job, POLL_EVERY_MS, { ...polled, progress: st.progress ?? null });
+    const next = st.next
+      ? {
+          provider_job_id: st.next.providerJobId,
+          provider_state: st.next.state,
+          provider_cost: (Number(job.provider_cost) || 0) + (st.next.cost ?? 0),
+        }
+      : {};
+    return delay(job, POLL_EVERY_MS, { ...polled, ...next, progress: st.progress ?? null });
   }
   if (st.state === "failed") {
     return failJob(job, st.errorCode, { ...polled, provider_cost: st.cost ?? job.provider_cost });
@@ -204,7 +226,7 @@ async function finalize(job: Job, outputUrl: string, cost?: number) {
 
   const now = new Date().toISOString();
   await db.from("generation_jobs").update({
-    status: "completed", completed_at: now, provider_cost: cost ?? job.provider_cost, error_code: null,
+    status: "completed", completed_at: now, provider_cost: cost ?? job.provider_cost, error_code: null, provider_state: null,
   }).eq("id", job.id);
   await db.from("orders").update({ generation_status: "completed", completed_at: now }).eq("id", job.order_id);
   await track("generation_succeeded", { userId: order.user_id, orderId: job.order_id });
