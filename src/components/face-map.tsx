@@ -7,7 +7,7 @@ import type { FaceSlot } from "@/lib/templates/schema";
 export function FaceMap({ slots }: { slots: FaceSlot[] }) {
   return (
     <div className="space-y-3">
-      <div className="relative aspect-video w-full max-w-md overflow-hidden rounded-card border border-line bg-white" aria-hidden>
+      <div className="relative aspect-[16/7] w-full max-w-md overflow-hidden rounded-card border border-line bg-white" aria-hidden>
         {slots.map((s, i) => (
           <div
             key={s.key}

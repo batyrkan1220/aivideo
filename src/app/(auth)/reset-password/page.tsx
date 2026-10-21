@@ -7,7 +7,7 @@ export const metadata = { title: kk.auth.resetTitle };
 export default function ResetPasswordPage() {
   return (
     <>
-      <h1 className="mb-6 text-xl font-semibold">{kk.auth.resetTitle}</h1>
+      <h1 className="mb-6 font-display text-2xl font-bold">{kk.auth.resetTitle}</h1>
       <AuthForm
         action={updatePasswordAction}
         submitLabel={kk.auth.setPassword}

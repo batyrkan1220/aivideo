@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
+import { isStaff } from "@/lib/auth/permissions";
 import { logoutAction } from "@/app/(auth)/actions";
 import { kk } from "@/lib/i18n/kk";
 import { OrderList } from "@/components/order-list";
@@ -37,7 +38,10 @@ async function AccountDetails() {
           <dt className="text-muted">{kk.auth.email}</dt>
           <dd>{user.email}</dd>
           <dt className="text-muted">{kk.account.role}</dt>
-          <dd>{kk.account.roles[user.role]}</dd>
+          <dd>
+            {kk.account.roles[user.role]}
+            {isStaff(user.role) && <Link href="/admin" className="ml-3 font-semibold text-brand hover:underline">{kk.nav.admin}</Link>}
+          </dd>
         </dl>
         <DisplayNameForm current={user.displayName ?? ""} />
       </section>

@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { kk } from "@/lib/i18n/kk";
 import { listCategories, listNewest, listPopular, listTrending } from "@/lib/templates/queries";
 import { CategoryChips, GridSkeleton, SearchForm, SectionHeading, TemplateGrid } from "@/components/catalog-bits";
+import { HeroShowcase } from "@/components/hero-showcase";
 
 export default function HomePage({ searchParams }: { searchParams: Promise<{ account?: string }> }) {
   return (
@@ -10,17 +11,24 @@ export default function HomePage({ searchParams }: { searchParams: Promise<{ acc
       <Suspense fallback={null}>
         <Notice searchParams={searchParams} />
       </Suspense>
-      <section className="mx-auto max-w-6xl px-4 pb-10 pt-12 sm:pt-20">
-        <h1 className="max-w-3xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
-          {kk.home.title}
-        </h1>
-        <p className="mt-5 max-w-xl text-lg text-muted">{kk.home.lead}</p>
-        <div className="mt-8">
-          <SearchForm />
+      <section className="mx-auto grid max-w-6xl items-center gap-8 px-4 pb-10 pt-10 sm:pt-16 md:grid-cols-[1.15fr_0.85fr]">
+        <div>
+          <h1 className="max-w-3xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
+            {kk.home.title}
+          </h1>
+          <p className="mt-5 max-w-xl text-lg text-muted">{kk.home.lead}</p>
+          <div className="mt-8">
+            <SearchForm />
+          </div>
+          <div className="mt-6">
+            <Suspense fallback={<div className="h-10" />}>
+              <Categories />
+            </Suspense>
+          </div>
         </div>
-        <div className="mt-6">
-          <Suspense fallback={<div className="h-10" />}>
-            <Categories />
+        <div className="hidden md:block">
+          <Suspense fallback={<div className="h-[30rem]" />}>
+            <Showcase />
           </Suspense>
         </div>
       </section>
@@ -52,9 +60,12 @@ async function Categories() {
 
 async function Sections() {
   await connection();
-  const [trending, popular, newest] = await Promise.all([listTrending(8), listPopular(8), listNewest(8)]);
+  const [trending, popular, latest] = await Promise.all([listTrending(8), listPopular(8), listNewest(12)]);
+  // Don't show the same template twice on one screen.
+  const shown = new Set([...trending, ...popular].map((t) => t.id));
+  const newest = latest.filter((t) => !shown.has(t.id)).slice(0, 8);
 
-  if (!trending.length && !newest.length) {
+  if (!trending.length && !latest.length) {
     return (
       <div className="mx-auto max-w-6xl px-4">
         <div className="rounded-card border border-dashed border-line bg-white px-6 py-16 text-center">
@@ -79,10 +90,12 @@ async function Sections() {
           <TemplateGrid items={popular} />
         </section>
       )}
-      <section>
-        <SectionHeading title={kk.home.newTitle} href="/templates" />
-        <TemplateGrid items={newest} priorityCount={trending.length ? 0 : 4} />
-      </section>
+      {newest.length > 0 && (
+        <section>
+          <SectionHeading title={kk.home.newTitle} href="/templates" />
+          <TemplateGrid items={newest} priorityCount={trending.length ? 0 : 4} />
+        </section>
+      )}
     </div>
   );
 }
@@ -95,4 +108,12 @@ async function Notice({ searchParams }: { searchParams: Promise<{ account?: stri
       <span className="block rounded-card bg-paper p-4 text-sm ring-1 ring-line">{kk.account.accountDeleted}</span>
     </p>
   );
+}
+
+async function Showcase() {
+  const [trending, latest] = await Promise.all([listTrending(3), listNewest(3)]);
+  const pick = [...trending, ...latest.filter((t) => !trending.some((x) => x.id === t.id))]
+    .filter((t) => t.coverUrl || t.previewUrl).slice(0, 3)
+    .map(({ id, title, coverUrl, previewUrl }) => ({ id, title, coverUrl, previewUrl }));
+  return <HeroShowcase items={pick} />;
 }

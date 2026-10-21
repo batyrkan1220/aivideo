@@ -19,7 +19,7 @@ async function Content({ searchParams }: { searchParams: Promise<{ next?: string
   const next = safeNext((await searchParams).next, "/account");
   return (
     <>
-      <h1 className="mb-6 text-xl font-semibold">{kk.auth.signupTitle}</h1>
+      <h1 className="mb-6 font-display text-2xl font-bold">{kk.auth.signupTitle}</h1>
       <AuthForm
         action={signupAction}
         next={next}
@@ -30,9 +30,9 @@ async function Content({ searchParams }: { searchParams: Promise<{ next?: string
           { name: "password", label: kk.auth.password, type: "password", autoComplete: "new-password", minLength: 8 },
         ]}
       />
-      <p className="mt-6 text-center text-sm text-neutral-600">
+      <p className="mt-6 text-center text-sm text-muted">
         {kk.auth.haveAccount}{" "}
-        <Link href={`/login?next=${encodeURIComponent(next)}`} className="font-semibold text-neutral-900 hover:underline">
+        <Link href={`/login?next=${encodeURIComponent(next)}`} className="font-semibold text-brand hover:underline">
           {kk.auth.login}
         </Link>
       </p>

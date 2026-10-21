@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { kk } from "@/lib/i18n/kk";
 import { formatKzt } from "@/lib/pricing";
@@ -24,6 +24,24 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
 
+  const cardRef = useRef<HTMLAnchorElement>(null);
+
+  // Touch screens have no hover: play the preview while the card is mostly on screen.
+  // Skipped for reduced-motion and data-saver users.
+  useEffect(() => {
+    const el = cardRef.current;
+    const v = videoRef.current;
+    if (!el || !v || !window.matchMedia("(hover: none)").matches) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return;
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) v.play().then(() => setPlaying(true)).catch(() => {});
+      else { v.pause(); setPlaying(false); }
+    }, { threshold: 0.6 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   const start = () => {
     const v = videoRef.current;
     if (!v) return;
@@ -38,13 +56,13 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
 
   return (
     <Link
+      ref={cardRef}
       href={`/templates/${t.id}`}
       className="group block"
       onMouseEnter={start}
       onMouseLeave={stop}
       onFocus={start}
       onBlur={stop}
-      onTouchStart={start}
     >
       <div className="relative aspect-[9/16] overflow-hidden rounded-card bg-ink/90">
         {t.coverUrl && (

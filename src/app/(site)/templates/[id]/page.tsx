@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { kk } from "@/lib/i18n/kk";
 import { getTemplate } from "@/lib/templates/queries";
-import { TemplateDetailView } from "@/components/template-detail";
+import { TemplateDetailView, QualityPriceList } from "@/components/template-detail";
 import { track } from "@/lib/analytics";
 import { CreateFlow } from "@/components/create-flow";
 import { getSessionUser } from "@/lib/auth/session";
@@ -43,6 +43,8 @@ async function CreateSection({ t }: { t: TemplateDetail }) {
   const user = await getSessionUser();
   if (!user) {
     return (
+      <div className="space-y-6">
+      <QualityPriceList t={t} />
       <div className="rounded-card bg-brand-soft p-6">
         <h2 className="font-display text-lg font-bold">{kk.create.loginTitle}</h2>
         <p className="mt-1 text-sm text-muted">{kk.create.loginText}</p>
@@ -50,6 +52,7 @@ async function CreateSection({ t }: { t: TemplateDetail }) {
           <ButtonLink href={`/login?next=/templates/${t.id}`} size="lg">{kk.auth.login}</ButtonLink>
           <ButtonLink href={`/signup?next=/templates/${t.id}`} size="lg" variant="secondary">{kk.auth.signup}</ButtonLink>
         </div>
+      </div>
       </div>
     );
   }

@@ -19,25 +19,25 @@ export function AuthForm({
       {next && <input type="hidden" name="next" value={next} />}
       {fields.map((f) => (
         <label key={f.name} className="block">
-          <span className="mb-1 block text-sm font-medium text-neutral-700">{f.label}</span>
+          <span className="mb-1 block text-sm font-medium text-ink">{f.label}</span>
           <input
             name={f.name}
             type={f.type}
             autoComplete={f.autoComplete}
             minLength={f.minLength}
             required
-            className="w-full rounded-xl border border-neutral-300 px-4 py-3 text-base outline-none focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10"
+            className="w-full rounded-xl border border-line bg-white px-4 py-3 text-base outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
           />
         </label>
       ))}
       <div aria-live="polite" className="min-h-5 text-sm">
-        {state.error && <p className="text-red-600">{state.error}</p>}
-        {state.message && <p className="text-emerald-700">{state.message}</p>}
+        {state.error && <p className="text-danger">{state.error}</p>}
+        {state.message && <p className="text-success">{state.message}</p>}
       </div>
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-xl bg-neutral-900 px-4 py-3 font-semibold text-white transition hover:bg-neutral-700 disabled:opacity-60"
+        className="h-12 w-full rounded-full bg-brand px-4 font-semibold text-white transition-colors hover:bg-brand-dark disabled:opacity-60"
       >
         {pending ? kk.common.loading : submitLabel}
       </button>
