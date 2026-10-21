@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description: kk.brand.tagline,
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1 };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#fafafc" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

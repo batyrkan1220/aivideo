@@ -64,8 +64,8 @@ async function Overview({ searchParams }: { searchParams: Promise<SP> }) {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <h1 className="font-display text-2xl font-bold">{kk.admin.nav.overview}</h1>
         <form className="flex flex-wrap items-end gap-2 text-sm">
-          <label><span className="block text-xs text-muted">{S.from}</span><input type="date" name="from" defaultValue={p.from} className="rounded-xl border border-line px-3 py-2" /></label>
-          <label><span className="block text-xs text-muted">{S.to}</span><input type="date" name="to" defaultValue={p.to} className="rounded-xl border border-line px-3 py-2" /></label>
+          <label><span className="block text-xs text-muted">{S.from}</span><input type="date" name="from" defaultValue={p.from} className="rounded-xl border border-line px-3 py-2 text-base sm:text-sm" /></label>
+          <label><span className="block text-xs text-muted">{S.to}</span><input type="date" name="to" defaultValue={p.to} className="rounded-xl border border-line px-3 py-2 text-base sm:text-sm" /></label>
           <button className="rounded-full bg-ink px-4 py-2 font-semibold text-white">{S.apply}</button>
           <a href={`/api/admin/orders/export?from=${p.from}&to=${p.to}`} className="rounded-full border border-line px-4 py-2 font-semibold hover:border-ink">{S.export}</a>
         </form>

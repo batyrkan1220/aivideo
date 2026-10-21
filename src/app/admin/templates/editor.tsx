@@ -13,7 +13,7 @@ import { saveTemplate, changeStatus, createUploadUrl } from "./actions";
 const e = kk.admin.editor;
 type Status = "draft" | "published" | "disabled" | "archived";
 
-const inputCls = "w-full rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand";
+const inputCls = "w-full rounded-xl border border-line bg-white px-3 py-2 text-base outline-none focus:border-brand sm:text-sm";
 const labelCls = "mb-1 block text-xs font-medium text-muted";
 
 function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
@@ -111,7 +111,7 @@ export function TemplateEditor({
   });
 
   return (
-    <div className="space-y-6 pb-28">
+    <div className="space-y-6 pb-56 sm:pb-28">
       <Section title={e.sections.basics}>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={e.title} className="sm:col-span-2">
@@ -283,9 +283,9 @@ export function TemplateEditor({
       </Section>
 
       {/* Sticky action bar */}
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-3">
-          <div className="min-w-0 flex-1 text-sm" aria-live="polite">
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-end gap-2 px-4 py-3 sm:gap-3">
+          <div className="w-full min-w-0 text-sm sm:w-auto sm:flex-1" aria-live="polite">
             {msg && (
               <div className={msg.kind === "ok" ? "text-success" : "text-danger"}>
                 <p>{msg.text}</p>

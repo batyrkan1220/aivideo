@@ -61,13 +61,13 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
   ]);
   const pages = Math.max(1, Math.ceil((count ?? 0) / PAGE));
   const fmt = new Intl.DateTimeFormat("kk-KZ", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Almaty" });
-  const input = "rounded-xl border border-line bg-white px-3 py-2 text-sm";
+  const input = "rounded-xl border border-line bg-white px-3 py-2 text-base sm:text-sm";
   const link = (p: number) => `/admin/orders?${new URLSearchParams({ ...Object.fromEntries(Object.entries(sp).filter(([, v]) => v)), page: String(p) })}`;
 
   return (
     <>
       <form className="mb-5 flex flex-wrap gap-2">
-        <input name="q" defaultValue={sp.q} placeholder={A.search} className={`${input} min-w-56 flex-1`} />
+        <input name="q" defaultValue={sp.q} placeholder={A.search} className={`${input} w-full sm:w-auto sm:min-w-56 sm:flex-1`} />
         <select name="status" defaultValue={sp.status ?? ""} className={input}>
           <option value="">{A.allStatuses}</option>
           {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}

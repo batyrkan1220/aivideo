@@ -24,7 +24,7 @@ async function Preview({ params }: { params: Promise<{ id: string }> }) {
   if (!t) notFound();
   return (
     <>
-      <Link href={`/admin/templates/${id}`} className="text-sm font-medium text-muted hover:text-ink">← {kk.admin.editor.editTitle}</Link>
+      <Link href={`/admin/templates/${id}`} className="-my-2 inline-block py-2 text-sm font-medium text-muted hover:text-ink">← {kk.admin.editor.editTitle}</Link>
       <TemplateDetailView t={t} />
     </>
   );

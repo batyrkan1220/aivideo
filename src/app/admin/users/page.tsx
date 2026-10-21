@@ -42,7 +42,7 @@ async function List() {
               <td className="px-4 py-3">
                 {p.id === u.id ? kk.account.roles[p.role as keyof typeof kk.account.roles] : (
                   <ActionForm action={changeRole} fields={{ userId: p.id }} label={U.changeRole}>
-                    <select name="role" defaultValue={p.role} className="rounded-xl border border-line px-2 py-1.5">
+                    <select name="role" defaultValue={p.role} className="rounded-xl border border-line px-2 py-1.5 text-base sm:text-sm">
                       {Object.entries(kk.account.roles).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
                   </ActionForm>

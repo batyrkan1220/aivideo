@@ -47,7 +47,7 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/admin/orders" className="text-sm text-muted hover:text-ink">← {kk.admin.nav.orders}</Link>
+        <Link href="/admin/orders" className="-my-2 inline-block py-2 text-sm text-muted hover:text-ink">← {kk.admin.nav.orders}</Link>
         <h1 className="mt-2 font-display text-2xl font-bold">{o.public_order_number}</h1>
         <p className="text-sm text-muted">{snap.title_kk}, {snap.quality?.labelKk ?? o.quality}, {fmt.format(new Date(o.created_at))}</p>
       </div>

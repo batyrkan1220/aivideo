@@ -66,7 +66,7 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/orders" className="text-sm font-medium text-muted hover:text-ink">← {kk.order.list}</Link>
+        <Link href="/orders" className="-my-2 inline-block py-2 text-sm font-medium text-muted hover:text-ink">← {kk.order.list}</Link>
         <h1 className="mt-3 font-display text-2xl font-bold sm:text-3xl">{snap.title_kk}</h1>
         <p className="mt-1 text-sm text-muted">
           {kk.order.number}: <span className="font-semibold text-ink">{o.public_order_number}</span>
