@@ -9,7 +9,12 @@ const schema = z.object({
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
   // Optional so login/signup work without it; supabaseAdmin() fails loudly if missing.
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
-  PAYMENT_PROVIDER: z.string().default("sandbox"),
+  PAYMENT_PROVIDER: z.enum(["sandbox", "kaspi"]).default("sandbox"),
+  PAYMENT_WEBHOOK_SECRET: z.string().min(16).optional(),
+  KASPI_MERCHANT_ID: z.string().optional(),
+  KASPI_API_KEY: z.string().optional(),
+  KASPI_WEBHOOK_SECRET: z.string().optional(),
+  KASPI_API_BASE_URL: z.string().url().optional(),
   AI_PROVIDER: z.string().default("dev"),
   UPLOAD_MAX_BYTES: z.coerce.number().int().positive().default(10 * 1024 * 1024),
   UPLOAD_MIN_DIMENSION: z.coerce.number().int().positive().default(256),

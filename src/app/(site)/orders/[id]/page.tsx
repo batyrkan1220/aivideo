@@ -7,6 +7,8 @@ import { requireUser } from "@/lib/auth/session";
 import { supabaseServer, supabaseAdmin } from "@/lib/supabase/server";
 import { formatKzt, type PriceBreakdown } from "@/lib/pricing";
 import { autoFaceLabel } from "@/lib/templates/schema";
+import { env } from "@/lib/env";
+import { PayButton } from "@/components/pay-button";
 
 export const metadata = { title: kk.order.title };
 
@@ -49,6 +51,7 @@ async function OrderView({ params }: { params: Promise<{ id: string }> }) {
   const price = o.pricing_breakdown_json as PriceBreakdown;
   const fmt = new Intl.DateTimeFormat("kk-KZ", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Almaty" });
   const payLabel = kk.order.payment[o.payment_status as keyof typeof kk.order.payment];
+  const genLabel = kk.order.generation[o.generation_status as keyof typeof kk.order.generation];
 
   return (
     <div className="space-y-6">
@@ -60,12 +63,24 @@ async function OrderView({ params }: { params: Promise<{ id: string }> }) {
         </p>
       </div>
 
+      {o.payment_status === "succeeded" && (
+        <p role="status" className="rounded-card bg-emerald-50 p-4 text-sm font-medium text-success">{kk.order.paidMsg}</p>
+      )}
+      {o.payment_status === "failed" && (
+        <p role="alert" className="rounded-card bg-red-50 p-4 text-sm font-medium text-danger">{kk.order.failedMsg}</p>
+      )}
+
       <section className="rounded-card border border-line bg-white p-5 sm:p-6">
         <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
           <dt className="text-muted">{kk.order.created}</dt><dd>{fmt.format(new Date(o.created_at))}</dd>
           <dt className="text-muted">{kk.pricing.quality}</dt><dd>{snap.quality?.labelKk ?? o.quality}</dd>
           <dt className="text-muted">{kk.order.status}</dt>
-          <dd><span className="rounded-full bg-flash/30 px-2.5 py-0.5 font-semibold">{payLabel}</span></dd>
+          <dd className="flex flex-wrap gap-2">
+            <span className={`rounded-full px-2.5 py-0.5 font-semibold ${o.payment_status === "succeeded" ? "bg-emerald-100 text-success" : o.payment_status === "failed" ? "bg-red-50 text-danger" : "bg-flash/30"}`}>{payLabel}</span>
+            {o.payment_status === "succeeded" && (
+              <span className="rounded-full bg-brand-soft px-2.5 py-0.5 font-semibold text-brand">{genLabel}</span>
+            )}
+          </dd>
         </dl>
       </section>
 
@@ -98,13 +113,12 @@ async function OrderView({ params }: { params: Promise<{ id: string }> }) {
             <dd className="font-display text-2xl font-bold">{formatKzt(o.amount_kzt)}</dd>
           </div>
         </dl>
-        {o.payment_status === "pending" && (
-          <>
-            <button disabled className="mt-5 h-13 w-full rounded-full bg-flash font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-50">
-              {kk.order.pay}
-            </button>
-            <p className="mt-3 text-center text-sm text-white/75">{kk.order.paySoon}</p>
-          </>
+        {["pending", "failed", "cancelled"].includes(o.payment_status) && o.generation_status === "awaiting_payment" && (
+          <PayButton
+            orderId={o.id}
+            label={o.payment_status === "pending" ? `${kk.order.pay} ${formatKzt(o.amount_kzt)}` : kk.order.payAgain}
+            sandbox={env().PAYMENT_PROVIDER === "sandbox"}
+          />
         )}
       </section>
     </div>
