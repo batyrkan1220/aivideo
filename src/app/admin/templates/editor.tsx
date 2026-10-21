@@ -70,32 +70,49 @@ export function TemplateEditor({
     set("faceSlots", arr.map((s, k) => ({ ...s, order: k })));
   };
 
-  const save = () => start(async () => {
+  /** Validates and saves; returns the template id or null on failure. */
+  const persist = async (): Promise<string | null> => {
     let providerConfig: Record<string, unknown>;
     try { providerConfig = configText.trim() ? JSON.parse(configText) : {}; }
-    catch { setMsg({ kind: "err", text: e.providerConfigInvalid }); return; }
+    catch { setMsg({ kind: "err", text: e.providerConfigInvalid }); return null; }
     const payload = { ...t, providerConfig, faceSlots: t.faceSlots.map((s, k) => ({ ...s, order: k })) };
     const r = await saveTemplate(payload, id);
     if (!r.ok) {
       setMsg({ kind: "err", text: r.error === "forbidden" ? kk.admin.forbidden : r.error === "invalid" ? e.invalid : kk.errors.generic });
-      return;
+      return null;
     }
     setDirty(false);
+    return r.id;
+  };
+
+  const save = () => start(async () => {
+    const savedId = await persist();
+    if (!savedId) return;
     setMsg({ kind: "ok", text: e.saved });
-    if (!id) router.replace(`/admin/templates/${r.id}`);
+    if (!id) router.replace(`/admin/templates/${savedId}`);
     else router.refresh();
   });
 
   const status_ = (action: "publish" | "unpublish" | "archive" | "restore") => start(async () => {
-    if (!id) return;
-    if (dirty) { setMsg({ kind: "err", text: e.unsavedPublish }); return; }
-    const r = await changeStatus(id, action);
+    // Publishing saves pending edits first, so one click is enough.
+    let targetId = id;
+    if (action === "publish" && (dirty || !id)) {
+      targetId = await persist();
+      if (!targetId) return;
+    } else if (dirty) {
+      setMsg({ kind: "err", text: e.unsavedPublish });
+      return;
+    }
+    if (!targetId) return;
+    const r = await changeStatus(targetId, action);
     if (!r.ok) {
       setMsg({ kind: "err", text: r.error === "forbidden" ? kk.admin.forbidden : kk.errors.generic, problems: r.problems });
+      if (!id) router.replace(`/admin/templates/${targetId}`);
       return;
     }
     setMsg({ kind: "ok", text: action === "publish" ? e.published : e.statusChanged });
-    router.refresh();
+    if (!id) router.replace(`/admin/templates/${targetId}`);
+    else router.refresh();
   });
 
   const qualityPrices = t.qualities.filter((q) => q.available).map((q) => {
@@ -325,7 +342,7 @@ export function TemplateEditor({
           <button type="button" disabled={pending} onClick={save} className="h-11 rounded-full border border-ink px-6 text-sm font-semibold hover:bg-ink hover:text-white disabled:opacity-50">
             {pending ? e.saving : e.save}
           </button>
-          {id && status !== "published" && status !== "archived" && (
+          {status !== "published" && status !== "archived" && (
             <button type="button" disabled={pending} onClick={() => status_("publish")} className="h-11 rounded-full bg-brand px-6 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50">
               {e.publish}
             </button>

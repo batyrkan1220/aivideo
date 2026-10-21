@@ -258,7 +258,7 @@ export const kk = {
       save: "Сақтау",
       saving: "Сақталуда…",
       saved: "Сақталды.",
-      publish: "Жариялау",
+      publish: "Сақтап, жариялау",
       unpublish: "Жариялаудан алу",
       archive: "Мұрағатқа жіберу",
       restore: "Жобаға қайтару",
