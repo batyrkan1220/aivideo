@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import { kk } from "@/lib/i18n/kk";
 import { listCategories, listNewest, listPopular, listTrending } from "@/lib/templates/queries";
-import { CategoryChips, GridSkeleton, SearchForm, SectionHeading, TemplateGrid } from "@/components/catalog-bits";
+import { CategoryChips, GridSkeleton, SectionHeading, TemplateGrid } from "@/components/catalog-bits";
 import { HeroShowcase } from "@/components/hero-showcase";
 
 export default function HomePage({ searchParams }: { searchParams: Promise<{ account?: string }> }) {
@@ -11,7 +11,7 @@ export default function HomePage({ searchParams }: { searchParams: Promise<{ acc
       <Suspense fallback={null}>
         <Notice searchParams={searchParams} />
       </Suspense>
-      {/* Phones: title → video showcase → search. Desktop: text left, showcase right. */}
+      {/* Phones: title → video showcase → categories. Desktop: text left, showcase right. */}
       <section className="mx-auto grid max-w-6xl gap-x-8 gap-y-6 px-4 pb-10 pt-8 sm:pt-16 md:grid-cols-[1.15fr_0.85fr] md:grid-rows-[auto_auto]">
         <div className="min-w-0 md:col-start-1 md:row-start-1 md:self-end">
           <h1 className="max-w-3xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
@@ -26,12 +26,9 @@ export default function HomePage({ searchParams }: { searchParams: Promise<{ acc
         </div>
         {/* min-w-0: the scrollable category rail must not widen the grid column (and the phone's layout viewport) */}
         <div className="min-w-0 md:col-start-1 md:row-start-2 md:self-start">
-          <SearchForm />
-          <div className="mt-6">
-            <Suspense fallback={<div className="h-10" />}>
-              <Categories />
-            </Suspense>
-          </div>
+          <Suspense fallback={<div className="h-10" />}>
+            <Categories />
+          </Suspense>
         </div>
       </section>
 
