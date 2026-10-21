@@ -11,26 +11,27 @@ export default function HomePage({ searchParams }: { searchParams: Promise<{ acc
       <Suspense fallback={null}>
         <Notice searchParams={searchParams} />
       </Suspense>
-      <section className="mx-auto grid max-w-6xl items-center gap-8 px-4 pb-10 pt-10 sm:pt-16 md:grid-cols-[1.15fr_0.85fr]">
-        {/* min-w-0: the scrollable category rail must not widen the grid column (and the phone's layout viewport) */}
-        <div className="min-w-0">
+      {/* Phones: title → video showcase → search. Desktop: text left, showcase right. */}
+      <section className="mx-auto grid max-w-6xl gap-x-8 gap-y-6 px-4 pb-10 pt-8 sm:pt-16 md:grid-cols-[1.15fr_0.85fr] md:grid-rows-[auto_auto]">
+        <div className="min-w-0 md:col-start-1 md:row-start-1 md:self-end">
           <h1 className="max-w-3xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
             {kk.home.title}
           </h1>
           <p className="mt-5 max-w-xl text-lg text-muted">{kk.home.lead}</p>
-          <div className="mt-8">
-            <SearchForm />
-          </div>
+        </div>
+        <div className="min-w-0 md:col-start-2 md:row-span-2 md:row-start-1 md:self-center">
+          <Suspense fallback={<div className="h-[21rem] sm:h-[26rem] md:h-[30rem]" />}>
+            <Showcase />
+          </Suspense>
+        </div>
+        {/* min-w-0: the scrollable category rail must not widen the grid column (and the phone's layout viewport) */}
+        <div className="min-w-0 md:col-start-1 md:row-start-2 md:self-start">
+          <SearchForm />
           <div className="mt-6">
             <Suspense fallback={<div className="h-10" />}>
               <Categories />
             </Suspense>
           </div>
-        </div>
-        <div className="hidden md:block">
-          <Suspense fallback={<div className="h-[30rem]" />}>
-            <Showcase />
-          </Suspense>
         </div>
       </section>
 
