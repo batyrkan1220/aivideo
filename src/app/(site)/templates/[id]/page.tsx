@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { kk } from "@/lib/i18n/kk";
 import { getTemplate } from "@/lib/templates/queries";
 import { TemplateDetailView } from "@/components/template-detail";
+import { track } from "@/lib/analytics";
 import { CreateFlow } from "@/components/create-flow";
 import { getSessionUser } from "@/lib/auth/session";
 import { env } from "@/lib/env";
@@ -25,6 +26,7 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const t = await getTemplate(id);
   if (!t) notFound();
+  void track("template_viewed", { templateId: t.id });
   return (
     <TemplateDetailView
       t={t}

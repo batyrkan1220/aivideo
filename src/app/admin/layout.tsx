@@ -30,9 +30,12 @@ async function AdminNav() {
   const u = await getSessionUser();
   if (!u || !isStaff(u.role)) return null;
   return (
-    <nav className="flex gap-1 text-sm">
+    <nav className="no-scrollbar flex gap-1 overflow-x-auto text-sm">
       {can(u.role, "dashboard.view") && <Link href="/admin" className="rounded-full px-3 py-1.5 hover:bg-brand-soft">{kk.admin.nav.overview}</Link>}
       {can(u.role, "templates.manage") && <Link href="/admin/templates" className="rounded-full px-3 py-1.5 hover:bg-brand-soft">{kk.admin.nav.templates}</Link>}
+      {can(u.role, "orders.view") && <Link href="/admin/orders" className="rounded-full px-3 py-1.5 hover:bg-brand-soft">{kk.admin.nav.orders}</Link>}
+      {can(u.role, "users.manage") && <Link href="/admin/users" className="rounded-full px-3 py-1.5 hover:bg-brand-soft">{kk.admin.nav.users}</Link>}
+      {can(u.role, "audit.view") && <Link href="/admin/audit" className="rounded-full px-3 py-1.5 hover:bg-brand-soft">{kk.admin.nav.audit}</Link>}
     </nav>
   );
 }
