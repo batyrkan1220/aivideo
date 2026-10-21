@@ -55,7 +55,7 @@ export function mediaUrl(path: string | null): string | null {
   return `${env().NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/template-media/${path.replace(/^\/+/, "")}`;
 }
 
-function parseRow(r: Row): TemplateDetail | null {
+export function parseRow(r: Row): TemplateDetail | null {
   const qualities = z.array(qualitySchema).safeParse(r.supported_qualities_json);
   const pricing = pricingConfigSchema.safeParse(r.pricing_config_json);
   const slots = z.array(faceSlotSchema).safeParse(r.face_slots_json);
@@ -158,5 +158,13 @@ export async function getTemplate(id: string): Promise<TemplateDetail | null> {
   if (!z.string().uuid().safeParse(id).success) return null;
   const { data } = await supabasePublic().from("templates").select(CARD_COLUMNS)
     .eq("id", id).eq("status", "published").maybeSingle();
+  return data ? parseRow(data as unknown as Row) : null;
+}
+
+/** Staff-only preview of any template regardless of status (caller must check permissions). */
+export async function getTemplateForAdmin(id: string): Promise<TemplateDetail | null> {
+  await connection();
+  if (!z.string().uuid().safeParse(id).success) return null;
+  const { data } = await supabaseAdmin().from("templates").select(CARD_COLUMNS).eq("id", id).maybeSingle();
   return data ? parseRow(data as unknown as Row) : null;
 }
