@@ -37,8 +37,9 @@ describe("calculatePrice", () => {
     expect(startingPrice(cfg, [], 1)).toBeNull();
   });
   it("formats tenge", () => {
-    expect(formatKzt(12500)).toMatch(/12\s?500/);
-    expect(formatKzt(12500)).toMatch(/₸|KZT/);
+    expect(formatKzt(12500)).toBe("12\u202F500\u00A0₸");
+    expect(formatKzt(990)).toBe("990\u00A0₸");
+    expect(formatKzt(1250000)).toBe("1\u202F250\u202F000\u00A0₸");
   });
 });
 

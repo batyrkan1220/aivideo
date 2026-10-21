@@ -64,11 +64,13 @@ export function startingPrice(cfg: PricingConfig, qualities: Quality[], faceCoun
   return Math.min(...avail.map((q) => calculatePrice(cfg, q, faceCount).totalKzt));
 }
 
-/** kk-KZ tenge formatting: "12 500 ₸" */
+/**
+ * kk-KZ tenge formatting: "12 500 ₸" (narrow no-break space as thousands
+ * separator, symbol after the amount). Implemented by hand because ICU data
+ * for kk-KZ differs between Node builds and browsers.
+ */
 export function formatKzt(amount: number): string {
-  return new Intl.NumberFormat("kk-KZ", {
-    style: "currency",
-    currency: "KZT",
-    maximumFractionDigits: 0,
-  }).format(amount);
+  const n = Math.round(amount);
+  const digits = Math.abs(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "\u202F");
+  return `${n < 0 ? "−" : ""}${digits}\u00A0₸`;
 }
