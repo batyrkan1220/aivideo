@@ -9,6 +9,7 @@ import { formatKzt, type PriceBreakdown } from "@/lib/pricing";
 import { autoFaceLabel } from "@/lib/templates/schema";
 import { env } from "@/lib/env";
 import { PayButton } from "@/components/pay-button";
+import { GenerationStatus } from "@/components/generation-status";
 
 export const metadata = { title: kk.order.title };
 
@@ -38,6 +39,11 @@ async function OrderView({ params }: { params: Promise<{ id: string }> }) {
   const db = supabaseAdmin();
   const { data: assets } = await db.from("order_assets")
     .select("face_slot_key,private_storage_path").eq("order_id", o.id).eq("user_id", user.id);
+  const [{ data: job }, { data: video }] = await Promise.all([
+    db.from("generation_jobs").select("status,progress,safe_error_message")
+      .eq("order_id", o.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    db.from("generated_videos").select("expires_at").eq("order_id", o.id).maybeSingle(),
+  ]);
   const paths = (assets ?? []).map((a) => a.private_storage_path);
   const { data: signed } = paths.length
     ? await db.storage.from("user-uploads").createSignedUrls(paths, 300)
@@ -83,6 +89,35 @@ async function OrderView({ params }: { params: Promise<{ id: string }> }) {
           </dd>
         </dl>
       </section>
+
+      {o.payment_status === "succeeded" && (
+        <GenerationStatus
+          orderId={o.id}
+          initial={{ generationStatus: o.generation_status, progress: job?.progress ?? null, error: job?.safe_error_message ?? null }}
+        />
+      )}
+      {o.generation_status === "failed" && (
+        <section role="alert" className="rounded-card border border-danger/30 bg-red-50 p-5 text-sm">
+          <p className="font-semibold text-danger">{kk.order.generation.failed}</p>
+          <p className="mt-1 text-ink">{job?.safe_error_message ?? kk.generation.errors.generic}</p>
+          <Link href="/support" className="mt-3 inline-block font-semibold text-brand hover:underline">{kk.result.contactSupport}</Link>
+        </section>
+      )}
+      {o.generation_status === "completed" && video && (
+        <section className="rounded-card border border-line bg-white p-5 sm:p-6">
+          <h2 className="font-display text-xl font-bold">{kk.result.ready}</h2>
+          <video
+            src={`/api/orders/${o.id}/video`}
+            controls
+            playsInline
+            preload="metadata"
+            className="mt-4 aspect-[9/16] w-full max-w-sm rounded-card bg-ink"
+          />
+          <a href={`/api/orders/${o.id}/video?download=1`} className="mt-4 inline-flex h-12 items-center rounded-full bg-brand px-6 font-semibold text-white hover:bg-brand-dark">
+            {kk.result.download}
+          </a>
+        </section>
+      )}
 
       <section className="rounded-card border border-line bg-white p-5 sm:p-6">
         <h2 className="mb-3 font-semibold">{kk.order.photos}</h2>

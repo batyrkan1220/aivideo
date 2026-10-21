@@ -45,6 +45,6 @@ export async function proxy(request: NextRequest) {
 export const config = {
   // Skip static assets, images and webhook endpoints (those verify signatures instead).
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|api/payments/webhook|api/generation/webhook|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/payments/webhook|api/generation/webhook|api/worker|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4)$).*)",
   ],
 };

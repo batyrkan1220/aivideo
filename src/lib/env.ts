@@ -22,7 +22,9 @@ const schema = z.object({
   UPLOAD_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
   VIDEO_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
   GENERATION_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
-  WORKER_SECRET: z.string().min(8).optional(),
+  WORKER_SECRET: z.string().min(16).optional(),
+  WORKER_CONCURRENCY: z.coerce.number().int().positive().default(2),
+  DAILY_PROVIDER_SPEND_LIMIT_USD: z.coerce.number().nonnegative().default(100),
 });
 
 let cached: z.infer<typeof schema> | null = null;
