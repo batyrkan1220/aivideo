@@ -4,9 +4,12 @@ import { kk } from "@/lib/i18n/kk";
 import { listCategories, listNewest, listPopular, listTrending } from "@/lib/templates/queries";
 import { CategoryChips, GridSkeleton, SearchForm, SectionHeading, TemplateGrid } from "@/components/catalog-bits";
 
-export default function HomePage() {
+export default function HomePage({ searchParams }: { searchParams: Promise<{ account?: string }> }) {
   return (
     <main>
+      <Suspense fallback={null}>
+        <Notice searchParams={searchParams} />
+      </Suspense>
       <section className="mx-auto max-w-6xl px-4 pb-10 pt-12 sm:pt-20">
         <h1 className="max-w-3xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
           {kk.home.title}
@@ -81,5 +84,15 @@ async function Sections() {
         <TemplateGrid items={newest} priorityCount={trending.length ? 0 : 4} />
       </section>
     </div>
+  );
+}
+
+async function Notice({ searchParams }: { searchParams: Promise<{ account?: string }> }) {
+  const sp = await searchParams;
+  if (sp.account !== "deleted") return null;
+  return (
+    <p role="status" className="mx-auto mt-6 max-w-6xl px-4">
+      <span className="block rounded-card bg-paper p-4 text-sm ring-1 ring-line">{kk.account.accountDeleted}</span>
+    </p>
   );
 }

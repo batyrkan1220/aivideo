@@ -10,28 +10,31 @@ import { autoFaceLabel } from "@/lib/templates/schema";
 import { env } from "@/lib/env";
 import { PayButton } from "@/components/pay-button";
 import { GenerationStatus } from "@/components/generation-status";
+import { ConfirmSubmit } from "@/components/account-forms";
+import { deleteVideo, deleteOrderPhotos } from "@/lib/account/actions";
 
 export const metadata = { title: kk.order.title };
 
-export default function OrderPage({ params }: { params: Promise<{ id: string }> }) {
+export default function OrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ deleted?: string; error?: string }> }) {
   return (
     <main className="mx-auto max-w-3xl px-4 pt-10">
       <Suspense fallback={<p className="text-muted">{kk.common.loading}</p>}>
-        <OrderView params={params} />
+        <OrderView params={params} searchParams={searchParams} />
       </Suspense>
     </main>
   );
 }
 
-async function OrderView({ params }: { params: Promise<{ id: string }> }) {
+async function OrderView({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ deleted?: string; error?: string }> }) {
   const { id } = await params;
+  const sp = await searchParams;
   const user = await requireUser(`/orders/${id}`);
   if (!z.string().uuid().safeParse(id).success) notFound();
 
   // RLS: the user's own client can only read their own orders.
   const sb = await supabaseServer();
   const { data: o } = await sb.from("orders")
-    .select("id,public_order_number,created_at,quality,face_count,amount_kzt,payment_status,generation_status,pricing_breakdown_json,template_snapshot_json,template_id")
+    .select("id,public_order_number,created_at,completed_at,quality,face_count,amount_kzt,payment_status,generation_status,pricing_breakdown_json,template_snapshot_json,template_id,photos_deleted_at")
     .eq("id", id).maybeSingle();
   if (!o) notFound();
 
@@ -56,20 +59,24 @@ async function OrderView({ params }: { params: Promise<{ id: string }> }) {
   const snap = o.template_snapshot_json as { title_kk?: string; quality?: { labelKk?: string } };
   const price = o.pricing_breakdown_json as PriceBreakdown;
   const fmt = new Intl.DateTimeFormat("kk-KZ", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Almaty" });
+  const dateFmt = new Intl.DateTimeFormat("kk-KZ", { dateStyle: "long", timeZone: "Asia/Almaty" });
   const payLabel = kk.order.payment[o.payment_status as keyof typeof kk.order.payment];
   const genLabel = kk.order.generation[o.generation_status as keyof typeof kk.order.generation];
 
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/account" className="text-sm font-medium text-muted hover:text-ink">← {kk.order.list}</Link>
+        <Link href="/orders" className="text-sm font-medium text-muted hover:text-ink">← {kk.order.list}</Link>
         <h1 className="mt-3 font-display text-2xl font-bold sm:text-3xl">{snap.title_kk}</h1>
         <p className="mt-1 text-sm text-muted">
           {kk.order.number}: <span className="font-semibold text-ink">{o.public_order_number}</span>
         </p>
       </div>
 
-      {o.payment_status === "succeeded" && (
+      {sp.deleted === "video" && <p role="status" className="rounded-card bg-paper p-4 text-sm">{kk.result.videoDeleted}</p>}
+      {sp.deleted === "photos" && <p role="status" className="rounded-card bg-paper p-4 text-sm">{kk.result.photosDeleted}</p>}
+      {sp.error === "busy" && <p role="alert" className="rounded-card bg-red-50 p-4 text-sm text-danger">{kk.result.busy}</p>}
+      {o.payment_status === "succeeded" && ["queued", "processing", "postprocessing"].includes(o.generation_status) && (
         <p role="status" className="rounded-card bg-emerald-50 p-4 text-sm font-medium text-success">{kk.order.paidMsg}</p>
       )}
       {o.payment_status === "failed" && (
@@ -103,24 +110,63 @@ async function OrderView({ params }: { params: Promise<{ id: string }> }) {
           <Link href="/support" className="mt-3 inline-block font-semibold text-brand hover:underline">{kk.result.contactSupport}</Link>
         </section>
       )}
-      {o.generation_status === "completed" && video && (
+      {o.generation_status === "completed" && (
         <section className="rounded-card border border-line bg-white p-5 sm:p-6">
           <h2 className="font-display text-xl font-bold">{kk.result.ready}</h2>
-          <video
-            src={`/api/orders/${o.id}/video`}
-            controls
-            playsInline
-            preload="metadata"
-            className="mt-4 aspect-[9/16] w-full max-w-sm rounded-card bg-ink"
-          />
-          <a href={`/api/orders/${o.id}/video?download=1`} className="mt-4 inline-flex h-12 items-center rounded-full bg-brand px-6 font-semibold text-white hover:bg-brand-dark">
-            {kk.result.download}
-          </a>
+          {video && notExpired(video.expires_at) ? (
+            <>
+              <video
+                src={`/api/orders/${o.id}/video`}
+                controls
+                playsInline
+                preload="metadata"
+                aria-label={kk.result.watch}
+                className="mt-4 aspect-[9/16] w-full max-w-sm rounded-card bg-ink"
+              />
+              <p className="mt-3 text-sm text-muted">{kk.result.keptUntil(dateFmt.format(new Date(video.expires_at)))}</p>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <a href={`/api/orders/${o.id}/video?download=1`} className="inline-flex h-12 items-center rounded-full bg-brand px-6 font-semibold text-white hover:bg-brand-dark">
+                  {kk.result.download}
+                </a>
+                <form action={deleteVideo}>
+                  <input type="hidden" name="orderId" value={o.id} />
+                  <ConfirmSubmit message={kk.result.deleteVideoConfirm} className="h-12 rounded-full px-4 text-sm font-medium text-muted hover:text-danger">
+                    {kk.result.deleteVideo}
+                  </ConfirmSubmit>
+                </form>
+              </div>
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-muted">{video ? kk.result.expired : kk.result.videoDeleted}</p>
+          )}
+          <dl className="mt-5 grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 border-t border-line pt-4 text-sm">
+            <dt className="text-muted">{kk.result.orderNumber}</dt><dd>{o.public_order_number}</dd>
+            {o.completed_at && (<><dt className="text-muted">{kk.order.created}</dt><dd>{fmt.format(new Date(o.created_at))}</dd></>)}
+            <dt className="text-muted">{kk.pricing.quality}</dt><dd>{snap.quality?.labelKk ?? o.quality}</dd>
+          </dl>
+          <div className="mt-5 rounded-xl bg-brand-soft p-4 text-sm">
+            <p className="text-muted">{kk.result.regenerateNote}</p>
+            <div className="mt-3 flex flex-wrap gap-4">
+              <Link href={`/templates/${o.template_id}`} className="font-semibold text-brand hover:underline">{kk.result.regenerate}</Link>
+              <Link href="/support" className="font-semibold text-brand hover:underline">{kk.result.contactSupport}</Link>
+            </div>
+          </div>
         </section>
       )}
 
       <section className="rounded-card border border-line bg-white p-5 sm:p-6">
-        <h2 className="mb-3 font-semibold">{kk.order.photos}</h2>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="font-semibold">{kk.order.photos}</h2>
+          {photos.length > 0 && !["queued", "processing", "postprocessing"].includes(o.generation_status) && (
+            <form action={deleteOrderPhotos}>
+              <input type="hidden" name="orderId" value={o.id} />
+              <ConfirmSubmit message={kk.result.deletePhotosConfirm} className="text-sm font-medium text-muted hover:text-danger">
+                {kk.result.deletePhotos}
+              </ConfirmSubmit>
+            </form>
+          )}
+        </div>
+        {o.photos_deleted_at && photos.length === 0 && <p className="text-sm text-muted">{kk.result.photosDeleted}</p>}
         <ol className={`grid gap-3 ${photos.length === 1 ? "max-w-[160px] grid-cols-1" : photos.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
           {photos.map((p, i) => (
             <li key={p.key}>
@@ -167,4 +213,9 @@ function Line({ label, value }: { label: string; value: string }) {
       <dd>{value}</dd>
     </div>
   );
+}
+
+/** Server-side expiry check (request time). */
+function notExpired(iso: string) {
+  return new Date(iso).getTime() > Date.now();
 }

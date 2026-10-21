@@ -1,10 +1,10 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
-import { supabaseServer } from "@/lib/supabase/server";
-import { formatKzt } from "@/lib/pricing";
 import { logoutAction } from "@/app/(auth)/actions";
 import { kk } from "@/lib/i18n/kk";
+import { OrderList } from "@/components/order-list";
+import { DisplayNameForm, DeleteAllPhotosForm, DeleteAccountForm } from "@/components/account-forms";
 
 export const metadata = { title: kk.account.title };
 
@@ -28,51 +28,38 @@ export default function AccountPage() {
 
 async function AccountDetails() {
   const user = await requireUser("/account");
+  const card = "rounded-card border border-line bg-white p-6";
   return (
     <div className="space-y-6">
-      <section className="rounded-card border border-line bg-white p-6">
+      <section className={card}>
         <h2 className="mb-4 font-semibold">{kk.account.profile}</h2>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-          <dt className="text-muted">{kk.auth.displayName}</dt>
-          <dd>{user.displayName ?? "—"}</dd>
+        <dl className="mb-5 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
           <dt className="text-muted">{kk.auth.email}</dt>
           <dd>{user.email}</dd>
           <dt className="text-muted">{kk.account.role}</dt>
           <dd>{kk.account.roles[user.role]}</dd>
         </dl>
+        <DisplayNameForm current={user.displayName ?? ""} />
       </section>
-      <section className="rounded-card border border-line bg-white p-6">
-        <h2 className="mb-3 font-semibold">{kk.nav.myOrders}</h2>
-        <OrdersList />
+
+      <section className={card}>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-semibold">{kk.nav.myOrders}</h2>
+          <Link href="/orders" className="text-sm font-semibold text-brand hover:underline">{kk.home.seeAll}</Link>
+        </div>
+        <OrderList limit={5} />
+      </section>
+
+      <section className={card}>
+        <h2 className="mb-2 font-semibold">{kk.account.privacyTitle}</h2>
+        <p className="mb-4 text-sm text-muted">{kk.account.privacyText}</p>
+        <DeleteAllPhotosForm />
+      </section>
+
+      <section className="rounded-card border border-danger/30 bg-white p-6">
+        <h2 className="mb-2 font-semibold text-danger">{kk.account.deleteAccount}</h2>
+        <DeleteAccountForm />
       </section>
     </div>
-  );
-}
-
-async function OrdersList() {
-  // RLS limits this to the signed-in user's own orders.
-  const sb = await supabaseServer();
-  const { data: orders } = await sb.from("orders")
-    .select("id,public_order_number,created_at,amount_kzt,payment_status,template_snapshot_json")
-    .order("created_at", { ascending: false }).limit(50);
-  if (!orders?.length) return <p className="text-sm text-muted">{kk.account.ordersEmpty}</p>;
-  const fmt = new Intl.DateTimeFormat("kk-KZ", { dateStyle: "medium", timeZone: "Asia/Almaty" });
-  return (
-    <ul className="divide-y divide-line">
-      {orders.map((o) => (
-        <li key={o.id}>
-          <Link href={`/orders/${o.id}`} className="flex items-center justify-between gap-4 py-3 hover:text-brand">
-            <span className="min-w-0">
-              <span className="block truncate font-medium">{(o.template_snapshot_json as { title_kk?: string }).title_kk}</span>
-              <span className="block text-xs text-muted">{o.public_order_number}, {fmt.format(new Date(o.created_at))}</span>
-            </span>
-            <span className="shrink-0 text-right text-sm">
-              <span className="block font-semibold">{formatKzt(o.amount_kzt)}</span>
-              <span className="block text-xs text-muted">{kk.order.payment[o.payment_status as keyof typeof kk.order.payment]}</span>
-            </span>
-          </Link>
-        </li>
-      ))}
-    </ul>
   );
 }
