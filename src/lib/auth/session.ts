@@ -1,5 +1,6 @@
 import "server-only";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { supabaseServer, supabaseAdmin } from "@/lib/supabase/server";
 import { can, type Permission, type Role } from "./permissions";
 
@@ -7,6 +8,7 @@ export type SessionUser = { id: string; email: string | null; role: Role; displa
 
 /** Current user with role read from the DB (never from client input or JWT claims). */
 export async function getSessionUser(): Promise<SessionUser | null> {
+  await connection();
   const sb = await supabaseServer();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return null;

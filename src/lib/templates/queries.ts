@@ -1,4 +1,5 @@
 import "server-only";
+import { connection } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { env } from "@/lib/env";
@@ -86,6 +87,7 @@ const toCards = (rows: Row[] | null) =>
   (rows ?? []).map(parseRow).filter((t): t is TemplateDetail => t !== null);
 
 export async function listCategories(): Promise<Category[]> {
+  await connection(); // request-time only: never run during prerender
   const { data, error } = await supabasePublic()
     .from("categories").select("id,title_kk,slug").order("sort_order");
   if (error) { console.error("[categories]", error.code); return []; }
@@ -101,6 +103,7 @@ function sanitizeSearch(q: string) {
 }
 
 export async function listTemplates(opts: { q?: string; category?: string; sort?: CatalogSort; page?: number }) {
+  await connection(); // request-time only: never run during prerender
   const page = Math.max(1, opts.page ?? 1);
   const from = (page - 1) * PAGE_SIZE;
   const cols = opts.category ? CARD_COLUMNS.replace("categories(", "categories!inner(") : CARD_COLUMNS;
@@ -120,12 +123,14 @@ export async function listTemplates(opts: { q?: string; category?: string; sort?
 }
 
 export async function listTrending(limit = 8) {
+  await connection(); // request-time only: never run during prerender
   const { data } = await supabasePublic().from("templates").select(CARD_COLUMNS)
     .eq("status", "published").eq("is_trending", true).order("sort_order").limit(limit);
   return toCards(data as unknown as Row[]);
 }
 
 export async function listNewest(limit = 8) {
+  await connection(); // request-time only: never run during prerender
   const { data } = await supabasePublic().from("templates").select(CARD_COLUMNS)
     .eq("status", "published").order("published_at", { ascending: false, nullsFirst: false }).limit(limit);
   return toCards(data as unknown as Row[]);
@@ -133,6 +138,7 @@ export async function listNewest(limit = 8) {
 
 /** Popular = most paid orders in the last 30 days. Empty when there's no real data yet. */
 export async function listPopular(limit = 8) {
+  await connection(); // request-time only: never run during prerender
   if (!env().SUPABASE_SERVICE_ROLE_KEY) return [];
   try {
     const { data: ranks, error } = await supabaseAdmin().rpc("popular_template_ids", { days: 30, max_rows: limit });
@@ -148,6 +154,7 @@ export async function listPopular(limit = 8) {
 }
 
 export async function getTemplate(id: string): Promise<TemplateDetail | null> {
+  await connection(); // request-time only: never run during prerender
   if (!z.string().uuid().safeParse(id).success) return null;
   const { data } = await supabasePublic().from("templates").select(CARD_COLUMNS)
     .eq("id", id).eq("status", "published").maybeSingle();
