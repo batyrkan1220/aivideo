@@ -6,6 +6,13 @@ import { createServerClient } from "@supabase/ssr";
 const PROTECTED = ["/account", "/orders", "/admin", "/checkout"];
 
 export async function proxy(request: NextRequest) {
+  // Supabase falls back to Site URL ("/?code=...") when the redirect isn't allow-listed.
+  if (request.nextUrl.pathname === "/" && request.nextUrl.searchParams.has("code")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/callback";
+    return NextResponse.redirect(url);
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
