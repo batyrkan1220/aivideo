@@ -32,7 +32,7 @@ export async function loginAction(_: AuthState, fd: FormData): Promise<AuthState
   const sb = await supabaseServer();
   const { error } = await sb.auth.signInWithPassword({ email: email.data, password: password.data });
   if (error) return { error: authError(error) };
-  redirect(safeNext(fd.get("next")));
+  redirect(safeNext(fd.get("next"), "/account"));
 }
 
 export async function signupAction(_: AuthState, fd: FormData): Promise<AuthState> {
@@ -47,13 +47,13 @@ export async function signupAction(_: AuthState, fd: FormData): Promise<AuthStat
     email: email.data,
     password: password.data,
     options: {
-      emailRedirectTo: `${env().NEXT_PUBLIC_APP_URL}/auth/callback?next=${encodeURIComponent(safeNext(fd.get("next")))}`,
+      emailRedirectTo: `${env().NEXT_PUBLIC_APP_URL}/auth/callback?next=${encodeURIComponent(safeNext(fd.get("next"), "/account"))}`,
       data: { display_name: name.success ? name.data : "" },
     },
   });
   if (error) return { error: authError(error) };
   if (!data.session) return { message: kk.auth.checkEmail }; // email confirmation enabled
-  redirect(safeNext(fd.get("next")));
+  redirect(safeNext(fd.get("next"), "/account"));
 }
 
 export async function requestResetAction(_: AuthState, fd: FormData): Promise<AuthState> {

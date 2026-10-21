@@ -126,6 +126,22 @@ export const kk = {
     emailNotConfirmed: "Алдымен поштаңызды растаңыз.",
     linkExpired: "Сілтеменің мерзімі өтіп кеткен. Қайта сұратыңыз.",
   },
+  account: {
+    title: "Жеке кабинет",
+    greeting: (name: string) => `Сәлем, ${name}!`,
+    profile: "Профиль",
+    role: "Рөл",
+    roles: {
+      user: "Қолданушы",
+      super_admin: "Бас әкімші",
+      template_manager: "Үлгі менеджері",
+      order_support: "Тапсырыс менеджері",
+    },
+    myAccount: "Менің кабинетім",
+    ordersEmpty: "Сізде әлі тапсырыс жоқ.",
+    comingSoon: "Видео үлгілер каталогы жақында қосылады.",
+    passwordUpdated: "Құпиясөз жаңартылды.",
+  },
   common: { loading: "Жүктелуде…", save: "Сақтау", cancel: "Бас тарту", confirm: "Растау", back: "Артқа" },
 } as const;
 

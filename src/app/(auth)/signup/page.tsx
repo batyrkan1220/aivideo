@@ -16,7 +16,7 @@ export default function SignupPage(props: { searchParams: Promise<Record<string,
 }
 
 async function Content({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
-  const next = safeNext((await searchParams).next);
+  const next = safeNext((await searchParams).next, "/account");
   return (
     <>
       <h1 className="mb-6 text-xl font-semibold">{kk.auth.signupTitle}</h1>
