@@ -9,6 +9,7 @@ import { calculatePrice } from "@/lib/pricing";
 import { faceSlotSchema, qualitySchema, pricingConfigSchema } from "@/lib/templates/schema";
 import { PHOTO_EXT, sniffImageType, validatePhotoMeta, type PhotoError, type PhotoType } from "@/lib/uploads/validate";
 import { track } from "@/lib/analytics";
+import { allow } from "@/lib/security/rate-limit";
 
 type Fail<E extends string> = { ok: false; error: E | "unauthorized" | "generic" };
 const BUCKET = "user-uploads";
@@ -148,10 +149,11 @@ const orderSchema = z.object({
 
 export async function createOrder(raw: unknown): Promise<
   { ok: true; orderId: string } |
-  Fail<"consent_required" | "template_unavailable" | "quality_unavailable" | "photos_missing" | "photos_expired">
+  Fail<"consent_required" | "template_unavailable" | "quality_unavailable" | "photos_missing" | "photos_expired" | "rate_limited">
 > {
   const user = await getSessionUser();
   if (!user) return { ok: false, error: "unauthorized" };
+  if (!(await allow("order", user.id))) return { ok: false, error: "rate_limited" };
   const p = orderSchema.safeParse(raw);
   if (!p.success) {
     const consentMissing = typeof raw === "object" && raw !== null && (raw as { consent?: unknown }).consent !== true;

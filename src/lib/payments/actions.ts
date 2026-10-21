@@ -11,8 +11,9 @@ import { activePaymentProvider } from "./index";
 import { handlePaymentWebhook } from "./process";
 import { signSandbox } from "./sandbox";
 import { PaymentProviderNotConfigured } from "./types";
+import { allow } from "@/lib/security/rate-limit";
 
-export type CheckoutState = { error?: "unauthorized" | "not_payable" | "price_changed" | "provider_unavailable" | "generic" };
+export type CheckoutState = { error?: "unauthorized" | "not_payable" | "price_changed" | "provider_unavailable" | "rate_limited" | "generic" };
 
 /**
  * Starts (or resumes) payment for an order. Safe to call repeatedly:
@@ -21,6 +22,7 @@ export type CheckoutState = { error?: "unauthorized" | "not_payable" | "price_ch
 export async function startCheckout(_: CheckoutState, fd: FormData): Promise<CheckoutState> {
   const user = await getSessionUser();
   if (!user) return { error: "unauthorized" };
+  if (!(await allow("checkout", user.id))) return { error: "rate_limited" };
   const orderId = z.string().uuid().safeParse(fd.get("orderId"));
   if (!orderId.success) return { error: "generic" };
 

@@ -5,6 +5,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { env } from "@/lib/env";
 import { kk } from "@/lib/i18n/kk";
 import { safeNext } from "@/lib/auth/redirect";
+import { allow, clientIp } from "@/lib/security/rate-limit";
 
 export type AuthState = { error?: string; message?: string };
 
@@ -28,6 +29,8 @@ export async function loginAction(_: AuthState, fd: FormData): Promise<AuthState
   const password = z.string().min(1).safeParse(fd.get("password"));
   if (!email.success) return { error: kk.auth.invalidEmail };
   if (!password.success) return { error: kk.auth.invalidCredentials };
+  const ip = await clientIp();
+  if (!(await allow("login", ip)) || !(await allow("login", email.data))) return { error: kk.errors.rateLimited };
 
   const sb = await supabaseServer();
   const { error } = await sb.auth.signInWithPassword({ email: email.data, password: password.data });
@@ -41,6 +44,7 @@ export async function signupAction(_: AuthState, fd: FormData): Promise<AuthStat
   const name = z.string().trim().max(80).safeParse(fd.get("displayName") ?? "");
   if (!email.success) return { error: kk.auth.invalidEmail };
   if (!password.success) return { error: kk.auth.weakPassword };
+  if (!(await allow("signup", await clientIp()))) return { error: kk.errors.rateLimited };
 
   const sb = await supabaseServer();
   const { data, error } = await sb.auth.signUp({
@@ -59,6 +63,7 @@ export async function signupAction(_: AuthState, fd: FormData): Promise<AuthStat
 export async function requestResetAction(_: AuthState, fd: FormData): Promise<AuthState> {
   const email = emailSchema.safeParse(fd.get("email"));
   if (!email.success) return { error: kk.auth.invalidEmail };
+  if (!(await allow("reset", await clientIp())) || !(await allow("reset", email.data))) return { error: kk.errors.rateLimited };
   const sb = await supabaseServer();
   const { error } = await sb.auth.resetPasswordForEmail(email.data, {
     redirectTo: `${env().NEXT_PUBLIC_APP_URL}/auth/callback?next=/reset-password`,
