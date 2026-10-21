@@ -12,7 +12,8 @@ export default function HomePage({ searchParams }: { searchParams: Promise<{ acc
         <Notice searchParams={searchParams} />
       </Suspense>
       <section className="mx-auto grid max-w-6xl items-center gap-8 px-4 pb-10 pt-10 sm:pt-16 md:grid-cols-[1.15fr_0.85fr]">
-        <div>
+        {/* min-w-0: the scrollable category rail must not widen the grid column (and the phone's layout viewport) */}
+        <div className="min-w-0">
           <h1 className="max-w-3xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
             {kk.home.title}
           </h1>

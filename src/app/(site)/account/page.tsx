@@ -34,7 +34,7 @@ async function AccountDetails() {
     <div className="space-y-6">
       <section className={card}>
         <h2 className="mb-4 font-semibold">{kk.account.profile}</h2>
-        <dl className="mb-5 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+        <dl className="mb-5 grid grid-cols-[auto_minmax(0,1fr)] [&>dd]:break-words gap-x-6 gap-y-2 text-sm">
           <dt className="text-muted">{kk.auth.email}</dt>
           <dd>{user.email}</dd>
           <dt className="text-muted">{kk.account.role}</dt>

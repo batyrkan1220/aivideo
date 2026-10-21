@@ -71,7 +71,7 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
 
       <section className={card}>
         <h2 className="mb-3 font-semibold">{A.details}</h2>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-sm">
+        <dl className="grid grid-cols-[auto_minmax(0,1fr)] [&>dd]:break-words gap-x-6 gap-y-1.5 text-sm">
           <dt className="text-muted">{A.colUser}</dt><dd>{prof?.email ?? A.deletedUser}{prof?.display_name ? ` (${prof.display_name})` : ""}</dd>
           <dt className="text-muted">{kk.order.status}</dt>
           <dd>{kk.order.payment[o.payment_status as keyof typeof kk.order.payment]} / {kk.order.generation[o.generation_status as keyof typeof kk.order.generation]}</dd>

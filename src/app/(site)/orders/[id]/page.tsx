@@ -84,7 +84,7 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
       )}
 
       <section className="rounded-card border border-line bg-white p-5 sm:p-6">
-        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+        <dl className="grid grid-cols-[auto_minmax(0,1fr)] [&>dd]:break-words gap-x-6 gap-y-2 text-sm">
           <dt className="text-muted">{kk.order.created}</dt><dd>{fmt.format(new Date(o.created_at))}</dd>
           <dt className="text-muted">{kk.pricing.quality}</dt><dd>{snap.quality?.labelKk ?? o.quality}</dd>
           <dt className="text-muted">{kk.order.status}</dt>
@@ -139,7 +139,7 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
           ) : (
             <p className="mt-2 text-sm text-muted">{video ? kk.result.expired : kk.result.videoDeleted}</p>
           )}
-          <dl className="mt-5 grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 border-t border-line pt-4 text-sm">
+          <dl className="mt-5 grid grid-cols-[auto_minmax(0,1fr)] [&>dd]:break-words gap-x-6 gap-y-1 border-t border-line pt-4 text-sm">
             <dt className="text-muted">{kk.result.orderNumber}</dt><dd>{o.public_order_number}</dd>
             {o.completed_at && (<><dt className="text-muted">{kk.order.created}</dt><dd>{fmt.format(new Date(o.created_at))}</dd></>)}
             <dt className="text-muted">{kk.pricing.quality}</dt><dd>{snap.quality?.labelKk ?? o.quality}</dd>
