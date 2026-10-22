@@ -68,8 +68,10 @@ async function call(path: string, init: RequestInit = {}) {
   if (!res.ok) {
     // 429/5xx: not accepted, safe to retry. Other 4xx (bad input, auth, no balance): don't retry.
     const retryable = res.status === 429 || res.status >= 500;
-    const code = res.status === 401 || res.status === 403 ? "provider_auth"
-      : res.status === 402 ? "provider_no_balance" : `provider_http_${res.status}`;
+    // WaveSpeed reports an empty balance as 400 "Insufficient credits…", not only 402.
+    const noBalance = res.status === 402 || /insufficient (credit|balance)|top up/i.test(JSON.stringify(body));
+    const code = noBalance ? "provider_no_balance"
+      : res.status === 401 || res.status === 403 ? "provider_auth" : `provider_http_${res.status}`;
     throw new ProviderError(code, retryable, JSON.stringify(body).slice(0, 300));
   }
   return body as { data?: { id?: string; status?: string; outputs?: unknown[]; error?: string } };
