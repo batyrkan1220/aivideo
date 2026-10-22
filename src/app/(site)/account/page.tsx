@@ -15,7 +15,8 @@ export default function AccountPage() {
     <main className="mx-auto w-full max-w-2xl px-4 py-6 sm:py-10">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="font-display text-2xl font-bold">{kk.account.title}</h1>
-        <LogoutButton action={logoutAction} />
+        {/* Inside the Telegram Mini App the account is the Telegram account: no logout / delete there. */}
+        <div className="tg-hide"><LogoutButton action={logoutAction} /></div>
       </div>
       <Suspense fallback={<p className="text-muted">{kk.common.loading}</p>}>
         <AccountDetails />
@@ -58,7 +59,7 @@ async function AccountDetails() {
         <DeleteAllPhotosForm />
       </section>
 
-      <section className="rounded-card border border-danger/30 bg-white p-6">
+      <section className="tg-hide rounded-card border border-danger/30 bg-white p-6">
         <h2 className="mb-2 font-semibold text-danger">{kk.account.deleteAccount}</h2>
         <TelegramDeleteNote />
         <DeleteAccountForm />
