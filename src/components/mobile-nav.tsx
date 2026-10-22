@@ -29,7 +29,7 @@ export function MobileNav() {
               <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={active(it.href) ? 2.2 : 1.7} strokeLinejoin="round" strokeLinecap="round" aria-hidden>
                 <path d={it.icon} />
               </svg>
-              <span className="max-w-full truncate px-1">{it.label}</span>
+              <span className="max-w-full px-1 text-center leading-tight">{it.label}</span>
             </Link>
           </li>
         ))}

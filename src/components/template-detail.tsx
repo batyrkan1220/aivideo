@@ -44,12 +44,12 @@ export function QualityPriceList({ t }: { t: TemplateDetail }) {
 
 export function TemplateDetailView({ t, cta }: { t: TemplateDetail; cta?: React.ReactNode }) {
   return (
-    <div className="mt-6 grid gap-8 md:grid-cols-[minmax(0,360px)_1fr] md:gap-12">
-      {/* On phones the sample is capped to ~2/3 of the screen height so the price and upload stay close. */}
-      <figure className="mx-auto w-full max-w-[min(100%,calc(66svh*9/16))] md:sticky md:top-24 md:max-w-none md:self-start">
+    <div className="mt-3 grid gap-5 md:mt-6 md:grid-cols-[minmax(0,360px)_1fr] md:gap-12">
+      {/* On phones the sample is capped so the photo step stays close; the title sits on the video. */}
+      <figure className="mx-auto w-full max-w-[min(100%,calc(52svh*9/16))] md:sticky md:top-24 md:max-w-none md:self-start">
         <div className="relative aspect-[9/16] overflow-hidden rounded-card bg-ink">
           {t.previewUrl ? (
-            <AutoVideo src={t.previewUrl} poster={t.coverUrl ?? undefined} controls className="h-full w-full object-cover" />
+            <AutoVideo src={t.previewUrl} poster={t.coverUrl ?? undefined} soundToggle className="h-full w-full object-cover" />
           ) : t.coverUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={t.coverUrl} alt="" className="h-full w-full object-cover" />
@@ -57,30 +57,41 @@ export function TemplateDetailView({ t, cta }: { t: TemplateDetail; cta?: React.
           <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-ink">
             {kk.catalog.sample}
           </span>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 pt-16 text-white md:hidden">
+            <p className="font-display text-xl font-bold leading-tight">{t.title}</p>
+            <p className="mt-2 flex flex-wrap gap-1.5 text-xs">
+              {t.startingPriceKzt !== null && <span className="rounded-full bg-white px-2.5 py-1 font-bold text-ink">{formatKzt(t.startingPriceKzt)}</span>}
+              <span className="rounded-full bg-white/20 px-2.5 py-1 font-medium backdrop-blur-sm">{kk.catalog.faces(t.faceCount)}</span>
+              {t.isTrending && <span className="rounded-full bg-flash px-2.5 py-1 font-bold text-ink">{kk.catalog2.trendBadge}</span>}
+            </p>
+          </div>
         </div>
-        <figcaption className="mt-3 text-sm text-muted">{kk.template.sampleNote}</figcaption>
+        <figcaption className="mt-2 text-xs text-muted md:mt-3 md:text-sm">{kk.template.sampleNote}</figcaption>
       </figure>
 
       <div className="min-w-0">
-        {t.category && (
-          <Link href={`/?category=${t.category.slug}`} className="text-sm font-semibold text-brand hover:underline">
-            {t.category.title}
-          </Link>
-        )}
-        <h1 className="mt-2 font-display text-3xl font-bold tracking-tight sm:text-4xl">{t.title}</h1>
-        <div className="mt-4 flex flex-wrap gap-2 text-sm">
-          {t.startingPriceKzt !== null && (
-            <span className="rounded-full bg-ink px-3 py-1.5 font-semibold text-white">
-              {formatKzt(t.startingPriceKzt)} {kk.catalog.from}
-            </span>
+        <div className="hidden md:block">
+          {t.category && (
+            <Link href={`/?category=${t.category.slug}`} className="text-sm font-semibold text-brand hover:underline">
+              {t.category.title}
+            </Link>
           )}
-          <span className="rounded-full border border-line bg-white px-3 py-1.5 font-medium">{kk.catalog.faces(t.faceCount)}</span>
-          {t.isTrending && <span className="rounded-full bg-flash px-3 py-1.5 font-bold">{kk.catalog2.trendBadge}</span>}
+          <h1 className="mt-2 font-display text-4xl font-bold tracking-tight">{t.title}</h1>
+          <div className="mt-4 flex flex-wrap gap-2 text-sm">
+            {t.startingPriceKzt !== null && (
+              <span className="rounded-full bg-ink px-3 py-1.5 font-semibold text-white">
+                {formatKzt(t.startingPriceKzt)} {kk.catalog.from}
+              </span>
+            )}
+            <span className="rounded-full border border-line bg-white px-3 py-1.5 font-medium">{kk.catalog.faces(t.faceCount)}</span>
+            {t.isTrending && <span className="rounded-full bg-flash px-3 py-1.5 font-bold">{kk.catalog2.trendBadge}</span>}
+          </div>
         </div>
-        {t.description && <p className="mt-5 max-w-prose text-lg text-muted">{t.description}</p>}
+        <h1 className="sr-only md:hidden">{t.title}</h1>
+        {t.description && <p className="max-w-prose text-muted md:mt-5 md:text-lg">{t.description}</p>}
 
         {t.faceCount > 1 && (
-          <section className="mt-8">
+          <section className="mt-6 md:mt-8">
             <h2 className="font-semibold">{kk.template.facesTitle}</h2>
             <div className="mt-4">
               <FaceMap slots={t.faceSlots} />
@@ -88,7 +99,7 @@ export function TemplateDetailView({ t, cta }: { t: TemplateDetail; cta?: React.
           </section>
         )}
 
-        <div className="mt-8">
+        <div className={t.description || t.faceCount > 1 ? "mt-5 md:mt-8" : "md:mt-8"}>
           {cta ?? (
             <>
               <QualityPriceList t={t} />
