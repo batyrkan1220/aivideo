@@ -17,9 +17,9 @@ const schema = z.object({
   KASPI_WEBHOOK_SECRET: z.string().optional(),
   KASPI_API_BASE_URL: z.string().url().optional(),
   // Tole Payments — server-only secrets (never exposed to the browser or logs).
-  TOLE_API_KEY: z.string().min(10).optional(),
-  TOLE_CONNECTION_ID: z.string().uuid().optional(),
-  TOLE_WEBHOOK_SECRET: z.string().min(16).optional(),
+  TOLE_API_KEY: z.string().transform((v) => v.trim().replace(/^["']|["']$/g, "").trim()).pipe(z.string().min(10)).optional(),
+  TOLE_CONNECTION_ID: z.string().transform((v) => v.trim().replace(/^["']|["']$/g, "").trim()).pipe(z.string().uuid()).optional(),
+  TOLE_WEBHOOK_SECRET: z.string().transform((v) => v.trim().replace(/^["']|["']$/g, "").trim()).pipe(z.string().min(16)).optional(),
   TOLE_API_BASE_URL: z.string().url().default("https://api.tolepay.kz/v1"),
   // Telegram bot / Mini App — server-only.
   TELEGRAM_BOT_TOKEN: z.string().regex(/^\d+:[A-Za-z0-9_-]{30,}$/).optional(),
@@ -64,7 +64,7 @@ export function env() {
       throw new Error("Invalid environment: " + parsed.error.issues.map((i) => i.path.join(".")).join(", "));
     }
     cached = parsed.data;
-    console.log(`[env] payment=${cached.PAYMENT_PROVIDER} tole_key=${cached.TOLE_API_KEY ? (cached.TOLE_API_KEY.startsWith("tole_sk_test_") ? "test" : "live") : "none"} tole_connection=${cached.TOLE_CONNECTION_ID ? "set" : "none"} tole_webhook_secret=${cached.TOLE_WEBHOOK_SECRET ? "set" : "none"} ai=${cached.AI_PROVIDER} telegram=${cached.TELEGRAM_BOT_TOKEN ? "on" : "off"}`);
+    console.log(`[env] payment=${cached.PAYMENT_PROVIDER} tole_key=${cached.TOLE_API_KEY ? (cached.TOLE_API_KEY.startsWith("tole_sk_test_") ? "test" : cached.TOLE_API_KEY.startsWith("tole_sk_live_") ? "live" : "unknown_format") : "none"} tole_connection=${cached.TOLE_CONNECTION_ID ? "set" : "none"} tole_webhook_secret=${cached.TOLE_WEBHOOK_SECRET ? "set" : "none"} ai=${cached.AI_PROVIDER} telegram=${cached.TELEGRAM_BOT_TOKEN ? "on" : "off"}`);
     if (cached.APP_ENV === "production" && (cached.PAYMENT_PROVIDER === "sandbox" || cached.PAYMENT_PROVIDER === "tole_sandbox" || cached.AI_PROVIDER === "dev")) {
       throw new Error("Sandbox payment / dev AI provider are not allowed in production");
     }
