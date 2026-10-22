@@ -7,8 +7,18 @@ import { kk } from "@/lib/i18n/kk";
 // Self-hosted Inter (body) + Unbounded (display); cyrillic-ext covers Kazakh letters Ә Ғ Қ Ң Ө Ұ Ү Һ І
 
 export const metadata: Metadata = {
-  title: { default: kk.brand.name, template: `%s · ${kk.brand.name}` },
-  description: kk.brand.tagline,
+  metadataBase: new URL(`https://${kk.brand.domain}`),
+  title: { default: `${kk.brand.name} — ${kk.brand.tagline}`, template: `%s · ${kk.brand.name}` },
+  description: kk.brand.description,
+  applicationName: kk.brand.name,
+  openGraph: {
+    type: "website",
+    siteName: kk.brand.name,
+    url: "/",
+    title: `${kk.brand.name} — ${kk.brand.tagline}`,
+    description: kk.brand.description,
+    locale: "kk_KZ",
+  },
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#fafafc" };

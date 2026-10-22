@@ -1,6 +1,11 @@
 // Centralized Kazakh (kk-KZ) dictionary. All user-visible text lives here.
 export const kk = {
-  brand: { name: "TrendVideo", tagline: "Тренд видеоларда өзіңізді көріңіз" },
+  brand: {
+    name: "TrendMe",
+    domain: "trendme.kz",
+    tagline: "Тренд видеоларда өзіңізді көріңіз",
+    description: "TrendMe — тренд видеоларда өзіңізді көріңіз. Ұнаған видеоны таңдаңыз, фотоңызды жүктеңіз, бірнеше минутта сіз бар видео дайын болады.",
+  },
   nav: {
     home: "Басты бет",
     trending: "Тренд видеолар",

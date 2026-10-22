@@ -63,7 +63,7 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
           <ActionForm action={refundPayment} fields={{ orderId: o.id }} label={A.refund} confirm={A.refundConfirm(formatKzt(o.amount_kzt))} tone="danger" />
         )}
         {prof?.email && (
-          <a href={`mailto:${prof.email}?subject=${encodeURIComponent(`TrendVideo ${o.public_order_number}`)}`} className="rounded-full border border-line px-4 py-2 text-sm font-semibold hover:border-ink">
+          <a href={`mailto:${prof.email}?subject=${encodeURIComponent(`TrendMe ${o.public_order_number}`)}`} className="rounded-full border border-line px-4 py-2 text-sm font-semibold hover:border-ink">
             {A.contact}
           </a>
         )}

@@ -69,7 +69,7 @@ export async function startCheckout(_: CheckoutState, fd: FormData): Promise<Che
   try {
     created = await provider.createPayment({
       paymentId, orderId: o.id, orderNumber: o.public_order_number, amountKzt: o.amount_kzt,
-      description: `TrendVideo ${o.public_order_number}`,
+      description: `TrendMe ${o.public_order_number}`,
       returnUrl: `${env().NEXT_PUBLIC_APP_URL}/orders/${o.id}`,
       idempotencyKey,
     });
