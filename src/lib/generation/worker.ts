@@ -10,7 +10,7 @@ import { kk } from "@/lib/i18n/kk";
 import { generationProvider } from "./index";
 import { ProviderError } from "./types";
 import { isTestPaymentProvider } from "@/lib/payments/types";
-import { notifyOrderOwner, escapeHtml } from "@/lib/telegram/bot";
+import { notifyOrderOwner } from "@/lib/telegram/bot";
 
 type Job = {
   id: string; order_id: string; provider: string; provider_job_id: string | null; status: string;
@@ -21,11 +21,6 @@ type Job = {
 const POLL_EVERY_MS = 5_000;
 const MAX_OUTPUT_BYTES = 50 * 1024 * 1024;   // generated-videos bucket limit
 const backoffMs = (attempt: number) => Math.min(30_000 * 2 ** attempt, 30 * 60_000);
-
-async function orderTitle(orderId: string) {
-  const { data } = await supabaseAdmin().from("orders").select("template_snapshot_json").eq("id", orderId).maybeSingle();
-  return escapeHtml(((data?.template_snapshot_json as { title_kk?: string } | null)?.title_kk ?? "TrendMe").slice(0, 80));
-}
 
 /** User-facing (Kazakh) message for an error code. Technical details stay in server logs. */
 function safeMessage(code: string): string {
@@ -72,7 +67,7 @@ async function failJob(job: Job, code: string, extra: Record<string, unknown> = 
   }).eq("id", job.id);
   await db.from("orders").update({ generation_status: "failed" }).eq("id", job.order_id);
   await track("generation_failed", { orderId: job.order_id, props: { code } });
-  await notifyOrderOwner(job.order_id, kk.telegram.failed(await orderTitle(job.order_id)), kk.telegram.openOrder);
+  await notifyOrderOwner(job.order_id, "failed");
 }
 
 async function delay(job: Job, ms: number, extra: Record<string, unknown> = {}) {
@@ -237,6 +232,6 @@ async function finalize(job: Job, outputUrl: string, cost?: number) {
     status: "completed", completed_at: now, provider_cost: cost ?? job.provider_cost, error_code: null, provider_state: null,
   }).eq("id", job.id);
   await db.from("orders").update({ generation_status: "completed", completed_at: now }).eq("id", job.order_id);
-  await notifyOrderOwner(job.order_id, kk.telegram.ready(await orderTitle(job.order_id)), kk.telegram.watch);
+  await notifyOrderOwner(job.order_id, "ready");
   await track("generation_succeeded", { userId: order.user_id, orderId: job.order_id });
 }

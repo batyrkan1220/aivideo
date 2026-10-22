@@ -1,4 +1,5 @@
 "use server";
+import { notifyOrderOwner } from "@/lib/telegram/bot";
 import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -101,6 +102,8 @@ export async function startCheckout(_: CheckoutState, fd: FormData): Promise<Che
     provider_phone_last4: created.phoneLast4 ?? null,
   }).eq("id", paymentId);
   await db.from("orders").update({ payment_status: "pending" }).eq("id", o.id);
+  // Kaspi invoice: remind the customer in Telegram where to pay (best effort).
+  if (needsPhone && created.providerPaymentId && !replay) await notifyOrderOwner(o.id, "invoice_sent");
 
   redirect(created.redirectUrl);
 }

@@ -1,9 +1,9 @@
 "use server";
 import { env } from "@/lib/env";
-import { kk } from "@/lib/i18n/kk";
 import { audit, getSessionUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { tg, webhookSecret } from "@/lib/telegram/bot";
+import { pushBotProfile } from "@/lib/telegram/profile";
 
 export type TelegramSetupState = { ok?: boolean; bot?: string; error?: "forbidden" | "not_configured" | "failed" };
 
@@ -24,9 +24,8 @@ export async function setupTelegram(_: TelegramSetupState): Promise<TelegramSetu
     { command: "videos", description: "Менің тапсырыстарым" },
     { command: "help", description: "Көмек" },
   ] });
-  await tg("setMyDescription", { description: kk.telegram.botDescription });
-  await tg("setMyShortDescription", { short_description: kk.telegram.botShortDescription });
-  await tg("setChatMenuButton", { menu_button: { type: "web_app", text: "Видео жасау", web_app: { url: base } } });
+  await pushBotProfile(base);
   await audit(u.id, "telegram.setup", "telegram", null, { ok: !!hook });
   return hook && me ? { ok: true, bot: me.username } : { error: "failed" };
 }
+

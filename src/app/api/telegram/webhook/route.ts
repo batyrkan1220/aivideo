@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { kk } from "@/lib/i18n/kk";
-import { checkWebhookSecret, escapeHtml, sendMessage } from "@/lib/telegram/bot";
+import { checkWebhookSecret, sendMessage } from "@/lib/telegram/bot";
+import { botMessage } from "@/lib/telegram/messages";
 
 /**
  * Telegram bot updates. Authentic only with our X-Telegram-Bot-Api-Secret-Token (set via setWebhook).
@@ -17,15 +17,13 @@ export async function POST(req: NextRequest) {
   const chatId = msg?.chat?.id;
   if (!chatId || msg?.chat?.type !== "private") return NextResponse.json({ ok: true });
 
-  const name = msg.from?.first_name ? escapeHtml(msg.from.first_name.slice(0, 40)) : "";
-  if (msg.text?.startsWith("/start")) {
-    await sendMessage(chatId, kk.telegram.welcome(name), { text: kk.telegram.openApp, path: "/" });
-  } else if (msg.text?.startsWith("/help")) {
-    await sendMessage(chatId, kk.telegram.help, { text: kk.telegram.openApp, path: "/" });
-  } else if (msg.text?.startsWith("/videos")) {
-    await sendMessage(chatId, kk.telegram.myVideos, { text: kk.telegram.openMyVideos, path: "/orders" });
-  } else {
-    await sendMessage(chatId, kk.telegram.hint, { text: kk.telegram.openApp, path: "/" });
-  }
+  const name = msg.from?.first_name?.slice(0, 40) ?? "";
+  const cmd = msg.text ?? "";
+  const [key, path] = cmd.startsWith("/start") ? (["welcome", "/"] as const)
+    : cmd.startsWith("/help") ? (["help", "/"] as const)
+    : cmd.startsWith("/videos") ? (["videos", "/orders"] as const)
+    : (["hint", "/"] as const);
+  const m = await botMessage(key, { name });
+  await sendMessage(chatId, m.text, m.button ? { text: m.button, path } : null);
   return NextResponse.json({ ok: true });
 }

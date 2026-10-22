@@ -2,6 +2,7 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { botMessage } from "./messages";
 
 /**
  * Minimal Telegram Bot API client. The token is never logged; errors are reported by method name only.
@@ -47,23 +48,30 @@ const appUrl = (path = "/") => `${env().NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}$
 /** Inline button that opens a page of the Mini App inside Telegram. */
 export const openAppButton = (text: string, path = "/") => ({ inline_keyboard: [[{ text, web_app: { url: appUrl(path) } }]] });
 
-export function sendMessage(chatId: number, text: string, button?: { text: string; path: string }) {
-  return tg("sendMessage", {
-    chat_id: chatId, text, parse_mode: "HTML", link_preview_options: { is_disabled: true },
-    ...(button ? { reply_markup: openAppButton(button.text, button.path) } : {}),
-  });
+/**
+ * Sends an HTML message. If Telegram rejects the markup (e.g. an admin typed an unclosed tag),
+ * it is resent once as plain text so the user still gets it.
+ */
+export async function sendMessage(chatId: number, text: string, button?: { text: string; path: string } | null) {
+  const markup = button ? { reply_markup: openAppButton(button.text, button.path) } : {};
+  const sent = await tg("sendMessage", { chat_id: chatId, text, parse_mode: "HTML", link_preview_options: { is_disabled: true }, ...markup });
+  if (sent) return sent;
+  const plain = text.replace(/<[^>]+>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+  return tg("sendMessage", { chat_id: chatId, text: plain, link_preview_options: { is_disabled: true }, ...markup });
 }
 
-/** Sends a message to the order's owner if they use Telegram. Best effort, never throws. */
-export async function notifyOrderOwner(orderId: string, text: string, buttonText: string) {
+/** Sends one of the editable order notifications to the order's owner if they use Telegram. Never throws. */
+export async function notifyOrderOwner(orderId: string, key: "invoice_sent" | "paid" | "ready" | "failed") {
   if (!botConfigured()) return;
   try {
     const db = supabaseAdmin();
-    const { data: o } = await db.from("orders").select("user_id").eq("id", orderId).maybeSingle();
+    const { data: o } = await db.from("orders").select("user_id,template_snapshot_json").eq("id", orderId).maybeSingle();
     if (!o?.user_id) return;
     const { data: p } = await db.from("profiles").select("telegram_id").eq("id", o.user_id).maybeSingle();
     if (!p?.telegram_id) return;
-    await sendMessage(Number(p.telegram_id), text, { text: buttonText, path: `/orders/${orderId}` });
+    const title = (o.template_snapshot_json as { title_kk?: string } | null)?.title_kk ?? "TrendMe";
+    const m = await botMessage(key, { title });
+    await sendMessage(Number(p.telegram_id), m.text, m.button ? { text: m.button, path: `/orders/${orderId}` } : null);
   } catch {
     console.error(JSON.stringify({ src: "telegram", event: "notify_failed" }));
   }
