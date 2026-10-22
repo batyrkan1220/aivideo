@@ -20,7 +20,7 @@ export async function setupTelegram(_: TelegramSetupState): Promise<TelegramSetu
   });
   await tg("setMyCommands", { commands: [
     { command: "start", description: "Видео жасау" },
-    { command: "videos", description: "Менің видеоларым" },
+    { command: "videos", description: "Менің тапсырыстарым" },
   ] });
   await tg("setChatMenuButton", { menu_button: { type: "web_app", text: "Видео жасау", web_app: { url: base } } });
   await audit(u.id, "telegram.setup", "telegram", null, { ok: !!hook });
