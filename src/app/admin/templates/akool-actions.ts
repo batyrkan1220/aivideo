@@ -8,7 +8,7 @@ import { ProviderError } from "@/lib/generation/types";
 import type { AkoolConfig } from "@/lib/templates/akool-config";
 
 /**
- * Akool person analysis for a template video (admin only).
+ * Akool Character Swap V5 person analysis for a template video (admin only).
  * start → poll until done → the people (obj_id + preview image) are returned to the editor.
  * Preview images are copied into our public template-media bucket because Akool URLs expire.
  */
@@ -59,7 +59,7 @@ export async function checkPersonAnalysis(id: string, videoPath: string, videoUr
   > {
   const u = await staff();
   if (!u) return { ok: false, error: "forbidden" };
-  if (!/^[A-Za-z0-9_-]{1,100}$/.test(id) || !pathSchema.safeParse(videoPath).success || videoUrl !== mediaUrl(videoPath)) {
+  if (!/^[a-fA-F0-9]{24}$/.test(id) || !pathSchema.safeParse(videoPath).success || videoUrl !== mediaUrl(videoPath)) {
     return { ok: false, error: "generic" };
   }
 
@@ -72,8 +72,10 @@ export async function checkPersonAnalysis(id: string, videoPath: string, videoUr
   if (!res.people.length) return { ok: false, error: "no_people" };
 
   const db = supabaseAdmin();
-  const people = [];
+  const people: { objId: number; previewPath?: string }[] = [];
   for (const p of res.people.slice(0, 30)) {
+    // Preview images are optional in the V5 API; copy them when present (Akool URLs expire).
+    if (!p.imgUrl) { people.push({ objId: p.objId }); continue; }
     try {
       const r = await fetch(p.imgUrl, { signal: AbortSignal.timeout(20_000) });
       const type = (r.headers.get("content-type") ?? "").split(";")[0].trim();
@@ -86,8 +88,8 @@ export async function checkPersonAnalysis(id: string, videoPath: string, videoUr
       people.push({ objId: p.objId, previewPath: path });
     } catch (err) {
       console.error("[akool.preview]", id, p.objId, err instanceof Error ? err.message : err);
-      return { ok: false, error: "generic" };
+      people.push({ objId: p.objId });
     }
   }
-  return { ok: true, done: true, analysis: { id, videoPath, videoUrl, people } };
+  return { ok: true, done: true, analysis: { id, videoPath, videoUrl, ...(res.trackManifestUrl ? { trackManifestUrl: res.trackManifestUrl } : {}), people } };
 }

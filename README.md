@@ -15,7 +15,7 @@
 | Фондық жұмыстар | БД-кезек `generation_jobs` + `pg_cron`/`pg_net` → `/api/worker/tick` |
 | Хостинг | Render (web service, `main` тармағынан авто-деплой) |
 | Төлем | `PaymentProvider` интерфейсі: `sandbox` (дайын), `kaspi` (мерчант құжаттамасын күтуде) |
-| AI генерация | `GenerationProvider` интерфейсі: `akool` (Akool Head Swap, 1–5 адам), `dev` демо адаптері (видео жасамайды) |
+| AI генерация | `GenerationProvider` интерфейсі: `akool` (Akool Character Swap V5, 1–5 адам), `dev` демо адаптері (видео жасамайды) |
 
 ```
 src/
@@ -103,20 +103,19 @@ Kaspi интернет-эквайринг API құжаттамасы мен кі
 
 Webhook-тан кейінгі өңдеу (idempotency, сома/валюта тексерісі, қос төлемнен қорғау) провайдерге тәуелсіз — `src/lib/payments/process.ts` және `apply_payment_event` SQL функциясы.
 
-## Akool Head Swap (қосылған)
+## Akool Character Swap V5 (қосылған)
 
-Модель: Akool Open API → Head Swap (`akool-premium`) — видеодағы адамдардың **бүкіл басы** (бет, шаш, контур) ауыстырылады, бір видеода **5 адамға дейін**. Құжат: https://docs.akool.com/ai-tools-suite/head-swap/head-swap
+Модель: Akool Open API → Swap Studio → Character Swap V5 (`akool-premium-multi-person`) — видеодағы адамдар **толық** (бет, шаш, дене, киім) фотодағы адамдармен ауыстырылады, бір видеода **1–5 адам**. Құжат: https://docs.akool.com/ai-tools-suite/swap-studio/character-swap-v5
 
 Akool ережесі бойынша үлгі баптау (әкімші редакторы):
-1. Үлгі видеоны жүктеу (ұзақтығы ~3–20 сек).
-2. «Адамдарды анықтау» → `POST /api/open/v4/headswap/analyze` → `analyze/detail` сұралады; Akool әр адамды `obj_id` және суретімен қайтарады (суреттер `template-media/people/…`-ке көшіріледі, себебі Akool сілтемелерінің мерзімі өтеді).
-3. Ауыстырылатын адамдарды таңдау (1–5). Таңдау реті = тапсырыс бетіндегі фото реті; әр фото ұяшығында видеодағы сол адамның суреті көрсетіледі.
-4. Тапсырыс: `POST /api/open/v4/headswap/task/create` — талданған **дәл сол** `video_url` + `mappings[{obj_id, img_url}]`; нәтиже `task/detail` арқылы алынады.
+1. Үлгі видеоны жүктеу (ұзақтығы 3–20 сек).
+2. «Адамдарды анықтау» → `POST /api/open/v5/characterSwap/analyze` (`media_type: video`, `type: person`) → `analyze/detail` сұралады; Akool әр адамға `obj_id` береді (сурет қайтарса, `template-media/people/…`-ке көшіріледі).
+3. Ауыстырылатын адамдарды таңдау (1–5). Таңдау реті = тапсырыс бетіндегі фото реті.
+4. Тапсырыс: `POST /api/open/v5/characterSwap/create` — талданған **дәл сол** `target_url` + `analyze_id` + `mappings[{obj_id, img_url}]`; нәтиже `task/detail` → `data.url`.
 
 - Үлгі видео ауыстырылса, адамдарды қайта анықтау керек (жариялау бұғатталады).
-- Баптау (`provider_config_json`): `{ "resolution": "720p", "analysis": {id, videoPath, videoUrl, people[]}, "selected": [obj_id…] }`; фото слоттары серверде осыдан шығарылады.
-- Render-ге `AKOOL_API_KEY` қойыңыз (akool.com → API → API Credentials). Akool кредитпен есептейді; кредит таусылса (`1104`) тапсырыс `provider_no_balance` қатесімен тоқтайды → балансты толтырып, әкімші панелінен «Генерацияны қайталау».
-- Аккаунтта Head Swap қосылмаса Akool `1003` қайтарады — Akool қолдау қызметіне жазу керек.
+- Кредит (құжат бойынша, әр 5 сек): 480p — 5, 720p — 10. `1104` = кредит жетпейді, `1009` = рұқсат жоқ (тариф), `1015` = кейінірек қайталау (автоматты).
+- Render-ге `AKOOL_API_KEY` қойыңыз (akool.com → API → API Credentials).
 - Қауіпсіздік: sandbox арқылы төленген тапсырыс нақты провайдерге тек әкімші үшін жіберіледі.
 
 ## Басқа AI провайдерін қосу

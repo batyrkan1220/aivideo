@@ -4,18 +4,22 @@ import { akoolConfigSchema } from "@/lib/templates/akool-config";
 import { ProviderError, type GenerationProvider, type ProviderJobStatus } from "./types";
 
 /**
- * Akool Open API — Head Swap (model `akool-premium`).
- * Docs: https://docs.akool.com/ai-tools-suite/head-swap/head-swap
+ * Akool Open API — Character Swap V5 (model `akool-premium-multi-person`).
+ * Replaces whole people (face, hair, body, outfit) in the template video, 1–5 people.
+ * Docs: https://docs.akool.com/ai-tools-suite/swap-studio/character-swap-v5
  *
- *   POST /api/open/v4/headswap/analyze          { video_url, type: "head" }        → data._id
- *   GET  /api/open/v4/headswap/analyze/detail?_id=…                               → analysis_result.media[{obj_id,img_url}]
- *   POST /api/open/v4/headswap/task/create      { video_url, mappings[{obj_id,img_url}], model_name, resolution }
- *   GET  /api/open/v4/headswap/task/detail?_id=…                                  → status 1|2|3|4, video_url
+ *   POST /api/open/v5/characterSwap/analyze         { url, media_type: "video", type: "person" } → data._id
+ *   GET  /api/open/v5/characterSwap/analyze/detail?_id=…  → analysis_result.{track_manifest_url, media[{obj_id,…}]}
+ *   POST /api/open/v5/characterSwap/create          { media_type, target_url, model_name, analyze_id,
+ *                                                     mappings[{obj_id,img_url}], resolution } → data.list[]._id
+ *   GET  /api/open/v5/characterSwap/task/detail?_id=…     → status 1|2|3|4, url
  *
  * Auth: `x-api-key`. Responses use a body `code` (1000 = success) even when HTTP is 200.
+ * Source video 3–20 s; the task must use the identical URL that was analysed.
  */
 
-const MODEL = "akool-premium";
+const MODEL = "akool-premium-multi-person";
+const BASE = "/api/open/v5/characterSwap";
 type Envelope<T> = { code?: number; msg?: string; data?: T };
 
 function apiKey() {
@@ -29,7 +33,9 @@ function codeError(code: number | undefined, msg: string | undefined): ProviderE
   const detail = `akool code ${code}: ${msg ?? ""}`.slice(0, 300);
   if (code === 1104) return new ProviderError("provider_no_balance", false, detail);
   if (code === 1101 || code === 1102 || code === 1200) return new ProviderError("provider_auth", false, detail);
-  if (code === 1003) return new ProviderError("provider_feature_disabled", false, detail);
+  if (code === 1009) return new ProviderError("provider_feature_disabled", false, detail);
+  if (code === 1015) return new ProviderError("provider_busy", true, detail);   // "create error, retry later"
+  if (code === 1003) return new ProviderError("provider_bad_params", false, detail);
   return new ProviderError(`provider_code_${code ?? "unknown"}`, false, detail);
 }
 
@@ -56,8 +62,8 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 // ── Person analysis (admin, once per template video) ───────────────────────────
 export async function akoolStartAnalysis(videoUrl: string) {
-  const d = await call<{ _id?: string }>("/api/open/v4/headswap/analyze", {
-    method: "POST", body: JSON.stringify({ video_url: videoUrl, type: "head" }),
+  const d = await call<{ _id?: string }>(`${BASE}/analyze`, {
+    method: "POST", body: JSON.stringify({ url: videoUrl, media_type: "video", type: "person" }),
   });
   if (!d._id) throw new ProviderError("provider_bad_response", false, "missing _id");
   return d._id;
@@ -66,19 +72,28 @@ export async function akoolStartAnalysis(videoUrl: string) {
 export type AkoolAnalysis =
   | { state: "processing"; progress: number | null }
   | { state: "failed"; reason: string }
-  | { state: "done"; people: { objId: number; imgUrl: string }[] };
+  | { state: "done"; trackManifestUrl: string | null; people: { objId: number; imgUrl: string | null }[] };
+
+/** Preview image of a detected person, if Akool returns one (field name isn't documented). */
+function previewOf(m: Record<string, unknown>): string | null {
+  for (const k of ["img_url", "image_url", "preview_url", "url", "thumbnail", "cover_url"]) {
+    const v = m[k];
+    if (typeof v === "string" && /^https?:\/\//.test(v)) return v;
+  }
+  return null;
+}
 
 export async function akoolGetAnalysis(id: string): Promise<AkoolAnalysis> {
   const d = await call<{
     status?: number; progress?: number; error_reason?: string;
-    analysis_result?: { media?: { obj_id?: number; img_url?: string }[] } | null;
-  }>(`/api/open/v4/headswap/analyze/detail?_id=${encodeURIComponent(id)}`);
+    analysis_result?: { track_manifest_url?: string; media?: Record<string, unknown>[] } | null;
+  }>(`${BASE}/analyze/detail?_id=${encodeURIComponent(id)}`);
   if (d.status === 4) return { state: "failed", reason: d.error_reason ?? "" };
   if (d.status !== 3) return { state: "processing", progress: d.progress ?? null };
   const people = (d.analysis_result?.media ?? [])
-    .filter((m) => Number.isInteger(m.obj_id) && typeof m.img_url === "string")
-    .map((m) => ({ objId: m.obj_id as number, imgUrl: m.img_url as string }));
-  return { state: "done", people };
+    .filter((m) => Number.isInteger(m.obj_id))
+    .map((m) => ({ objId: m.obj_id as number, imgUrl: previewOf(m) }));
+  return { state: "done", trackManifestUrl: d.analysis_result?.track_manifest_url ?? null, people };
 }
 
 // ── Generation provider ───────────────────────────────────────────────────────
@@ -121,31 +136,37 @@ export const akoolProvider: GenerationProvider = {
 
   async submit(input) {
     const cfg = akoolConfigSchema.parse(input.config ?? {});
-    const d = await call<{ _id?: string }>("/api/open/v4/headswap/task/create", {
+    const d = await call<{ list?: { _id?: string; deduction_credit?: number }[]; errors?: { index?: number; error?: string }[] }>(`${BASE}/create`, {
       method: "POST",
       body: JSON.stringify({
-        video_url: cfg.analysis!.videoUrl,
-        mappings: input.faces.map((f) => ({ obj_id: objIdOf(f.providerInput), img_url: f.imageUrl })),
+        media_type: "video",
+        target_url: cfg.analysis!.videoUrl,
         model_name: MODEL,
+        analyze_id: cfg.analysis!.id,
+        mappings: input.faces.map((f) => ({ obj_id: objIdOf(f.providerInput), img_url: f.imageUrl })),
         resolution: cfg.resolution,
         keep_original_sound: true,
       }),
     });
-    if (!d._id) throw new ProviderError("provider_bad_response", false, "missing _id");
-    return { providerJobId: d._id };
+    const task = d.list?.[0];
+    if (!task?._id) {
+      // Creation errors are not billed (docs), so it is safe to report and stop.
+      throw new ProviderError("provider_rejected", false, JSON.stringify(d.errors ?? []).slice(0, 300));
+    }
+    return { providerJobId: task._id };
   },
 
   async getStatus(providerJobId): Promise<ProviderJobStatus> {
-    const d = await call<{ status?: number; progress?: number; video_url?: string | null; error_reason?: string; error_code?: number }>(
-      `/api/open/v4/headswap/task/detail?_id=${encodeURIComponent(providerJobId)}`,
+    const d = await call<{ status?: number; progress?: number; url?: string | null; error_reason?: string }>(
+      `${BASE}/task/detail?_id=${encodeURIComponent(providerJobId)}`,
     );
     if (d.status === 4) {
-      console.error("[akool] task failed", providerJobId, d.error_code, d.error_reason);
+      console.error("[akool] task failed", providerJobId, d.error_reason);
       return { state: "failed", errorCode: "provider_failed", retryable: false };
     }
     if (d.status === 3) {
-      if (!d.video_url) return { state: "failed", errorCode: "provider_no_output", retryable: false };
-      return { state: "succeeded", outputUrl: d.video_url };
+      if (!d.url) return { state: "failed", errorCode: "provider_no_output", retryable: false };
+      return { state: "succeeded", outputUrl: d.url };
     }
     return { state: d.status === 1 ? "queued" : "processing", progress: d.progress ?? undefined };
   },

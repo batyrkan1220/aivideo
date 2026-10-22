@@ -2,12 +2,12 @@ import { z } from "zod";
 import type { FaceSlot } from "./schema";
 
 /**
- * Template provider config for Akool Head Swap (shared by the admin editor, the server
- * save path and the generation adapter).
+ * Template provider config for Akool Character Swap V5 (shared by the admin editor, the
+ * server save path and the generation adapter).
  *
- * Akool rules (docs.akool.com → Head Swap):
+ * Akool rules (docs.akool.com → Swap Studio → Character Swap V5, model akool-premium-multi-person):
  *  1. The template video is analysed once ("person analysis"); Akool returns every detected
- *     person with an `obj_id` and a preview image.
+ *     person with an `obj_id` (and, when returned, a preview image).
  *  2. The admin chooses which people customers replace (1–5).
  *  3. Each order creates a task with the SAME `video_url` string that was analysed and one
  *     mapping per chosen person: { obj_id, img_url: customer's photo }.
@@ -17,15 +17,16 @@ export const AKOOL_MAX_PEOPLE = 5;
 
 export const akoolPersonSchema = z.object({
   objId: z.number().int().min(0),
-  previewPath: z.string().min(1).max(300),
+  previewPath: z.string().min(1).max(300).optional(),
 });
 
 export const akoolConfigSchema = z.object({
   resolution: z.enum(["480p", "720p"]).default("720p"),
   analysis: z.object({
-    id: z.string().min(1).max(100),
+    id: z.string().regex(/^[a-fA-F0-9]{24}$/),
     videoPath: z.string().min(1).max(300),   // template preview video path that was analysed
     videoUrl: z.string().url(),              // exact URL string sent to Akool (must be reused)
+    trackManifestUrl: z.string().url().optional(),
     people: z.array(akoolPersonSchema).max(30),
   }).optional(),
   selected: z.array(z.number().int().min(0)).max(AKOOL_MAX_PEOPLE).default([]),
@@ -54,7 +55,7 @@ export function akoolSlots(cfg: AkoolConfig): FaceSlot[] {
     labelKk: akoolSlotLabel(i, n),
     position: { x: (i + 1) / (n + 1), y: 0.42 },
     providerInput: `obj_${p.objId}`,
-    previewImagePath: p.previewPath,
+    ...(p.previewPath ? { previewImagePath: p.previewPath } : {}),
     order: i,
   }));
 }

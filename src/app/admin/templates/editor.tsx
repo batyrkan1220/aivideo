@@ -212,7 +212,7 @@ export function TemplateEditor({
             <select className={inputCls(err("providerKey"))} value={t.providerKey ?? ""} onChange={(ev) => setProvider(ev.target.value || null)}>
               <option value="">—</option>
               <option value="dev">dev (демо)</option>
-              <option value="akool">Akool — бүкіл басты ауыстыру (Head Swap)</option>
+              <option value="akool">Akool — персонажды ауыстыру (Character Swap)</option>
             </select>
           </Field>
           <Field label={e.maxUpload} field="maxUploadBytes" required error={err("maxUploadBytes")}>

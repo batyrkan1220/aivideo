@@ -22,7 +22,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 const VIDEO = "https://cdn/template.mp4";
 const analysis = {
-  id: "an1", videoPath: "previews/v.mp4", videoUrl: VIDEO,
+  id: "6700000000000000000000a1", videoPath: "previews/v.mp4", videoUrl: VIDEO,
   people: [{ objId: 0, previewPath: "people/an1/0.jpg" }, { objId: 1, previewPath: "people/an1/1.jpg" }, { objId: 2, previewPath: "people/an1/2.jpg" }],
 };
 const cfg = { resolution: "720p", analysis, selected: [2, 0] };
@@ -54,42 +54,54 @@ describe("Akool config → slots", () => {
   });
 });
 
-describe("Akool head swap adapter (mocked API)", () => {
-  it("analysis: start → detail with people", async () => {
+describe("Akool Character Swap V5 adapter (mocked API)", () => {
+  it("analysis: start → detail with people (preview optional)", async () => {
     const calls = mockApi([
       { body: { code: 1000, data: { _id: "an1", status: 1 } } },
       { body: { code: 1000, data: { status: 2, progress: 40 } } },
-      { body: { code: 1000, data: { status: 3, analysis_result: { media: [{ obj_id: 0, img_url: "https://a/0.jpg" }, { obj_id: 1, img_url: "https://a/1.jpg" }] } } } },
+      { body: { code: 1000, data: { status: 3, analysis_result: { track_manifest_url: "https://a/m.json", media: [{ obj_id: 0, img_url: "https://a/0.jpg" }, { obj_id: 1 }] } } } },
     ]);
     expect(await akoolStartAnalysis(VIDEO)).toBe("an1");
-    expect(calls[0].url).toBe("https://openapi.akool.com/api/open/v4/headswap/analyze");
-    expect(calls[0].body).toEqual({ video_url: VIDEO, type: "head" });
+    expect(calls[0].url).toBe("https://openapi.akool.com/api/open/v5/characterSwap/analyze");
+    expect(calls[0].body).toEqual({ url: VIDEO, media_type: "video", type: "person" });
     expect(calls[0].key).toBe("test-akool-key-123");
     expect(await akoolGetAnalysis("an1")).toEqual({ state: "processing", progress: 40 });
-    expect(await akoolGetAnalysis("an1")).toEqual({ state: "done", people: [{ objId: 0, imgUrl: "https://a/0.jpg" }, { objId: 1, imgUrl: "https://a/1.jpg" }] });
-    expect(calls[1].url).toMatch(/\/headswap\/analyze\/detail\?_id=an1$/);
+    expect(await akoolGetAnalysis("an1")).toEqual({
+      state: "done", trackManifestUrl: "https://a/m.json",
+      people: [{ objId: 0, imgUrl: "https://a/0.jpg" }, { objId: 1, imgUrl: null }],
+    });
+    expect(calls[1].url).toMatch(/\/characterSwap\/analyze\/detail\?_id=an1$/);
   });
 
   it("task: create with mappings → detail → succeeded", async () => {
     const calls = mockApi([
-      { body: { code: 1000, data: { _id: "t1", status: 1 } } },
+      { body: { code: 1000, data: { list: [{ _id: "t1", status: 1, deduction_credit: 40 }], errors: [] } } },
       { body: { code: 1000, data: { status: 2, progress: 50 } } },
-      { body: { code: 1000, data: { status: 3, video_url: "https://out/r.mp4" } } },
+      { body: { code: 1000, data: { status: 3, url: "https://out/r.mp4" } } },
     ]);
     const sub = await ak.submit({ jobId: "j", ...base, faces, config: cfg });
     expect(sub.providerJobId).toBe("t1");
-    expect(calls[0].url).toMatch(/\/headswap\/task\/create$/);
+    expect(calls[0].url).toBe("https://openapi.akool.com/api/open/v5/characterSwap/create");
     expect(calls[0].body).toEqual({
-      video_url: VIDEO,
+      media_type: "video", target_url: VIDEO, model_name: "akool-premium-multi-person",
+      analyze_id: "6700000000000000000000a1",
       mappings: [{ obj_id: 2, img_url: "https://s/f1.jpg" }, { obj_id: 0, img_url: "https://s/f2.jpg" }],
-      model_name: "akool-premium", resolution: "720p", keep_original_sound: true,
+      resolution: "720p", keep_original_sound: true,
     });
     expect(await ak.getStatus("t1", { startedAt: null, state: null })).toEqual({ state: "processing", progress: 50 });
     expect(await ak.getStatus("t1", { startedAt: null, state: null })).toEqual({ state: "succeeded", outputUrl: "https://out/r.mp4" });
+    expect(calls[1].url).toMatch(/\/characterSwap\/task\/detail\?_id=t1$/);
   });
 
-  it("business codes: 1104 no credits, 1003 not enabled — not retryable; 5xx retryable", async () => {
-    for (const [code, expected] of [[1104, "provider_no_balance"], [1003, "provider_feature_disabled"], [1101, "provider_auth"]] as const) {
+  it("rejected input (data.errors) is reported, not billed", async () => {
+    mockApi([{ body: { code: 1000, data: { list: [], errors: [{ index: 0, error: "bad image" }] } } }]);
+    await expect(ak.submit({ jobId: "j", ...base, faces, config: cfg })).rejects.toMatchObject({ code: "provider_rejected", retryable: false });
+  });
+
+  it("business codes: 1104 no credits, 1009 no permission — not retryable; 1015 and 5xx retryable", async () => {
+    mockApi([{ body: { code: 1015, msg: "retry later" } }]);
+    await expect(ak.submit({ jobId: "j", ...base, faces, config: cfg })).rejects.toMatchObject({ retryable: true });
+    for (const [code, expected] of [[1104, "provider_no_balance"], [1009, "provider_feature_disabled"], [1101, "provider_auth"]] as const) {
       mockApi([{ body: { code, msg: "x" } }]);
       const err = await ak.submit({ jobId: "j", ...base, faces, config: cfg }).catch((e) => e);
       expect(err).toBeInstanceOf(ProviderError);

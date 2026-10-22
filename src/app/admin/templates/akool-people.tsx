@@ -98,8 +98,15 @@ export function AkoolPeople({
                     onClick={() => toggle(p.objId)}
                     className={`relative block aspect-[3/4] w-full overflow-hidden rounded-xl border-2 bg-paper transition ${on ? "border-brand" : "border-line hover:border-ink"} disabled:opacity-40`}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={`${mediaBase}/${p.previewPath}`} alt={a.personAlt(p.objId + 1)} className="h-full w-full object-cover" />
+                    {p.previewPath ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={`${mediaBase}/${p.previewPath}`} alt={a.personAlt(p.objId + 1)} className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="flex h-full w-full flex-col items-center justify-center gap-1 text-sm font-semibold text-muted">
+                        <span className="h-8 w-8 rounded-full bg-line" aria-hidden />
+                        {a.personAlt(p.objId + 1)}
+                      </span>
+                    )}
                     <span className={`absolute left-1.5 top-1.5 flex h-7 min-w-7 items-center justify-center rounded-full px-1.5 text-xs font-bold ${on ? "bg-brand text-white" : "bg-white/90 text-muted"}`}>
                       {on ? n + 1 : "+"}
                     </span>
