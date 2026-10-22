@@ -17,7 +17,7 @@ export function TemplateGrid({ items, priorityCount = 0, mobileLimit }: { items:
 }
 
 /** Send only what the card needs to the client bundle. */
-function pickCard(t: CardData): CardData {
+export function pickCard(t: CardData): CardData {
   const { id, title, description, faceCount, qualityLabels, startingPriceKzt, coverUrl, previewUrl, isTrending } = t;
   return { id, title, description, faceCount, qualityLabels, startingPriceKzt, coverUrl, previewUrl, isTrending };
 }

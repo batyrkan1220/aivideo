@@ -2,8 +2,9 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { connection } from "next/server";
 import { kk } from "@/lib/i18n/kk";
-import { listCategories, listNewest, listTrending } from "@/lib/templates/queries";
-import { CategoryChips, GridSkeleton, SectionHeading, TemplateGrid } from "@/components/catalog-bits";
+import { listCategories, listTemplates, listTrending } from "@/lib/templates/queries";
+import { CategoryChips, GridSkeleton, SectionHeading, TemplateGrid, pickCard } from "@/components/catalog-bits";
+import { VideoFeed } from "@/components/video-feed";
 import { HeroShowcase } from "@/components/hero-showcase";
 import { resolveShowcase } from "@/lib/templates/showcase";
 
@@ -61,12 +62,9 @@ async function Categories() {
 
 async function Sections() {
   await connection();
-  const [trending, latest] = await Promise.all([listTrending(8), listNewest(12)]);
-  // Don't show the same template twice on one screen.
-  const shown = new Set(trending.map((t) => t.id));
-  const newest = latest.filter((t) => !shown.has(t.id)).slice(0, 8);
+  const [trending, all] = await Promise.all([listTrending(8), listTemplates({ page: 1 })]);
 
-  if (!trending.length && !latest.length) {
+  if (!trending.length && !all.items.length) {
     return (
       <div className="mx-auto max-w-6xl px-4">
         <div className="rounded-card border border-dashed border-line bg-white px-6 py-16 text-center">
@@ -81,18 +79,28 @@ async function Sections() {
     <div className="mx-auto max-w-6xl space-y-14 px-4">
       {trending.length > 0 && (
         <section>
-          <SectionHeading title={kk.home.trendingTitle} href="/templates?sort=trending" />
+          <SectionHeading title={kk.home.trendingTitle} />
           <TemplateGrid items={trending} priorityCount={4} mobileLimit={4} />
         </section>
       )}
-      {newest.length > 0 && (
-        <section className={trending.length ? "max-sm:hidden" : undefined}>
-          <SectionHeading title={kk.home.newTitle} href="/templates" />
-          <TemplateGrid items={newest} priorityCount={trending.length ? 0 : 4} mobileLimit={trending.length ? undefined : 4} />
+      {/* Phones: only a few videos, then a button to the full video catalog. */}
+      {!trending.length && (
+        <section className="sm:hidden">
+          <TemplateGrid items={all.items.slice(0, 4)} priorityCount={4} />
         </section>
       )}
-      {/* Phones: a few videos only, then straight to the full video catalog. */}
       <MobileAllVideos />
+      {/* Desktop: one endless feed of all videos, loaded page by page while scrolling. */}
+      {all.items.length > 0 && (
+        <section className="max-sm:hidden">
+          <VideoFeed
+            title={kk.home.allVideos}
+            initial={all.items.map(pickCard)}
+            initialHasMore={all.items.length < all.total}
+            exclude={trending.map((t) => t.id)}
+          />
+        </section>
+      )}
     </div>
   );
 }
