@@ -29,6 +29,7 @@ export const M = {
   jsonInvalid: "JSON қате жазылған.",
   uploadSize: "1 мен 10 МБ аралығында.",
   wsIndexDuplicate: "Әр адамның нөмірі әртүрлі болуы керек.",
+  wsHeadSingle: "Бүкіл басты ауыстыру тек 1 адамдық үлгіде жұмыс істейді.",
   wsSeconds: "Видео ұзақтығын секундпен енгізіңіз (шығынды есептеу үшін).",
 } as const;
 
@@ -115,6 +116,7 @@ export function validateTemplateForm(t: TemplateInput, configText: string, forPu
       if (new Set(map.slice(0, n)).size !== Math.min(map.length, n)) e["ws.index"] = M.wsIndexDuplicate;
       if (map.length !== n) e["ws.index"] = M.wsIndexDuplicate;
     }
+    if (cfg.swapMode === "head" && n > 1) e["ws.swapMode"] = M.wsHeadSingle;
     const sec = cfg.videoSeconds;
     if (forPublish && (typeof sec !== "number" || !(sec > 0) || sec > 600)) e["ws.videoSeconds"] = M.wsSeconds;
   }

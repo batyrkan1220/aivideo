@@ -55,4 +55,11 @@ describe("template editor validation", () => {
     expect(bad["ws.videoSeconds"]).toBe(M.wsSeconds);
     expect(validateTemplateForm(t, JSON.stringify({ targetIndexBySlot: [1, 0, 2], videoSeconds: 12 }), true)).toEqual({});
   });
+
+  it("WaveSpeed head swap is single-person only", () => {
+    const t = { ...ok(), providerKey: "wavespeed", faceSlots: autoFaceSlots(2) };
+    expect(validateTemplateForm(t, JSON.stringify({ swapMode: "head", videoSeconds: 10, targetIndexBySlot: [0, 1] }), true)["ws.swapMode"]).toBe(M.wsHeadSingle);
+    const one = { ...ok(), providerKey: "wavespeed", faceSlots: autoFaceSlots(1) };
+    expect(validateTemplateForm(one, JSON.stringify({ swapMode: "head", videoSeconds: 10 }), true)).toEqual({});
+  });
 });

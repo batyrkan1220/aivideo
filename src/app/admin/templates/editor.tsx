@@ -170,7 +170,9 @@ export function TemplateEditor({
     catch { return { q, total: null }; }
   });
   const wsSeconds = typeof cfg?.videoSeconds === "number" ? (cfg.videoSeconds as number) : undefined;
-  const wsCost = wsSeconds ? (Math.max(3, Math.ceil(wsSeconds)) * 0.01 * t.faceSlots.length).toFixed(2) : null;
+  const wsHead = cfg?.swapMode === "head";
+  const wsRate = wsHead ? (cfg?.resolution === "480p" ? 0.04 : 0.08) : 0.01;
+  const wsCost = wsSeconds ? (Math.max(3, Math.ceil(wsSeconds)) * wsRate * t.faceSlots.length).toFixed(2) : null;
 
   return (
     <div className="space-y-6 pb-56 sm:pb-28">
@@ -358,8 +360,21 @@ export function TemplateEditor({
           {t.providerKey === "wavespeed" && cfg && (
             <div className={`rounded-xl border p-4 sm:col-span-2 ${err("ws.index") || err("ws.videoSeconds") ? "border-danger" : "border-brand/30 bg-brand-soft/50"}`}>
               <h3 className="font-semibold">{e.ws.title}</h3>
-              <p className="mt-1 text-sm text-muted">{e.ws.intro}</p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-3" data-field="ws.index">
+              <div className="mt-3" data-field="ws.swapMode">
+                <span className={labelCls}>{e.ws.mode}</span>
+                <div className="grid gap-2">
+                  {(["face", "head"] as const).map((m) => (
+                    <label key={m} className={`flex cursor-pointer items-start gap-2 rounded-xl border bg-white px-3 py-2 text-sm ${(cfg.swapMode ?? "face") === m ? "border-brand" : "border-line"}`}>
+                      <input type="radio" name="ws-mode" className="mt-0.5 accent-brand" checked={(cfg.swapMode ?? "face") === m} onChange={() => setCfg({ swapMode: m, ...(m === "head" ? { resolution: cfg.resolution ?? "720p" } : {}) })} />
+                      {m === "face" ? e.ws.modeFace : e.ws.modeHead}
+                    </label>
+                  ))}
+                </div>
+                <p className="mt-1 text-xs text-muted">{e.ws.modeHint}</p>
+                {err("ws.swapMode") && <p className="mt-1 text-xs font-medium text-danger" role="alert">{err("ws.swapMode")}</p>}
+              </div>
+              {!wsHead && <p className="mt-4 text-sm text-muted">{e.ws.intro}</p>}
+              {!wsHead && <div className="mt-4 grid gap-3 sm:grid-cols-3" data-field="ws.index">
                 {t.faceSlots.map((s, i) => (
                   <Field key={s.key} label={e.ws.slot(s.labelKk)} required error={err(`ws.index.${i}`)}>
                     <select
@@ -373,20 +388,29 @@ export function TemplateEditor({
                     </select>
                   </Field>
                 ))}
-              </div>
-              {err("ws.index") && <p className="mt-2 text-xs font-medium text-danger" role="alert">{err("ws.index")}</p>}
+              </div>}
+              {!wsHead && err("ws.index") && <p className="mt-2 text-xs font-medium text-danger" role="alert">{err("ws.index")}</p>}
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <Field label={e.ws.seconds} field="ws.videoSeconds" required error={err("ws.videoSeconds")}>
                   <Num value={wsSeconds} min={1} error={err("ws.videoSeconds")} onChange={(v) => setCfg({ videoSeconds: v })} />
                   <span className="mt-1 block text-xs text-muted">{wsCost ? e.ws.cost(wsCost) : e.ws.secondsHint}</span>
                 </Field>
-                <Field label={e.ws.gender}>
-                  <select className={inputCls()} value={String(cfg.targetGender ?? "all")} onChange={(ev) => setCfg({ targetGender: ev.target.value })}>
-                    <option value="all">{e.ws.genderAll}</option>
-                    <option value="male">{e.ws.genderMale}</option>
-                    <option value="female">{e.ws.genderFemale}</option>
-                  </select>
-                </Field>
+                {wsHead ? (
+                  <Field label={e.ws.resolution}>
+                    <select className={inputCls()} value={String(cfg.resolution ?? "720p")} onChange={(ev) => setCfg({ resolution: ev.target.value })}>
+                      <option value="720p">720p — $0.08/сек</option>
+                      <option value="480p">480p — $0.04/сек</option>
+                    </select>
+                  </Field>
+                ) : (
+                  <Field label={e.ws.gender}>
+                    <select className={inputCls()} value={String(cfg.targetGender ?? "all")} onChange={(ev) => setCfg({ targetGender: ev.target.value })}>
+                      <option value="all">{e.ws.genderAll}</option>
+                      <option value="male">{e.ws.genderMale}</option>
+                      <option value="female">{e.ws.genderFemale}</option>
+                    </select>
+                  </Field>
+                )}
               </div>
             </div>
           )}
