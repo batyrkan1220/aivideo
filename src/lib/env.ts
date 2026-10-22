@@ -37,11 +37,28 @@ const schema = z.object({
   DAILY_PROVIDER_SPEND_LIMIT_USD: z.coerce.number().nonnegative().default(100),
 });
 
+const OPTIONAL_INTEGRATION_KEYS = new Set([
+  "TOLE_API_KEY", "TOLE_CONNECTION_ID", "TOLE_WEBHOOK_SECRET", "TOLE_API_BASE_URL",
+  "AKOOL_API_KEY", "AKOOL_API_BASE_URL", "TELEGRAM_BOT_TOKEN",
+  "KASPI_MERCHANT_ID", "KASPI_API_KEY", "KASPI_WEBHOOK_SECRET", "KASPI_API_BASE_URL",
+]);
+
 let cached: z.infer<typeof schema> | null = null;
 
 export function env() {
   if (!cached) {
-    const parsed = schema.safeParse(process.env);
+    let parsed = schema.safeParse(process.env);
+    // A malformed OPTIONAL integration secret must not take the whole site down:
+    // drop just that key (the integration then reports "not configured") and log its NAME only.
+    if (!parsed.success) {
+      const bad = new Set(parsed.error.issues.map((i) => String(i.path[0])));
+      if ([...bad].every((k) => OPTIONAL_INTEGRATION_KEYS.has(k))) {
+        console.error(`[env] ignoring invalid optional variable(s): ${[...bad].join(", ")}`);
+        const src: Record<string, string | undefined> = { ...process.env };
+        bad.forEach((k) => delete src[k]);
+        parsed = schema.safeParse(src);
+      }
+    }
     if (!parsed.success) {
       // Developer-facing message (logs only)
       throw new Error("Invalid environment: " + parsed.error.issues.map((i) => i.path.join(".")).join(", "));
