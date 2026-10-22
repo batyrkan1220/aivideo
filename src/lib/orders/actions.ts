@@ -12,6 +12,7 @@ import { track } from "@/lib/analytics";
 import { allow } from "@/lib/security/rate-limit";
 import { customVideoSettings } from "@/lib/custom-video/settings";
 import { akoolTierPrices, applyAkoolPricing } from "@/lib/pricing-akool";
+import { AKOOL_MAX_PEOPLE } from "@/lib/templates/akool-config";
 import { akoolPricingSettings } from "@/lib/pricing-akool/settings";
 import { ensureTemplateDuration } from "@/lib/pricing-akool/duration";
 import { mediaUrl } from "@/lib/templates/queries";
@@ -67,7 +68,9 @@ export async function requestPhotoUpload(raw: unknown): Promise<
   const p = requestSchema.safeParse(raw);
   if (!p.success) return { ok: false, error: "generic" };
   const tv = await loadPublishedVersion(p.data.templateId);
-  if (!tv || !tv.slots.some((s) => s.key === p.data.slotKey)) return { ok: false, error: "template_unavailable" };
+  // Өз видеом: one photo per person Akool found in the customer's video (slot p_<obj_id>).
+  const customPersonSlot = tv?.template.kind === "custom" && /^p_\d{1,4}$/.test(p.data.slotKey);
+  if (!tv || (!customPersonSlot && !tv.slots.some((s) => s.key === p.data.slotKey))) return { ok: false, error: "template_unavailable" };
 
   const problem = validatePhotoMeta(p.data, limits(tv.maxUploadBytes));
   if (problem) return { ok: false, error: problem };
@@ -169,40 +172,67 @@ export async function createOrder(raw: unknown): Promise<
   const tv = await loadPublishedVersion(p.data.templateId);
   if (!tv) return { ok: false, error: "template_unavailable" };
 
+  const db = supabaseAdmin();
+  const now = Date.now();
+
+  // Custom video: the customer's own verified, unattached video (+ Akool person analysis).
+  const custom = tv.template.kind === "custom";
+  let snapshotExtra: Record<string, unknown> = {};
+  let durationSec: number | null = null;
+  let slots = tv.slots;
+  if (custom) {
+    const cs = await customVideoSettings();
+    if (!cs.enabled) return { ok: false, error: "template_unavailable" };
+    if (!p.data.videoId) return { ok: false, error: "video_missing" };
+    const { data: v } = await db.from("order_videos")
+      .select("id,storage_path,verified_at,expires_at,duration_sec,analysis_status,akool_analysis_id,akool_video_url,akool_people")
+      .eq("id", p.data.videoId).eq("user_id", user.id).is("order_id", null).maybeSingle();
+    if (!v?.verified_at || new Date(v.expires_at).getTime() < now) return { ok: false, error: "video_missing" };
+    durationSec = Number(v.duration_sec);
+    snapshotExtra = { user_video_path: v.storage_path, user_video_duration_sec: durationSec };
+    const people = (v.analysis_status === "done" ? (v.akool_people ?? []) : []) as { objId: number }[];
+    if (people.length) {
+      // Akool rule: replace the people the customer gave photos for; the task reuses the analysed URL.
+      const chosen = Object.keys(p.data.assets).map((k) => Number(/^p_(\d{1,4})$/.exec(k)?.[1] ?? NaN));
+      if (!chosen.length || chosen.length > AKOOL_MAX_PEOPLE || chosen.some((id) => !people.some((x) => x.objId === id))) {
+        return { ok: false, error: "photos_missing" };
+      }
+      const order = people.map((x) => x.objId).filter((id) => chosen.includes(id));
+      slots = order.map((id, i) => ({
+        key: `p_${id}`, order: i, labelKk: `${people.findIndex((x) => x.objId === id) + 1}-адам`,
+        position: { x: 0.5, y: 0.42 }, providerInput: `obj_${id}`,
+      }));
+      snapshotExtra = {
+        ...snapshotExtra,
+        akool_video_url: v.akool_video_url,
+        face_slots_json: slots,
+        required_face_count: slots.length,
+        provider_config_json: {
+          resolution: "720p",
+          analysis: { id: v.akool_analysis_id, videoPath: v.storage_path, videoUrl: v.akool_video_url, people: people.map((x) => ({ objId: x.objId })) },
+          selected: order,
+        },
+      };
+    }
+  } else if (p.data.videoId) {
+    return { ok: false, error: "generic" };
+  }
+
   // Every slot must have exactly one verified, unattached, unexpired photo owned by this user.
-  const slotKeys = tv.slots.map((s) => s.key);
+  const slotKeys = slots.map((s) => s.key);
   const ids = slotKeys.map((k) => p.data.assets[k]);
   if (ids.some((x) => !x) || Object.keys(p.data.assets).length !== slotKeys.length) {
     return { ok: false, error: "photos_missing" };
   }
-  const db = supabaseAdmin();
   const { data: assets } = await db.from("order_assets")
     .select("id,face_slot_key,verified_at,expires_at,template_id")
     .in("id", ids).eq("user_id", user.id).is("order_id", null);
-  const now = Date.now();
   for (const k of slotKeys) {
     const a = assets?.find((x) => x.id === p.data.assets[k]);
     if (!a || a.face_slot_key !== k || a.template_id !== tv.template.id || !a.verified_at) {
       return { ok: false, error: "photos_missing" };
     }
     if (new Date(a.expires_at).getTime() < now) return { ok: false, error: "photos_expired" };
-  }
-
-  // Custom video: the customer's own verified, unattached video.
-  const custom = tv.template.kind === "custom";
-  let snapshotExtra: Record<string, unknown> = {};
-  let durationSec: number | null = null;
-  if (custom) {
-    const cs = await customVideoSettings();
-    if (!cs.enabled) return { ok: false, error: "template_unavailable" };
-    if (!p.data.videoId) return { ok: false, error: "video_missing" };
-    const { data: v } = await db.from("order_videos").select("id,storage_path,verified_at,expires_at,duration_sec")
-      .eq("id", p.data.videoId).eq("user_id", user.id).is("order_id", null).maybeSingle();
-    if (!v?.verified_at || new Date(v.expires_at).getTime() < now) return { ok: false, error: "video_missing" };
-    durationSec = Number(v.duration_sec);
-    snapshotExtra = { user_video_path: v.storage_path, user_video_duration_sec: durationSec };
-  } else if (p.data.videoId) {
-    return { ok: false, error: "generic" };
   }
 
   // Akool: quality = output resolution, price from video length × credits (or manual 720p price).
@@ -224,14 +254,14 @@ export async function createOrder(raw: unknown): Promise<
   if (!quality) return { ok: false, error: "quality_unavailable" };
 
   // Price is computed here, from the version snapshot — never taken from the browser.
-  const breakdown = calculatePrice(pricing, quality, tv.slots.length);
+  const breakdown = calculatePrice(pricing, quality, slots.length);
   const { data: order, error } = await db.from("orders").insert({
     user_id: user.id,
     template_id: tv.template.id,
     template_version_id: tv.versionId,
     template_snapshot_json: { ...tv.snapshot, ...snapshotExtra, quality },
     quality: quality.key,
-    face_count: tv.slots.length,
+    face_count: slots.length,
     pricing_breakdown_json: breakdown,
     amount_kzt: breakdown.totalKzt,
     currency: "KZT",

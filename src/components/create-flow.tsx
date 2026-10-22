@@ -11,7 +11,8 @@ import { startCheckout } from "@/lib/payments/actions";
 import { normalizeKzPhone } from "@/lib/payments/phone";
 import { useSavedPhone, savePhone } from "@/lib/payments/saved-phone";
 import { compressPhoto } from "@/lib/uploads/compress";
-import { requestVideoUpload, confirmVideoUpload, removeVideoUpload, type VideoError } from "@/lib/custom-video/actions";
+import { AKOOL_MAX_PEOPLE } from "@/lib/templates/akool-config";
+import { requestVideoUpload, confirmVideoUpload, removeVideoUpload, checkVideoAnalysis, type VideoError, type AnalysisResult } from "@/lib/custom-video/actions";
 
 type SlotState =
   | { phase: "empty" }
@@ -21,6 +22,7 @@ type SlotState =
   | { phase: "error"; preview?: string; message: string };
 
 const c = kk.create;
+const EMPTY: SlotState = { phase: "empty" };
 const cv = kk.customVideo;
 const videoErr = (e: VideoError, l: { maxSeconds: number; maxMb: number }) =>
   e === "too_long" ? cv.errors.too_long(l.maxSeconds) : e === "too_large" ? cv.errors.too_large(l.maxMb)
@@ -79,7 +81,7 @@ function readVideoDuration(url: string): Promise<number | null> {
 }
 
 export function CreateFlow({
-  templateId, slots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, customVideo, akoolPricing,
+  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, customVideo, akoolPricing,
 }: {
   templateId: string;
   slots: FaceSlot[];
@@ -99,7 +101,7 @@ export function CreateFlow({
 }) {
   const router = useRouter();
   const [state, setState] = useState<Record<string, SlotState>>(() =>
-    Object.fromEntries(slots.map((s) => [s.key, { phase: "empty" } as SlotState])));
+    Object.fromEntries(baseSlots.map((s) => [s.key, { phase: "empty" } as SlotState])));
   const available = qualities.filter((q) => q.available);
   const [quality, setQuality] = useState(available[0]?.key ?? "");
   const [consent, setConsent] = useState(false);
@@ -152,12 +154,40 @@ export function CreateFlow({
     if (video.phase === "ready") void removeVideoUpload(video.videoId);
     setVideo({ phase: "empty" });
   };
+
+  // Akool person analysis of the uploaded video → one photo per person the customer wants to replace.
+  const [analysis, setAnalysis] = useState<{ videoId: string; result: AnalysisResult } | null>(null);
+  const readyVideoId = video.phase === "ready" ? video.videoId : null;
+  useEffect(() => {
+    if (!readyVideoId) return;
+    let stop = false;
+    let tries = 0;
+    const tick = async () => {
+      if (stop) return;
+      const r = await checkVideoAnalysis(readyVideoId).catch(() => ({ status: "processing" }) as AnalysisResult);
+      if (stop) return;
+      tries++;
+      const result: AnalysisResult = r.status === "processing" && tries > 60 ? { status: "unavailable" } : r;
+      setAnalysis({ videoId: readyVideoId, result });
+      if (result.status === "processing") setTimeout(tick, 3000);
+    };
+    void tick();
+    return () => { stop = true; };
+  }, [readyVideoId]);
+  const an = analysis && analysis.videoId === readyVideoId ? analysis.result : readyVideoId ? ({ status: "processing" } as AnalysisResult) : null;
+  const people = an?.status === "done" ? an.people : null;
+  const analysing = !!customVideo && !!readyVideoId && an?.status === "processing";
+  const peopleSlots: FaceSlot[] | null = people
+    ? people.map((p, i) => ({ key: `p_${p.objId}`, order: i, labelKk: kk.upload.personInVideo(i + 1), position: { x: 0.5, y: 0.42 }, providerInput: `obj_${p.objId}`, previewImagePath: p.previewUrl ?? undefined }))
+    : null;
+  const slots = peopleSlots ?? baseSlots;
+  const pickMode = !!peopleSlots; // choose who to replace (1–5), not "fill every slot"
   const limits = { maxBytes: maxUploadBytes, minDimension, maxDimension };
 
   const onPick = async (slot: FaceSlot, file: File | undefined) => {
     if (!file) return;
     setFormError(null);
-    const prev = state[slot.key];
+    const prev = state[slot.key] ?? EMPTY;
     if (prev.phase === "ready") void removePhotoUpload(prev.assetId); // replacing: drop the old file
 
     const preview = URL.createObjectURL(file);
@@ -189,13 +219,18 @@ export function CreateFlow({
   };
 
   const onRemove = (slot: FaceSlot) => {
-    const s = state[slot.key];
+    const s = state[slot.key] ?? EMPTY;
     if (s.phase === "ready") void removePhotoUpload(s.assetId);
     setSlot(slot.key, { phase: "empty" });
   };
 
-  const readyCount = slots.filter((s) => state[s.key].phase === "ready").length;
-  const missing = slots.length - readyCount;
+  const readyCount = slots.filter((s) => (state[s.key] ?? EMPTY).phase === "ready").length;
+  const missing = analysing ? 1 : pickMode ? (readyCount > 0 ? 0 : 1) : slots.length - readyCount;
+  const faceCount = pickMode ? Math.max(1, readyCount) : slots.length;
+  const pickPhoto = (slot: FaceSlot, f: File | undefined) => {
+    if (pickMode && (state[slot.key] ?? EMPTY).phase !== "ready" && readyCount >= AKOOL_MAX_PEOPLE) { setFormError(cv.errors.maxPeople); return; }
+    void onPick(slot, f);
+  };
   // "Өз видеом": price appears once the video length is known (seconds × credits × tenge).
   const dyn = customVideo && akoolPricing && video.phase === "ready"
     ? applyAkoolPricing(pricing, akoolTierPrices(video.durationSec, 0, akoolPricing)!) : null;
@@ -203,7 +238,7 @@ export function CreateFlow({
   const effPricing = dyn?.pricing ?? pricing;
   const effQualities = (dyn?.qualities ?? qualities).filter((q) => q.available);
   const selected = effQualities.find((q) => q.key === quality) ?? effQualities[0];
-  const price = selected && !waitingForVideo ? calculatePrice(effPricing, selected, slots.length) : null;
+  const price = selected && !waitingForVideo ? calculatePrice(effPricing, selected, faceCount) : null;
   const photosRef = useRef<HTMLElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
   const consentRef = useRef<HTMLLabelElement>(null);
@@ -211,7 +246,7 @@ export function CreateFlow({
   const videoMissing = !!customVideo && video.phase !== "ready";
   const busyVideo = video.phase === "uploading" || video.phase === "verifying";
   const blocker = videoMissing ? "video" : missing > 0 ? "photo" : !phoneOk || (needPhone && !phone) ? "phone" : !consent ? "consent" : null;
-  const busyUpload = slots.some((s) => state[s.key].phase === "uploading" || state[s.key].phase === "verifying");
+  const busyUpload = slots.some((s) => (state[s.key] ?? EMPTY).phase === "uploading" || (state[s.key] ?? EMPTY).phase === "verifying");
 
   /** The pay button is always tappable: it points the user to whatever is still missing. */
   const onPay = () => {
@@ -220,9 +255,13 @@ export function CreateFlow({
       if (!busyVideo) videoRef.current?.querySelector<HTMLInputElement>('input[type="file"]')?.click();
       return;
     }
+    if (blocker === "photo" && analysing) {
+      photosRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     if (blocker === "photo" && !busyUpload) {
       // Open the file picker straight away for the first photo that is still missing.
-      const idx = slots.findIndex((s) => state[s.key].phase !== "ready");
+      const idx = slots.findIndex((s) => (state[s.key] ?? EMPTY).phase !== "ready");
       const inputs = photosRef.current?.querySelectorAll<HTMLInputElement>('input[type="file"]');
       inputs?.[Math.max(0, idx)]?.click();
       return;
@@ -244,10 +283,11 @@ export function CreateFlow({
     if (!phoneOk) { setFormError(kk.order.payErrors.phone_invalid); return; }
     const assets: Record<string, string> = {};
     for (const s of slots) {
-      const st = state[s.key];
-      if (st.phase !== "ready") { setFormError(c.errors.photos_missing); return; }
-      assets[s.key] = st.assetId;
+      const st = state[s.key] ?? EMPTY;
+      if (st.phase === "ready") { assets[s.key] = st.assetId; continue; }
+      if (!pickMode) { setFormError(c.errors.photos_missing); return; }
     }
+    if (!Object.keys(assets).length) { setFormError(c.errors.photos_missing); return; }
     if (customVideo && video.phase !== "ready") { setFormError(cv.errors.missing); return; }
     const r = await createOrder({ templateId, quality, assets, consent: true, ...(customVideo && video.phase === "ready" ? { videoId: video.videoId } : {}) });
     if (!r.ok) {
@@ -285,17 +325,25 @@ export function CreateFlow({
 
       {/* Step: photos */}
       <section ref={photosRef} className={`rounded-card border bg-white p-4 transition-shadow sm:p-5 ${nudge === "photo" ? "border-brand ring-4 ring-brand/20" : "border-line"}`}>
-        <StepTitle n={++step} done={missing === 0}>{slots.length > 1 ? c.stepPhotos(slots.length) : c.stepPhoto}</StepTitle>
-        {slots.length > 1 && <p className="mt-1 text-sm text-muted">{c.photosHint}</p>}
-        {slots.length === 1 ? (
+        <StepTitle n={++step} done={missing === 0}>{pickMode && slots.length > 1 ? cv.whoTitle : slots.length > 1 ? c.stepPhotos(slots.length) : c.stepPhoto}</StepTitle>
+        {pickMode && slots.length > 1 ? <p className="mt-1 text-sm text-muted">{cv.whoText(slots.length)}</p>
+          : slots.length > 1 && <p className="mt-1 text-sm text-muted">{c.photosHint}</p>}
+        {customVideo && !readyVideoId ? (
+          <p className="mt-3 rounded-xl bg-paper px-4 py-5 text-center text-sm text-muted">{cv.photoAfterVideo}</p>
+        ) : analysing ? (
+          <div className="mt-3 flex items-center gap-3 rounded-xl bg-brand-soft/60 px-4 py-5" role="status">
+            <span className="h-6 w-6 shrink-0 animate-spin rounded-full border-[3px] border-brand/25 border-t-brand" aria-hidden />
+            <span className="text-sm font-medium">{cv.analysing}</span>
+          </div>
+        ) : slots.length === 1 ? (
           <div className="mt-3">
-            <SinglePhoto slot={slots[0]} st={state[slots[0].key]} onPick={(f) => onPick(slots[0], f)} onRemove={() => onRemove(slots[0])} />
+            <SinglePhoto slot={slots[0]} st={state[slots[0].key] ?? EMPTY} onPick={(f) => pickPhoto(slots[0], f)} onRemove={() => onRemove(slots[0])} />
           </div>
         ) : (
           <ol className={`mt-3 grid gap-3 ${gridCols} ${slots.length > 3 ? "sm:grid-cols-4" : ""}`}>
             {slots.map((s, i) => (
               <li key={s.key}>
-                <SlotCard index={i} slot={s} st={state[s.key]} mediaBase={`${supabaseUrl}/storage/v1/object/public/template-media`} onPick={(f) => onPick(s, f)} onRemove={() => onRemove(s)} />
+                <SlotCard index={i} slot={s} st={state[s.key] ?? EMPTY} mediaBase={`${supabaseUrl}/storage/v1/object/public/template-media`} onPick={(f) => pickPhoto(s, f)} onRemove={() => onRemove(s)} />
               </li>
             ))}
           </ol>
@@ -310,7 +358,7 @@ export function CreateFlow({
         <StepTitle n={++step} done>{c.qualityTitle}</StepTitle>
         <div role="radiogroup" className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line">
           {effQualities.map((q) => {
-            const p = waitingForVideo ? null : calculatePrice(effPricing, q, slots.length).totalKzt;
+            const p = waitingForVideo ? null : calculatePrice(effPricing, q, faceCount).totalKzt;
             const specs = [q.resolution && !q.labelKk.includes(q.resolution) ? q.resolution : null, q.fps ? `${q.fps} ${kk.template.fps}` : null].filter(Boolean).join(", ");
             return (
               <label key={q.key} className="flex cursor-pointer items-center gap-4 px-4 py-3 has-[:checked]:bg-brand-soft">
