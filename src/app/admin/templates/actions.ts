@@ -115,7 +115,6 @@ export async function changeStatus(
 
   await audit(user.id, `template.${action}`, "template", id);
   revalidatePath("/admin/templates");
-  revalidatePath("/templates");
   revalidatePath("/");
   return { ok: true };
 }

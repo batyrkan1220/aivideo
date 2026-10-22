@@ -29,6 +29,10 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // The separate catalog page was merged into the home feed.
+  async redirects() {
+    return [{ source: "/templates", destination: "/", permanent: false }];
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

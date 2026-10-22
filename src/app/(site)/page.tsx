@@ -1,126 +1,103 @@
 import { Suspense } from "react";
-import Link from "next/link";
 import { connection } from "next/server";
 import { kk } from "@/lib/i18n/kk";
-import { listCategories, listTemplates, listTrending } from "@/lib/templates/queries";
-import { CategoryChips, GridSkeleton, SectionHeading, TemplateGrid, pickCard } from "@/components/catalog-bits";
+import { listCategories, listTemplates } from "@/lib/templates/queries";
+import { CategoryChips, GridSkeleton, pickCard } from "@/components/catalog-bits";
 import { VideoFeed } from "@/components/video-feed";
 import { MyVideosBanner } from "@/components/my-videos-banner";
 import { HeroShowcase } from "@/components/hero-showcase";
 import { resolveShowcase } from "@/lib/templates/showcase";
 
-export default function HomePage({ searchParams }: { searchParams: Promise<{ account?: string }> }) {
+type SP = { account?: string; category?: string };
+
+/**
+ * App-style home: every video in one endless feed (trending first), filtered by category chips.
+ * Phones get a compact intro; desktops keep the hero showcase above the feed.
+ */
+export default function HomePage({ searchParams }: { searchParams: Promise<SP> }) {
   return (
-    <main>
+    <main className="pb-6">
       <Suspense fallback={null}>
         <Notice searchParams={searchParams} />
       </Suspense>
       <Suspense fallback={null}>
         <MyVideosBanner />
       </Suspense>
-      {/* Phones: title → video showcase → categories. Desktop: text left, showcase right. */}
-      <section className="mx-auto grid max-w-6xl gap-x-8 gap-y-6 px-4 pb-10 pt-8 sm:pt-16 md:grid-cols-[1.15fr_0.85fr] md:grid-rows-[auto_auto]">
-        <div className="min-w-0 md:col-start-1 md:row-start-1 md:self-end">
-          <h1 className="max-w-3xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
-            {kk.home.title}
-          </h1>
+
+      {/* Desktop hero */}
+      <section className="mx-auto hidden max-w-6xl grid-cols-[1.15fr_0.85fr] items-center gap-8 px-4 pb-6 pt-12 md:grid">
+        <div className="min-w-0">
+          <h1 className="max-w-3xl font-display text-5xl font-extrabold leading-[1.05] tracking-tight lg:text-6xl">{kk.home.title}</h1>
           <p className="mt-5 max-w-xl text-lg text-muted">{kk.home.lead}</p>
+          <HowItWorks />
         </div>
-        <div className="min-w-0 md:col-start-2 md:row-span-2 md:row-start-1 md:self-center">
-          <Suspense fallback={<div className="h-[21rem] sm:h-[26rem] md:h-[30rem]" />}>
+        <div className="min-w-0">
+          <Suspense fallback={<div className="h-[30rem]" />}>
             <Showcase />
           </Suspense>
         </div>
-        {/* min-w-0: the scrollable category rail must not widen the grid column (and the phone's layout viewport) */}
-        <div className="min-w-0 md:col-start-1 md:row-start-2 md:self-start">
-          <Suspense fallback={<div className="h-10" />}>
-            <Categories />
-          </Suspense>
-        </div>
       </section>
 
-      <Suspense fallback={<div className="mx-auto max-w-6xl px-4"><GridSkeleton /></div>}>
-        <Sections />
+      {/* Phone intro: one line + three tiny steps, then straight to the videos */}
+      <section className="mx-auto max-w-6xl px-4 pt-4 md:hidden">
+        <h1 className="font-display text-xl font-extrabold leading-tight tracking-tight">{kk.home.title}</h1>
+        <HowItWorks compact />
+      </section>
+
+      <Suspense fallback={<div className="mx-auto mt-4 max-w-6xl px-4"><GridSkeleton /></div>}>
+        <Feed searchParams={searchParams} />
       </Suspense>
-
-      <section className="mx-auto mt-20 max-w-6xl px-4">
-        <h2 className="font-display text-xl font-bold sm:text-2xl">{kk.home.howTitle}</h2>
-        <ol className="mt-6 grid gap-6 sm:grid-cols-3">
-          {kk.home.steps.map((s, i) => (
-            <li key={s.t} className="border-t-2 border-ink pt-4">
-              <span className="font-display text-3xl font-bold text-brand">{i + 1}</span>
-              <h3 className="mt-2 font-semibold">{s.t}</h3>
-              <p className="mt-1 text-sm text-muted">{s.d}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
     </main>
   );
 }
 
-async function Categories() {
-  await connection(); // always fresh — admins publish templates at any time
-  return <CategoryChips categories={await listCategories()} />;
+function HowItWorks({ compact = false }: { compact?: boolean }) {
+  return (
+    <ol className={compact ? "no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 text-xs" : "mt-8 grid max-w-xl grid-cols-3 gap-4 text-sm"}>
+      {kk.home.steps.map((s, i) => (
+        <li key={s.t} className={compact ? "flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full bg-white py-1.5 pl-1.5 pr-3 ring-1 ring-line" : "border-t-2 border-ink pt-3"}>
+          <span className={compact ? "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-white" : "font-display text-2xl font-bold text-brand"}>{i + 1}</span>
+          <span className={compact ? "font-medium" : "mt-1 block font-semibold"}>{compact ? s.short : s.t}</span>
+        </li>
+      ))}
+    </ol>
+  );
 }
 
-async function Sections() {
-  await connection();
-  const [trending, all] = await Promise.all([listTrending(8), listTemplates({ page: 1 })]);
+async function Feed({ searchParams }: { searchParams: Promise<SP> }) {
+  await connection(); // always fresh — admins publish templates at any time
+  const sp = await searchParams;
+  const categories = await listCategories();
+  const category = categories.some((c) => c.slug === sp.category) ? sp.category : undefined;
+  const first = await listTemplates({ page: 1, sort: "trending", category });
 
-  if (!trending.length && !all.items.length) {
-    return (
-      <div className="mx-auto max-w-6xl px-4">
-        <div className="rounded-card border border-dashed border-line bg-white px-6 py-16 text-center">
+  return (
+    <div className="mx-auto max-w-6xl px-4">
+      {/* Sticky category chips, like an app's filter bar */}
+      {categories.length > 0 && (
+        <div className="under-header sticky z-20 -mx-4 bg-paper/95 px-4 py-3 backdrop-blur">
+          <CategoryChips categories={categories} active={category} />
+        </div>
+      )}
+      {first.items.length === 0 ? (
+        <div className="mt-4 rounded-card border border-dashed border-line bg-white px-6 py-16 text-center">
           <h2 className="font-display text-xl font-bold">{kk.home.emptyTitle}</h2>
           <p className="mx-auto mt-2 max-w-md text-muted">{kk.home.emptyText}</p>
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mx-auto max-w-6xl space-y-14 px-4">
-      {trending.length > 0 && (
-        <section>
-          <SectionHeading title={kk.home.trendingTitle} />
-          <TemplateGrid items={trending} priorityCount={4} mobileLimit={4} />
-        </section>
-      )}
-      {/* Phones: only a few videos, then a button to the full video catalog. */}
-      {!trending.length && (
-        <section className="sm:hidden">
-          <TemplateGrid items={all.items.slice(0, 4)} priorityCount={4} />
-        </section>
-      )}
-      <MobileAllVideos />
-      {/* Desktop: one endless feed of all videos, loaded page by page while scrolling. */}
-      {all.items.length > 0 && (
-        <section className="max-sm:hidden">
-          <VideoFeed
-            title={kk.home.allVideos}
-            initial={all.items.map(pickCard)}
-            initialHasMore={all.items.length < all.total}
-            exclude={trending.map((t) => t.id)}
-          />
-        </section>
+      ) : (
+        <VideoFeed
+          key={category ?? "all"}
+          category={category}
+          initial={first.items.map(pickCard)}
+          initialHasMore={first.items.length < first.total}
+          priorityCount={4}
+        />
       )}
     </div>
   );
 }
 
-function MobileAllVideos() {
-  return (
-    <Link
-      href="/templates"
-      className="flex h-12 items-center justify-center gap-2 rounded-full bg-ink text-base font-semibold text-white sm:hidden"
-    >
-      {kk.home.allVideos} <span aria-hidden>→</span>
-    </Link>
-  );
-}
-
-async function Notice({ searchParams }: { searchParams: Promise<{ account?: string }> }) {
+async function Notice({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;
   if (sp.account !== "deleted") return null;
   return (

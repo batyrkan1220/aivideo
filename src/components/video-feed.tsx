@@ -8,7 +8,7 @@ import { loadMoreVideos } from "@/app/(site)/home-actions";
  * Endless video feed: shows the first page, then loads the next page automatically when the
  * end of the list comes into view. Cards themselves load video lazily (see TemplateCard).
  */
-export function VideoFeed({ title, initial, initialHasMore, exclude = [] }: { title: string; initial: CardData[]; initialHasMore: boolean; exclude?: string[] }) {
+export function VideoFeed({ title, category, initial, initialHasMore, exclude = [], priorityCount = 0 }: { title?: string; category?: string; initial: CardData[]; initialHasMore: boolean; exclude?: string[]; priorityCount?: number }) {
   const [items, setItems] = useState(initial);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(initialHasMore);
@@ -23,7 +23,7 @@ export function VideoFeed({ title, initial, initialHasMore, exclude = [] }: { ti
       if (!e.isIntersecting || loading) return;
       setLoading(true);
       try {
-        const next = await loadMoreVideos(page + 1);
+        const next = await loadMoreVideos(page + 1, category);
         setItems((prev) => {
           const seen = new Set(prev.map((x) => x.id));
           return [...prev, ...next.items.filter((x) => !seen.has(x.id))];
@@ -38,16 +38,16 @@ export function VideoFeed({ title, initial, initialHasMore, exclude = [] }: { ti
     }, { rootMargin: "600px 0px" });
     io.observe(el);
     return () => io.disconnect();
-  }, [page, hasMore, loading]);
+  }, [page, hasMore, loading, category]);
 
   const shown = items.filter((t) => !skip.has(t.id));
   if (!shown.length && !hasMore) return null;
   return (
     <>
-      <h2 className="mb-5 font-display text-xl font-bold tracking-tight sm:text-2xl">{title}</h2>
+      {title && <h2 className="mb-5 font-display text-xl font-bold tracking-tight sm:text-2xl">{title}</h2>}
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-        {shown.map((t) => (
-          <li key={t.id}><TemplateCard t={t} /></li>
+        {shown.map((t, i) => (
+          <li key={t.id}><TemplateCard t={t} priority={i < priorityCount} /></li>
         ))}
       </ul>
       {hasMore && (

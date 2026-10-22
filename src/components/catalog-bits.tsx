@@ -50,7 +50,7 @@ export function CategoryChips({
     const p = new URLSearchParams();
     Object.entries({ ...extraParams, category: slug }).forEach(([k, v]) => v && p.set(k, v));
     const s = p.toString();
-    return `/templates${s ? `?${s}` : ""}`;
+    return `/${s ? `?${s}` : ""}`;
   };
   const chip = (isActive: boolean) =>
     `shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${

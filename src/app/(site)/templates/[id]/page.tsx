@@ -14,7 +14,7 @@ import type { TemplateDetail } from "@/lib/templates/queries";
 export default function TemplatePage({ params }: { params: Promise<{ id: string }> }) {
   return (
     <main className="mx-auto max-w-6xl px-4 pt-8">
-      <Link href="/templates" className="-my-2 inline-block py-2 text-sm font-medium text-muted hover:text-ink">← {kk.template.back}</Link>
+      <Link href="/" className="-my-2 inline-block py-2 text-sm font-medium text-muted hover:text-ink">← {kk.template.back}</Link>
       <Suspense fallback={<div className="mt-6 aspect-[9/16] max-w-sm animate-pulse rounded-card bg-line" />}>
         <Detail params={params} />
       </Suspense>
