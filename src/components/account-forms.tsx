@@ -2,6 +2,7 @@
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { kk } from "@/lib/i18n/kk";
+import { confirmAsync, setNoAutoLogin, useIsTelegram } from "@/lib/telegram/client";
 import { updateDisplayName, deleteAllPhotos, deleteAccount, type FormState } from "@/lib/account/actions";
 
 const inputCls = "w-full rounded-xl border border-line bg-white px-3 py-2 outline-none focus:border-brand";
@@ -13,7 +14,12 @@ export function ConfirmSubmit({ message, children, className = "" }: { message: 
     <button
       type="submit"
       disabled={pending}
-      onClick={(e) => { if (!window.confirm(message)) e.preventDefault(); }}
+      onClick={(e) => {
+        // Ask first (Telegram-native dialog inside the Mini App), then submit the same form.
+        e.preventDefault();
+        const btn = e.currentTarget;
+        void confirmAsync(message).then((ok) => { if (ok) btn.form?.requestSubmit(btn); });
+      }}
       className={className}
     >
       {pending ? kk.common.loading : children}
@@ -57,10 +63,11 @@ export function DeleteAllPhotosForm() {
 
 export function DeleteAccountForm() {
   const [state, action] = useActionState(deleteAccount, {});
+  const inTelegram = useIsTelegram();
   const [word, setWord] = useState("");
   const ready = word.trim().toUpperCase() === kk.account.deleteAccountWord;
   return (
-    <form action={action} className="space-y-3">
+    <form action={action} className="space-y-3" onSubmit={() => { if (inTelegram) setNoAutoLogin(true); }}>
       <p className="text-sm text-muted">{kk.account.deleteAccountText}</p>
       <label className="block max-w-xs">
         <span className="mb-1 block text-xs font-medium text-muted">{kk.account.deleteAccountTypeHint}</span>
@@ -72,4 +79,21 @@ export function DeleteAccountForm() {
       <Msg s={state} />
     </form>
   );
+}
+
+/** Logout. Inside Telegram it also stops the automatic Telegram sign-in for this session. */
+export function LogoutButton({ action }: { action: () => Promise<void> }) {
+  const inTelegram = useIsTelegram();
+  return (
+    <form action={action} onSubmit={() => { if (inTelegram) setNoAutoLogin(true); }}>
+      <button className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium hover:border-ink">
+        {kk.nav.logout}
+      </button>
+    </form>
+  );
+}
+
+/** Telegram users: deleting the account, then reopening the bot, starts a fresh empty account. */
+export function TelegramDeleteNote() {
+  return useIsTelegram() ? <p className="mb-3 text-sm text-muted">{kk.account.telegramDeleteNote}</p> : null;
 }

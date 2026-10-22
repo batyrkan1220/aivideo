@@ -6,7 +6,7 @@ import { logoutAction } from "@/app/(auth)/actions";
 import { kk } from "@/lib/i18n/kk";
 import { isTelegramEmail } from "@/lib/telegram/session";
 import { OrderList } from "@/components/order-list";
-import { DisplayNameForm, DeleteAllPhotosForm, DeleteAccountForm } from "@/components/account-forms";
+import { DisplayNameForm, DeleteAllPhotosForm, DeleteAccountForm, LogoutButton, TelegramDeleteNote } from "@/components/account-forms";
 
 export const metadata = { title: kk.account.title };
 
@@ -15,11 +15,7 @@ export default function AccountPage() {
     <main className="mx-auto w-full max-w-2xl px-4 py-10">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="font-display text-2xl font-bold">{kk.account.title}</h1>
-        <form action={logoutAction}>
-          <button className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium hover:border-ink">
-            {kk.nav.logout}
-          </button>
-        </form>
+        <LogoutButton action={logoutAction} />
       </div>
       <Suspense fallback={<p className="text-muted">{kk.common.loading}</p>}>
         <AccountDetails />
@@ -63,6 +59,7 @@ async function AccountDetails() {
 
       <section className="rounded-card border border-danger/30 bg-white p-6">
         <h2 className="mb-2 font-semibold text-danger">{kk.account.deleteAccount}</h2>
+        <TelegramDeleteNote />
         <DeleteAccountForm />
       </section>
     </div>

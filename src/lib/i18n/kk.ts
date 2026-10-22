@@ -88,6 +88,7 @@ export const kk = {
     openBrowser: "Браузерде ашу →",
     payOpened: "Төлем беті браузерде ашылды. Төлеген соң Telegram-ға оралыңыз — видео осында шығады.",
     signingIn: "Telegram арқылы кіріп жатырмыз…",
+    signInButton: "Telegram арқылы кіру",
   },
   myVideos: {
     title: "Менің видеоларым",
@@ -600,6 +601,7 @@ export const kk = {
     deleteAccountButton: "Аккаунтты біржола өшіру",
     deleteAccountBusy: "Видео жасалып жатқан тапсырыс бар. Ол аяқталған соң қайталаңыз.",
     deleteAccountWrong: "Растау сөзі дұрыс емес.",
+    telegramDeleteNote: "Telegram арқылы кірдіңіз: аккаунт өшкен соң ботты қайта ашсаңыз, жаңа бос аккаунт ашылады.",
     accountDeleted: "Аккаунтыңыз өшірілді.",
     greeting: (name: string) => `Сәлем, ${name}!`,
     profile: "Профиль",

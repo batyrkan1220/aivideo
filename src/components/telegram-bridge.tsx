@@ -2,10 +2,11 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { kk } from "@/lib/i18n/kk";
-import { TG_READY_EVENT, launchInitData, telegramApp } from "@/lib/telegram/client";
+import { TG_READY_EVENT, launchInitData, noAutoLogin, setNoAutoLogin, telegramApp } from "@/lib/telegram/client";
 
 const SCRIPT = "https://telegram.org/js/telegram-web-app.js";
 const AUTH_PAGES = ["/login", "/signup"];
+let signInRef: (() => void) | null = null;
 
 /**
  * Inside the Telegram Mini App:
@@ -25,6 +26,8 @@ export function TelegramBridge() {
     () => !!launchInitData() && AUTH_PAGES.includes(window.location.pathname),
     () => false,
   );
+  // After an explicit logout in Telegram: no auto sign-in; show a one-tap button on login pages.
+  const manual = useSyncExternalStore(() => () => {}, () => !!launchInitData() && noAutoLogin(), () => false);
   const setSigningIn = (v: boolean) => setPending(v);
 
   useEffect(() => {
@@ -35,6 +38,7 @@ export function TelegramBridge() {
 
     // Sign in (cheap no-op on the server when this Telegram user is already signed in).
     let tries = 0;
+    if (noAutoLogin()) { setTimeout(() => setSigningIn(false), 0); }
     const signIn = async (): Promise<void> => {
       try {
         const r = await fetch("/api/telegram/auth", {
@@ -60,7 +64,8 @@ export function TelegramBridge() {
         setSigningIn(false);
       }
     };
-    void signIn();
+    if (!noAutoLogin()) void signIn();
+    signInRef = () => { setNoAutoLogin(false); setSigningIn(true); tries = 0; void signIn(); };
 
     // Telegram UI helpers (optional).
     const ui = () => {
@@ -88,7 +93,17 @@ export function TelegramBridge() {
     return () => wa.BackButton.offClick(back);
   }, [pathname, search, router]);
 
-  if (!(pending && tgOnAuthPage)) return null;
+  if (manual && tgOnAuthPage && !pending) {
+    return (
+      <div className="fixed inset-x-0 bottom-24 z-[60] px-4">
+        <button type="button" onClick={() => signInRef?.()}
+          className="mx-auto flex h-13 w-full max-w-md items-center justify-center rounded-full bg-[#2AABEE] font-semibold text-white shadow-lg">
+          {kk.telegram.signInButton}
+        </button>
+      </div>
+    );
+  }
+  if (!(pending && tgOnAuthPage) || manual) return null;
   return (
     <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-4 bg-paper" role="status" aria-live="polite">
       <span className="h-10 w-10 animate-spin rounded-full border-4 border-brand/20 border-t-brand" aria-hidden />
