@@ -53,7 +53,7 @@ export function emptyTemplate(): TemplateInput {
     previewVideoPath: null,
     faceSlots: autoFaceSlots(1),
     qualities: [{ key: "standard", labelKk: "Стандарт", resolution: "720x1280", fps: 30, providerQuality: "standard", surchargeKzt: 0, available: true }],
-    pricing: { basePriceKzt: 1990, chargeExtraFaces: false, extraFacePriceKzt: 0, includedFaces: 1, platformFeeKzt: 0, minPriceKzt: 0 },
+    pricing: { basePriceKzt: 0, chargeExtraFaces: false, extraFacePriceKzt: 0, includedFaces: 1, platformFeeKzt: 0, minPriceKzt: 0 },
     providerKey: "akool",
     providerConfig: { resolution: "720p", selected: [] },
     maxUploadBytes: 10 * 1024 * 1024,
