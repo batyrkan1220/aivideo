@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { akoolPricingSettings } from "@/lib/pricing-akool/settings";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ru } from "@/lib/i18n/ru";
@@ -35,9 +36,10 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.page) || 1);
   const db = supabaseAdmin();
+  const ap = await akoolPricingSettings();
 
   let q = db.from("orders")
-    .select("id,public_order_number,created_at,amount_kzt,payment_status,generation_status,template_snapshot_json,profiles(email)", { count: "exact" })
+    .select("id,public_order_number,created_at,amount_kzt,quality,payment_status,generation_status,template_snapshot_json,profiles(email),generation_jobs(provider_credits)", { count: "exact" })
     .order("created_at", { ascending: false });
 
   const term = (sp.q ?? "").trim().slice(0, 80);
@@ -88,7 +90,7 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
           <table className="w-full text-left text-sm">
             <thead className="border-b border-line text-muted">
               <tr>
-                {[A.colNumber, A.colDate, A.colUser, A.colTemplate, A.colAmount, A.colStatus].map((h) => (
+                {[A.colNumber, A.colDate, A.colUser, A.colTemplate, A.colAmount, A.colCost, A.colStatus].map((h) => (
                   <th key={h} className="px-4 py-3 font-medium">{h}</th>
                 ))}
               </tr>
@@ -102,7 +104,14 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
                     <td className="px-4 py-3 text-muted">{fmt.format(new Date(o.created_at))}</td>
                     <td className="px-4 py-3">{(prof as { email?: string } | null)?.email ?? <span className="text-muted">{A.deletedUser}</span>}</td>
                     <td className="px-4 py-3">{(o.template_snapshot_json as { title_kk?: string }).title_kk}</td>
-                    <td className="px-4 py-3">{formatKzt(o.amount_kzt)}</td>
+                    <td className="px-4 py-3">{formatKzt(o.amount_kzt)}<span className="block text-xs text-muted">{o.quality}</span></td>
+                    <td className="px-4 py-3 text-xs">{(() => {
+                      const jobs = (Array.isArray(o.generation_jobs) ? o.generation_jobs : o.generation_jobs ? [o.generation_jobs] : []) as { provider_credits: number | null }[];
+                      const credits = jobs.reduce((n, j) => n + (j.provider_credits ?? 0), 0);
+                      if (!credits) return <span className="text-muted">—</span>;
+                      const cost = Math.round(credits * ap.tengePerCredit);
+                      return <>{A.credits(credits)} · {formatKzt(cost)}<span className={`block ${o.amount_kzt - cost >= 0 ? "text-success" : "text-danger"}`}>{A.margin(formatKzt(o.amount_kzt - cost))}</span></>;
+                    })()}</td>
                     <td className="px-4 py-3 text-xs">
                       {ru.order.payment[o.payment_status as keyof typeof ru.order.payment]}
                       {o.payment_status === "succeeded" && <> / {ru.order.generation[o.generation_status as keyof typeof ru.order.generation]}</>}

@@ -10,6 +10,8 @@ import { isTestPaymentProvider } from "@/lib/payments/types";
 import { TelegramSetup } from "./telegram/setup";
 import { ToleCheckPanel } from "./tole/check";
 import { CustomVideoForm } from "./custom-video/form";
+import { AkoolPricingForm } from "./akool-pricing/form";
+import { akoolPricingSettings } from "@/lib/pricing-akool/settings";
 import { customVideoSettings } from "@/lib/custom-video/settings";
 
 const S = ru.admin.stats;
@@ -76,6 +78,7 @@ async function Overview({ searchParams }: { searchParams: Promise<SP> }) {
         </form>
       </div>
 
+      {can(u.role, "templates.manage") && <AkoolPricingForm value={await akoolPricingSettings()} />}
       {can(u.role, "templates.manage") && <CustomVideoForm value={await customVideoSettings()} />}
       {can(u.role, "users.manage") && <ToleCheckPanel />}
       {can(u.role, "users.manage") && (

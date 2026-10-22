@@ -139,6 +139,8 @@ export const akoolProvider: GenerationProvider = {
 
   async submit(input) {
     const cfg = akoolConfigSchema.parse(input.config ?? {});
+    // The customer's chosen quality is the output resolution (Akool rule); else the template default.
+    const resolution = input.quality === "480p" || input.quality === "720p" ? input.quality : cfg.resolution;
     const a = cfg.analysis;
     if (!a || a.videoUrl !== input.templateVideoUrl) {
       // Auto mode: Akool requires a person analysis of the same video before replacing,
@@ -146,13 +148,13 @@ export const akoolProvider: GenerationProvider = {
       const analysisId = await akoolStartAnalysis(input.templateVideoUrl);
       const state: AutoState = {
         phase: "analysis", analysisId, videoUrl: input.templateVideoUrl,
-        faceUrl: input.faces[0].imageUrl, resolution: cfg.resolution,
+        faceUrl: input.faces[0].imageUrl, resolution,
       };
       return { providerJobId: analysisId, state };
     }
-    const id = await createTask(a.videoUrl, a.id,
-      input.faces.map((f) => ({ obj_id: objIdOf(f.providerInput)!, img_url: f.imageUrl })), cfg.resolution);
-    return { providerJobId: id };
+    const task = await createTask(a.videoUrl, a.id,
+      input.faces.map((f) => ({ obj_id: objIdOf(f.providerInput)!, img_url: f.imageUrl })), resolution);
+    return { providerJobId: task.id, credits: task.credits };
   },
 
   async getStatus(providerJobId, { state }): Promise<ProviderJobStatus> {
@@ -166,8 +168,8 @@ export const akoolProvider: GenerationProvider = {
       }
       if (!r.people.length) return { state: "failed", errorCode: "akool_no_people", retryable: false };
       // One-person template: replace the first (main) person Akool detected.
-      const taskId = await createTask(s.videoUrl, s.analysisId, [{ obj_id: r.people[0].objId, img_url: s.faceUrl }], s.resolution);
-      return { state: "processing", progress: 0, next: { providerJobId: taskId, state: { phase: "task" } } };
+      const task = await createTask(s.videoUrl, s.analysisId, [{ obj_id: r.people[0].objId, img_url: s.faceUrl }], s.resolution);
+      return { state: "processing", progress: 0, next: { providerJobId: task.id, state: { phase: "task" }, credits: task.credits } };
     }
 
     const d = await call<{ status?: number; progress?: number; url?: string | null; error_reason?: string }>(
@@ -205,5 +207,5 @@ async function createTask(videoUrl: string, analyzeId: string, mappings: { obj_i
     // Creation errors are not billed (docs), so it is safe to report and stop.
     throw new ProviderError("provider_rejected", false, JSON.stringify(d.errors ?? []).slice(0, 300));
   }
-  return task._id;
+  return { id: task._id, credits: typeof task.deduction_credit === "number" ? task.deduction_credit : undefined };
 }

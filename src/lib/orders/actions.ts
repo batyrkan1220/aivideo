@@ -11,6 +11,10 @@ import { PHOTO_EXT, sniffImageType, validatePhotoMeta, type PhotoError, type Pho
 import { track } from "@/lib/analytics";
 import { allow } from "@/lib/security/rate-limit";
 import { customVideoSettings } from "@/lib/custom-video/settings";
+import { akoolTierPrices, applyAkoolPricing } from "@/lib/pricing-akool";
+import { akoolPricingSettings } from "@/lib/pricing-akool/settings";
+import { ensureTemplateDuration } from "@/lib/pricing-akool/duration";
+import { mediaUrl } from "@/lib/templates/queries";
 
 type Fail<E extends string> = { ok: false; error: E | "unauthorized" | "generic" };
 const BUCKET = "user-uploads";
@@ -21,7 +25,7 @@ async function loadPublishedVersion(templateId: string) {
   if (!z.string().uuid().safeParse(templateId).success) return null;
   const db = supabaseAdmin();
   const { data: t } = await db.from("templates")
-    .select("id,title_kk,status,current_version_id,cover_asset_path,kind").eq("id", templateId).maybeSingle();
+    .select("id,title_kk,status,current_version_id,cover_asset_path,kind,video_duration_sec").eq("id", templateId).maybeSingle();
   if (!t || t.status !== "published" || !t.current_version_id) return null;
   const { data: v } = await db.from("template_versions")
     .select("id,configuration_snapshot").eq("id", t.current_version_id).single();
@@ -165,9 +169,6 @@ export async function createOrder(raw: unknown): Promise<
   const tv = await loadPublishedVersion(p.data.templateId);
   if (!tv) return { ok: false, error: "template_unavailable" };
 
-  const quality = tv.qualities.find((q) => q.key === p.data.quality && q.available);
-  if (!quality) return { ok: false, error: "quality_unavailable" };
-
   // Every slot must have exactly one verified, unattached, unexpired photo owned by this user.
   const slotKeys = tv.slots.map((s) => s.key);
   const ids = slotKeys.map((k) => p.data.assets[k]);
@@ -187,22 +188,40 @@ export async function createOrder(raw: unknown): Promise<
     if (new Date(a.expires_at).getTime() < now) return { ok: false, error: "photos_expired" };
   }
 
-  // Custom video: the customer's own verified, unattached video; price from admin settings.
+  // Custom video: the customer's own verified, unattached video.
   const custom = tv.template.kind === "custom";
-  let pricing = tv.pricing;
   let snapshotExtra: Record<string, unknown> = {};
+  let durationSec: number | null = null;
   if (custom) {
-    const s = await customVideoSettings();
-    if (!s.enabled) return { ok: false, error: "template_unavailable" };
+    const cs = await customVideoSettings();
+    if (!cs.enabled) return { ok: false, error: "template_unavailable" };
     if (!p.data.videoId) return { ok: false, error: "video_missing" };
     const { data: v } = await db.from("order_videos").select("id,storage_path,verified_at,expires_at,duration_sec")
       .eq("id", p.data.videoId).eq("user_id", user.id).is("order_id", null).maybeSingle();
     if (!v?.verified_at || new Date(v.expires_at).getTime() < now) return { ok: false, error: "video_missing" };
-    pricing = { ...tv.pricing, basePriceKzt: s.priceKzt };
-    snapshotExtra = { user_video_path: v.storage_path, user_video_duration_sec: Number(v.duration_sec), pricing_config_json: pricing };
+    durationSec = Number(v.duration_sec);
+    snapshotExtra = { user_video_path: v.storage_path, user_video_duration_sec: durationSec };
   } else if (p.data.videoId) {
     return { ok: false, error: "generic" };
   }
+
+  // Akool: quality = output resolution, price from video length × credits (or manual 720p price).
+  let pricing = tv.pricing;
+  let qualities = tv.qualities;
+  if (tv.snapshot.provider_key === "akool") {
+    if (!custom) {
+      durationSec = tv.template.video_duration_sec == null ? null : Number(tv.template.video_duration_sec);
+      if (durationSec === null) durationSec = await ensureTemplateDuration(tv.template.id, mediaUrl((tv.snapshot.preview_video_path as string) ?? null));
+    }
+    const tiers = akoolTierPrices(durationSec, custom ? 0 : tv.pricing.basePriceKzt, await akoolPricingSettings());
+    if (!tiers) return { ok: false, error: "template_unavailable" };
+    const eff = applyAkoolPricing(tv.pricing, tiers);
+    pricing = eff.pricing;
+    qualities = eff.qualities;
+    snapshotExtra = { ...snapshotExtra, pricing_config_json: pricing, video_duration_sec: durationSec };
+  }
+  const quality = qualities.find((q) => q.key === p.data.quality && q.available) ?? (qualities.length === 1 ? qualities[0] : undefined);
+  if (!quality) return { ok: false, error: "quality_unavailable" };
 
   // Price is computed here, from the version snapshot — never taken from the browser.
   const breakdown = calculatePrice(pricing, quality, tv.slots.length);

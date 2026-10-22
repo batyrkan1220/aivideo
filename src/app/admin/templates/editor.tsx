@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ru } from "@/lib/i18n/ru";
@@ -9,6 +9,7 @@ import { autoFaceSlots } from "@/lib/templates/schema";
 import { validateTemplateForm, firstErrorKey, type FieldErrors } from "@/lib/templates/editor-validation";
 import { parseAkoolConfig, akoolSlots, type AkoolConfig } from "@/lib/templates/akool-config";
 import { calculatePrice, formatKzt } from "@/lib/pricing";
+import { akoolTierPrices, type AkoolPricing } from "@/lib/pricing-akool";
 import { FaceMap } from "@/components/face-map";
 import { AkoolPeople } from "./akool-people";
 import { saveTemplate, changeStatus, createUploadUrl } from "./actions";
@@ -71,21 +72,32 @@ function goTo(key: string | null) {
 }
 
 export function TemplateEditor({
-  id, initial, status, categories, mediaBase,
+  id, initial, status, categories, mediaBase, akoolPricing,
 }: {
   id: string | null;
   initial: TemplateInput;
   status: Status;
   categories: { id: string; title: string }[];
   mediaBase: string;
+  akoolPricing: AkoolPricing;
 }) {
   const router = useRouter();
+  const [duration, setDuration] = useState<number | null>(null);
   // Every template is an Akool template: one fixed quality, Akool provider, Akool config.
   const [t, setT] = useState<TemplateInput>(() => ({
     ...initial,
     providerKey: "akool",
     qualities: [initial.qualities.find((q) => q.available) ?? FIXED_QUALITY].map((q) => ({ ...q, surchargeKzt: 0, available: true })),
   }));
+  // Template video length → automatic Akool price preview.
+  useEffect(() => {
+    if (!t.previewVideoPath) return;
+    const v = document.createElement("video");
+    v.preload = "metadata";
+    v.onloadedmetadata = () => setDuration(Number.isFinite(v.duration) ? v.duration : null);
+    v.src = /^https?:/.test(t.previewVideoPath) ? t.previewVideoPath : `${mediaBase}/${t.previewVideoPath}`;
+    return () => { v.onloadedmetadata = null; v.removeAttribute("src"); };
+  }, [t.previewVideoPath, mediaBase]);
   const [akool, setAkoolState] = useState<AkoolConfig>(() =>
     parseAkoolConfig(initial.providerKey === "akool" ? initial.providerConfig : {}));
   const [dirty, setDirty] = useState(false);
@@ -166,6 +178,7 @@ export function TemplateEditor({
   });
 
   let total: number | null = null;
+  const tiers = akoolTierPrices(duration, Number(t.pricing.basePriceKzt) || 0, akoolPricing);
   try { total = calculatePrice(t.pricing, t.qualities[0], Math.max(1, slots.length)).totalKzt; } catch { total = null; }
 
   return (
@@ -280,7 +293,23 @@ export function TemplateEditor({
           </div>
           <div className="rounded-xl bg-brand-soft p-4 lg:self-start">
             <p className="text-sm font-semibold">{e.pricePreview}</p>
-            <p className="mt-2 font-display text-2xl font-bold">{total === null || Number.isNaN(total) ? "—" : formatKzt(total)}</p>
+            {tiers ? (
+              <dl className="mt-2 space-y-1">
+                {(["720p", "480p"] as const).map((r) => (
+                  <div key={r} className="flex items-baseline justify-between gap-3">
+                    <dt className="text-sm text-muted">{r}</dt>
+                    <dd className="font-display text-xl font-bold">{formatKzt(calculatePrice({ ...t.pricing, basePriceKzt: tiers[r] }, { ...t.qualities[0], surchargeKzt: 0 }, Math.max(1, slots.length)).totalKzt)}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              <p className="mt-2 font-display text-2xl font-bold">{total === null || Number.isNaN(total) || !t.pricing.basePriceKzt ? "—" : formatKzt(total)}</p>
+            )}
+            <p className="mt-2 text-xs text-muted">
+              {duration === null ? e.durationUnknown : !t.pricing.basePriceKzt && tiers
+                ? e.autoPrice(formatKzt(tiers["720p"]), formatKzt(tiers["480p"]), Math.round(duration))
+                : tiers ? e.manualPrice(formatKzt(tiers["480p"])) : null}
+            </p>
           </div>
         </div>
       </Section>

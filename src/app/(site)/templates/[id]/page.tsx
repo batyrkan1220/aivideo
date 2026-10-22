@@ -56,6 +56,9 @@ async function CreateSection({ t }: { t: TemplateDetail }) {
       </div>
     );
   }
+  if (!t.priced) {
+    return <p className="rounded-card border border-line bg-white p-5 text-sm text-muted">{kk.template.pricePending}</p>;
+  }
   const e = env();
   return (
     <CreateFlow

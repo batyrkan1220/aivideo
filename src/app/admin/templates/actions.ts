@@ -1,4 +1,6 @@
 "use server";
+import { ensureTemplateDuration } from "@/lib/pricing-akool/duration";
+import { mediaUrl } from "@/lib/templates/queries";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -36,6 +38,7 @@ export async function saveTemplate(raw: unknown, id: string | null): Promise<Sav
     const { data, error } = await db.from("templates")
       .insert({ ...row, status: "draft", created_by: user.id }).select("id").single();
     if (error) { console.error("[admin.template.create]", error.code, error.message); return { ok: false, error: "generic" }; }
+    if (row.preview_video_path) await ensureTemplateDuration(data.id, mediaUrl(row.preview_video_path));
     await audit(user.id, "template.create", "template", data.id, { title: row.title_kk });
     revalidatePath("/admin/templates");
     return { ok: true, id: data.id };
@@ -43,12 +46,16 @@ export async function saveTemplate(raw: unknown, id: string | null): Promise<Sav
 
   if (!z.string().uuid().safeParse(id).success) return { ok: false, error: "generic" };
   const { data: before } = await db.from("templates")
-    .select("pricing_config_json, supported_qualities_json, status").eq("id", id).single();
+    .select("pricing_config_json, supported_qualities_json, status, preview_video_path, video_duration_sec").eq("id", id).single();
   if (!before) return { ok: false, error: "generic" };
 
   const { error } = await db.from("templates").update(row).eq("id", id);
   if (error) { console.error("[admin.template.update]", error.code, error.message); return { ok: false, error: "generic" }; }
 
+  // Video length drives automatic Akool prices: re-read it whenever the video changes.
+  if (row.preview_video_path && (row.preview_video_path !== before.preview_video_path || before.video_duration_sec == null)) {
+    await ensureTemplateDuration(id, mediaUrl(row.preview_video_path));
+  }
   await audit(user.id, "template.update", "template", id, { title: row.title_kk });
   const pricingChanged =
     JSON.stringify(before.pricing_config_json) !== JSON.stringify(row.pricing_config_json) ||

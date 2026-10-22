@@ -142,6 +142,7 @@ async function submitJob(job: Job) {
     await db.from("generation_jobs").update({
       status: "processing", provider_job_id: res.providerJobId, provider_state: res.state ?? null, started_at: now,
       attempt_count: job.attempt_count + 1, provider_cost: res.cost ?? null, progress: 0,
+      ...(res.credits !== undefined ? { provider_credits: res.credits } : {}),
       next_attempt_at: new Date(Date.now() + POLL_EVERY_MS).toISOString(),
     }).eq("id", job.id);
     await db.from("orders").update({ generation_status: "processing" }).eq("id", order.id);
@@ -181,6 +182,7 @@ async function pollJob(job: Job) {
           provider_job_id: st.next.providerJobId,
           provider_state: st.next.state,
           provider_cost: (Number(job.provider_cost) || 0) + (st.next.cost ?? 0),
+          ...(st.next.credits !== undefined ? { provider_credits: st.next.credits } : {}),
         }
       : {};
     return delay(job, POLL_EVERY_MS, { ...polled, ...next, progress: st.progress ?? null });

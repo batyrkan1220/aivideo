@@ -7,6 +7,7 @@ import { customTemplateId, customVideoSettings } from "@/lib/custom-video/settin
 import { CreateFlow } from "@/components/create-flow";
 import { ButtonLink } from "@/components/ui/button";
 import { formatKzt } from "@/lib/pricing";
+import { akoolPricingSettings } from "@/lib/pricing-akool/settings";
 
 export const metadata = { title: kk.customVideo.title };
 
@@ -36,7 +37,7 @@ export default function CreateOwnPage() {
 
 async function Flow() {
   const cv = kk.customVideo;
-  const [user, s, id] = await Promise.all([getSessionUser(), customVideoSettings(), customTemplateId()]);
+  const [user, s, id, ap] = await Promise.all([getSessionUser(), customVideoSettings(), customTemplateId(), akoolPricingSettings()]);
   const t = s.enabled && id ? await getTemplateForAdmin(id) : null;
   if (!t) {
     return (
@@ -52,7 +53,7 @@ async function Flow() {
       <div className="rounded-card bg-brand-soft p-6">
         <h2 className="font-display text-lg font-bold">{kk.create.loginTitle}</h2>
         <p className="mt-1 text-sm text-muted">{kk.create.loginText}</p>
-        <p className="mt-3 font-display text-xl font-bold">{formatKzt(s.priceKzt)}</p>
+        <p className="mt-3 text-sm text-muted">{cv.priceFrom(formatKzt(ap.minPriceKzt))}</p>
         <div className="mt-4 flex flex-wrap gap-3">
           <ButtonLink href="/login?next=/create" size="lg">{kk.auth.login}</ButtonLink>
           <ButtonLink href="/signup?next=/create" size="lg" variant="secondary">{kk.auth.signup}</ButtonLink>
@@ -66,7 +67,8 @@ async function Flow() {
       templateId={t.id}
       slots={t.faceSlots}
       qualities={t.qualities}
-      pricing={{ ...t.pricing, basePriceKzt: s.priceKzt }}
+      pricing={t.pricing}
+      akoolPricing={ap}
       maxUploadBytes={Math.min(t.maxUploadBytes, e.UPLOAD_MAX_BYTES)}
       minDimension={e.UPLOAD_MIN_DIMENSION}
       maxDimension={e.UPLOAD_MAX_DIMENSION}

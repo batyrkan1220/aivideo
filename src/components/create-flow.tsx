@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { kk } from "@/lib/i18n/kk";
 import { calculatePrice, formatKzt } from "@/lib/pricing";
+import { akoolTierPrices, applyAkoolPricing, type AkoolPricing } from "@/lib/pricing-akool";
 import { slotPreviewSrc, type FaceSlot, type PricingConfig, type Quality } from "@/lib/templates/schema";
 import { PHOTO_TYPES, validatePhotoMeta, type PhotoError } from "@/lib/uploads/validate";
 import { requestPhotoUpload, confirmPhotoUpload, removePhotoUpload, createOrder } from "@/lib/orders/actions";
@@ -78,7 +79,7 @@ function readVideoDuration(url: string): Promise<number | null> {
 }
 
 export function CreateFlow({
-  templateId, slots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, customVideo,
+  templateId, slots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, customVideo, akoolPricing,
 }: {
   templateId: string;
   slots: FaceSlot[];
@@ -93,6 +94,8 @@ export function CreateFlow({
   askPhone?: boolean;
   /** "Өз видеом": the customer uploads their own video first. */
   customVideo?: { maxSeconds: number; maxMb: number };
+  /** With customVideo: the price is computed from the uploaded video's length and the quality. */
+  akoolPricing?: AkoolPricing;
 }) {
   const router = useRouter();
   const [state, setState] = useState<Record<string, SlotState>>(() =>
@@ -193,8 +196,14 @@ export function CreateFlow({
 
   const readyCount = slots.filter((s) => state[s.key].phase === "ready").length;
   const missing = slots.length - readyCount;
-  const selected = available.find((q) => q.key === quality);
-  const price = selected ? calculatePrice(pricing, selected, slots.length) : null;
+  // "Өз видеом": price appears once the video length is known (seconds × credits × tenge).
+  const dyn = customVideo && akoolPricing && video.phase === "ready"
+    ? applyAkoolPricing(pricing, akoolTierPrices(video.durationSec, 0, akoolPricing)!) : null;
+  const waitingForVideo = !!customVideo && !dyn;
+  const effPricing = dyn?.pricing ?? pricing;
+  const effQualities = (dyn?.qualities ?? qualities).filter((q) => q.available);
+  const selected = effQualities.find((q) => q.key === quality) ?? effQualities[0];
+  const price = selected && !waitingForVideo ? calculatePrice(effPricing, selected, slots.length) : null;
   const photosRef = useRef<HTMLElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
   const consentRef = useRef<HTMLLabelElement>(null);
@@ -259,7 +268,7 @@ export function CreateFlow({
 
   const gridCols = slots.length === 2 ? "grid-cols-2" : "grid-cols-3";
   let step = 0;
-  const hint = blocker === "phone" ? c.needPhone : blocker === "consent" ? c.needConsent : null;
+  const hint = blocker === "video" ? cv.priceAfterUpload : blocker === "phone" ? c.needPhone : blocker === "consent" ? c.needConsent : null;
 
   return (
     <div className="space-y-4">
@@ -296,13 +305,13 @@ export function CreateFlow({
         </ul>
       </section>
 
-      {/* Akool templates have one fixed quality, so the picker only appears when there is a real choice. */}
-      {available.length > 1 && <section className="rounded-card border border-line bg-white p-4 sm:p-5">
+      {/* Quality = Akool output resolution; the picker only appears when there is a real choice. */}
+      {effQualities.length > 1 && <section className="rounded-card border border-line bg-white p-4 sm:p-5">
         <StepTitle n={++step} done>{c.qualityTitle}</StepTitle>
         <div role="radiogroup" className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line">
-          {available.map((q) => {
-            const p = calculatePrice(pricing, q, slots.length).totalKzt;
-            const specs = [q.resolution, q.fps ? `${q.fps} ${kk.template.fps}` : null].filter(Boolean).join(", ");
+          {effQualities.map((q) => {
+            const p = waitingForVideo ? null : calculatePrice(effPricing, q, slots.length).totalKzt;
+            const specs = [q.resolution && !q.labelKk.includes(q.resolution) ? q.resolution : null, q.fps ? `${q.fps} ${kk.template.fps}` : null].filter(Boolean).join(", ");
             return (
               <label key={q.key} className="flex cursor-pointer items-center gap-4 px-4 py-3 has-[:checked]:bg-brand-soft">
                 <input type="radio" name="quality" value={q.key} checked={quality === q.key} onChange={() => setQuality(q.key)} className="h-4 w-4 accent-brand" />
@@ -310,7 +319,7 @@ export function CreateFlow({
                   <span className="block font-medium">{q.labelKk}</span>
                   {specs && <span className="block text-sm text-muted">{specs}</span>}
                 </span>
-                <span className="font-display font-semibold">{formatKzt(p)}</span>
+                <span className="font-display font-semibold">{p === null ? "" : formatKzt(p)}</span>
               </label>
             );
           })}
@@ -334,13 +343,12 @@ export function CreateFlow({
       )}
 
       {/* Step: pay. On phones the total + button stick above the bottom tab bar. */}
-      {price && (
+      {(price || waitingForVideo) && (
         <section className="rounded-card border border-line bg-white p-4 sm:p-5">
           <StepTitle n={++step} done={false}>{c.stepPay}</StepTitle>
-          {(price.qualitySurchargeKzt > 0 || price.extraFacesKzt > 0 || price.platformFeeKzt > 0 || price.discountKzt > 0) && (
+          {price && (price.extraFacesKzt > 0 || price.platformFeeKzt > 0 || price.discountKzt > 0) && (
             <dl className="mt-3 space-y-1.5 text-sm">
-              <Row label={kk.pricing.videoPrice} value={formatKzt(price.basePriceKzt)} />
-              {price.qualitySurchargeKzt > 0 && <Row label={`${kk.pricing.quality}: ${selected?.labelKk}`} value={`+${formatKzt(price.qualitySurchargeKzt)}`} />}
+              <Row label={`${kk.pricing.videoPrice}${selected ? ` · ${selected.labelKk}` : ""}`} value={formatKzt(price.basePriceKzt + price.qualitySurchargeKzt)} />
               {price.extraFacesKzt > 0 && <Row label={`${kk.pricing.extraFaces} (${price.extraFaces})`} value={`+${formatKzt(price.extraFacesKzt)}`} />}
               {price.platformFeeKzt > 0 && <Row label={kk.pricing.platformFee} value={`+${formatKzt(price.platformFeeKzt)}`} />}
               {price.discountKzt > 0 && <Row label={kk.pricing.discount} value={`−${formatKzt(price.discountKzt)}`} />}
@@ -354,12 +362,12 @@ export function CreateFlow({
         </section>
       )}
 
-      {price && (
+      {(price || waitingForVideo) && (
         <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 -mx-4 border-t border-line bg-white/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:rounded-card sm:border sm:p-4">
           <div className="flex items-center gap-3">
             <div className="min-w-0 shrink-0">
               <p className="text-xs text-muted">{c.total}</p>
-              <p className="font-display text-xl font-bold leading-tight">{formatKzt(price.totalKzt)}</p>
+              <p className="font-display text-xl font-bold leading-tight">{price ? formatKzt(price.totalKzt) : "—"}</p>
             </div>
             <button
               type="button"
@@ -371,7 +379,7 @@ export function CreateFlow({
               {pending ? c.paying
                 : blocker === "video" ? (busyVideo ? kk.upload.uploading : `🎬 ${cv.pickTitle}`)
                 : blocker === "photo" ? (busyUpload ? kk.upload.uploading : `📷 ${c.pickTitle}`)
-                : c.payNow(formatKzt(price.totalKzt))}
+                : price ? c.payNow(formatKzt(price.totalKzt)) : c.confirm}
             </button>
           </div>
           <p className="mt-1.5 min-h-4 text-center text-xs text-danger" aria-live="polite">

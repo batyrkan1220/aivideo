@@ -1,11 +1,14 @@
 import "server-only";
-import { connection } from "next/server";
+import { after, connection } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { faceSlotSchema, qualitySchema, pricingConfigSchema, orderedSlots, type FaceSlot, type Quality } from "./schema";
 import { startingPrice } from "@/lib/pricing";
+import { akoolTierPrices, applyAkoolPricing, DEFAULT_AKOOL_PRICING, type AkoolPricing } from "@/lib/pricing-akool";
+import { akoolPricingSettings } from "@/lib/pricing-akool/settings";
+import { ensureTemplateDuration } from "@/lib/pricing-akool/duration";
 
 /** Cookie-less anon client for public catalog reads (RLS: published templates only). */
 function supabasePublic() {
@@ -35,16 +38,21 @@ export type TemplateDetail = TemplateCard & {
   qualities: Quality[];
   pricing: z.infer<typeof pricingConfigSchema>;
   maxUploadBytes: number;
+  /** Template video length (Akool automatic pricing). */
+  durationSec: number | null;
+  /** false = automatic price not known yet (video length still being read). */
+  priced: boolean;
 };
 
 const CARD_COLUMNS =
-  "id,title_kk,description_kk,required_face_count,cover_asset_path,preview_video_path,supported_qualities_json,pricing_config_json,face_slots_json,max_upload_bytes,is_trending,categories(id,title_kk,slug)";
+  "id,title_kk,description_kk,required_face_count,cover_asset_path,preview_video_path,supported_qualities_json,pricing_config_json,face_slots_json,max_upload_bytes,is_trending,provider_key,video_duration_sec,categories(id,title_kk,slug)";
 
 type Row = {
   id: string; title_kk: string; description_kk: string; required_face_count: number;
   cover_asset_path: string | null; preview_video_path: string | null;
   supported_qualities_json: unknown; pricing_config_json: unknown; face_slots_json: unknown;
   max_upload_bytes: number; is_trending: boolean;
+  provider_key?: string | null; video_duration_sec?: number | string | null;
   categories: { id: string; title_kk: string; slug: string } | { id: string; title_kk: string; slug: string }[] | null;
 };
 
@@ -55,13 +63,25 @@ export function mediaUrl(path: string | null): string | null {
   return `${env().NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/template-media/${path.replace(/^\/+/, "")}`;
 }
 
-export function parseRow(r: Row): TemplateDetail | null {
-  const qualities = z.array(qualitySchema).safeParse(r.supported_qualities_json);
-  const pricing = pricingConfigSchema.safeParse(r.pricing_config_json);
+export function parseRow(r: Row, akoolPricing: AkoolPricing = DEFAULT_AKOOL_PRICING): TemplateDetail | null {
+  const parsedQ = z.array(qualitySchema).safeParse(r.supported_qualities_json);
+  const parsedP = pricingConfigSchema.safeParse(r.pricing_config_json);
   const slots = z.array(faceSlotSchema).safeParse(r.face_slots_json);
-  if (!qualities.success || !pricing.success || !slots.success) {
+  if (!parsedQ.success || !parsedP.success || !slots.success) {
     console.error("[templates] invalid config", r.id);
     return null; // never show a template whose configuration can't be priced
+  }
+  let qualities = parsedQ;
+  let pricing = parsedP;
+  let priced = true;
+  if (r.provider_key === "akool") {
+    // Akool: quality = output resolution; price from video length (or manual 720p price).
+    const duration = r.video_duration_sec == null ? null : Number(r.video_duration_sec);
+    const tiers = akoolTierPrices(duration, parsedP.data.basePriceKzt, akoolPricing);
+    const eff = applyAkoolPricing(parsedP.data, tiers ?? { "720p": 0, "480p": 0 });
+    qualities = { success: true, data: eff.qualities } as typeof parsedQ;
+    pricing = { success: true, data: eff.pricing } as typeof parsedP;
+    priced = tiers !== null;
   }
   const cat = Array.isArray(r.categories) ? r.categories[0] : r.categories;
   const available = qualities.data.filter((q) => q.available);
@@ -71,7 +91,7 @@ export function parseRow(r: Row): TemplateDetail | null {
     description: r.description_kk,
     faceCount: r.required_face_count,
     qualityLabels: available.map((q) => q.labelKk),
-    startingPriceKzt: startingPrice(pricing.data, qualities.data, r.required_face_count),
+    startingPriceKzt: priced ? startingPrice(pricing.data, qualities.data, r.required_face_count) : null,
     coverUrl: mediaUrl(r.cover_asset_path),
     previewUrl: mediaUrl(r.preview_video_path),
     isTrending: r.is_trending,
@@ -81,11 +101,26 @@ export function parseRow(r: Row): TemplateDetail | null {
     qualities: qualities.data,
     pricing: pricing.data,
     maxUploadBytes: r.max_upload_bytes,
+    durationSec: r.video_duration_sec == null ? null : Number(r.video_duration_sec),
+    priced,
   };
 }
 
-const toCards = (rows: Row[] | null) =>
-  (rows ?? []).map(parseRow).filter((t): t is TemplateDetail => t !== null);
+/** Parses rows; Akool templates whose video length is unknown get it filled after the response. */
+async function toCards(rows: Row[] | null): Promise<TemplateDetail[]> {
+  const s = await akoolPricingSettings();
+  const missing = (rows ?? []).filter((r) => r.provider_key === "akool" && r.video_duration_sec == null && r.preview_video_path).slice(0, 3);
+  if (missing.length) after(async () => { for (const r of missing) await ensureTemplateDuration(r.id, mediaUrl(r.preview_video_path)); });
+  return (rows ?? []).map((r) => parseRow(r, s)).filter((t): t is TemplateDetail => t !== null);
+}
+
+async function parseOne(r: Row): Promise<TemplateDetail | null> {
+  if (r.provider_key === "akool" && r.video_duration_sec == null && r.preview_video_path) {
+    const d = await ensureTemplateDuration(r.id, mediaUrl(r.preview_video_path));
+    if (d) r = { ...r, video_duration_sec: d };
+  }
+  return parseRow(r, await akoolPricingSettings());
+}
 
 export async function listCategories(): Promise<Category[]> {
   await connection(); // request-time only: never run during prerender
@@ -120,21 +155,21 @@ export async function listTemplates(opts: { q?: string; category?: string; sort?
 
   const { data, error, count } = await query.range(from, from + PAGE_SIZE - 1);
   if (error) { console.error("[templates.list]", error.code, error.message); return { items: [], total: 0, page }; }
-  return { items: toCards(data as unknown as Row[]), total: count ?? 0, page };
+  return { items: await toCards(data as unknown as Row[]), total: count ?? 0, page };
 }
 
 export async function listTrending(limit = 8) {
   await connection(); // request-time only: never run during prerender
   const { data } = await supabasePublic().from("templates").select(CARD_COLUMNS)
     .eq("status", "published").eq("kind", "catalog").eq("is_trending", true).order("sort_order").limit(limit);
-  return toCards(data as unknown as Row[]);
+  return await toCards(data as unknown as Row[]);
 }
 
 export async function listNewest(limit = 8) {
   await connection(); // request-time only: never run during prerender
   const { data } = await supabasePublic().from("templates").select(CARD_COLUMNS)
     .eq("status", "published").eq("kind", "catalog").order("published_at", { ascending: false, nullsFirst: false }).limit(limit);
-  return toCards(data as unknown as Row[]);
+  return await toCards(data as unknown as Row[]);
 }
 
 export async function getTemplate(id: string): Promise<TemplateDetail | null> {
@@ -142,7 +177,7 @@ export async function getTemplate(id: string): Promise<TemplateDetail | null> {
   if (!z.string().uuid().safeParse(id).success) return null;
   const { data } = await supabasePublic().from("templates").select(CARD_COLUMNS)
     .eq("id", id).eq("status", "published").eq("kind", "catalog").maybeSingle();
-  return data ? parseRow(data as unknown as Row) : null;
+  return data ? await parseOne(data as unknown as Row) : null;
 }
 
 /** Staff-only preview of any template regardless of status (caller must check permissions). */
@@ -150,5 +185,5 @@ export async function getTemplateForAdmin(id: string): Promise<TemplateDetail | 
   await connection();
   if (!z.string().uuid().safeParse(id).success) return null;
   const { data } = await supabaseAdmin().from("templates").select(CARD_COLUMNS).eq("id", id).maybeSingle();
-  return data ? parseRow(data as unknown as Row) : null;
+  return data ? await parseOne(data as unknown as Row) : null;
 }

@@ -12,7 +12,6 @@ export async function saveCustomVideoSettings(_: CustomVideoState, fd: FormData)
   if (!u || !can(u.role, "templates.manage")) return { error: "forbidden" };
   const p = customVideoSettingsSchema.safeParse({
     enabled: fd.get("enabled") === "on",
-    priceKzt: Number(fd.get("priceKzt")),
     maxSeconds: Number(fd.get("maxSeconds")),
     maxMb: Number(fd.get("maxMb")),
   });
