@@ -10,6 +10,7 @@ import { faceSlotSchema, qualitySchema, pricingConfigSchema } from "@/lib/templa
 import { PHOTO_EXT, sniffImageType, validatePhotoMeta, type PhotoError, type PhotoType } from "@/lib/uploads/validate";
 import { track } from "@/lib/analytics";
 import { allow } from "@/lib/security/rate-limit";
+import { customVideoSettings } from "@/lib/custom-video/settings";
 
 type Fail<E extends string> = { ok: false; error: E | "unauthorized" | "generic" };
 const BUCKET = "user-uploads";
@@ -20,7 +21,7 @@ async function loadPublishedVersion(templateId: string) {
   if (!z.string().uuid().safeParse(templateId).success) return null;
   const db = supabaseAdmin();
   const { data: t } = await db.from("templates")
-    .select("id,title_kk,status,current_version_id,cover_asset_path").eq("id", templateId).maybeSingle();
+    .select("id,title_kk,status,current_version_id,cover_asset_path,kind").eq("id", templateId).maybeSingle();
   if (!t || t.status !== "published" || !t.current_version_id) return null;
   const { data: v } = await db.from("template_versions")
     .select("id,configuration_snapshot").eq("id", t.current_version_id).single();
@@ -145,11 +146,13 @@ const orderSchema = z.object({
   quality: z.string().regex(/^[a-z0-9_]+$/),
   assets: z.record(z.string(), z.string().uuid()),
   consent: z.literal(true),
+  /** "Өз видеом" orders: the customer's own verified video. */
+  videoId: z.string().uuid().optional(),
 });
 
 export async function createOrder(raw: unknown): Promise<
   { ok: true; orderId: string } |
-  Fail<"consent_required" | "template_unavailable" | "quality_unavailable" | "photos_missing" | "photos_expired" | "rate_limited">
+  Fail<"consent_required" | "template_unavailable" | "quality_unavailable" | "photos_missing" | "photos_expired" | "rate_limited" | "video_missing">
 > {
   const user = await getSessionUser();
   if (!user) return { ok: false, error: "unauthorized" };
@@ -184,13 +187,30 @@ export async function createOrder(raw: unknown): Promise<
     if (new Date(a.expires_at).getTime() < now) return { ok: false, error: "photos_expired" };
   }
 
+  // Custom video: the customer's own verified, unattached video; price from admin settings.
+  const custom = tv.template.kind === "custom";
+  let pricing = tv.pricing;
+  let snapshotExtra: Record<string, unknown> = {};
+  if (custom) {
+    const s = await customVideoSettings();
+    if (!s.enabled) return { ok: false, error: "template_unavailable" };
+    if (!p.data.videoId) return { ok: false, error: "video_missing" };
+    const { data: v } = await db.from("order_videos").select("id,storage_path,verified_at,expires_at,duration_sec")
+      .eq("id", p.data.videoId).eq("user_id", user.id).is("order_id", null).maybeSingle();
+    if (!v?.verified_at || new Date(v.expires_at).getTime() < now) return { ok: false, error: "video_missing" };
+    pricing = { ...tv.pricing, basePriceKzt: s.priceKzt };
+    snapshotExtra = { user_video_path: v.storage_path, user_video_duration_sec: Number(v.duration_sec), pricing_config_json: pricing };
+  } else if (p.data.videoId) {
+    return { ok: false, error: "generic" };
+  }
+
   // Price is computed here, from the version snapshot — never taken from the browser.
-  const breakdown = calculatePrice(tv.pricing, quality, tv.slots.length);
+  const breakdown = calculatePrice(pricing, quality, tv.slots.length);
   const { data: order, error } = await db.from("orders").insert({
     user_id: user.id,
     template_id: tv.template.id,
     template_version_id: tv.versionId,
-    template_snapshot_json: { ...tv.snapshot, quality },
+    template_snapshot_json: { ...tv.snapshot, ...snapshotExtra, quality },
     quality: quality.key,
     face_count: tv.slots.length,
     pricing_breakdown_json: breakdown,
@@ -207,6 +227,15 @@ export async function createOrder(raw: unknown): Promise<
     await db.from("order_assets").update({ order_id: null }).eq("order_id", order.id);
     await db.from("orders").delete().eq("id", order.id);
     return { ok: false, error: "photos_missing" };
+  }
+  if (custom) {
+    const { data: vClaim } = await db.from("order_videos").update({ order_id: order.id })
+      .eq("id", p.data.videoId!).eq("user_id", user.id).is("order_id", null).select("id");
+    if (!vClaim?.length) {
+      await db.from("order_assets").update({ order_id: null }).eq("order_id", order.id);
+      await db.from("orders").delete().eq("id", order.id);
+      return { ok: false, error: "video_missing" };
+    }
   }
 
   await track("checkout_initiated", { userId: user.id, templateId: tv.template.id, orderId: order.id, props: { quality: quality.key } });

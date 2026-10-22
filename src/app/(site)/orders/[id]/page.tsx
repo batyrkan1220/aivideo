@@ -180,7 +180,7 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
           <div className="mt-5 rounded-xl bg-brand-soft p-4 text-sm">
             <p className="text-muted">{kk.result.regenerateNote}</p>
             <div className="mt-3 flex flex-wrap gap-4">
-              <Link href={`/templates/${o.template_id}`} className="font-semibold text-brand hover:underline">{kk.result.regenerate}</Link>
+              <Link href={(o.template_snapshot_json as { user_video_path?: string } | null)?.user_video_path ? "/create" : `/templates/${o.template_id}`} className="font-semibold text-brand hover:underline">{kk.result.regenerate}</Link>
               <Link href="/support" className="font-semibold text-brand hover:underline">{kk.result.contactSupport}</Link>
             </div>
           </div>

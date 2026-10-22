@@ -32,6 +32,18 @@ export async function runRetention() {
     if (due.length < BATCH) break;
   }
 
+  // Customer source videos ("Өз видеом") past expires_at, never while their order is generating.
+  const { data: srcVideos } = await db.from("order_videos")
+    .select("id,storage_path,orders(generation_status)").lt("expires_at", now).limit(BATCH);
+  const srcDue = (srcVideos ?? []).filter((v) => {
+    const o = (Array.isArray(v.orders) ? v.orders[0] : v.orders) as { generation_status?: string } | null;
+    return !o || !ACTIVE.includes(o.generation_status ?? "");
+  });
+  if (srcDue.length) {
+    await db.storage.from("user-videos").remove(srcDue.map((v) => v.storage_path));
+    await db.from("order_videos").delete().in("id", srcDue.map((v) => v.id));
+  }
+
   const { data: videos } = await db.from("generated_videos")
     .select("order_id,private_storage_path").lt("expires_at", now).neq("private_storage_path", "").limit(1000);
   if (videos?.length) {

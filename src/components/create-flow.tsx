@@ -10,6 +10,7 @@ import { startCheckout } from "@/lib/payments/actions";
 import { normalizeKzPhone } from "@/lib/payments/phone";
 import { useSavedPhone, savePhone } from "@/lib/payments/saved-phone";
 import { compressPhoto } from "@/lib/uploads/compress";
+import { requestVideoUpload, confirmVideoUpload, removeVideoUpload, type VideoError } from "@/lib/custom-video/actions";
 
 type SlotState =
   | { phase: "empty" }
@@ -19,6 +20,11 @@ type SlotState =
   | { phase: "error"; preview?: string; message: string };
 
 const c = kk.create;
+const cv = kk.customVideo;
+const videoErr = (e: VideoError, l: { maxSeconds: number; maxMb: number }) =>
+  e === "too_long" ? cv.errors.too_long(l.maxSeconds) : e === "too_large" ? cv.errors.too_large(l.maxMb)
+  : e === "too_short" ? cv.errors.too_short : e === "bad_type" ? cv.errors.bad_type : e === "unreadable" ? cv.errors.unreadable
+  : e === "disabled" ? cv.errors.disabled : e === "rate_limited" ? c.errors.rate_limited : kk.errors.generic;
 const errText = (e: string) => (c.errors as Record<string, string>)[e] ?? kk.errors.generic;
 
 /** Reads real pixel dimensions in the browser (also proves the file is a decodable image). */
@@ -50,8 +56,29 @@ function uploadWithProgress(url: string, file: File, anonKey: string, onProgress
   });
 }
 
+type VideoState =
+  | { phase: "empty" }
+  | { phase: "uploading"; preview: string; progress: number }
+  | { phase: "verifying"; preview: string }
+  | { phase: "ready"; preview: string; videoId: string; durationSec: number }
+  | { phase: "error"; message: string };
+
+/** Duration from the browser's own decoder (the server re-checks it from the file). */
+function readVideoDuration(url: string): Promise<number | null> {
+  return new Promise((resolve) => {
+    const v = document.createElement("video");
+    v.preload = "metadata";
+    v.muted = true;
+    const done = (d: number | null) => { v.removeAttribute("src"); v.load(); resolve(d); };
+    v.onloadedmetadata = () => done(Number.isFinite(v.duration) ? v.duration : null);
+    v.onerror = () => done(null);
+    setTimeout(() => done(null), 15_000);
+    v.src = url;
+  });
+}
+
 export function CreateFlow({
-  templateId, slots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false,
+  templateId, slots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, customVideo,
 }: {
   templateId: string;
   slots: FaceSlot[];
@@ -64,6 +91,8 @@ export function CreateFlow({
   anonKey: string;
   /** Kaspi invoice payments need the customer's Kaspi phone number. */
   askPhone?: boolean;
+  /** "Өз видеом": the customer uploads their own video first. */
+  customVideo?: { maxSeconds: number; maxMb: number };
 }) {
   const router = useRouter();
   const [state, setState] = useState<Record<string, SlotState>>(() =>
@@ -81,6 +110,45 @@ export function CreateFlow({
   useEffect(() => () => previews.current.forEach((u) => URL.revokeObjectURL(u)), []);
 
   const setSlot = (key: string, s: SlotState) => setState((prev) => ({ ...prev, [key]: s }));
+  const [video, setVideo] = useState<VideoState>({ phase: "empty" });
+  const videoRef = useRef<HTMLElement>(null);
+
+  const onPickVideo = async (file: File | undefined) => {
+    if (!file || !customVideo) return;
+    setFormError(null);
+    if (video.phase === "ready") void removeVideoUpload(video.videoId);
+    const type = file.type || (/\.mov$/i.test(file.name) ? "video/quicktime" : "video/mp4");
+    if (!["video/mp4", "video/quicktime"].includes(type)) { setVideo({ phase: "error", message: cv.errors.bad_type }); return; }
+    if (file.size > customVideo.maxMb * 1024 * 1024) { setVideo({ phase: "error", message: cv.errors.too_large(customVideo.maxMb) }); return; }
+    const preview = URL.createObjectURL(file);
+    previews.current.push(preview);
+    setVideo({ phase: "uploading", preview, progress: 0 });
+    const durationSec = await readVideoDuration(preview);
+    if (durationSec === null) { setVideo({ phase: "error", message: cv.errors.unreadable }); return; }
+    if (durationSec > customVideo.maxSeconds + 0.5) { setVideo({ phase: "error", message: cv.errors.too_long(customVideo.maxSeconds) }); return; }
+    const req = await requestVideoUpload({ contentType: type, size: file.size, durationSec });
+    if (!req.ok) {
+      if (req.error === "unauthorized") { router.push("/login?next=/create"); return; }
+      setVideo({ phase: "error", message: videoErr(req.error, customVideo) });
+      return;
+    }
+    try {
+      const url = `${supabaseUrl}/storage/v1/object/upload/sign/user-videos/${req.path}?token=${encodeURIComponent(req.token)}`;
+      await uploadWithProgress(url, new File([file], file.name, { type }), anonKey, (p) => setVideo({ phase: "uploading", preview, progress: p }));
+    } catch {
+      void removeVideoUpload(req.videoId);
+      setVideo({ phase: "error", message: cv.errors.upload_failed });
+      return;
+    }
+    setVideo({ phase: "verifying", preview });
+    const conf = await confirmVideoUpload(req.videoId);
+    if (!conf.ok) { setVideo({ phase: "error", message: videoErr(conf.error, customVideo) }); return; }
+    setVideo({ phase: "ready", preview, videoId: req.videoId, durationSec: conf.durationSec });
+  };
+  const onRemoveVideo = () => {
+    if (video.phase === "ready") void removeVideoUpload(video.videoId);
+    setVideo({ phase: "empty" });
+  };
   const limits = { maxBytes: maxUploadBytes, minDimension, maxDimension };
 
   const onPick = async (slot: FaceSlot, file: File | undefined) => {
@@ -130,13 +198,19 @@ export function CreateFlow({
   const photosRef = useRef<HTMLElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
   const consentRef = useRef<HTMLLabelElement>(null);
-  const [nudge, setNudge] = useState<null | "photo" | "phone" | "consent">(null);
-  const blocker = missing > 0 ? "photo" : !phoneOk || (needPhone && !phone) ? "phone" : !consent ? "consent" : null;
+  const [nudge, setNudge] = useState<null | "video" | "photo" | "phone" | "consent">(null);
+  const videoMissing = !!customVideo && video.phase !== "ready";
+  const busyVideo = video.phase === "uploading" || video.phase === "verifying";
+  const blocker = videoMissing ? "video" : missing > 0 ? "photo" : !phoneOk || (needPhone && !phone) ? "phone" : !consent ? "consent" : null;
   const busyUpload = slots.some((s) => state[s.key].phase === "uploading" || state[s.key].phase === "verifying");
 
   /** The pay button is always tappable: it points the user to whatever is still missing. */
   const onPay = () => {
     if (pending) return;
+    if (blocker === "video") {
+      if (!busyVideo) videoRef.current?.querySelector<HTMLInputElement>('input[type="file"]')?.click();
+      return;
+    }
     if (blocker === "photo" && !busyUpload) {
       // Open the file picker straight away for the first photo that is still missing.
       const idx = slots.findIndex((s) => state[s.key].phase !== "ready");
@@ -146,7 +220,7 @@ export function CreateFlow({
     }
     if (blocker) {
       setNudge(blocker);
-      const el = blocker === "photo" ? photosRef.current : blocker === "phone" ? phoneRef.current : consentRef.current;
+      const el = blocker === "photo" ? photosRef.current as HTMLElement | null : blocker === "phone" ? phoneRef.current : consentRef.current;
       el?.scrollIntoView({ behavior: "smooth", block: "center" });
       if (blocker === "phone") phoneRef.current?.focus({ preventScroll: true });
       setTimeout(() => setNudge(null), 1800);
@@ -165,9 +239,11 @@ export function CreateFlow({
       if (st.phase !== "ready") { setFormError(c.errors.photos_missing); return; }
       assets[s.key] = st.assetId;
     }
-    const r = await createOrder({ templateId, quality, assets, consent: true });
+    if (customVideo && video.phase !== "ready") { setFormError(cv.errors.missing); return; }
+    const r = await createOrder({ templateId, quality, assets, consent: true, ...(customVideo && video.phase === "ready" ? { videoId: video.videoId } : {}) });
     if (!r.ok) {
-      if (r.error === "unauthorized") { router.push(`/login?next=/templates/${templateId}`); return; }
+      if (r.error === "unauthorized") { router.push(customVideo ? "/login?next=/create" : `/login?next=/templates/${templateId}`); return; }
+      if (r.error === "video_missing") { setVideo({ phase: "empty" }); setFormError(cv.errors.missing); return; }
       setFormError(errText(r.error));
       return;
     }
@@ -187,6 +263,17 @@ export function CreateFlow({
 
   return (
     <div className="space-y-4">
+      {/* Step: the customer's own video */}
+      {customVideo && (
+        <section ref={videoRef} className={`rounded-card border bg-white p-4 transition-shadow sm:p-5 ${nudge === "video" ? "border-brand ring-4 ring-brand/20" : "border-line"}`}>
+          <StepTitle n={++step} done={video.phase === "ready"}>{cv.stepVideo}</StepTitle>
+          <p className="mt-1 text-sm text-muted">{cv.videoHint(customVideo.maxSeconds)}</p>
+          <div className="mt-3">
+            <VideoPicker st={video} limits={customVideo} onPick={onPickVideo} onRemove={onRemoveVideo} />
+          </div>
+        </section>
+      )}
+
       {/* Step: photos */}
       <section ref={photosRef} className={`rounded-card border bg-white p-4 transition-shadow sm:p-5 ${nudge === "photo" ? "border-brand ring-4 ring-brand/20" : "border-line"}`}>
         <StepTitle n={++step} done={missing === 0}>{slots.length > 1 ? c.stepPhotos(slots.length) : c.stepPhoto}</StepTitle>
@@ -261,7 +348,7 @@ export function CreateFlow({
           )}
           <label ref={consentRef} className={`mt-3 flex cursor-pointer gap-3 rounded-xl p-3 text-sm transition-colors ${nudge === "consent" ? "bg-flash/30 ring-2 ring-flash" : "bg-paper"}`}>
             <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0 accent-brand" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-            <span className="text-muted">{kk.consent.combined}</span>
+            <span className="text-muted">{customVideo ? cv.consent : kk.consent.combined}</span>
           </label>
           <p className="mt-3 text-xs text-muted">{c.afterPay}</p>
         </section>
@@ -278,10 +365,13 @@ export function CreateFlow({
               type="button"
               onClick={onPay}
               aria-disabled={!!blocker || pending}
-              className={`flex h-13 flex-1 items-center justify-center gap-2 rounded-full px-5 font-semibold transition-all active:scale-[0.98] ${blocker === "photo" ? "bg-ink text-white" : "bg-brand text-white hover:bg-brand-dark"} ${pending || (blocker === "photo" && busyUpload) ? "opacity-70" : ""}`}
+              className={`flex h-13 flex-1 items-center justify-center gap-2 rounded-full px-5 font-semibold transition-all active:scale-[0.98] ${blocker === "photo" || blocker === "video" ? "bg-ink text-white" : "bg-brand text-white hover:bg-brand-dark"} ${pending || (blocker === "photo" && busyUpload) || (blocker === "video" && busyVideo) ? "opacity-70" : ""}`}
             >
               {pending && <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden />}
-              {pending ? c.paying : blocker === "photo" ? (busyUpload ? kk.upload.uploading : `📷 ${c.pickTitle}`) : c.payNow(formatKzt(price.totalKzt))}
+              {pending ? c.paying
+                : blocker === "video" ? (busyVideo ? kk.upload.uploading : `🎬 ${cv.pickTitle}`)
+                : blocker === "photo" ? (busyUpload ? kk.upload.uploading : `📷 ${c.pickTitle}`)
+                : c.payNow(formatKzt(price.totalKzt))}
             </button>
           </div>
           <p className="mt-1.5 min-h-4 text-center text-xs text-danger" aria-live="polite">
@@ -301,6 +391,65 @@ function StepTitle({ n, done, children }: { n: number; done: boolean; children: 
       </span>
       {children}
     </h2>
+  );
+}
+
+/** "Өз видеом": pick a video, see it immediately, upload with progress. */
+function VideoPicker({ st, limits, onPick, onRemove }: { st: VideoState; limits: { maxSeconds: number; maxMb: number }; onPick: (f: File | undefined) => void; onRemove: () => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const busy = st.phase === "uploading" || st.phase === "verifying";
+  const preview = "preview" in st ? st.preview : undefined;
+  return (
+    <div>
+      {preview ? (
+        <div className="flex items-start gap-4">
+          <div className="relative aspect-[9/16] w-32 shrink-0 overflow-hidden rounded-xl bg-ink">
+            <video src={preview} muted loop playsInline autoPlay className="h-full w-full object-cover" />
+            {busy && (
+              <span className="absolute inset-0 flex items-center justify-center bg-black/40">
+                <span className="h-8 w-8 animate-spin rounded-full border-[3px] border-white/40 border-t-white" />
+              </span>
+            )}
+          </div>
+          <div className="min-w-0 flex-1 pt-1">
+            <p className="font-semibold">
+              {st.phase === "ready" ? `✓ ${cv.videoReady}` : st.phase === "uploading" && st.progress > 0 ? `${kk.upload.uploading} ${st.progress}%` : c.verifying}
+            </p>
+            {st.phase === "ready" && <p className="mt-0.5 text-sm text-muted">{cv.seconds(Math.round(st.durationSec))}</p>}
+            {st.phase === "uploading" && (
+              <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-black/10">
+                <span className="block h-full rounded-full bg-brand transition-[width]" style={{ width: `${Math.max(6, st.progress)}%` }} />
+              </span>
+            )}
+            {!busy && (
+              <div className="mt-3 flex gap-4 text-sm">
+                <button type="button" className="font-semibold text-brand hover:underline" onClick={() => inputRef.current?.click()}>{kk.upload.replace}</button>
+                <button type="button" className="text-muted hover:text-danger" onClick={onRemove}>{kk.upload.remove}</button>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className={`flex w-full items-center gap-4 rounded-xl border-2 border-dashed p-4 text-left transition-colors hover:border-brand ${st.phase === "error" ? "border-danger bg-red-50" : "border-brand/40 bg-brand-soft/50"}`}
+        >
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-white text-brand">
+            <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <rect x="3" y="5" width="13" height="14" rx="2" /><path d="m16 10 5-3v10l-5-3" />
+            </svg>
+          </span>
+          <span className="min-w-0">
+            <span className="block font-semibold">{cv.pickTitle}</span>
+            <span className="mt-0.5 block text-sm text-muted">{cv.pickText(limits.maxSeconds, limits.maxMb)}</span>
+          </span>
+        </button>
+      )}
+      <input ref={inputRef} type="file" accept="video/mp4,video/quicktime,.mp4,.mov" className="sr-only" tabIndex={-1}
+        onChange={(e) => { onPick(e.target.files?.[0]); e.target.value = ""; }} />
+      {st.phase === "error" && <p className="mt-2 text-sm text-danger" role="alert">{st.message}</p>}
+    </div>
   );
 }
 

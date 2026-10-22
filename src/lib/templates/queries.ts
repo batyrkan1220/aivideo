@@ -108,7 +108,7 @@ export async function listTemplates(opts: { q?: string; category?: string; sort?
   const page = Math.max(1, opts.page ?? 1);
   const from = (page - 1) * PAGE_SIZE;
   const cols = opts.category ? CARD_COLUMNS.replace("categories(", "categories!inner(") : CARD_COLUMNS;
-  let query = supabasePublic().from("templates").select(cols, { count: "exact" }).eq("status", "published");
+  let query = supabasePublic().from("templates").select(cols, { count: "exact" }).eq("status", "published").eq("kind", "catalog");
 
   if (opts.category) query = query.eq("categories.slug", opts.category);
   const q = opts.q ? sanitizeSearch(opts.q) : "";
@@ -126,14 +126,14 @@ export async function listTemplates(opts: { q?: string; category?: string; sort?
 export async function listTrending(limit = 8) {
   await connection(); // request-time only: never run during prerender
   const { data } = await supabasePublic().from("templates").select(CARD_COLUMNS)
-    .eq("status", "published").eq("is_trending", true).order("sort_order").limit(limit);
+    .eq("status", "published").eq("kind", "catalog").eq("is_trending", true).order("sort_order").limit(limit);
   return toCards(data as unknown as Row[]);
 }
 
 export async function listNewest(limit = 8) {
   await connection(); // request-time only: never run during prerender
   const { data } = await supabasePublic().from("templates").select(CARD_COLUMNS)
-    .eq("status", "published").order("published_at", { ascending: false, nullsFirst: false }).limit(limit);
+    .eq("status", "published").eq("kind", "catalog").order("published_at", { ascending: false, nullsFirst: false }).limit(limit);
   return toCards(data as unknown as Row[]);
 }
 
@@ -141,7 +141,7 @@ export async function getTemplate(id: string): Promise<TemplateDetail | null> {
   await connection(); // request-time only: never run during prerender
   if (!z.string().uuid().safeParse(id).success) return null;
   const { data } = await supabasePublic().from("templates").select(CARD_COLUMNS)
-    .eq("id", id).eq("status", "published").maybeSingle();
+    .eq("id", id).eq("status", "published").eq("kind", "catalog").maybeSingle();
   return data ? parseRow(data as unknown as Row) : null;
 }
 

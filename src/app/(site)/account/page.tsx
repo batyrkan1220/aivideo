@@ -12,7 +12,7 @@ export const metadata = { title: kk.account.title };
 
 export default function AccountPage() {
   return (
-    <main className="mx-auto w-full max-w-2xl px-4 py-10">
+    <main className="mx-auto w-full max-w-2xl px-4 py-6 sm:py-10">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="font-display text-2xl font-bold">{kk.account.title}</h1>
         <LogoutButton action={logoutAction} />
@@ -30,6 +30,14 @@ async function AccountDetails() {
   return (
     <div className="space-y-6">
       <section className={card}>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-semibold">{kk.nav.myOrders}</h2>
+          <Link href="/orders" className="text-sm font-semibold text-brand hover:underline">{kk.home.seeAll}</Link>
+        </div>
+        <OrderList limit={10} />
+      </section>
+
+      <section className={card}>
         <h2 className="mb-4 font-semibold">{kk.account.profile}</h2>
         <dl className="mb-5 grid grid-cols-[auto_minmax(0,1fr)] [&>dd]:break-words gap-x-6 gap-y-2 text-sm">
           <dt className="text-muted">{isTelegramEmail(user.email) ? "Telegram" : kk.auth.email}</dt>
@@ -43,13 +51,6 @@ async function AccountDetails() {
         <DisplayNameForm current={user.displayName ?? ""} />
       </section>
 
-      <section className={card}>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-semibold">{kk.nav.myOrders}</h2>
-          <Link href="/orders" className="text-sm font-semibold text-brand hover:underline">{kk.home.seeAll}</Link>
-        </div>
-        <OrderList limit={5} />
-      </section>
 
       <section className={card}>
         <h2 className="mb-2 font-semibold">{kk.account.privacyTitle}</h2>

@@ -35,6 +35,7 @@ async function List() {
 
   const { data } = await supabaseAdmin().from("templates")
     .select("id,title_kk,status,required_face_count,updated_at,is_trending")
+    .eq("kind", "catalog")
     .order("updated_at", { ascending: false });
 
   if (!data?.length) {

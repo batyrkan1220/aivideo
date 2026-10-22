@@ -25,7 +25,7 @@ async function Editor() {
   if (!can(u.role, "templates.manage")) return <p className="text-muted">{ru.admin.forbidden}</p>;
   const [{ data }, current] = await Promise.all([
     supabaseAdmin().from("templates").select("id,title_kk,cover_asset_path,preview_video_path")
-      .eq("status", "published").order("title_kk"),
+      .eq("status", "published").eq("kind", "catalog").order("title_kk"),
     readShowcaseSetting(),
   ]);
   const options = (data ?? []).map((t) => ({ id: t.id, title: t.title_kk, cover: t.cover_asset_path ?? t.preview_video_path }));

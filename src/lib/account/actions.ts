@@ -65,6 +65,9 @@ export async function deleteOrderPhotos(fd: FormData) {
   const { data: assets } = await db.from("order_assets").select("private_storage_path").eq("order_id", o.id);
   if (assets?.length) await db.storage.from("user-uploads").remove(assets.map((a) => a.private_storage_path));
   await db.from("order_assets").delete().eq("order_id", o.id);
+  const { data: vids } = await db.from("order_videos").select("storage_path").eq("order_id", o.id);
+  if (vids?.length) await db.storage.from("user-videos").remove(vids.map((v) => v.storage_path));
+  await db.from("order_videos").delete().eq("order_id", o.id);
   await db.from("orders").update({ photos_deleted_at: new Date().toISOString() }).eq("id", o.id);
   await audit(user.id, "photos.delete", "order", o.id);
   revalidatePath(`/orders/${o.id}`);
@@ -78,6 +81,8 @@ export async function deleteAllPhotos(_: FormState): Promise<FormState> {
   const { data: busy } = await db.from("orders").select("id").eq("user_id", user.id).in("generation_status", ACTIVE).limit(1);
   if (busy?.length) return { error: kk.result.busy };
   await removeFolder("user-uploads", user.id);
+  await removeFolder("user-videos", user.id);
+  await db.from("order_videos").delete().eq("user_id", user.id);
   const { data: rows } = await db.from("order_assets").select("order_id").eq("user_id", user.id);
   await db.from("order_assets").delete().eq("user_id", user.id);
   const orderIds = [...new Set((rows ?? []).map((r) => r.order_id).filter(Boolean))] as string[];
@@ -104,6 +109,7 @@ export async function deleteAccount(_: FormState, fd: FormData): Promise<FormSta
   const { data: orders } = await db.from("orders").select("id").eq("user_id", user.id);
   const orderIds = (orders ?? []).map((o) => o.id);
   await removeFolder("user-uploads", user.id);
+  await removeFolder("user-videos", user.id);
   await removeFolder("generated-videos", user.id);
   if (orderIds.length) {
     await db.from("generated_videos").delete().in("order_id", orderIds);

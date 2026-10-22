@@ -18,7 +18,7 @@ export async function saveShowcase(_: ShowcaseState, fd: FormData): Promise<Show
   if (new Set(ids).size !== ids.length) return { error: ru.admin.home.duplicate };
 
   if (ids.length) {
-    const { data } = await supabaseAdmin().from("templates").select("id").in("id", ids as string[]).eq("status", "published");
+    const { data } = await supabaseAdmin().from("templates").select("id").in("id", ids as string[]).eq("status", "published").eq("kind", "catalog");
     if ((data?.length ?? 0) !== ids.length) return { error: ru.errors.generic };
   }
   const { error } = await supabaseAdmin().from("site_settings").upsert({

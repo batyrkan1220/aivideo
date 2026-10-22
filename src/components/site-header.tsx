@@ -38,6 +38,7 @@ async function AccountNav() {
       {isStaff(user.role) && (
         <Link href="/admin" className="hidden rounded-full px-3 py-2 text-sm font-medium hover:bg-brand-soft sm:inline-block">{kk.nav.admin}</Link>
       )}
+      <Link href="/create" className="hidden rounded-full px-3 py-2 text-sm font-semibold text-brand hover:bg-brand-soft sm:inline-block">+ {kk.nav.createOwn}</Link>
       <Link href="/orders" className="hidden rounded-full px-3 py-2 text-sm font-medium hover:bg-brand-soft sm:inline-block">{kk.nav.myOrders}</Link>
       <span className="hidden sm:block"><ButtonLink href="/account" variant="secondary">{kk.nav.account}</ButtonLink></span>
     </>

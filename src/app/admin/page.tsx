@@ -9,6 +9,8 @@ import { env } from "@/lib/env";
 import { isTestPaymentProvider } from "@/lib/payments/types";
 import { TelegramSetup } from "./telegram/setup";
 import { ToleCheckPanel } from "./tole/check";
+import { CustomVideoForm } from "./custom-video/form";
+import { customVideoSettings } from "@/lib/custom-video/settings";
 
 const S = ru.admin.stats;
 type SP = { from?: string; to?: string };
@@ -74,6 +76,7 @@ async function Overview({ searchParams }: { searchParams: Promise<SP> }) {
         </form>
       </div>
 
+      {can(u.role, "templates.manage") && <CustomVideoForm value={await customVideoSettings()} />}
       {can(u.role, "users.manage") && <ToleCheckPanel />}
       {can(u.role, "users.manage") && (
         <TelegramSetup configured={!!env().TELEGRAM_BOT_TOKEN} appUrl={env().NEXT_PUBLIC_APP_URL} />

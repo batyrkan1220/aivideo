@@ -123,7 +123,13 @@ async function submitJob(job: Job) {
     if (!signed) return delay(job, backoffMs(job.attempt_count));
     faces.push({ slotKey: s.key, providerInput: s.providerInput, imageUrl: signed.signedUrl });
   }
-  const templateVideoUrl = mediaUrl((snap.preview_video_path as string) ?? null) ?? "";
+  let templateVideoUrl = mediaUrl((snap.preview_video_path as string) ?? null) ?? "";
+  if (typeof snap.user_video_path === "string" && snap.user_video_path) {
+    // "Өз видеом": the customer's own private video, shared with the provider via a signed URL.
+    const { data: signedVideo } = await db.storage.from("user-videos").createSignedUrl(snap.user_video_path, 24 * 3600);
+    if (!signedVideo) return delay(job, backoffMs(job.attempt_count));
+    templateVideoUrl = signedVideo.signedUrl;
+  }
   const quality = (snap.quality as { providerQuality?: string } | undefined)?.providerQuality ?? "standard";
   const input = { templateVideoUrl, faces, quality, config: (snap.provider_config_json as Record<string, unknown>) ?? {} };
 
