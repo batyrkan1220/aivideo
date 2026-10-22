@@ -121,42 +121,55 @@ export const akoolProvider: GenerationProvider = {
     const problems: string[] = [];
     const cfg = akoolConfigSchema.safeParse(input.config ?? {});
     if (!cfg.success) return ["invalid_provider_config"];
-    const a = cfg.data.analysis;
-    if (!a) problems.push("akool_not_analyzed");
-    // Akool requires the exact same video_url string that was analysed.
-    else if (a.videoUrl !== input.templateVideoUrl) problems.push("akool_video_changed");
     if (!input.faces.length) problems.push("missing_faces");
     if (input.faces.length > 5) problems.push("too_many_faces");
+    const a = cfg.data.analysis;
+    const auto = !a || a.videoUrl !== input.templateVideoUrl;
+    if (auto) {
+      // Auto mode (admin skipped "find people"): one person, analysed per order.
+      if (input.faces.length !== 1) problems.push(a ? "akool_video_changed" : "akool_not_analyzed");
+      return problems;
+    }
     const ids = input.faces.map((f) => objIdOf(f.providerInput));
     if (ids.some((x) => x === null)) problems.push("akool_unmapped_slot");
     if (new Set(ids).size !== ids.length) problems.push("duplicate_target");
-    if (a && ids.some((x) => x !== null && !a.people.some((p) => p.objId === x))) problems.push("akool_unknown_person");
+    if (ids.some((x) => x !== null && !a.people.some((p) => p.objId === x))) problems.push("akool_unknown_person");
     return problems;
   },
 
   async submit(input) {
     const cfg = akoolConfigSchema.parse(input.config ?? {});
-    const d = await call<{ list?: { _id?: string; deduction_credit?: number }[]; errors?: { index?: number; error?: string }[] }>(`${BASE}/create`, {
-      method: "POST",
-      body: JSON.stringify({
-        media_type: "video",
-        target_url: cfg.analysis!.videoUrl,
-        model_name: MODEL,
-        analyze_id: cfg.analysis!.id,
-        mappings: input.faces.map((f) => ({ obj_id: objIdOf(f.providerInput), img_url: f.imageUrl })),
-        resolution: cfg.resolution,
-        keep_original_sound: true,
-      }),
-    });
-    const task = d.list?.[0];
-    if (!task?._id) {
-      // Creation errors are not billed (docs), so it is safe to report and stop.
-      throw new ProviderError("provider_rejected", false, JSON.stringify(d.errors ?? []).slice(0, 300));
+    const a = cfg.analysis;
+    if (!a || a.videoUrl !== input.templateVideoUrl) {
+      // Auto mode: Akool requires a person analysis of the same video before replacing,
+      // so step 1 analyses the template video; step 2 (in getStatus) creates the swap task.
+      const analysisId = await akoolStartAnalysis(input.templateVideoUrl);
+      const state: AutoState = {
+        phase: "analysis", analysisId, videoUrl: input.templateVideoUrl,
+        faceUrl: input.faces[0].imageUrl, resolution: cfg.resolution,
+      };
+      return { providerJobId: analysisId, state };
     }
-    return { providerJobId: task._id };
+    const id = await createTask(a.videoUrl, a.id,
+      input.faces.map((f) => ({ obj_id: objIdOf(f.providerInput)!, img_url: f.imageUrl })), cfg.resolution);
+    return { providerJobId: id };
   },
 
-  async getStatus(providerJobId): Promise<ProviderJobStatus> {
+  async getStatus(providerJobId, { state }): Promise<ProviderJobStatus> {
+    const s = state as AutoState | null;
+    if (s?.phase === "analysis") {
+      const r = await akoolGetAnalysis(s.analysisId);
+      if (r.state === "processing") return { state: "processing", progress: 0 };
+      if (r.state === "failed") {
+        console.error("[akool] auto analysis failed", s.analysisId, r.reason);
+        return { state: "failed", errorCode: "akool_analysis_failed", retryable: false };
+      }
+      if (!r.people.length) return { state: "failed", errorCode: "akool_no_people", retryable: false };
+      // One-person template: replace the first (main) person Akool detected.
+      const taskId = await createTask(s.videoUrl, s.analysisId, [{ obj_id: r.people[0].objId, img_url: s.faceUrl }], s.resolution);
+      return { state: "processing", progress: 0, next: { providerJobId: taskId, state: { phase: "task" } } };
+    }
+
     const d = await call<{ status?: number; progress?: number; url?: string | null; error_reason?: string }>(
       `${BASE}/task/detail?_id=${encodeURIComponent(providerJobId)}`,
     );
@@ -171,3 +184,26 @@ export const akoolProvider: GenerationProvider = {
     return { state: d.status === 1 ? "queued" : "processing", progress: d.progress ?? undefined };
   },
 };
+
+type AutoState = { phase: "analysis"; analysisId: string; videoUrl: string; faceUrl: string; resolution: "480p" | "720p" };
+
+async function createTask(videoUrl: string, analyzeId: string, mappings: { obj_id: number; img_url: string }[], resolution: string) {
+  const d = await call<{ list?: { _id?: string; deduction_credit?: number }[]; errors?: { index?: number; error?: string }[] }>(`${BASE}/create`, {
+    method: "POST",
+    body: JSON.stringify({
+      media_type: "video",
+      target_url: videoUrl,
+      model_name: MODEL,
+      analyze_id: analyzeId,
+      mappings,
+      resolution,
+      keep_original_sound: true,
+    }),
+  });
+  const task = d.list?.[0];
+  if (!task?._id) {
+    // Creation errors are not billed (docs), so it is safe to report and stop.
+    throw new ProviderError("provider_rejected", false, JSON.stringify(d.errors ?? []).slice(0, 300));
+  }
+  return task._id;
+}

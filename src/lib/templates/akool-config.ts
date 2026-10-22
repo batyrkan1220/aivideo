@@ -60,11 +60,16 @@ export function akoolSlots(cfg: AkoolConfig): FaceSlot[] {
   }));
 }
 
-/** Problems that block publishing an Akool template (empty = ready). */
+/**
+ * Problems that block publishing an Akool template (empty = ready).
+ * Not analysed at all is fine: the template is a one-person template and each order analyses
+ * the video automatically ("auto mode"). An analysis of an older video is an error, because the
+ * admin's person selection no longer matches the current video.
+ */
 export function akoolProblems(cfg: AkoolConfig, previewVideoPath: string | null) {
-  const p: ("akool_not_analyzed" | "akool_video_changed" | "akool_no_people")[] = [];
-  if (!cfg.analysis) p.push("akool_not_analyzed");
-  else if (cfg.analysis.videoPath !== previewVideoPath) p.push("akool_video_changed");
+  const p: ("akool_video_changed" | "akool_no_people")[] = [];
+  if (!cfg.analysis) return p;
+  if (cfg.analysis.videoPath !== previewVideoPath) p.push("akool_video_changed");
   else if (!akoolSlots(cfg).length) p.push("akool_no_people");
   return p;
 }

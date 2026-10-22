@@ -106,10 +106,11 @@ export function validateTemplateForm(t: TemplateInput, configText: string, forPu
   const cfg = parseConfig(configText);
   if (!cfg) e.providerConfig = M.jsonInvalid;
 
-  // Akool rules: the current template video must be analysed, then 1–5 people chosen.
+  // Akool rules: either no analysis (one person, auto) or an analysis of the CURRENT video with 1–5 people chosen.
   if (t.providerKey === "akool" && cfg) {
     const ak = parseAkoolConfig(cfg);
-    if (!ak.analysis) { if (forPublish) e["akool.analysis"] = M.akoolNotAnalyzed; }
+    // No analysis = auto mode for one person (allowed).
+    if (!ak.analysis) { /* ok */ }
     else if (ak.analysis.videoPath !== t.previewVideoPath) e["akool.analysis"] = M.akoolVideoChanged;
     else if (!akoolSlots(ak).length) { if (forPublish) e["akool.people"] = M.akoolNoPeople; }
     if (ak.selected.length > AKOOL_MAX_PEOPLE) e["akool.people"] = M.akoolTooMany;

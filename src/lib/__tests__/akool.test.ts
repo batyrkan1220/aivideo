@@ -45,8 +45,8 @@ describe("Akool config → slots", () => {
     expect(row.face_slots_json.map((s) => s.providerInput)).toEqual(["obj_2", "obj_0"]);
   });
 
-  it("publish requires analysis of the current video and a selection", () => {
-    expect(akoolProblems(parseAkoolConfig({}), "previews/v.mp4")).toEqual(["akool_not_analyzed"]);
+  it("publish: no analysis is fine (auto); a stale analysis or empty selection is not", () => {
+    expect(akoolProblems(parseAkoolConfig({}), "previews/v.mp4")).toEqual([]); // auto, one person
     expect(akoolProblems(parseAkoolConfig(cfg), "previews/other.mp4")).toEqual(["akool_video_changed"]);
     expect(akoolProblems(parseAkoolConfig({ ...cfg, selected: [] }), "previews/v.mp4")).toEqual(["akool_no_people"]);
     const t = { ...emptyTemplate(), titleKk: "Би", coverAssetPath: "c.jpg", previewVideoPath: "previews/v.mp4", providerKey: "akool", providerConfig: cfg };
@@ -119,8 +119,34 @@ describe("Akool Character Swap V5 adapter (mocked API)", () => {
   it("validates video identity and mappings", () => {
     expect(ak.validateInputs({ ...base, faces, config: cfg })).toEqual([]);
     expect(ak.validateInputs({ ...base, templateVideoUrl: "https://cdn/other.mp4", faces, config: cfg })).toContain("akool_video_changed");
-    expect(ak.validateInputs({ ...base, faces, config: {} })).toContain("akool_not_analyzed");
+    expect(ak.validateInputs({ ...base, faces, config: {} })).toContain("akool_not_analyzed"); // 2 people need analysis
+    expect(ak.validateInputs({ ...base, faces: [{ ...faces[0], providerInput: "face_1" }], config: {} })).toEqual([]); // auto, 1 person
     expect(ak.validateInputs({ ...base, faces: [{ ...faces[0], providerInput: "face_1" }], config: cfg })).toContain("akool_unmapped_slot");
     expect(ak.validateInputs({ ...base, faces: [{ ...faces[0], providerInput: "obj_9" }], config: cfg })).toContain("akool_unknown_person");
+  });
+
+  it("auto mode: no analysis → analyse per order → swap the first person", async () => {
+    const one = [{ slotKey: "face_1", providerInput: "face_1", imageUrl: "https://s/me.jpg" }];
+    const calls = mockApi([
+      { body: { code: 1000, data: { _id: "6700000000000000000000b2", status: 1 } } },                 // analyze
+      { body: { code: 1000, data: { status: 2, progress: 30 } } },                                   // analysis running
+      { body: { code: 1000, data: { status: 3, analysis_result: { media: [{ obj_id: 4 }, { obj_id: 7 }] } } } },
+      { body: { code: 1000, data: { list: [{ _id: "t9", status: 1 }], errors: [] } } },             // create
+      { body: { code: 1000, data: { status: 3, url: "https://out/x.mp4" } } },                       // task done
+    ]);
+    const sub = await ak.submit({ jobId: "j", ...base, faces: one, config: { resolution: "480p" } });
+    expect(calls[0].body).toEqual({ url: VIDEO, media_type: "video", type: "person" });
+    expect(sub.providerJobId).toBe("6700000000000000000000b2");
+
+    expect(await ak.getStatus(sub.providerJobId, { startedAt: null, state: sub.state! })).toEqual({ state: "processing", progress: 0 });
+    const s2 = await ak.getStatus(sub.providerJobId, { startedAt: null, state: sub.state! });
+    if (s2.state !== "processing" || !s2.next) throw new Error("expected next step");
+    expect(calls[3].body).toMatchObject({
+      target_url: VIDEO, analyze_id: "6700000000000000000000b2", resolution: "480p",
+      mappings: [{ obj_id: 4, img_url: "https://s/me.jpg" }],
+    });
+    expect(s2.next.providerJobId).toBe("t9");
+    expect(s2.next.state).toEqual({ phase: "task" });               // face URL not kept after use
+    expect(await ak.getStatus("t9", { startedAt: null, state: s2.next.state })).toEqual({ state: "succeeded", outputUrl: "https://out/x.mp4" });
   });
 });

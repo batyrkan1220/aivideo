@@ -62,6 +62,7 @@ export function AkoolPeople({
       <ol className="list-decimal space-y-1 pl-5 text-sm text-muted">
         {a.steps.map((s) => <li key={s}>{s}</li>)}
       </ol>
+      {!current && <p className="rounded-xl bg-brand-soft px-3 py-2 text-sm">{a.autoNote}</p>}
 
       <div data-field="akool.analysis">
         <div className="flex flex-wrap items-center gap-3">

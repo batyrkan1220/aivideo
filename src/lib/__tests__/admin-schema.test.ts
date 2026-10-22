@@ -6,7 +6,6 @@ describe("template publishing rules", () => {
     const p = publishProblems(emptyTemplate());
     expect(p).not.toContain("missing_cover");
     expect(p).toContain("missing_preview");
-    expect(p).toContain("akool_not_analyzed");
   });
 
   it("a complete template passes", () => {
