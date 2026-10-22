@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth/session";
 import { isStaff } from "@/lib/auth/permissions";
 import { logoutAction } from "@/app/(auth)/actions";
 import { kk } from "@/lib/i18n/kk";
+import { isTelegramEmail } from "@/lib/telegram/session";
 import { OrderList } from "@/components/order-list";
 import { DisplayNameForm, DeleteAllPhotosForm, DeleteAccountForm } from "@/components/account-forms";
 
@@ -35,8 +36,8 @@ async function AccountDetails() {
       <section className={card}>
         <h2 className="mb-4 font-semibold">{kk.account.profile}</h2>
         <dl className="mb-5 grid grid-cols-[auto_minmax(0,1fr)] [&>dd]:break-words gap-x-6 gap-y-2 text-sm">
-          <dt className="text-muted">{kk.auth.email}</dt>
-          <dd>{user.email}</dd>
+          <dt className="text-muted">{isTelegramEmail(user.email) ? "Telegram" : kk.auth.email}</dt>
+          <dd>{isTelegramEmail(user.email) ? kk.account.viaTelegram : user.email}</dd>
           <dt className="text-muted">{kk.account.role}</dt>
           <dd>
             {kk.account.roles[user.role]}

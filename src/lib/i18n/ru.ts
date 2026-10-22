@@ -147,6 +147,18 @@ export const ru = {
       system: "Система",
     },
     forbidden: "У вас нет доступа к этой странице.",
+    telegram: {
+      title: "Telegram бот / Mini App",
+      hint: (url: string) => `Подключает webhook бота, команды /start и /videos и кнопку меню «Видео жасау» → ${url}. Нажмите один раз после смены токена или адреса сайта.`,
+      noToken: "Добавьте TELEGRAM_BOT_TOKEN в Render → Environment, затем вернитесь сюда.",
+      connect: "Подключить бота",
+      done: (bot: string) => `Готово${bot ? `: @${bot}` : ""}`,
+      errors: {
+        forbidden: "Нет прав (нужен главный администратор).",
+        not_configured: "Не задан TELEGRAM_BOT_TOKEN.",
+        failed: "Telegram не принял настройки. Проверьте токен и NEXT_PUBLIC_APP_URL (должен быть https://trendme.kz).",
+      },
+    },
     overview: {
       templatesByStatus: "Шаблоны по статусам",
       users: "Зарегистрированные пользователи",

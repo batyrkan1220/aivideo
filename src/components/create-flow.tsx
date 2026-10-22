@@ -9,6 +9,7 @@ import { requestPhotoUpload, confirmPhotoUpload, removePhotoUpload, createOrder 
 import { startCheckout } from "@/lib/payments/actions";
 import { normalizeKzPhone } from "@/lib/payments/phone";
 import { useSavedPhone, savePhone } from "@/lib/payments/saved-phone";
+import { useIsTelegram } from "@/lib/telegram/client";
 
 type SlotState =
   | { phase: "empty" }
@@ -71,7 +72,9 @@ export function CreateFlow({
   const [quality, setQuality] = useState(available[0]?.key ?? "");
   const [consent, setConsent] = useState(false);
   const [phone, setPhone] = useSavedPhone();
-  const phoneOk = !askPhone || !!normalizeKzPhone(phone);
+  const inTelegram = useIsTelegram();
+  const needPhone = askPhone && !inTelegram; // in Telegram the phone is asked on the website
+  const phoneOk = !needPhone || !!normalizeKzPhone(phone);
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const previews = useRef<string[]>([]);
@@ -142,6 +145,8 @@ export function CreateFlow({
       setFormError(errText(r.error));
       return;
     }
+    // Telegram: the order page offers "pay in browser" (payment runs on the website).
+    if (inTelegram) { router.push(`/orders/${r.orderId}`); return; }
     // One click: the order is created and payment starts right away (the action redirects to it).
     if (askPhone) savePhone(phone);
     const fd = new FormData();
@@ -211,7 +216,7 @@ export function CreateFlow({
           </dl>
 
           <div className="mt-5 space-y-3 text-sm text-white/85">
-            {askPhone && (
+            {needPhone && (
               <label className="block">
                 <span className="mb-1 block font-medium text-white">{kk.tole.phoneLabel}</span>
                 <input
@@ -237,7 +242,7 @@ export function CreateFlow({
             disabled={!canSubmit}
             className="mt-2 h-13 w-full rounded-full bg-flash px-7 font-semibold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {pending ? c.paying : price ? c.payNow(formatKzt(price.totalKzt)) : c.confirm}
+            {pending ? c.paying : inTelegram ? c.confirm : price ? c.payNow(formatKzt(price.totalKzt)) : c.confirm}
           </button>
         </section>
       )}

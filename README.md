@@ -109,6 +109,16 @@ Supabase → Authentication → URL Configuration: **Site URL** = сайт ад�
 
 Live-та тексерілуі керек: Tole `data.id` (invoice) мен webhook-тағы `paymentIntentId` бір UUID екені (құжатта анық жазылмаған; сәйкес келмесе webhook `not_found` қайтарады). Қайтару (refund) әзірге автоматты емес.
 
+## Telegram Mini App (қосылған)
+
+- Бот мәзіріндегі «Видео жасау» батырмасы `https://trendme.kz` сайтын Telegram ішінде ашады.
+- **Кіру:** `src/components/telegram-bridge.tsx` Telegram скриптін тек Telegram ішінде жүктейді, `initData`-ны `/api/telegram/auth`-қа жібереді. Сервер оны бот токенімен тексереді (HMAC, `auth_date` ≤ 24 сағ), аккаунтты табады/құрады (`tg<id>@telegram.trendme.kz`, Telegram id — тек `app_metadata`-да) және кәдімгі Supabase сессиясын ашады. Бұл домен email-тіркелуде бұғатталған.
+- **Төлем браузерде:** Telegram ережесі (цифрлық тауар) бойынша Mini App ішінде Kaspi төлемі жоқ. «Kaspi арқылы төлеу (браузерде)» → бір реттік 10 минуттық сілтеме (`login_handoffs`, `/auth/handoff/{id}`) → браузерде сол аккаунтпен тапсырыс беті ашылады.
+- **Хабарламалар:** төлем қабылданды, видео дайын, қате — бот иесіне «Видеоны көру» батырмасымен жазады (`notifyOrderOwner`).
+- **Бот:** `/api/telegram/webhook` (`X-Telegram-Bot-Api-Secret-Token` тексеріледі), `/start` және `/videos`.
+- **Баптау:** Render-ге `TELEGRAM_BOT_TOKEN` қойыңыз, `NEXT_PUBLIC_APP_URL=https://trendme.kz` болуы керек, содан соң Админ панель → Обзор → «Подключить бота» (webhook, командалар, мәзір батырмасы).
+- CSP: `script-src` + `https://telegram.org`; `frame-ancestors` тек `web.telegram.org` (Telegram Web үшін).
+
 ## Akool Character Swap V5 (қосылған)
 
 Модель: Akool Open API → Swap Studio → Character Swap V5 (`akool-premium-multi-person`) — видеодағы адамдар **толық** (бет, шаш, дене, киім) фотодағы адамдармен ауыстырылады, бір видеода **1–5 адам**. Құжат: https://docs.akool.com/ai-tools-suite/swap-studio/character-swap-v5

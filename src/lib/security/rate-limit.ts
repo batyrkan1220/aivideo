@@ -11,6 +11,8 @@ export const LIMITS = {
   checkout: [20, 60 * 60],
   tole_reconcile: [15, 60],   // per payment: status polling reads Tole at most every ~4 s
   tole_simulate: [10, 60 * 60],
+  telegram_auth: [30, 10 * 60],
+  handoff: [10, 10 * 60],
 } as const satisfies Record<string, readonly [number, number]>;
 
 /** Client IP as seen by Render's proxy (first X-Forwarded-For hop). */

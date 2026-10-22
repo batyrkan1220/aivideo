@@ -2,7 +2,9 @@ import type { Metadata, Viewport } from "next";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/unbounded";
 import "./globals.css";
+import { Suspense } from "react";
 import { kk } from "@/lib/i18n/kk";
+import { TelegramBridge } from "@/components/telegram-bridge";
 
 // Self-hosted Inter (body) + Unbounded (display); cyrillic-ext covers Kazakh letters Ә Ғ Қ Ң Ө Ұ Ү Һ І
 
@@ -26,7 +28,12 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, view
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="kk" className="h-full antialiased">
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        {children}
+        <Suspense fallback={null}>
+          <TelegramBridge />
+        </Suspense>
+      </body>
     </html>
   );
 }

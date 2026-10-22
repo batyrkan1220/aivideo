@@ -7,6 +7,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { formatKzt } from "@/lib/pricing";
 import { env } from "@/lib/env";
 import { isTestPaymentProvider } from "@/lib/payments/types";
+import { TelegramSetup } from "./telegram/setup";
 
 const S = ru.admin.stats;
 type SP = { from?: string; to?: string };
@@ -72,6 +73,9 @@ async function Overview({ searchParams }: { searchParams: Promise<SP> }) {
         </form>
       </div>
 
+      {can(u.role, "users.manage") && (
+        <TelegramSetup configured={!!env().TELEGRAM_BOT_TOKEN} appUrl={env().NEXT_PUBLIC_APP_URL} />
+      )}
       {isTestPaymentProvider(env().PAYMENT_PROVIDER) && (
         <p className="rounded-card bg-flash/20 p-4 text-sm font-medium">{S.sandboxNote}</p>
       )}

@@ -44,3 +44,6 @@ body {
 /* Horizontal chip rail without a visible scrollbar */
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Inside the Telegram Mini App: Telegram provides the title bar and Back button. */
+html[data-tg] .tg-hide { display: none; }

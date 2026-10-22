@@ -1,10 +1,54 @@
 "use client";
-import { useActionState } from "react";
+import { useActionState, useState, useTransition } from "react";
+import { telegramApp, useIsTelegram } from "@/lib/telegram/client";
+import { createPaymentHandoff } from "@/lib/telegram/actions";
 import { useSavedPhone, savePhone } from "@/lib/payments/saved-phone";
 import { kk } from "@/lib/i18n/kk";
 import { startCheckout, type CheckoutState } from "@/lib/payments/actions";
 
-export function PayButton({ orderId, label, sandbox, askPhone = false }: { orderId: string; label: string; sandbox: boolean; askPhone?: boolean }) {
+export function PayButton(props: { orderId: string; label: string; sandbox: boolean; askPhone?: boolean }) {
+  // Inside Telegram the payment continues on the website (Telegram rules for digital goods).
+  return useIsTelegram() ? <TelegramPay orderId={props.orderId} /> : <WebPay {...props} />;
+}
+
+/**
+ * Opens the order in the regular browser, already signed in (one-time link).
+ * Step 1 prepares the link; step 2 opens it directly from the tap (Telegram expects a user gesture).
+ */
+function TelegramPay({ orderId }: { orderId: string }) {
+  const [pending, start] = useTransition();
+  const [url, setUrl] = useState<string | null>(null);
+  const [opened, setOpened] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const prepare = () => start(async () => {
+    setFailed(false);
+    const r = await createPaymentHandoff(orderId);
+    if (r.ok) setUrl(r.url); else setFailed(true);
+  });
+  const open = () => {
+    const wa = telegramApp();
+    if (!url || !wa) return;
+    wa.openLink(url);
+    setOpened(true);
+    setUrl(null); // the link is single-use
+  };
+  const btn = "h-13 w-full rounded-full bg-flash font-semibold text-ink transition-opacity hover:opacity-90 disabled:opacity-60";
+  return (
+    <div className="mt-5">
+      {url ? (
+        <button type="button" onClick={open} className={btn}>{kk.telegram.openBrowser}</button>
+      ) : (
+        <button type="button" onClick={prepare} disabled={pending} className={btn}>
+          {pending ? kk.order.paying : kk.telegram.payInBrowser}
+        </button>
+      )}
+      {opened && <p role="status" className="mt-3 text-center text-sm opacity-90">{kk.telegram.payOpened}</p>}
+      {failed && <p role="alert" className="mt-3 text-center text-sm text-flash">{kk.order.payErrors.generic}</p>}
+    </div>
+  );
+}
+
+function WebPay({ orderId, label, sandbox, askPhone = false }: { orderId: string; label: string; sandbox: boolean; askPhone?: boolean }) {
   const [state, action, pending] = useActionState<CheckoutState, FormData>(startCheckout, {});
   const [phone, setPhone] = useSavedPhone();
   return (

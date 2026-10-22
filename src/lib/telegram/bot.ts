@@ -1,0 +1,72 @@
+import "server-only";
+import { createHmac, timingSafeEqual } from "node:crypto";
+import { env } from "@/lib/env";
+import { supabaseAdmin } from "@/lib/supabase/server";
+
+/**
+ * Minimal Telegram Bot API client. The token is never logged; errors are reported by method name only.
+ */
+export function botConfigured() { return !!env().TELEGRAM_BOT_TOKEN; }
+
+export async function tg<T = unknown>(method: string, payload: Record<string, unknown>): Promise<T | null> {
+  const token = env().TELEGRAM_BOT_TOKEN;
+  if (!token) return null;
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(10_000),
+      cache: "no-store",
+    });
+    const body = (await res.json().catch(() => null)) as { ok?: boolean; result?: T; error_code?: number } | null;
+    if (!body?.ok) { console.error(JSON.stringify({ src: "telegram", event: "api_error", method, code: body?.error_code ?? res.status })); return null; }
+    return body.result ?? null;
+  } catch {
+    console.error(JSON.stringify({ src: "telegram", event: "api_unreachable", method }));
+    return null;
+  }
+}
+
+/** Secret for X-Telegram-Bot-Api-Secret-Token, derived from the bot token (1–256 chars of A-Za-z0-9_-). */
+export function webhookSecret(): string | null {
+  const token = env().TELEGRAM_BOT_TOKEN;
+  return token ? createHmac("sha256", token).update("trendme-telegram-webhook-v1").digest("hex") : null;
+}
+
+export function checkWebhookSecret(header: string | null): boolean {
+  const s = webhookSecret();
+  if (!s || !header) return false;
+  const a = Buffer.from(header);
+  const b = Buffer.from(s);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+const appUrl = (path = "/") => `${env().NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}${path}`;
+
+/** Inline button that opens a page of the Mini App inside Telegram. */
+export const openAppButton = (text: string, path = "/") => ({ inline_keyboard: [[{ text, web_app: { url: appUrl(path) } }]] });
+
+export function sendMessage(chatId: number, text: string, button?: { text: string; path: string }) {
+  return tg("sendMessage", {
+    chat_id: chatId, text, parse_mode: "HTML", link_preview_options: { is_disabled: true },
+    ...(button ? { reply_markup: openAppButton(button.text, button.path) } : {}),
+  });
+}
+
+/** Sends a message to the order's owner if they use Telegram. Best effort, never throws. */
+export async function notifyOrderOwner(orderId: string, text: string, buttonText: string) {
+  if (!botConfigured()) return;
+  try {
+    const db = supabaseAdmin();
+    const { data: o } = await db.from("orders").select("user_id").eq("id", orderId).maybeSingle();
+    if (!o?.user_id) return;
+    const { data: p } = await db.from("profiles").select("telegram_id").eq("id", o.user_id).maybeSingle();
+    if (!p?.telegram_id) return;
+    await sendMessage(Number(p.telegram_id), text, { text: buttonText, path: `/orders/${orderId}` });
+  } catch {
+    console.error(JSON.stringify({ src: "telegram", event: "notify_failed" }));
+  }
+}
+
+export const escapeHtml = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);

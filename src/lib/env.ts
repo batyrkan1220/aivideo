@@ -21,6 +21,8 @@ const schema = z.object({
   TOLE_CONNECTION_ID: z.string().uuid().optional(),
   TOLE_WEBHOOK_SECRET: z.string().min(16).optional(),
   TOLE_API_BASE_URL: z.string().url().default("https://api.tolepay.kz/v1"),
+  // Telegram bot / Mini App — server-only.
+  TELEGRAM_BOT_TOKEN: z.string().regex(/^\d+:[A-Za-z0-9_-]{30,}$/).optional(),
   AI_PROVIDER: z.string().default("dev"),
   AKOOL_API_KEY: z.string().min(10).optional(),
   AKOOL_API_BASE_URL: z.string().url().default("https://openapi.akool.com"),

@@ -9,7 +9,8 @@ import { allow, clientIp } from "@/lib/security/rate-limit";
 
 export type AuthState = { error?: string; message?: string };
 
-const emailSchema = z.string().trim().toLowerCase().email();
+// The Telegram placeholder domain is reserved for accounts created by the Mini App sign-in.
+const emailSchema = z.string().trim().toLowerCase().email().refine((v) => !v.endsWith("@telegram.trendme.kz"));
 const passwordSchema = z.string().min(8).max(128);
 
 /** Map provider errors to safe Kazakh messages — raw errors only go to server logs. */
