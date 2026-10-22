@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { Logo } from "@/components/logo";
 import { kk } from "@/lib/i18n/kk";
 import { getSessionUser } from "@/lib/auth/session";
 import { isStaff } from "@/lib/auth/permissions";
@@ -9,8 +10,8 @@ export function SiteHeader() {
   return (
     <header className="tg-hide sticky top-0 z-30 border-b border-line bg-paper/90 pt-[env(safe-area-inset-top)] backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4">
-        <Link href="/" className="flex h-11 items-center font-display text-lg font-bold tracking-tight">
-          {kk.brand.name}
+        <Link href="/" aria-label={kk.brand.name} className="flex h-11 items-center">
+          <Logo className="text-lg" />
         </Link>
         <div className="ml-auto flex items-center gap-2">
           <Suspense fallback={<div className="h-10 w-20" />}>

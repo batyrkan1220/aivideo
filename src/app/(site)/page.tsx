@@ -6,6 +6,7 @@ import { CategoryChips, GridSkeleton, pickCard } from "@/components/catalog-bits
 import { VideoFeed } from "@/components/video-feed";
 import { MyVideosBanner } from "@/components/my-videos-banner";
 import { HeroShowcase } from "@/components/hero-showcase";
+import { Logo } from "@/components/logo";
 import { resolveShowcase } from "@/lib/templates/showcase";
 
 type SP = { account?: string; category?: string };
@@ -40,6 +41,7 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
 
       {/* Phone intro: one line + three tiny steps, then straight to the videos */}
       <section className="mx-auto max-w-6xl px-4 pt-4 md:hidden">
+        <div className="tg-only mb-3"><Logo className="text-lg" /></div>
         <h1 className="font-display text-xl font-extrabold leading-tight tracking-tight">{kk.home.title}</h1>
         <HowItWorks compact />
       </section>

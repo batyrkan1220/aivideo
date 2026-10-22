@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Logo } from "@/components/logo";
 import { kk } from "@/lib/i18n/kk";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
@@ -6,7 +7,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     <main className="grid min-h-dvh md:grid-cols-[1fr_minmax(0,520px)]">
       {/* Brand panel (tablet/desktop only) */}
       <section className="relative hidden overflow-hidden bg-ink p-12 text-white md:flex md:flex-col md:justify-between">
-        <Link href="/" className="font-display text-xl font-bold">{kk.brand.name}</Link>
+        <Link href="/" aria-label={kk.brand.name}><Logo className="text-xl" /></Link>
         <div>
           <p className="max-w-md font-display text-5xl font-extrabold leading-[1.05] tracking-tight">{kk.home.title}</p>
           <ol className="mt-10 space-y-4 text-white/75">
@@ -23,7 +24,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
       <section className="flex items-center justify-center bg-paper px-4 py-10">
         <div className="w-full max-w-sm">
-          <Link href="/" className="mb-8 block text-center font-display text-2xl font-bold md:hidden">{kk.brand.name}</Link>
+          <Link href="/" aria-label={kk.brand.name} className="mb-8 flex justify-center md:hidden"><Logo className="text-2xl" /></Link>
           <div className="rounded-card border border-line bg-white p-6 sm:p-8">{children}</div>
         </div>
       </section>
