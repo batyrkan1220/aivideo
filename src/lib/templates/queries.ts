@@ -137,23 +137,6 @@ export async function listNewest(limit = 8) {
   return toCards(data as unknown as Row[]);
 }
 
-/** Popular = most paid orders in the last 30 days. Empty when there's no real data yet. */
-export async function listPopular(limit = 8) {
-  await connection(); // request-time only: never run during prerender
-  if (!env().SUPABASE_SERVICE_ROLE_KEY) return [];
-  try {
-    const { data: ranks, error } = await supabaseAdmin().rpc("popular_template_ids", { days: 30, max_rows: limit });
-    if (error || !ranks?.length) return [];
-    const ids = (ranks as { template_id: string }[]).map((r) => r.template_id);
-    const { data } = await supabasePublic().from("templates").select(CARD_COLUMNS).in("id", ids);
-    const cards = toCards(data as unknown as Row[]);
-    return ids.map((id) => cards.find((c) => c.id === id)).filter((c): c is TemplateDetail => !!c);
-  } catch (err) {
-    console.error("[templates.popular]", err);
-    return [];
-  }
-}
-
 export async function getTemplate(id: string): Promise<TemplateDetail | null> {
   await connection(); // request-time only: never run during prerender
   if (!z.string().uuid().safeParse(id).success) return null;

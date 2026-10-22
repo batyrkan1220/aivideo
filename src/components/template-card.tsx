@@ -17,42 +17,79 @@ export type CardData = {
 };
 
 /**
- * 9:16 template card. The preview video is not downloaded until the user
- * hovers or focuses the card (preload="none"), so the grid stays light.
+ * Keeps at most MAX_PLAYING previews running at once across the whole page: starting a new
+ * one pauses the oldest. Many cards on screen then never decode/stream videos in parallel.
+ */
+const MAX_PLAYING = 2;
+const playingNow: HTMLVideoElement[] = [];
+function claimPlayback(v: HTMLVideoElement) {
+  const i = playingNow.indexOf(v);
+  if (i >= 0) playingNow.splice(i, 1);
+  playingNow.push(v);
+  while (playingNow.length > MAX_PLAYING) playingNow.shift()?.pause();
+}
+function releasePlayback(v: HTMLVideoElement) {
+  const i = playingNow.indexOf(v);
+  if (i >= 0) playingNow.splice(i, 1);
+}
+
+/**
+ * 9:16 template card, built for long grids of video:
+ *  - the cover image is lazy-loaded; the video has NO src until the card is near the screen;
+ *  - the video only downloads when it is about to play (hover/focus, or mostly visible on touch);
+ *  - at most two previews play at the same time; off-screen videos are paused.
  */
 export function TemplateCard({ t, priority = false }: { t: CardData; priority?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [playing, setPlaying] = useState(false);
-
   const cardRef = useRef<HTMLAnchorElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [near, setNear] = useState(false); // card is within ~1 screen: attach the video src
 
-  // Touch screens have no hover: play the preview while the card is mostly on screen.
-  // Skipped for reduced-motion and data-saver users.
+  // Attach the video only when the card approaches the viewport.
   useEffect(() => {
     const el = cardRef.current;
-    const v = videoRef.current;
-    if (!el || !v || !window.matchMedia("(hover: none)").matches) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    if ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return;
-    const io = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting) v.play().then(() => setPlaying(true)).catch(() => {});
-      else { v.pause(); setPlaying(false); }
-    }, { threshold: 0.6 });
+    if (!el || !t.previewUrl) return;
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setNear(true); io.disconnect(); } }, { rootMargin: "400px 0px" });
     io.observe(el);
     return () => io.disconnect();
-  }, []);
+  }, [t.previewUrl]);
 
-  const start = () => {
+  const play = () => {
     const v = videoRef.current;
     if (!v) return;
-    v.play().then(() => setPlaying(true)).catch(() => {});
+    claimPlayback(v);
+    v.play().then(() => setPlaying(true)).catch(() => releasePlayback(v));
   };
   const stop = () => {
     const v = videoRef.current;
     if (!v) return;
     v.pause();
+    releasePlayback(v);
     setPlaying(false);
   };
+
+  // Touch screens have no hover: play while the card is mostly on screen.
+  // Skipped for reduced-motion and data-saver users.
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el || !near || !window.matchMedia("(hover: none)").matches) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return;
+    const io = new IntersectionObserver(([e]) => (e.isIntersecting ? play() : stop()), { threshold: 0.75 });
+    io.observe(el);
+    return () => { io.disconnect(); stop(); };
+  }, [near]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep the UI in sync when the playback manager pauses this video.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const onPause = () => setPlaying(false);
+    v.addEventListener("pause", onPause);
+    return () => v.removeEventListener("pause", onPause);
+  }, [near]);
+
+  const start = play;
 
   return (
     <Link
@@ -74,7 +111,7 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
             className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${playing ? "opacity-0" : "opacity-100"}`}
           />
         )}
-        {t.previewUrl && (
+        {t.previewUrl && near && (
           <video
             ref={videoRef}
             // Without a cover image the first video frame acts as the poster.

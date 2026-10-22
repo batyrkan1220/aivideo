@@ -3,11 +3,12 @@ import { kk } from "@/lib/i18n/kk";
 import type { Category } from "@/lib/templates/queries";
 import { TemplateCard, type CardData } from "./template-card";
 
-export function TemplateGrid({ items, priorityCount = 0 }: { items: CardData[]; priorityCount?: number }) {
+/** mobileLimit: on phones only the first N cards are shown (hidden cards never load video). */
+export function TemplateGrid({ items, priorityCount = 0, mobileLimit }: { items: CardData[]; priorityCount?: number; mobileLimit?: number }) {
   return (
     <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
       {items.map((t, i) => (
-        <li key={t.id}>
+        <li key={t.id} className={mobileLimit !== undefined && i >= mobileLimit ? "max-sm:hidden" : undefined}>
           <TemplateCard t={pickCard(t)} priority={i < priorityCount} />
         </li>
       ))}

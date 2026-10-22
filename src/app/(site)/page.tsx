@@ -1,7 +1,8 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { connection } from "next/server";
 import { kk } from "@/lib/i18n/kk";
-import { listCategories, listNewest, listPopular, listTrending } from "@/lib/templates/queries";
+import { listCategories, listNewest, listTrending } from "@/lib/templates/queries";
 import { CategoryChips, GridSkeleton, SectionHeading, TemplateGrid } from "@/components/catalog-bits";
 import { HeroShowcase } from "@/components/hero-showcase";
 import { resolveShowcase } from "@/lib/templates/showcase";
@@ -60,9 +61,9 @@ async function Categories() {
 
 async function Sections() {
   await connection();
-  const [trending, popular, latest] = await Promise.all([listTrending(8), listPopular(8), listNewest(12)]);
+  const [trending, latest] = await Promise.all([listTrending(8), listNewest(12)]);
   // Don't show the same template twice on one screen.
-  const shown = new Set([...trending, ...popular].map((t) => t.id));
+  const shown = new Set(trending.map((t) => t.id));
   const newest = latest.filter((t) => !shown.has(t.id)).slice(0, 8);
 
   if (!trending.length && !latest.length) {
@@ -81,22 +82,29 @@ async function Sections() {
       {trending.length > 0 && (
         <section>
           <SectionHeading title={kk.home.trendingTitle} href="/templates?sort=trending" />
-          <TemplateGrid items={trending} priorityCount={4} />
-        </section>
-      )}
-      {popular.length > 0 && (
-        <section>
-          <SectionHeading title={kk.home.popularTitle} />
-          <TemplateGrid items={popular} />
+          <TemplateGrid items={trending} priorityCount={4} mobileLimit={4} />
         </section>
       )}
       {newest.length > 0 && (
-        <section>
+        <section className={trending.length ? "max-sm:hidden" : undefined}>
           <SectionHeading title={kk.home.newTitle} href="/templates" />
-          <TemplateGrid items={newest} priorityCount={trending.length ? 0 : 4} />
+          <TemplateGrid items={newest} priorityCount={trending.length ? 0 : 4} mobileLimit={trending.length ? undefined : 4} />
         </section>
       )}
+      {/* Phones: a few videos only, then straight to the full video catalog. */}
+      <MobileAllVideos />
     </div>
+  );
+}
+
+function MobileAllVideos() {
+  return (
+    <Link
+      href="/templates"
+      className="flex h-12 items-center justify-center gap-2 rounded-full bg-ink text-base font-semibold text-white sm:hidden"
+    >
+      {kk.home.allVideos} <span aria-hidden>→</span>
+    </Link>
   );
 }
 

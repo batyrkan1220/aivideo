@@ -116,7 +116,14 @@ export function TemplateEditor({
       return null;
     }
     const sent = slots.length ? slots : autoFaceSlots(1);
-    const payload = { ...t, coverAssetPath: null, providerKey: "akool", providerConfig: akool, faceSlots: sent };
+    // Older templates without a cover: make one from the video now.
+    let cover = t.coverAssetPath;
+    if (!cover && t.previewVideoPath) {
+      const blob = await captureCover(`${mediaBase}/${t.previewVideoPath}`);
+      cover = blob ? await uploadCover(blob) : null;
+      if (cover) set("coverAssetPath", cover);
+    }
+    const payload = { ...t, coverAssetPath: cover, providerKey: "akool", providerConfig: akool, faceSlots: sent };
     const r = await saveTemplate(payload, id);
     if (!r.ok) {
       setMsg({ kind: "err", text: r.error === "forbidden" ? ru.admin.forbidden : r.error === "invalid" ? e.invalid : ru.errors.generic });
@@ -193,7 +200,7 @@ export function TemplateEditor({
       </Section>
 
       <Section title={e.sections.media}>
-        <VideoField error={err("preview")} path={t.previewVideoPath} mediaBase={mediaBase} onUploaded={(p) => set("previewVideoPath", p)} />
+        <VideoField error={err("preview")} path={t.previewVideoPath} mediaBase={mediaBase} onUploaded={(p) => set("previewVideoPath", p)} onCover={(p) => set("coverAssetPath", p)} />
       </Section>
 
       <Section title={e.akool.title}>
@@ -332,12 +339,49 @@ function fromLocal(v: string) {
   return v ? new Date(v).toISOString() : undefined;
 }
 
+/**
+ * Grabs one frame of the video as a small JPEG. Catalog cards show this image instead of
+ * downloading every video, which keeps pages with many templates fast.
+ */
+async function captureCover(source: File | string): Promise<Blob | null> {
+  const v = document.createElement("video");
+  v.muted = true;
+  v.playsInline = true;
+  v.preload = "auto";
+  v.crossOrigin = "anonymous";
+  const objectUrl = typeof source === "string" ? null : URL.createObjectURL(source);
+  v.src = objectUrl ?? (source as string);
+  try {
+    await new Promise<void>((res, rej) => { v.onloadeddata = () => res(); v.onerror = () => rej(new Error("load")); });
+    v.currentTime = Math.min(0.5, (v.duration || 1) / 2);
+    await new Promise<void>((res, rej) => { v.onseeked = () => res(); v.onerror = () => rej(new Error("seek")); });
+    const w = Math.min(540, v.videoWidth || 540);
+    const h = Math.round(w * ((v.videoHeight || 960) / (v.videoWidth || 540)));
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    c.getContext("2d")!.drawImage(v, 0, 0, w, h);
+    return await new Promise<Blob | null>((res) => c.toBlob(res, "image/jpeg", 0.8));
+  } catch {
+    return null;
+  } finally {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+  }
+}
+
+async function uploadCover(blob: Blob): Promise<string | null> {
+  const r = await createUploadUrl({ kind: "cover", contentType: "image/jpeg", size: blob.size });
+  if (!r.ok) return null;
+  const { error } = await supabaseBrowser().storage.from("template-media")
+    .uploadToSignedUrl(r.path, r.token, blob, { contentType: "image/jpeg" });
+  return error ? null : r.path;
+}
+
 const VIDEO_TYPES = ["video/mp4", "video/webm"];
 const VIDEO_MAX = 50 * 1024 * 1024;
 
 function VideoField({
-  error, path, mediaBase, onUploaded,
-}: { error?: string; path: string | null; mediaBase: string; onUploaded: (p: string) => void }) {
+  error, path, mediaBase, onUploaded, onCover,
+}: { error?: string; path: string | null; mediaBase: string; onUploaded: (p: string) => void; onCover: (p: string | null) => void }) {
   const [busy, setBusy] = useState(false);
   const [uploadErr, setUploadErr] = useState<string | null>(null);
   const url = path ? (/^https?:/.test(path) ? path : `${mediaBase}/${path}`) : null;
@@ -355,6 +399,9 @@ function VideoField({
         .uploadToSignedUrl(r.path, r.token, file, { contentType: file.type });
       if (upErr) { setUploadErr(e.uploadFailed); return; }
       onUploaded(r.path);
+      // Cover for catalog cards, made from this video (best effort).
+      const blob = await captureCover(file);
+      onCover(blob ? await uploadCover(blob) : null);
     } catch {
       setUploadErr(e.uploadFailed);
     } finally {
