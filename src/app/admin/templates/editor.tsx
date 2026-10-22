@@ -79,7 +79,13 @@ export function TemplateEditor({
   const [dirty, setDirty] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string; problems?: PublishProblem[] } | null>(null);
   const [pending, start] = useTransition();
-  const [configText, setConfigText] = useState(JSON.stringify(initial.providerConfig, null, 2));
+  // Only the keys the WaveSpeed head swap uses are kept; older keys are dropped on the next save.
+  const [configText, setConfigText] = useState(() => {
+    const c = (initial.providerConfig ?? {}) as Record<string, unknown>;
+    return JSON.stringify(initial.providerKey === "wavespeed"
+      ? { resolution: c.resolution ?? "720p", ...(c.videoSeconds !== undefined ? { videoSeconds: c.videoSeconds } : {}) }
+      : c);
+  });
   // Errors appear after the first save/publish attempt and then update live as the admin types.
   const [mode, setMode] = useState<null | "save" | "publish">(null);
 
@@ -92,25 +98,18 @@ export function TemplateEditor({
     set("qualities", t.qualities.map((q, j) => (j === i ? { ...q, ...patch } : q)));
   const setPricing = (patch: Partial<TemplateInput["pricing"]>) => set("pricing", { ...t.pricing, ...patch });
 
-  // Provider config: structured controls read/write the JSON text (single source of truth).
+  // Provider config, edited through the structured WaveSpeed controls below.
   const cfg = parseConfig(configText);
   const setCfg = (patch: Record<string, unknown>) => {
-    const next = { ...(cfg ?? {}), ...patch };
-    setConfigText(JSON.stringify(next, null, 2));
+    setConfigText(JSON.stringify({ ...(cfg ?? {}), ...patch }));
     setDirty(true);
   };
-  const wsMap = (n: number): number[] => {
-    const m = Array.isArray(cfg?.targetIndexBySlot) ? (cfg!.targetIndexBySlot as number[]) : [];
-    return Array.from({ length: n }, (_, i) => (Number.isInteger(m[i]) ? m[i] : i));
-  };
-  const setFaceCount = (n: number) => {
-    set("faceSlots", autoFaceSlots(n));
-    if (t.providerKey === "wavespeed") setCfg({ targetIndexBySlot: wsMap(n) });
-  };
+  const setFaceCount = (n: number) => set("faceSlots", autoFaceSlots(n));
   const setProvider = (key: string | null) => {
     set("providerKey", key);
-    if (key === "wavespeed" && cfg && !Array.isArray(cfg.targetIndexBySlot)) {
-      setCfg({ targetIndexBySlot: wsMap(t.faceSlots.length), targetGender: cfg.targetGender ?? "all" });
+    if (key === "wavespeed") {
+      setConfigText(JSON.stringify({ resolution: cfg?.resolution ?? "720p", ...(cfg?.videoSeconds !== undefined ? { videoSeconds: cfg.videoSeconds } : {}) }));
+      if (t.faceSlots.length > 1) set("faceSlots", autoFaceSlots(1));
     }
   };
 
@@ -170,9 +169,8 @@ export function TemplateEditor({
     catch { return { q, total: null }; }
   });
   const wsSeconds = typeof cfg?.videoSeconds === "number" ? (cfg.videoSeconds as number) : undefined;
-  const wsHead = cfg?.swapMode === "head";
-  const wsRate = wsHead ? (cfg?.resolution === "480p" ? 0.04 : 0.08) : 0.01;
-  const wsCost = wsSeconds ? (Math.max(3, Math.ceil(wsSeconds)) * wsRate * t.faceSlots.length).toFixed(2) : null;
+  const wsRate = cfg?.resolution === "480p" ? 0.04 : 0.08;
+  const wsCost = wsSeconds ? (Math.min(120, Math.max(3, Math.ceil(wsSeconds))) * wsRate).toFixed(2) : null;
 
   return (
     <div className="space-y-6 pb-56 sm:pb-28">
@@ -212,14 +210,14 @@ export function TemplateEditor({
         </div>
       </Section>
 
-      <Section title={e.sections.faces}>
+      <Section title={e.sections.faces} field="ws.faces" error={err("ws.faces")}>
         <div className="grid gap-6 lg:grid-cols-[1fr_minmax(0,320px)]">
           <div>
             <span className={labelCls}>{e.peopleCount}<span className="text-danger" aria-hidden> *</span></span>
             <div className="flex items-center gap-3">
               <button type="button" aria-label={e.fewer} disabled={t.faceSlots.length <= 1} onClick={() => setFaceCount(t.faceSlots.length - 1)} className="h-11 w-11 rounded-full border border-line text-xl font-semibold hover:border-ink disabled:opacity-30">−</button>
               <output className="w-10 text-center font-display text-3xl font-bold" aria-live="polite">{t.faceSlots.length}</output>
-              <button type="button" aria-label={e.more} disabled={t.faceSlots.length >= 10} onClick={() => setFaceCount(t.faceSlots.length + 1)} className="h-11 w-11 rounded-full border border-line text-xl font-semibold hover:border-ink disabled:opacity-30">+</button>
+              <button type="button" aria-label={e.more} disabled={t.faceSlots.length >= (t.providerKey === "wavespeed" ? 1 : 10)} onClick={() => setFaceCount(t.faceSlots.length + 1)} className="h-11 w-11 rounded-full border border-line text-xl font-semibold hover:border-ink disabled:opacity-30">+</button>
             </div>
             <p className="mt-4 max-w-md text-sm text-muted">{e.faceHint}</p>
           </div>
@@ -350,7 +348,7 @@ export function TemplateEditor({
             <select className={inputCls(err("providerKey"))} value={t.providerKey ?? ""} onChange={(ev) => setProvider(ev.target.value || null)}>
               <option value="">—</option>
               <option value="dev">dev (демо)</option>
-              <option value="wavespeed">WaveSpeed AI — video face swap</option>
+              <option value="wavespeed">WaveSpeed AI — бүкіл басты ауыстыру</option>
             </select>
           </Field>
           <Field label={e.maxUpload} field="maxUploadBytes" required error={err("maxUploadBytes")}>
@@ -358,71 +356,23 @@ export function TemplateEditor({
           </Field>
 
           {t.providerKey === "wavespeed" && cfg && (
-            <div className={`rounded-xl border p-4 sm:col-span-2 ${err("ws.index") || err("ws.videoSeconds") ? "border-danger" : "border-brand/30 bg-brand-soft/50"}`}>
+            <div className={`rounded-xl border p-4 sm:col-span-2 ${err("ws.videoSeconds") || err("ws.resolution") ? "border-danger" : "border-brand/30 bg-brand-soft/50"}`}>
               <h3 className="font-semibold">{e.ws.title}</h3>
-              <div className="mt-3" data-field="ws.swapMode">
-                <span className={labelCls}>{e.ws.mode}</span>
-                <div className="grid gap-2">
-                  {(["face", "head"] as const).map((m) => (
-                    <label key={m} className={`flex cursor-pointer items-start gap-2 rounded-xl border bg-white px-3 py-2 text-sm ${(cfg.swapMode ?? "face") === m ? "border-brand" : "border-line"}`}>
-                      <input type="radio" name="ws-mode" className="mt-0.5 accent-brand" checked={(cfg.swapMode ?? "face") === m} onChange={() => setCfg({ swapMode: m, ...(m === "head" ? { resolution: cfg.resolution ?? "720p" } : {}) })} />
-                      {m === "face" ? e.ws.modeFace : e.ws.modeHead}
-                    </label>
-                  ))}
-                </div>
-                <p className="mt-1 text-xs text-muted">{e.ws.modeHint}</p>
-                {err("ws.swapMode") && <p className="mt-1 text-xs font-medium text-danger" role="alert">{err("ws.swapMode")}</p>}
-              </div>
-              {!wsHead && <p className="mt-4 text-sm text-muted">{e.ws.intro}</p>}
-              {!wsHead && <div className="mt-4 grid gap-3 sm:grid-cols-3" data-field="ws.index">
-                {t.faceSlots.map((s, i) => (
-                  <Field key={s.key} label={e.ws.slot(s.labelKk)} required error={err(`ws.index.${i}`)}>
-                    <select
-                      className={inputCls(err("ws.index") || err(`ws.index.${i}`))}
-                      value={wsMap(t.faceSlots.length)[i]}
-                      onChange={(ev) => { const m = wsMap(t.faceSlots.length); m[i] = Number(ev.target.value); setCfg({ targetIndexBySlot: m }); }}
-                    >
-                      {Array.from({ length: Math.max(t.faceSlots.length, 1) }, (_, n) => (
-                        <option key={n} value={n}>{e.ws.nth(n + 1)}</option>
-                      ))}
-                    </select>
-                  </Field>
-                ))}
-              </div>}
-              {!wsHead && err("ws.index") && <p className="mt-2 text-xs font-medium text-danger" role="alert">{err("ws.index")}</p>}
+              <p className="mt-1 text-sm text-muted">{e.ws.intro}</p>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <Field label={e.ws.resolution} field="ws.resolution" error={err("ws.resolution")}>
+                  <select className={inputCls(err("ws.resolution"))} value={String(cfg.resolution ?? "720p")} onChange={(ev) => setCfg({ resolution: ev.target.value })}>
+                    <option value="720p">720p — $0.08/сек</option>
+                    <option value="480p">480p — $0.04/сек</option>
+                  </select>
+                </Field>
                 <Field label={e.ws.seconds} field="ws.videoSeconds" required error={err("ws.videoSeconds")}>
                   <Num value={wsSeconds} min={1} error={err("ws.videoSeconds")} onChange={(v) => setCfg({ videoSeconds: v })} />
                   <span className="mt-1 block text-xs text-muted">{wsCost ? e.ws.cost(wsCost) : e.ws.secondsHint}</span>
                 </Field>
-                {wsHead ? (
-                  <Field label={e.ws.resolution}>
-                    <select className={inputCls()} value={String(cfg.resolution ?? "720p")} onChange={(ev) => setCfg({ resolution: ev.target.value })}>
-                      <option value="720p">720p — $0.08/сек</option>
-                      <option value="480p">480p — $0.04/сек</option>
-                    </select>
-                  </Field>
-                ) : (
-                  <Field label={e.ws.gender}>
-                    <select className={inputCls()} value={String(cfg.targetGender ?? "all")} onChange={(ev) => setCfg({ targetGender: ev.target.value })}>
-                      <option value="all">{e.ws.genderAll}</option>
-                      <option value="male">{e.ws.genderMale}</option>
-                      <option value="female">{e.ws.genderFemale}</option>
-                    </select>
-                  </Field>
-                )}
               </div>
             </div>
           )}
-
-          <details className="sm:col-span-2" open={!!err("providerConfig")}>
-            <summary className="cursor-pointer text-sm font-medium text-muted hover:text-ink">{e.ws.advanced}</summary>
-            <div className="mt-3">
-              <Field label={e.providerConfig} field="providerConfig" error={err("providerConfig")}>
-                <textarea className={`${inputCls(err("providerConfig"))} min-h-28 font-mono text-xs`} value={configText} onChange={(ev) => { setConfigText(ev.target.value); setDirty(true); }} />
-              </Field>
-            </div>
-          </details>
         </div>
       </Section>
 

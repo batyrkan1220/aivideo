@@ -48,18 +48,12 @@ describe("template editor validation", () => {
     expect(validateTemplateForm(ok(), "{oops", false).providerConfig).toBe(M.jsonInvalid);
   });
 
-  it("WaveSpeed: unique per-person index and video length to publish", () => {
-    const t = { ...ok(), providerKey: "wavespeed", faceSlots: autoFaceSlots(3) };
-    const bad = validateTemplateForm(t, JSON.stringify({ targetIndexBySlot: [0, 0, 1] }), true);
-    expect(bad["ws.index"]).toBe(M.wsIndexDuplicate);
+  it("WaveSpeed: single person and video length to publish", () => {
+    const multi = { ...ok(), providerKey: "wavespeed", faceSlots: autoFaceSlots(2) };
+    const bad = validateTemplateForm(multi, "{}", true);
+    expect(bad["ws.faces"]).toBe(M.wsHeadSingle);
     expect(bad["ws.videoSeconds"]).toBe(M.wsSeconds);
-    expect(validateTemplateForm(t, JSON.stringify({ targetIndexBySlot: [1, 0, 2], videoSeconds: 12 }), true)).toEqual({});
-  });
-
-  it("WaveSpeed head swap is single-person only", () => {
-    const t = { ...ok(), providerKey: "wavespeed", faceSlots: autoFaceSlots(2) };
-    expect(validateTemplateForm(t, JSON.stringify({ swapMode: "head", videoSeconds: 10, targetIndexBySlot: [0, 1] }), true)["ws.swapMode"]).toBe(M.wsHeadSingle);
     const one = { ...ok(), providerKey: "wavespeed", faceSlots: autoFaceSlots(1) };
-    expect(validateTemplateForm(one, JSON.stringify({ swapMode: "head", videoSeconds: 10 }), true)).toEqual({});
+    expect(validateTemplateForm(one, JSON.stringify({ resolution: "720p", videoSeconds: 19 }), true)).toEqual({});
   });
 });

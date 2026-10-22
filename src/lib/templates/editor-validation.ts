@@ -28,9 +28,8 @@ export const M = {
   providerMissing: "Провайдерді таңдаңыз.",
   jsonInvalid: "JSON қате жазылған.",
   uploadSize: "1 мен 10 МБ аралығында.",
-  wsIndexDuplicate: "Әр адамның нөмірі әртүрлі болуы керек.",
-  wsHeadSingle: "Бүкіл басты ауыстыру тек 1 адамдық үлгіде жұмыс істейді.",
-  wsSeconds: "Видео ұзақтығын секундпен енгізіңіз (шығынды есептеу үшін).",
+  wsHeadSingle: "WaveSpeed тек 1 адамдық үлгіде жұмыс істейді. Адам санын 1 етіңіз.",
+  wsSeconds: "Видео ұзақтығын секундпен енгізіңіз (1–120, шығынды есептеу үшін).",
 } as const;
 
 const KEY_RE = /^[a-z0-9_]+$/;
@@ -107,18 +106,10 @@ export function validateTemplateForm(t: TemplateInput, configText: string, forPu
   if (!cfg) e.providerConfig = M.jsonInvalid;
 
   if (t.providerKey === "wavespeed" && cfg) {
-    const n = t.faceSlots.length;
-    const map = Array.isArray(cfg.targetIndexBySlot) ? (cfg.targetIndexBySlot as unknown[]) : null;
-    if (map) {
-      map.slice(0, n).forEach((v, i) => {
-        if (!isInt(v) || (v as number) < 0) e[`ws.index.${i}`] = M.required;
-      });
-      if (new Set(map.slice(0, n)).size !== Math.min(map.length, n)) e["ws.index"] = M.wsIndexDuplicate;
-      if (map.length !== n) e["ws.index"] = M.wsIndexDuplicate;
-    }
-    if (cfg.swapMode === "head" && n > 1) e["ws.swapMode"] = M.wsHeadSingle;
+    if (t.faceSlots.length > 1) e["ws.faces"] = M.wsHeadSingle;
+    if (cfg.resolution !== undefined && cfg.resolution !== "480p" && cfg.resolution !== "720p") e["ws.resolution"] = M.required;
     const sec = cfg.videoSeconds;
-    if (forPublish && (typeof sec !== "number" || !(sec > 0) || sec > 600)) e["ws.videoSeconds"] = M.wsSeconds;
+    if (forPublish && (typeof sec !== "number" || !(sec > 0) || sec > 120)) e["ws.videoSeconds"] = M.wsSeconds;
   }
   return e;
 }
@@ -126,12 +117,12 @@ export function validateTemplateForm(t: TemplateInput, configText: string, forPu
 /** Visual order of fields, so "go to first error" lands on the top-most one. */
 export function firstErrorKey(errors: FieldErrors): string | null {
   const order = [
-    "titleKk", "descriptionKk", "cover", "preview", "qualities",
+    "titleKk", "descriptionKk", "cover", "preview", "ws.faces", "qualities",
     ...Object.keys(errors).filter((k) => k.startsWith("quality.")).sort(),
     "pricing.basePriceKzt", "pricing.platformFeeKzt", "pricing.includedFaces", "pricing.extraFacePriceKzt",
     "pricing.discount.value", "pricing.discount.endsAt", "pricing.minPriceKzt", "pricing.maxPriceKzt",
     "providerKey", "maxUploadBytes",
-    ...Object.keys(errors).filter((k) => k.startsWith("ws.")).sort(),
+    "ws.resolution", "ws.videoSeconds",
     "providerConfig",
   ];
   return order.find((k) => errors[k]) ?? Object.keys(errors)[0] ?? null;
