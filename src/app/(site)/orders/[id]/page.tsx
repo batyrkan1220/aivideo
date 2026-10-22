@@ -16,7 +16,8 @@ import { deleteVideo, deleteOrderPhotos } from "@/lib/account/actions";
 
 export const metadata = { title: kk.order.title };
 
-export default function OrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ deleted?: string; error?: string }> }) {
+type SP = { deleted?: string; error?: string; pay_error?: string };
+export default function OrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<SP> }) {
   return (
     <main className="mx-auto max-w-3xl px-4 pt-10">
       <Suspense fallback={<p className="text-muted">{kk.common.loading}</p>}>
@@ -26,7 +27,7 @@ export default function OrderPage({ params, searchParams }: { params: Promise<{ 
   );
 }
 
-async function OrderView({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ deleted?: string; error?: string }> }) {
+async function OrderView({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<SP> }) {
   const { id } = await params;
   const sp = await searchParams;
   const user = await requireUser(`/orders/${id}`);
@@ -64,6 +65,31 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
   const payLabel = kk.order.payment[o.payment_status as keyof typeof kk.order.payment];
   const genLabel = kk.order.generation[o.generation_status as keyof typeof kk.order.generation];
 
+  const awaitingPayment = ["pending", "failed", "cancelled"].includes(o.payment_status) && o.generation_status === "awaiting_payment";
+  const priceBox = (
+      <section className="rounded-card bg-ink p-5 text-white sm:p-6">
+        <dl className="space-y-2 text-sm">
+          <Line label={kk.pricing.videoPrice} value={formatKzt(price.basePriceKzt)} />
+          {price.qualitySurchargeKzt > 0 && <Line label={kk.pricing.quality} value={`+${formatKzt(price.qualitySurchargeKzt)}`} />}
+          {price.extraFacesKzt > 0 && <Line label={`${kk.pricing.extraFaces} (${price.extraFaces})`} value={`+${formatKzt(price.extraFacesKzt)}`} />}
+          {price.platformFeeKzt > 0 && <Line label={kk.pricing.platformFee} value={`+${formatKzt(price.platformFeeKzt)}`} />}
+          {price.discountKzt > 0 && <Line label={kk.pricing.discount} value={`−${formatKzt(price.discountKzt)}`} />}
+          <div className="flex items-baseline justify-between border-t border-white/20 pt-3">
+            <dt className="font-semibold">{kk.pricing.total}</dt>
+            <dd className="font-display text-2xl font-bold">{formatKzt(o.amount_kzt)}</dd>
+          </div>
+        </dl>
+        {["pending", "failed", "cancelled"].includes(o.payment_status) && o.generation_status === "awaiting_payment" && (
+          <PayButton
+            orderId={o.id}
+            label={o.payment_status === "pending" ? `${kk.order.pay} ${formatKzt(o.amount_kzt)}` : kk.order.payAgain}
+            sandbox={isTestPaymentProvider(env().PAYMENT_PROVIDER)}
+            askPhone={env().PAYMENT_PROVIDER === "tole" || env().PAYMENT_PROVIDER === "tole_sandbox"}
+          />
+        )}
+      </section>
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -77,12 +103,18 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
       {sp.deleted === "video" && <p role="status" className="rounded-card bg-paper p-4 text-sm">{kk.result.videoDeleted}</p>}
       {sp.deleted === "photos" && <p role="status" className="rounded-card bg-paper p-4 text-sm">{kk.result.photosDeleted}</p>}
       {sp.error === "busy" && <p role="alert" className="rounded-card bg-red-50 p-4 text-sm text-danger">{kk.result.busy}</p>}
+      {sp.pay_error && sp.pay_error in kk.order.payErrors && (
+        <p role="alert" className="rounded-card bg-red-50 p-4 text-sm text-danger">{kk.order.payErrors[sp.pay_error as keyof typeof kk.order.payErrors]}</p>
+      )}
       {o.payment_status === "succeeded" && ["queued", "processing", "postprocessing"].includes(o.generation_status) && (
         <p role="status" className="rounded-card bg-emerald-50 p-4 text-sm font-medium text-success">{kk.order.paidMsg}</p>
       )}
       {o.payment_status === "failed" && (
         <p role="alert" className="rounded-card bg-red-50 p-4 text-sm font-medium text-danger">{kk.order.failedMsg}</p>
       )}
+
+      {/* Awaiting payment: the pay step comes first. */}
+      {awaitingPayment && priceBox}
 
       <section className="rounded-card border border-line bg-white p-5 sm:p-6">
         <dl className="grid grid-cols-[auto_minmax(0,1fr)] [&>dd]:break-words gap-x-6 gap-y-2 text-sm">
@@ -183,27 +215,7 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
         </ol>
       </section>
 
-      <section className="rounded-card bg-ink p-5 text-white sm:p-6">
-        <dl className="space-y-2 text-sm">
-          <Line label={kk.pricing.videoPrice} value={formatKzt(price.basePriceKzt)} />
-          {price.qualitySurchargeKzt > 0 && <Line label={kk.pricing.quality} value={`+${formatKzt(price.qualitySurchargeKzt)}`} />}
-          {price.extraFacesKzt > 0 && <Line label={`${kk.pricing.extraFaces} (${price.extraFaces})`} value={`+${formatKzt(price.extraFacesKzt)}`} />}
-          {price.platformFeeKzt > 0 && <Line label={kk.pricing.platformFee} value={`+${formatKzt(price.platformFeeKzt)}`} />}
-          {price.discountKzt > 0 && <Line label={kk.pricing.discount} value={`−${formatKzt(price.discountKzt)}`} />}
-          <div className="flex items-baseline justify-between border-t border-white/20 pt-3">
-            <dt className="font-semibold">{kk.pricing.total}</dt>
-            <dd className="font-display text-2xl font-bold">{formatKzt(o.amount_kzt)}</dd>
-          </div>
-        </dl>
-        {["pending", "failed", "cancelled"].includes(o.payment_status) && o.generation_status === "awaiting_payment" && (
-          <PayButton
-            orderId={o.id}
-            label={o.payment_status === "pending" ? `${kk.order.pay} ${formatKzt(o.amount_kzt)}` : kk.order.payAgain}
-            sandbox={isTestPaymentProvider(env().PAYMENT_PROVIDER)}
-            askPhone={env().PAYMENT_PROVIDER === "tole" || env().PAYMENT_PROVIDER === "tole_sandbox"}
-          />
-        )}
-      </section>
+      {!awaitingPayment && priceBox}
     </div>
   );
 }

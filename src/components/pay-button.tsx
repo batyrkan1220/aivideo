@@ -1,18 +1,20 @@
 "use client";
 import { useActionState } from "react";
+import { useSavedPhone, savePhone } from "@/lib/payments/saved-phone";
 import { kk } from "@/lib/i18n/kk";
 import { startCheckout, type CheckoutState } from "@/lib/payments/actions";
 
 export function PayButton({ orderId, label, sandbox, askPhone = false }: { orderId: string; label: string; sandbox: boolean; askPhone?: boolean }) {
   const [state, action, pending] = useActionState<CheckoutState, FormData>(startCheckout, {});
+  const [phone, setPhone] = useSavedPhone();
   return (
-    <form action={action} className="mt-5">
+    <form action={action} className="mt-5" onSubmit={() => savePhone(phone)}>
       <input type="hidden" name="orderId" value={orderId} />
       {askPhone && (
         <label className="mb-3 block">
           <span className="mb-1 block text-sm font-medium">{kk.tole.phoneLabel}</span>
           <input
-            name="phone" type="tel" inputMode="tel" autoComplete="tel" required
+            name="phone" type="tel" inputMode="tel" autoComplete="tel" required value={phone} onChange={(e) => setPhone(e.target.value)}
             placeholder={kk.tole.phonePlaceholder}
             aria-invalid={state.error === "phone_invalid"}
             className={`h-12 w-full rounded-xl border bg-white px-4 text-base text-ink outline-none focus:border-brand ${state.error === "phone_invalid" ? "border-danger" : "border-line"}`}

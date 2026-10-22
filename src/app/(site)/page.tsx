@@ -5,6 +5,7 @@ import { kk } from "@/lib/i18n/kk";
 import { listCategories, listTemplates, listTrending } from "@/lib/templates/queries";
 import { CategoryChips, GridSkeleton, SectionHeading, TemplateGrid, pickCard } from "@/components/catalog-bits";
 import { VideoFeed } from "@/components/video-feed";
+import { MyVideosBanner } from "@/components/my-videos-banner";
 import { HeroShowcase } from "@/components/hero-showcase";
 import { resolveShowcase } from "@/lib/templates/showcase";
 
@@ -13,6 +14,9 @@ export default function HomePage({ searchParams }: { searchParams: Promise<{ acc
     <main>
       <Suspense fallback={null}>
         <Notice searchParams={searchParams} />
+      </Suspense>
+      <Suspense fallback={null}>
+        <MyVideosBanner />
       </Suspense>
       {/* Phones: title → video showcase → categories. Desktop: text left, showcase right. */}
       <section className="mx-auto grid max-w-6xl gap-x-8 gap-y-6 px-4 pb-10 pt-8 sm:pt-16 md:grid-cols-[1.15fr_0.85fr] md:grid-rows-[auto_auto]">

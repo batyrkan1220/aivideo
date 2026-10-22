@@ -6,6 +6,9 @@ import { calculatePrice, formatKzt } from "@/lib/pricing";
 import { slotPreviewSrc, type FaceSlot, type PricingConfig, type Quality } from "@/lib/templates/schema";
 import { PHOTO_TYPES, validatePhotoMeta, type PhotoError } from "@/lib/uploads/validate";
 import { requestPhotoUpload, confirmPhotoUpload, removePhotoUpload, createOrder } from "@/lib/orders/actions";
+import { startCheckout } from "@/lib/payments/actions";
+import { normalizeKzPhone } from "@/lib/payments/phone";
+import { useSavedPhone, savePhone } from "@/lib/payments/saved-phone";
 
 type SlotState =
   | { phase: "empty" }
@@ -47,7 +50,7 @@ function uploadWithProgress(url: string, file: File, anonKey: string, onProgress
 }
 
 export function CreateFlow({
-  templateId, slots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey,
+  templateId, slots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false,
 }: {
   templateId: string;
   slots: FaceSlot[];
@@ -58,14 +61,17 @@ export function CreateFlow({
   maxDimension: number;
   supabaseUrl: string;
   anonKey: string;
+  /** Kaspi invoice payments need the customer's Kaspi phone number. */
+  askPhone?: boolean;
 }) {
   const router = useRouter();
   const [state, setState] = useState<Record<string, SlotState>>(() =>
     Object.fromEntries(slots.map((s) => [s.key, { phase: "empty" } as SlotState])));
   const available = qualities.filter((q) => q.available);
   const [quality, setQuality] = useState(available[0]?.key ?? "");
-  const [consentRights, setConsentRights] = useState(false);
-  const [consentProcessing, setConsentProcessing] = useState(false);
+  const [consent, setConsent] = useState(false);
+  const [phone, setPhone] = useSavedPhone();
+  const phoneOk = !askPhone || !!normalizeKzPhone(phone);
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const previews = useRef<string[]>([]);
@@ -118,11 +124,12 @@ export function CreateFlow({
   const missing = slots.length - readyCount;
   const selected = available.find((q) => q.key === quality);
   const price = selected ? calculatePrice(pricing, selected, slots.length) : null;
-  const canSubmit = missing === 0 && !!selected && consentRights && consentProcessing && !pending;
+  const canSubmit = missing === 0 && !!selected && consent && phoneOk && !pending;
 
   const submit = () => start(async () => {
     setFormError(null);
-    if (!consentRights || !consentProcessing) { setFormError(c.errors.consent_required); return; }
+    if (!consent) { setFormError(c.errors.consent_required); return; }
+    if (!phoneOk) { setFormError(kk.order.payErrors.phone_invalid); return; }
     const assets: Record<string, string> = {};
     for (const s of slots) {
       const st = state[s.key];
@@ -135,7 +142,14 @@ export function CreateFlow({
       setFormError(errText(r.error));
       return;
     }
-    router.push(`/orders/${r.orderId}`);
+    // One click: the order is created and payment starts right away (the action redirects to it).
+    if (askPhone) savePhone(phone);
+    const fd = new FormData();
+    fd.set("orderId", r.orderId);
+    if (askPhone) fd.set("phone", phone);
+    const pay = await startCheckout({}, fd);
+    // Only reached when payment could not start: the order is saved, pay from its page.
+    router.push(`/orders/${r.orderId}${pay?.error ? `?pay_error=${pay.error}` : ""}`);
   });
 
   const gridCols = slots.length === 1 ? "grid-cols-1 max-w-[220px]" : slots.length === 2 ? "grid-cols-2" : "grid-cols-3";
@@ -197,13 +211,20 @@ export function CreateFlow({
           </dl>
 
           <div className="mt-5 space-y-3 text-sm text-white/85">
+            {askPhone && (
+              <label className="block">
+                <span className="mb-1 block font-medium text-white">{kk.tole.phoneLabel}</span>
+                <input
+                  type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
+                  placeholder={kk.tole.phonePlaceholder}
+                  className={`h-12 w-full rounded-xl border bg-white px-4 text-base text-ink outline-none ${phone && !phoneOk ? "border-danger" : "border-transparent"}`}
+                />
+                <span className="mt-1 block text-xs text-white/70">{kk.tole.phoneHint}</span>
+              </label>
+            )}
             <label className="flex gap-3">
-              <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-flash" checked={consentRights} onChange={(e) => setConsentRights(e.target.checked)} />
-              <span>{kk.consent.rights}</span>
-            </label>
-            <label className="flex gap-3">
-              <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-flash" checked={consentProcessing} onChange={(e) => setConsentProcessing(e.target.checked)} />
-              <span>{kk.consent.processing}</span>
+              <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-flash" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+              <span>{kk.consent.combined}</span>
             </label>
           </div>
 
@@ -216,7 +237,7 @@ export function CreateFlow({
             disabled={!canSubmit}
             className="mt-2 h-13 w-full rounded-full bg-flash px-7 font-semibold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {pending ? c.creating : c.confirm}
+            {pending ? c.paying : price ? c.payNow(formatKzt(price.totalKzt)) : c.confirm}
           </button>
         </section>
       )}

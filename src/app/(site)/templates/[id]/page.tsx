@@ -68,6 +68,7 @@ async function CreateSection({ t }: { t: TemplateDetail }) {
       maxDimension={e.UPLOAD_MAX_DIMENSION}
       supabaseUrl={e.NEXT_PUBLIC_SUPABASE_URL}
       anonKey={e.NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      askPhone={e.PAYMENT_PROVIDER === "tole" || e.PAYMENT_PROVIDER === "tole_sandbox"}
     />
   );
 }
