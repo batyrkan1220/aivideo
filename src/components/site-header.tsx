@@ -12,10 +12,6 @@ export function SiteHeader() {
         <Link href="/" className="flex h-11 items-center font-display text-lg font-bold tracking-tight">
           {kk.brand.name}
         </Link>
-        <nav aria-label={kk.nav.home} className="hidden items-center gap-1 text-sm sm:flex">
-          <Link href="/templates" className="rounded-full px-3 py-2 hover:bg-brand-soft">{kk.catalog2.title}</Link>
-          <Link href="/templates?sort=trending" className="rounded-full px-3 py-2 hover:bg-brand-soft">{kk.nav.trending}</Link>
-        </nav>
         <div className="ml-auto flex items-center gap-2">
           <Suspense fallback={<div className="h-10 w-20" />}>
             <AccountNav />
