@@ -11,6 +11,7 @@ import { generationProvider } from "./index";
 import { ProviderError } from "./types";
 import { isTestPaymentProvider } from "@/lib/payments/types";
 import { notifyOrderOwner } from "@/lib/telegram/bot";
+import { notifyAdmins } from "@/lib/telegram/admin";
 
 type Job = {
   id: string; order_id: string; provider: string; provider_job_id: string | null; status: string;
@@ -68,6 +69,7 @@ async function failJob(job: Job, code: string, extra: Record<string, unknown> = 
   await db.from("orders").update({ generation_status: "failed" }).eq("id", job.order_id);
   await track("generation_failed", { orderId: job.order_id, props: { code } });
   await notifyOrderOwner(job.order_id, "failed");
+  await notifyAdmins(job.order_id, "failed");
 }
 
 async function delay(job: Job, ms: number, extra: Record<string, unknown> = {}) {
@@ -244,5 +246,6 @@ async function finalize(job: Job, outputUrl: string, cost?: number) {
   }).eq("id", job.id);
   await db.from("orders").update({ generation_status: "completed", completed_at: now }).eq("id", job.order_id);
   await notifyOrderOwner(job.order_id, "ready");
+  await notifyAdmins(job.order_id, "ready");
   await track("generation_succeeded", { userId: order.user_id, orderId: job.order_id });
 }
