@@ -4,7 +4,6 @@ import { kk } from "@/lib/i18n/kk";
 import { listCategories, listTemplates } from "@/lib/templates/queries";
 import { CategoryChips, GridSkeleton, pickCard } from "@/components/catalog-bits";
 import { VideoFeed } from "@/components/video-feed";
-import { MyVideosBanner } from "@/components/my-videos-banner";
 import { HeroShowcase } from "@/components/hero-showcase";
 import { Logo } from "@/components/logo";
 import { resolveShowcase } from "@/lib/templates/showcase";
@@ -20,9 +19,6 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
     <main className="pb-6">
       <Suspense fallback={null}>
         <Notice searchParams={searchParams} />
-      </Suspense>
-      <Suspense fallback={null}>
-        <MyVideosBanner />
       </Suspense>
 
       {/* Desktop hero */}
