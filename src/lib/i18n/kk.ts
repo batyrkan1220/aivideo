@@ -19,7 +19,7 @@ export const kk = {
     admin: "Админ панель",
     tabHome: "Басты",
     tabTemplates: "Видеолар",
-    tabOrders: "Видеоларым",
+    tabOrders: "Менің тапсырыстарым",
     tabAccount: "Кабинет",
     login: "Кіру",
     logout: "Шығу",
@@ -91,7 +91,7 @@ export const kk = {
     signInButton: "Telegram арқылы кіру",
   },
   myVideos: {
-    title: "Менің видеоларым",
+    title: "Менің тапсырыстарым",
     lead: "Барлық тапсырысыңыз осында сақталады. Дайын видеоны кез келген уақытта көріп, жүктеп ала аласыз.",
     watch: "Көру",
     pay: "Төлеу",

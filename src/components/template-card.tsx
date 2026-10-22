@@ -20,7 +20,7 @@ export type CardData = {
  * Keeps at most MAX_PLAYING previews running at once across the whole page: starting a new
  * one pauses the oldest. Many cards on screen then never decode/stream videos in parallel.
  */
-const MAX_PLAYING = 2;
+const MAX_PLAYING = 6;
 const playingNow: HTMLVideoElement[] = [];
 function claimPlayback(v: HTMLVideoElement) {
   const i = playingNow.indexOf(v);
@@ -36,8 +36,7 @@ function releasePlayback(v: HTMLVideoElement) {
 /**
  * 9:16 template card, built for long grids of video:
  *  - the cover image is lazy-loaded; the video has NO src until the card is near the screen;
- *  - the video only downloads when it is about to play (hover/focus, or mostly visible on touch);
- *  - at most two previews play at the same time; off-screen videos are paused.
+ *  - visible cards autoplay (muted, inline), up to six at once; off-screen videos are paused.
  */
 export function TemplateCard({ t, priority = false }: { t: CardData; priority?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -57,8 +56,13 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
   const play = () => {
     const v = videoRef.current;
     if (!v) return;
+    v.muted = true; // Telegram WebView: the property must be set before play()
+    v.defaultMuted = true;
     claimPlayback(v);
-    v.play().then(() => setPlaying(true)).catch(() => releasePlayback(v));
+    v.play().then(() => setPlaying(true)).catch(() => {
+      // Not enough data yet (or WebView refused): retry once the first frame is loaded.
+      v.addEventListener("loadeddata", () => { v.play().then(() => setPlaying(true)).catch(() => releasePlayback(v)); }, { once: true });
+    });
   };
   const stop = () => {
     const v = videoRef.current;
@@ -68,14 +72,14 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
     setPlaying(false);
   };
 
-  // Touch screens have no hover: play while the card is mostly on screen.
+  // Every card plays while it is on screen (phones, Telegram and desktop alike).
   // Skipped for reduced-motion and data-saver users.
   useEffect(() => {
     const el = cardRef.current;
-    if (!el || !near || !window.matchMedia("(hover: none)").matches) return;
+    if (!el || !near) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     if ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return;
-    const io = new IntersectionObserver(([e]) => (e.isIntersecting ? play() : stop()), { threshold: 0.75 });
+    const io = new IntersectionObserver(([e]) => (e.isIntersecting ? play() : stop()), { threshold: 0.4 });
     io.observe(el);
     return () => { io.disconnect(); stop(); };
   }, [near]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -119,7 +123,7 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
             muted
             loop
             playsInline
-            preload={t.coverUrl ? "none" : "metadata"}
+            preload="metadata"
             aria-hidden
             className="absolute inset-0 h-full w-full object-cover"
           />

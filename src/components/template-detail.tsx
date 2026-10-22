@@ -3,6 +3,7 @@ import { kk } from "@/lib/i18n/kk";
 import type { TemplateDetail } from "@/lib/templates/queries";
 import { calculatePrice, formatKzt } from "@/lib/pricing";
 import { FaceMap } from "@/components/face-map";
+import { AutoVideo } from "@/components/auto-video";
 
 /** Per-quality prices (server-computed). Shown to guests and in admin preview. */
 export function QualityPriceList({ t }: { t: TemplateDetail }) {
@@ -48,16 +49,7 @@ export function TemplateDetailView({ t, cta }: { t: TemplateDetail; cta?: React.
       <figure className="mx-auto w-full max-w-[min(100%,calc(66svh*9/16))] md:sticky md:top-24 md:max-w-none md:self-start">
         <div className="relative aspect-[9/16] overflow-hidden rounded-card bg-ink">
           {t.previewUrl ? (
-            <video
-              src={t.previewUrl}
-              poster={t.coverUrl ?? undefined}
-              controls
-              muted
-              loop
-              playsInline
-              preload="metadata"
-              className="h-full w-full object-cover"
-            />
+            <AutoVideo src={t.previewUrl} poster={t.coverUrl ?? undefined} controls className="h-full w-full object-cover" />
           ) : t.coverUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={t.coverUrl} alt="" className="h-full w-full object-cover" />
@@ -71,7 +63,7 @@ export function TemplateDetailView({ t, cta }: { t: TemplateDetail; cta?: React.
 
       <div className="min-w-0">
         {t.category && (
-          <Link href={`/templates?category=${t.category.slug}`} className="text-sm font-semibold text-brand hover:underline">
+          <Link href={`/?category=${t.category.slug}`} className="text-sm font-semibold text-brand hover:underline">
             {t.category.title}
           </Link>
         )}
