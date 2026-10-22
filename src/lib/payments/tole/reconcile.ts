@@ -55,7 +55,7 @@ export async function reconcileTolePayment(paymentId: string): Promise<TolePayme
           p_provider: p.provider, p_provider_payment_id: intent.id, p_status: mapped.status,
           p_amount_kzt: intent.amount, p_currency: intent.currency, p_reason: mapped.reason ?? null,
         });
-        toleLog("reconcile_intent", { paymentId: p.id, paymentIntentId: intent.id, status: intent.status, result: String(result) });
+        toleLog("reconcile_intent", { paymentId: p.id, paymentIntentId: intent.id, status: intent.status, result: String(result), ...(intent.status === "failed" ? { failure: JSON.stringify(intent.failureInfo) } : {}) });
         if (result === "applied" && mapped.status === "succeeded") await track("payment_succeeded", { orderId: p.order_id });
         return { status: result === "applied" ? mapped.status : "pending", ready: true, outcome: null };
       }

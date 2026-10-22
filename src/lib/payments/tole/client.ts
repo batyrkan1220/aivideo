@@ -180,7 +180,7 @@ export class ToleClient {
     return this.mutate(this.p(`/invoices/${encodeURIComponent(operationId)}/cancel`), {}, idempotencyKey, (d) => d);
   }
 
-  async getInvoicePaymentIntent(paymentIntentId: string): Promise<{ id: string; status: PaymentIntentStatus; amount: number; currency: string }> {
+  async getInvoicePaymentIntent(paymentIntentId: string): Promise<{ id: string; status: PaymentIntentStatus; amount: number; currency: string; failureInfo: Record<string, string> }> {
     // Durable intent reads are documented for live only (no sandbox mirror listed).
     const body = (await this.read(`/payment-intents/invoices/${encodeURIComponent(paymentIntentId)}`)) as { data?: Record<string, unknown> } | null;
     const d = body?.data ?? {};
@@ -188,7 +188,7 @@ export class ToleClient {
     if (typeof d.id !== "string" || !INTENT_STATUSES.includes(status) || typeof d.amount !== "number") {
       throw new ToleError("bad_response", 200, null);
     }
-    return { id: d.id, status, amount: d.amount, currency: typeof d.currency === "string" ? d.currency : "KZT" };
+    return { id: d.id, status, amount: d.amount, currency: typeof d.currency === "string" ? d.currency : "KZT", failureInfo: failureInfo(d) };
   }
 
   async getCommand(commandId: string): Promise<CommandState> {
@@ -219,6 +219,25 @@ export class ToleClient {
     const r = await this.send("POST", `/sandbox/payment-intents/${encodeURIComponent(paymentIntentId)}/simulate`, { body: { status }, timeoutMs: READ_TIMEOUT_MS });
     if (r.status !== 200) this.fail(r);
   }
+}
+
+/** Short, non-personal failure codes Tole may attach to an intent (never phone numbers or free text beyond 80 chars). */
+export function failureInfo(d: Record<string, unknown>): Record<string, string> {
+  const out: Record<string, string> = {};
+  const keys = ["failureCode", "failureReason", "failure_code", "failure_reason", "statusReason", "reason", "declineReason", "errorCode", "code"];
+  const pick = (src: Record<string, unknown>, prefix: string) => {
+    for (const k of keys) {
+      const v = src[k];
+      if (typeof v === "string" && v && !/\d{6,}/.test(v)) out[prefix + k] = v.slice(0, 80);
+    }
+  };
+  pick(d, "");
+  for (const nest of ["error", "failure", "lastError"]) {
+    const n = d[nest];
+    if (n && typeof n === "object") pick(n as Record<string, unknown>, nest + ".");
+    else if (typeof n === "string" && !/\d{6,}/.test(n)) out[nest] = n.slice(0, 80);
+  }
+  return out;
 }
 
 export function parseInvoice(data: unknown): InvoiceCreated {

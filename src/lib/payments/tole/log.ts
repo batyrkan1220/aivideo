@@ -7,7 +7,7 @@ import "server-only";
  */
 const ALLOWED = new Set([
   "paymentId", "orderId", "commandId", "paymentIntentId", "webhookId", "eventType", "status",
-  "kind", "httpStatus", "code", "attempt", "reason", "mode", "path", "outcome", "result",
+  "kind", "httpStatus", "code", "attempt", "reason", "mode", "path", "outcome", "result", "failure",
 ]);
 
 export function toleLog(event: string, fields: Record<string, unknown> = {}, level: "info" | "error" = "info") {
