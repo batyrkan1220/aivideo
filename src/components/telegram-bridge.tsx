@@ -1,70 +1,84 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { TG_READY_EVENT, telegramApp } from "@/lib/telegram/client";
+import { kk } from "@/lib/i18n/kk";
+import { TG_READY_EVENT, launchInitData, telegramApp } from "@/lib/telegram/client";
 
 const SCRIPT = "https://telegram.org/js/telegram-web-app.js";
-const FLAG = "trendme.tg";
-const AUTHED = "trendme.tgAuthed";
-const ss = {
-  get: (k: string) => { try { return sessionStorage.getItem(k); } catch { return null; } },
-  set: (k: string, v: string) => { try { sessionStorage.setItem(k, v); } catch { /* ignore */ } },
-};
+const AUTH_PAGES = ["/login", "/signup"];
 
 /**
- * Inside the Telegram Mini App: loads Telegram's script, signs the user in from the signed
- * initData, hides the site header and wires Telegram's Back button. Does nothing in a browser.
+ * Inside the Telegram Mini App:
+ *  - signs the user in right away from the signed launch data (no waiting for Telegram's script);
+ *  - covers the login form with "signing in…" until that finishes, then continues to `next`;
+ *  - loads Telegram's script only for UI (Back button, colours, openLink).
+ * Does nothing in a normal browser.
  */
 export function TelegramBridge() {
   const router = useRouter();
   const pathname = usePathname();
   const search = useSearchParams();
+  // Cover the login form only while a Telegram sign-in is still running.
+  const [pending, setPending] = useState(true);
+  const tgOnAuthPage = useSyncExternalStore(
+    () => () => {},
+    () => !!launchInitData() && AUTH_PAGES.includes(window.location.pathname),
+    () => false,
+  );
+  const setSigningIn = (v: boolean) => setPending(v);
 
-  // 1) Detect a Telegram launch (Telegram appends #tgWebApp… to the first URL) and boot.
   useEffect(() => {
-    const launched = window.location.hash.includes("tgWebApp") || ss.get(FLAG) === "1";
-    if (!launched) return;
-    ss.set(FLAG, "1");
+    const initData = launchInitData();
+    if (!initData) return;
+    document.documentElement.dataset.tg = "1";
+    window.dispatchEvent(new Event(TG_READY_EVENT));
 
-    const boot = async () => {
-      const wa = telegramApp();
-      if (!wa) return;
-      wa.ready();
-      wa.expand();
-      wa.setHeaderColor?.("#fafafc");
-      wa.setBackgroundColor?.("#fafafc");
-      document.documentElement.dataset.tg = "1";
-      window.dispatchEvent(new Event(TG_READY_EVENT));
-
-      if (ss.get(AUTHED) === "1") return;
+    // Sign in (cheap no-op on the server when this Telegram user is already signed in).
+    let tries = 0;
+    const signIn = async (): Promise<void> => {
       try {
         const r = await fetch("/api/telegram/auth", {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ initData: wa.initData }),
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ initData }), credentials: "same-origin",
         });
-        const j = (await r.json().catch(() => ({}))) as { ok?: boolean; signedIn?: boolean };
-        if (!j.ok) return;
-        ss.set(AUTHED, "1");
-        if (j.signedIn) {
-          const p = window.location.pathname;
-          if (p === "/login" || p === "/signup") {
-            const next = new URLSearchParams(window.location.search).get("next");
-            router.replace(next && next.startsWith("/") && !next.startsWith("//") ? next : "/");
-          } else {
-            router.refresh();
-          }
+        const j = (await r.json().catch(() => ({}))) as { ok?: boolean; signedIn?: boolean; error?: string };
+        if (!j.ok) {
+          if (r.status >= 500 && tries++ < 2) { await new Promise((res) => setTimeout(res, 800)); return signIn(); }
+          console.warn("[telegram] sign-in failed:", j.error ?? r.status);
+          setSigningIn(false);
+          return;
         }
-      } catch { /* offline: the normal login page still works */ }
+        if (AUTH_PAGES.includes(window.location.pathname)) {
+          const next = new URLSearchParams(window.location.search).get("next");
+          router.replace(next && next.startsWith("/") && !next.startsWith("//") ? next : "/");
+        } else if (j.signedIn) {
+          router.refresh();
+        }
+        setTimeout(() => setSigningIn(false), 400);
+      } catch {
+        if (tries++ < 2) { await new Promise((res) => setTimeout(res, 800)); return signIn(); }
+        setSigningIn(false);
+      }
     };
+    void signIn();
 
-    if (window.Telegram?.WebApp) { void boot(); return; }
-    const s = document.createElement("script");
-    s.src = SCRIPT;
-    s.async = true;
-    s.onload = () => void boot();
-    document.head.appendChild(s);
+    // Telegram UI helpers (optional).
+    const ui = () => {
+      const wa = telegramApp();
+      if (!wa) return;
+      wa.ready(); wa.expand();
+      wa.setHeaderColor?.("#fafafc"); wa.setBackgroundColor?.("#fafafc");
+      window.dispatchEvent(new Event(TG_READY_EVENT));
+    };
+    if (window.Telegram?.WebApp) ui();
+    else {
+      const s = document.createElement("script");
+      s.src = SCRIPT; s.async = true; s.onload = ui;
+      document.head.appendChild(s);
+    }
   }, [router]);
 
-  // 2) Telegram's native Back button on every page except home.
+  // Telegram's native Back button on every page except home.
   useEffect(() => {
     const wa = telegramApp();
     if (!wa) return;
@@ -74,5 +88,11 @@ export function TelegramBridge() {
     return () => wa.BackButton.offClick(back);
   }, [pathname, search, router]);
 
-  return null;
+  if (!(pending && tgOnAuthPage)) return null;
+  return (
+    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-4 bg-paper" role="status" aria-live="polite">
+      <span className="h-10 w-10 animate-spin rounded-full border-4 border-brand/20 border-t-brand" aria-hidden />
+      <p className="text-sm font-medium text-muted">{kk.telegram.signingIn}</p>
+    </div>
+  );
 }

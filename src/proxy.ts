@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { sessionCookieOptions } from "@/lib/supabase/cookie-options";
 
 // Refreshes the Supabase session cookie and gates private sections.
 // Authorization (roles, ownership) is re-checked on the server for every request.
@@ -19,6 +20,7 @@ export async function proxy(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: sessionCookieOptions,
       cookies: {
         getAll: () => request.cookies.getAll(),
         setAll: (list) => {

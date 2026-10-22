@@ -1,4 +1,5 @@
 import "server-only";
+import { sessionCookieOptions } from "./cookie-options";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
@@ -9,6 +10,7 @@ export async function supabaseServer() {
   const cookieStore = await cookies();
   const e = env();
   return createServerClient(e.NEXT_PUBLIC_SUPABASE_URL, e.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
+    cookieOptions: sessionCookieOptions,
     cookies: {
       getAll: () => cookieStore.getAll(),
       setAll: (list) => {
