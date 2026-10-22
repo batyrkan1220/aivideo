@@ -160,7 +160,8 @@ export function CreateFlow({
         </ul>
       </section>
 
-      <section>
+      {/* Akool templates have one fixed quality, so the picker only appears when there is a real choice. */}
+      {available.length > 1 && <section>
         <h2 className="font-display text-lg font-bold">{c.qualityTitle}</h2>
         <div role="radiogroup" className="mt-3 divide-y divide-line rounded-card border border-line bg-white">
           {available.map((q) => {
@@ -178,7 +179,7 @@ export function CreateFlow({
             );
           })}
         </div>
-      </section>
+      </section>}
 
       {price && (
         <section className="rounded-card bg-ink p-5 text-white sm:p-6">

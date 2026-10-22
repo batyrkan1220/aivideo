@@ -1,10 +1,10 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { kk } from "@/lib/i18n/kk";
+import { ru } from "@/lib/i18n/ru";
 import { AKOOL_MAX_PEOPLE, type AkoolConfig } from "@/lib/templates/akool-config";
 import { startPersonAnalysis, checkPersonAnalysis, type AnalysisError } from "./akool-actions";
 
-const a = kk.admin.editor.akool;
+const a = ru.admin.editor.akool;
 const POLL_MS = 3_000;
 const MAX_WAIT_MS = 6 * 60_000;
 
@@ -27,7 +27,7 @@ export function AkoolPeople({
   useEffect(() => () => { alive.current = false; }, []);
 
   const current = cfg.analysis && cfg.analysis.videoPath === videoPath ? cfg.analysis : null;
-  const errText = (e: AnalysisError, reason?: string) => (a.errors[e] ?? kk.errors.generic) + (reason ? ` (${reason})` : "");
+  const errText = (e: AnalysisError, reason?: string) => (a.errors[e] ?? ru.errors.generic) + (reason ? ` (${reason})` : "");
 
   const analyse = async () => {
     if (!videoPath) return;

@@ -1,18 +1,18 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { kk } from "@/lib/i18n/kk";
+import { ru } from "@/lib/i18n/ru";
 import { getSessionUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabase/server";
 
-const L = kk.admin.audit;
+const L = ru.admin.audit;
 
 export default function AuditPage() {
   return (
     <div>
-      <h1 className="mb-6 font-display text-2xl font-bold">{kk.admin.nav.audit}</h1>
-      <Suspense fallback={<p className="text-muted">{kk.common.loading}</p>}>
+      <h1 className="mb-6 font-display text-2xl font-bold">{ru.admin.nav.audit}</h1>
+      <Suspense fallback={<p className="text-muted">{ru.common.loading}</p>}>
         <List />
       </Suspense>
     </div>
@@ -22,11 +22,11 @@ export default function AuditPage() {
 async function List() {
   const u = await getSessionUser();
   if (!u) redirect("/login?next=/admin/audit");
-  if (!can(u.role, "audit.view")) return <p className="text-muted">{kk.admin.forbidden}</p>;
+  if (!can(u.role, "audit.view")) return <p className="text-muted">{ru.admin.forbidden}</p>;
   const { data } = await supabaseAdmin().from("audit_logs")
     .select("id,action,resource_type,resource_id,created_at,profiles(email)")
     .order("created_at", { ascending: false }).limit(300);
-  const fmt = new Intl.DateTimeFormat("kk-KZ", { dateStyle: "short", timeStyle: "medium", timeZone: "Asia/Almaty" });
+  const fmt = new Intl.DateTimeFormat("ru-RU", { dateStyle: "short", timeStyle: "medium", timeZone: "Asia/Almaty" });
   return (
     <div className="overflow-x-auto rounded-card border border-line bg-white">
       <table className="w-full text-left text-sm">

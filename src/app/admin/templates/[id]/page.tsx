@@ -1,10 +1,10 @@
 import { Suspense } from "react";
-import { kk } from "@/lib/i18n/kk";
+import { ru } from "@/lib/i18n/ru";
 import { EditorLoader } from "../editor-loader";
 
 export default function EditTemplatePage({ params }: { params: Promise<{ id: string }> }) {
   return (
-    <Suspense fallback={<p className="text-muted">{kk.common.loading}</p>}>
+    <Suspense fallback={<p className="text-muted">{ru.common.loading}</p>}>
       <Loader params={params} />
     </Suspense>
   );

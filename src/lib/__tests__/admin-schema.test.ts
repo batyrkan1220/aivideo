@@ -2,14 +2,15 @@ import { describe, it, expect } from "vitest";
 import { emptyTemplate, publishProblems, inputToRow, templateInputSchema } from "../templates/admin-schema";
 
 describe("template publishing rules", () => {
-  it("a new template cannot be published without media", () => {
+  it("a new template cannot be published without a video (no cover needed)", () => {
     const p = publishProblems(emptyTemplate());
-    expect(p).toContain("missing_cover");
+    expect(p).not.toContain("missing_cover");
     expect(p).toContain("missing_preview");
+    expect(p).toContain("akool_not_analyzed");
   });
 
   it("a complete template passes", () => {
-    const t = { ...emptyTemplate(), titleKk: "Той биі", coverAssetPath: "covers/a.jpg", previewVideoPath: "previews/a.mp4" };
+    const t = { ...emptyTemplate(), providerKey: "dev", titleKk: "Той биі", previewVideoPath: "previews/a.mp4" };
     expect(publishProblems(t)).toEqual([]);
   });
 
@@ -34,7 +35,7 @@ describe("template publishing rules", () => {
 
 describe("inputToRow", () => {
   it("always lays faces out automatically left → right", () => {
-    const t = emptyTemplate();
+    const t = { ...emptyTemplate(), providerKey: "dev" };
     t.faceSlots = [
       { key: "l", labelKk: "1-бет — сол жақ", position: { x: 0.2, y: 0.4 }, providerInput: "f1", order: 5 },
       { key: "c", labelKk: "2-бет — ортада", position: { x: 0.5, y: 0.4 }, providerInput: "f2", order: 9 },

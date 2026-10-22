@@ -29,7 +29,6 @@ export type PublishProblem =
 /** A template may be published only when it is complete and coherent. */
 export function publishProblems(t: TemplateInput): PublishProblem[] {
   const p: PublishProblem[] = [];
-  if (!t.coverAssetPath) p.push("missing_cover");
   if (!t.previewVideoPath) p.push("missing_preview");
   if (validateFaceSlots(t.faceSlots, t.faceSlots.length).length) p.push("invalid_face_slots");
   if (!t.qualities.some((q) => q.available)) p.push("no_available_quality");
@@ -41,7 +40,7 @@ export function publishProblems(t: TemplateInput): PublishProblem[] {
   return p;
 }
 
-/** Default config for a new template: one face, one standard quality. */
+/** Default config for a new template: Akool, one fixed quality (Akool controls output quality). */
 export function emptyTemplate(): TemplateInput {
   return {
     titleKk: "",
@@ -55,8 +54,8 @@ export function emptyTemplate(): TemplateInput {
     faceSlots: autoFaceSlots(1),
     qualities: [{ key: "standard", labelKk: "Стандарт", resolution: "720x1280", fps: 30, providerQuality: "standard", surchargeKzt: 0, available: true }],
     pricing: { basePriceKzt: 1990, chargeExtraFaces: false, extraFacePriceKzt: 0, includedFaces: 1, platformFeeKzt: 0, minPriceKzt: 0 },
-    providerKey: "dev",
-    providerConfig: {},
+    providerKey: "akool",
+    providerConfig: { resolution: "720p", selected: [] },
     maxUploadBytes: 10 * 1024 * 1024,
   };
 }

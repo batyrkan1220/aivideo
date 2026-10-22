@@ -11,28 +11,27 @@ import { parseAkoolConfig, akoolSlots, AKOOL_MAX_PEOPLE } from "./akool-config";
 export type FieldErrors = Record<string, string>;
 
 export const M = {
-  required: "Міндетті өріс.",
-  titleShort: "Атауы кемінде 2 таңба болуы керек.",
-  titleLong: "Атауы 120 таңбадан аспауы керек.",
-  descLong: "Сипаттама 1000 таңбадан аспауы керек.",
-  coverMissing: "Жариялау үшін мұқаба суретін жүктеңіз.",
-  previewMissing: "Жариялау үшін үлгі видеоны жүктеңіз.",
-  keyFormat: "Тек кіші латын әріптері, сандар және «_».",
-  keyDuplicate: "Бұл кілт басқа сапада бар.",
-  noAvailableQuality: "Кемінде бір сапа «Қолжетімді» болуы керек.",
-  nonNegative: "Теріс сан болмауы керек.",
-  wholeNumber: "Бүтін сан енгізіңіз.",
-  percentMax: "Пайыз 100-ден аспауы керек.",
-  discountEnds: "Аяқталу уақыты басталудан кейін болуы керек.",
-  maxBelowMin: "Ең жоғары баға ең төменгіден кем болмауы керек.",
-  includedFacesMin: "Кемінде 1.",
-  providerMissing: "Провайдерді таңдаңыз.",
-  jsonInvalid: "JSON қате жазылған.",
-  uploadSize: "1 мен 10 МБ аралығында.",
-  akoolNotAnalyzed: "Жариялау үшін видеодағы адамдарды анықтаңыз.",
-  akoolVideoChanged: "Үлгі видео ауысты. Адамдарды қайта анықтаңыз.",
-  akoolNoPeople: "Фотосы ауыстырылатын кемінде 1 адамды таңдаңыз.",
-  akoolTooMany: "Ең көбі 5 адам таңдауға болады.",
+  required: "Обязательное поле.",
+  titleShort: "Название — минимум 2 символа.",
+  titleLong: "Название — не больше 120 символов.",
+  descLong: "Описание — не больше 1000 символов.",
+  previewMissing: "Для публикации загрузите видео.",
+  keyFormat: "Только строчные латинские буквы, цифры и «_».",
+  keyDuplicate: "Такой ключ уже есть.",
+  noAvailableQuality: "Нужно хотя бы одно доступное качество.",
+  nonNegative: "Не может быть отрицательным.",
+  wholeNumber: "Введите целое число.",
+  percentMax: "Процент не может быть больше 100.",
+  discountEnds: "Окончание должно быть позже начала.",
+  maxBelowMin: "Максимальная цена не может быть меньше минимальной.",
+  includedFacesMin: "Минимум 1.",
+  providerMissing: "Выберите провайдера.",
+  jsonInvalid: "Ошибка в настройках провайдера.",
+  uploadSize: "От 1 до 10 МБ.",
+  akoolNotAnalyzed: "Для публикации найдите людей в видео.",
+  akoolVideoChanged: "Видео заменено. Найдите людей заново.",
+  akoolNoPeople: "Выберите хотя бы одного человека для замены.",
+  akoolTooMany: "Можно выбрать максимум 5 человек.",
 } as const;
 
 const KEY_RE = /^[a-z0-9_]+$/;
@@ -57,7 +56,6 @@ export function validateTemplateForm(t: TemplateInput, configText: string, forPu
   else if (title.length > 120) e.titleKk = M.titleLong;
   if (t.descriptionKk.length > 1000) e.descriptionKk = M.descLong;
 
-  if (forPublish && !t.coverAssetPath) e.cover = M.coverMissing;
   if (forPublish && !t.previewVideoPath) e.preview = M.previewMissing;
 
   const keys = new Map<string, number>();
@@ -122,7 +120,7 @@ export function validateTemplateForm(t: TemplateInput, configText: string, forPu
 /** Visual order of fields, so "go to first error" lands on the top-most one. */
 export function firstErrorKey(errors: FieldErrors): string | null {
   const order = [
-    "titleKk", "descriptionKk", "cover", "preview", "providerKey", "maxUploadBytes", "akool.analysis", "akool.people", "qualities",
+    "titleKk", "descriptionKk", "preview", "providerKey", "maxUploadBytes", "akool.analysis", "akool.people", "qualities",
     ...Object.keys(errors).filter((k) => k.startsWith("quality.")).sort(),
     "pricing.basePriceKzt", "pricing.platformFeeKzt", "pricing.includedFaces", "pricing.extraFacePriceKzt",
     "pricing.discount.value", "pricing.discount.endsAt", "pricing.minPriceKzt", "pricing.maxPriceKzt",

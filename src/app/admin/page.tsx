@@ -1,13 +1,13 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { kk } from "@/lib/i18n/kk";
+import { ru } from "@/lib/i18n/ru";
 import { getSessionUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { formatKzt } from "@/lib/pricing";
 import { env } from "@/lib/env";
 
-const S = kk.admin.stats;
+const S = ru.admin.stats;
 type SP = { from?: string; to?: string };
 
 type Stats = {
@@ -20,7 +20,7 @@ type Stats = {
 
 export default function AdminHome({ searchParams }: { searchParams: Promise<SP> }) {
   return (
-    <Suspense fallback={<p className="text-muted">{kk.common.loading}</p>}>
+    <Suspense fallback={<p className="text-muted">{ru.common.loading}</p>}>
       <Overview searchParams={searchParams} />
     </Suspense>
   );
@@ -47,7 +47,7 @@ async function Overview({ searchParams }: { searchParams: Promise<SP> }) {
   const p = period(await searchParams);
 
   const { data, error } = await supabaseAdmin().rpc("admin_stats", { p_from: p.fromIso, p_to: p.toIso });
-  if (error || !data) return <p className="text-danger">{kk.errors.generic}</p>;
+  if (error || !data) return <p className="text-danger">{ru.errors.generic}</p>;
   const s = data as Stats;
   const finished = s.generations_completed + s.generations_failed;
   const cost = s.provider_cost === null ? null : Number(s.provider_cost);
@@ -62,7 +62,7 @@ async function Overview({ searchParams }: { searchParams: Promise<SP> }) {
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="font-display text-2xl font-bold">{kk.admin.nav.overview}</h1>
+        <h1 className="font-display text-2xl font-bold">{ru.admin.nav.overview}</h1>
         <form className="flex flex-wrap items-end gap-2 text-sm">
           <label><span className="block text-xs text-muted">{S.from}</span><input type="date" name="from" defaultValue={p.from} className="rounded-xl border border-line px-3 py-2 text-base sm:text-sm" /></label>
           <label><span className="block text-xs text-muted">{S.to}</span><input type="date" name="to" defaultValue={p.to} className="rounded-xl border border-line px-3 py-2 text-base sm:text-sm" /></label>

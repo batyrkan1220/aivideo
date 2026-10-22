@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
-import { kk } from "@/lib/i18n/kk";
+import { ru } from "@/lib/i18n/ru";
 import { getSessionUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabase/server";
@@ -10,11 +10,11 @@ import { formatKzt, type PriceBreakdown } from "@/lib/pricing";
 import { ActionForm } from "../action-form";
 import { retryGeneration, cancelGeneration, refundPayment } from "../actions";
 
-const A = kk.admin.orders;
+const A = ru.admin.orders;
 
 export default function AdminOrderPage({ params }: { params: Promise<{ id: string }> }) {
   return (
-    <Suspense fallback={<p className="text-muted">{kk.common.loading}</p>}>
+    <Suspense fallback={<p className="text-muted">{ru.common.loading}</p>}>
       <Detail params={params} />
     </Suspense>
   );
@@ -23,7 +23,7 @@ export default function AdminOrderPage({ params }: { params: Promise<{ id: strin
 async function Detail({ params }: { params: Promise<{ id: string }> }) {
   const u = await getSessionUser();
   if (!u) redirect("/login?next=/admin/orders");
-  if (!can(u.role, "orders.view")) return <p className="text-muted">{kk.admin.forbidden}</p>;
+  if (!can(u.role, "orders.view")) return <p className="text-muted">{ru.admin.forbidden}</p>;
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) notFound();
 
@@ -38,7 +38,7 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
   const prof = (Array.isArray(o.profiles) ? o.profiles[0] : o.profiles) as { email?: string; display_name?: string } | null;
   const snap = o.template_snapshot_json as { title_kk?: string; quality?: { labelKk?: string } };
   const price = o.pricing_breakdown_json as PriceBreakdown;
-  const fmt = new Intl.DateTimeFormat("kk-KZ", { dateStyle: "medium", timeStyle: "medium", timeZone: "Asia/Almaty" });
+  const fmt = new Intl.DateTimeFormat("ru-RU", { dateStyle: "medium", timeStyle: "medium", timeZone: "Asia/Almaty" });
   const activeJob = jobs?.some((j) => ["queued", "processing", "postprocessing"].includes(j.status));
   const card = "rounded-card border border-line bg-white p-5";
   const th = "px-3 py-2 font-medium";
@@ -47,7 +47,7 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/admin/orders" className="-my-2 inline-block py-2 text-sm text-muted hover:text-ink">← {kk.admin.nav.orders}</Link>
+        <Link href="/admin/orders" className="-my-2 inline-block py-2 text-sm text-muted hover:text-ink">← {ru.admin.nav.orders}</Link>
         <h1 className="mt-2 font-display text-2xl font-bold">{o.public_order_number}</h1>
         <p className="text-sm text-muted">{snap.title_kk}, {snap.quality?.labelKk ?? o.quality}, {fmt.format(new Date(o.created_at))}</p>
       </div>
@@ -73,11 +73,11 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
         <h2 className="mb-3 font-semibold">{A.details}</h2>
         <dl className="grid grid-cols-[auto_minmax(0,1fr)] [&>dd]:break-words gap-x-6 gap-y-1.5 text-sm">
           <dt className="text-muted">{A.colUser}</dt><dd>{prof?.email ?? A.deletedUser}{prof?.display_name ? ` (${prof.display_name})` : ""}</dd>
-          <dt className="text-muted">{kk.order.status}</dt>
-          <dd>{kk.order.payment[o.payment_status as keyof typeof kk.order.payment]} / {kk.order.generation[o.generation_status as keyof typeof kk.order.generation]}</dd>
-          <dt className="text-muted">{kk.pricing.total}</dt>
-          <dd>{formatKzt(o.amount_kzt)} ({kk.pricing.videoPrice} {formatKzt(price.basePriceKzt)}, {kk.pricing.quality} +{formatKzt(price.qualitySurchargeKzt)}, {kk.pricing.extraFaces} +{formatKzt(price.extraFacesKzt)}, {kk.pricing.discount} −{formatKzt(price.discountKzt)})</dd>
-          <dt className="text-muted">{kk.order.photos}</dt><dd>{o.face_count}{o.photos_deleted_at ? `, ${kk.result.photosDeleted}` : ""}</dd>
+          <dt className="text-muted">{ru.order.status}</dt>
+          <dd>{ru.order.payment[o.payment_status as keyof typeof ru.order.payment]} / {ru.order.generation[o.generation_status as keyof typeof ru.order.generation]}</dd>
+          <dt className="text-muted">{ru.pricing.total}</dt>
+          <dd>{formatKzt(o.amount_kzt)} ({ru.pricing.videoPrice} {formatKzt(price.basePriceKzt)}, {ru.pricing.quality} +{formatKzt(price.qualitySurchargeKzt)}, {ru.pricing.extraFaces} +{formatKzt(price.extraFacesKzt)}, {ru.pricing.discount} −{formatKzt(price.discountKzt)})</dd>
+          <dt className="text-muted">{ru.order.photos}</dt><dd>{o.face_count}{o.photos_deleted_at ? `, ${ru.result.photosDeleted}` : ""}</dd>
         </dl>
       </section>
 
@@ -91,7 +91,7 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
                 <td className={td}>{p.provider}</td>
                 <td className={`${td} font-mono text-xs`}>{p.provider_payment_id ?? "—"}</td>
                 <td className={td}>
-                  {kk.order.payment[p.status as keyof typeof kk.order.payment]}
+                  {ru.order.payment[p.status as keyof typeof ru.order.payment]}
                   {p.failure_reason && <span className="block text-xs text-danger">{p.failure_reason}</span>}
                 </td>
                 <td className={td}>{formatKzt(p.amount_kzt)}</td>
@@ -111,7 +111,7 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
               <tr key={j.id}>
                 <td className={td}>{j.provider}</td>
                 <td className={`${td} font-mono text-xs`}>{j.provider_job_id ?? "—"}</td>
-                <td className={td}>{kk.order.generation[j.status as keyof typeof kk.order.generation] ?? j.status}{j.progress !== null ? ` (${j.progress}%)` : ""}</td>
+                <td className={td}>{ru.order.generation[j.status as keyof typeof ru.order.generation] ?? j.status}{j.progress !== null ? ` (${j.progress}%)` : ""}</td>
                 <td className={td}>{j.attempt_count}</td>
                 <td className={`${td} text-xs`}>{j.error_code ? <><span className="font-mono">{j.error_code}</span><span className="block text-muted">{j.safe_error_message}</span></> : "—"}</td>
                 <td className={td}>{j.provider_cost ?? "—"}</td>

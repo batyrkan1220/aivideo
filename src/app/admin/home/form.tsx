@@ -1,10 +1,10 @@
 "use client";
 import { useActionState } from "react";
-import { kk } from "@/lib/i18n/kk";
+import { ru } from "@/lib/i18n/ru";
 import { saveShowcase, type ShowcaseState } from "./actions";
 
 type Option = { id: string; title: string; cover: string | null };
-const H = kk.admin.home;
+const H = ru.admin.home;
 
 export function ShowcaseForm({ options, current }: { options: Option[]; current: (string | null)[] }) {
   const [state, action, pending] = useActionState<ShowcaseState, FormData>(saveShowcase, {});
@@ -30,7 +30,7 @@ export function ShowcaseForm({ options, current }: { options: Option[]; current:
       </div>
       <div className="flex flex-wrap items-center gap-4">
         <button disabled={pending} className="h-11 rounded-full bg-brand px-6 font-semibold text-white hover:bg-brand-dark disabled:opacity-50">
-          {pending ? kk.common.loading : H.save}
+          {pending ? ru.common.loading : H.save}
         </button>
         <a href="/" target="_blank" rel="noopener" className="text-sm font-semibold text-brand hover:underline">{H.preview}</a>
         {state.ok && <span className="text-sm text-success" role="status">{state.ok}</span>}

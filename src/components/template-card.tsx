@@ -77,11 +77,12 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
         {t.previewUrl && (
           <video
             ref={videoRef}
-            src={t.previewUrl}
+            // Without a cover image the first video frame acts as the poster.
+            src={t.coverUrl ? t.previewUrl : `${t.previewUrl}#t=0.1`}
             muted
             loop
             playsInline
-            preload="none"
+            preload={t.coverUrl ? "none" : "metadata"}
             aria-hidden
             className="absolute inset-0 h-full w-full object-cover"
           />

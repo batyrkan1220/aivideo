@@ -155,6 +155,7 @@ export const kk = {
     faceCount: "Қажетті фото саны",
     facesTitle: "Кім қай жерде тұрады",
     qualitiesTitle: "Сапаны таңдау",
+    priceTitle: "Бағасы",
     resolution: "Ажыратымдылық",
     fps: "кадр/сек",
     upToSec: (s: number) => `${s} сек дейін`,

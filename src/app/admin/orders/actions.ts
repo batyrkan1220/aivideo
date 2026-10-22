@@ -9,10 +9,10 @@ import { paymentProvider } from "@/lib/payments";
 import { handlePaymentWebhook } from "@/lib/payments/process";
 import { signSandbox } from "@/lib/payments/sandbox";
 import { generationProvider } from "@/lib/generation";
-import { kk } from "@/lib/i18n/kk";
+import { ru } from "@/lib/i18n/ru";
 
 export type AdminState = { ok?: string; error?: string };
-const E = kk.admin.orders.errors;
+const E = ru.admin.orders.errors;
 const ACTIVE = ["queued", "processing", "postprocessing"];
 
 async function staff(perm: Permission) {
@@ -39,7 +39,7 @@ export async function retryGeneration(_: AdminState, fd: FormData): Promise<Admi
   await db.from("orders").update({ generation_status: "queued", completed_at: null }).eq("id", o.id);
   await audit(u.id, "order.retry_generation", "order", o.id);
   revalidatePath(`/admin/orders/${o.id}`);
-  return { ok: kk.admin.orders.done };
+  return { ok: ru.admin.orders.done };
 }
 
 /** Stops an active generation (asks the provider to cancel when it supports it). */
@@ -52,7 +52,7 @@ export async function cancelGeneration(_: AdminState, fd: FormData): Promise<Adm
   if (!r) return { error: E.not_eligible };
   await audit(u.id, "order.cancel_generation", "order", id.data);
   revalidatePath(`/admin/orders/${id.data}`);
-  return { ok: kk.admin.orders.done };
+  return { ok: ru.admin.orders.done };
 }
 
 async function cancelActiveJob(orderId: string) {
@@ -66,7 +66,7 @@ async function cancelActiveJob(orderId: string) {
   }
   await db.from("generation_jobs").update({
     status: "cancelled", completed_at: new Date().toISOString(), error_code: "cancelled_by_admin",
-    safe_error_message: kk.order.generation.cancelled,
+    safe_error_message: ru.order.generation.cancelled,
   }).eq("id", job.id);
   await db.from("orders").update({ generation_status: "cancelled" }).eq("id", orderId);
   return true;
@@ -103,7 +103,7 @@ export async function refundPayment(_: AdminState, fd: FormData): Promise<AdminS
   }
   await audit(u.id, "order.refund", "order", id.data, { amount_kzt: pay.amount_kzt, provider: pay.provider });
   revalidatePath(`/admin/orders/${id.data}`);
-  return { ok: kk.admin.orders.done };
+  return { ok: ru.admin.orders.done };
 }
 
 const ROLES = ["user", "super_admin", "template_manager", "order_support"] as const;
@@ -114,12 +114,12 @@ export async function changeRole(_: AdminState, fd: FormData): Promise<AdminStat
   const id = uuid(fd.get("userId"));
   const role = z.enum(ROLES).safeParse(fd.get("role"));
   if (!id.success || !role.success) return { error: E.generic };
-  if (id.data === u.id) return { error: kk.admin.users.selfLock }; // avoid locking yourself out
+  if (id.data === u.id) return { error: ru.admin.users.selfLock }; // avoid locking yourself out
   const db = supabaseAdmin();
   const { data: before } = await db.from("profiles").select("role").eq("id", id.data).single();
   const { error } = await db.from("profiles").update({ role: role.data as Role }).eq("id", id.data);
   if (error) return { error: E.generic };
   await audit(u.id, "user.role_change", "profile", id.data, { from: before?.role, to: role.data });
   revalidatePath("/admin/users");
-  return { ok: kk.admin.users.saved };
+  return { ok: ru.admin.users.saved };
 }

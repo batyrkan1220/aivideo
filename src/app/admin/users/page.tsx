@@ -1,19 +1,19 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { kk } from "@/lib/i18n/kk";
+import { ru } from "@/lib/i18n/ru";
 import { getSessionUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { ActionForm } from "../orders/action-form";
 import { changeRole } from "../orders/actions";
 
-const U = kk.admin.users;
+const U = ru.admin.users;
 
 export default function UsersPage() {
   return (
     <div>
-      <h1 className="mb-6 font-display text-2xl font-bold">{kk.admin.nav.users}</h1>
-      <Suspense fallback={<p className="text-muted">{kk.common.loading}</p>}>
+      <h1 className="mb-6 font-display text-2xl font-bold">{ru.admin.nav.users}</h1>
+      <Suspense fallback={<p className="text-muted">{ru.common.loading}</p>}>
         <List />
       </Suspense>
     </div>
@@ -23,10 +23,10 @@ export default function UsersPage() {
 async function List() {
   const u = await getSessionUser();
   if (!u) redirect("/login?next=/admin/users");
-  if (!can(u.role, "users.manage")) return <p className="text-muted">{kk.admin.forbidden}</p>;
+  if (!can(u.role, "users.manage")) return <p className="text-muted">{ru.admin.forbidden}</p>;
   const { data } = await supabaseAdmin().from("profiles")
     .select("id,email,display_name,role,created_at").order("created_at", { ascending: false }).limit(500);
-  const fmt = new Intl.DateTimeFormat("kk-KZ", { dateStyle: "medium", timeZone: "Asia/Almaty" });
+  const fmt = new Intl.DateTimeFormat("ru-RU", { dateStyle: "medium", timeZone: "Asia/Almaty" });
   return (
     <div className="overflow-x-auto rounded-card border border-line bg-white">
       <table className="w-full text-left text-sm">
@@ -40,10 +40,10 @@ async function List() {
               <td className="px-4 py-3">{p.display_name ?? "—"}</td>
               <td className="px-4 py-3 text-muted">{fmt.format(new Date(p.created_at))}</td>
               <td className="px-4 py-3">
-                {p.id === u.id ? kk.account.roles[p.role as keyof typeof kk.account.roles] : (
+                {p.id === u.id ? ru.account.roles[p.role as keyof typeof ru.account.roles] : (
                   <ActionForm action={changeRole} fields={{ userId: p.id }} label={U.changeRole}>
                     <select name="role" defaultValue={p.role} className="rounded-xl border border-line px-2 py-1.5 text-base sm:text-sm">
-                      {Object.entries(kk.account.roles).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                      {Object.entries(ru.account.roles).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
                   </ActionForm>
                 )}

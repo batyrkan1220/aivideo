@@ -6,6 +6,15 @@ import { FaceMap } from "@/components/face-map";
 
 /** Per-quality prices (server-computed). Shown to guests and in admin preview. */
 export function QualityPriceList({ t }: { t: TemplateDetail }) {
+  const available = t.qualities.filter((q) => q.available);
+  if (available.length === 1) {
+    return (
+      <section className="flex items-center justify-between gap-4 rounded-card border border-line bg-white px-5 py-4">
+        <h2 className="font-semibold">{kk.template.priceTitle}</h2>
+        <p className="font-display text-xl font-bold">{formatKzt(calculatePrice(t.pricing, available[0], t.faceCount).totalKzt)}</p>
+      </section>
+    );
+  }
   return (
     <section>
       <h2 className="font-semibold">{kk.template.qualitiesTitle}</h2>

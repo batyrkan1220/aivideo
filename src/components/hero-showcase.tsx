@@ -35,6 +35,10 @@ export function HeroShowcase({ items }: { items: Item[] }) {
               // eslint-disable-next-line @next/next/no-img-element
               <img src={t.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
             )}
+            {!front && !t.coverUrl && t.previewUrl && (
+              // No cover: show the first video frame on the side phones.
+              <video src={`${t.previewUrl}#t=0.1`} muted playsInline preload="metadata" aria-hidden className="absolute inset-0 h-full w-full object-cover" />
+            )}
             {front && t.previewUrl && (
               <video src={t.previewUrl} poster={t.coverUrl ?? undefined} autoPlay muted loop playsInline preload="metadata" aria-hidden className="absolute inset-0 h-full w-full object-cover motion-reduce:hidden" />
             )}

@@ -3,20 +3,20 @@ import { emptyTemplate } from "../templates/admin-schema";
 import { autoFaceSlots } from "../templates/schema";
 import { validateTemplateForm, firstErrorKey, M } from "../templates/editor-validation";
 
-const ok = () => ({ ...emptyTemplate(), titleKk: "Той биі", coverAssetPath: "c.jpg", previewVideoPath: "p.mp4" });
+const ok = () => ({ ...emptyTemplate(), providerKey: "dev", titleKk: "Той биі", previewVideoPath: "p.mp4" });
 
 describe("template editor validation", () => {
   it("a complete template has no errors, even for publish", () => {
     expect(validateTemplateForm(ok(), "{}", true)).toEqual({});
   });
 
-  it("title is required; media only required to publish", () => {
-    const t = { ...emptyTemplate() };
+  it("title is required; video only required to publish; no cover needed", () => {
+    const t = { ...emptyTemplate(), providerKey: "dev" };
     const draft = validateTemplateForm(t, "{}", false);
     expect(draft.titleKk).toBe(M.required);
-    expect(draft.cover).toBeUndefined();
+    expect(draft.preview).toBeUndefined();
     const pub = validateTemplateForm(t, "{}", true);
-    expect(pub.cover).toBe(M.coverMissing);
+    expect(pub.cover).toBeUndefined();
     expect(pub.preview).toBe(M.previewMissing);
     expect(firstErrorKey(pub)).toBe("titleKk");
   });
