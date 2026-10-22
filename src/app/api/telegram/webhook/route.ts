@@ -20,6 +20,8 @@ export async function POST(req: NextRequest) {
   const name = msg.from?.first_name ? escapeHtml(msg.from.first_name.slice(0, 40)) : "";
   if (msg.text?.startsWith("/start")) {
     await sendMessage(chatId, kk.telegram.welcome(name), { text: kk.telegram.openApp, path: "/" });
+  } else if (msg.text?.startsWith("/help")) {
+    await sendMessage(chatId, kk.telegram.help, { text: kk.telegram.openApp, path: "/" });
   } else if (msg.text?.startsWith("/videos")) {
     await sendMessage(chatId, kk.telegram.myVideos, { text: kk.telegram.openMyVideos, path: "/orders" });
   } else {
