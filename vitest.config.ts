@@ -15,7 +15,7 @@ export default defineConfig({
       NEXT_PUBLIC_SUPABASE_ANON_KEY: "test-anon",
       SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key",
       APP_ENV: "development",
-      WAVESPEED_API_KEY: "test-wavespeed-key",
+      AKOOL_API_KEY: "test-akool-key-123",
     },
   },
 });

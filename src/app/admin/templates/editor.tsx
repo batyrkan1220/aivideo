@@ -9,6 +9,8 @@ import { autoFaceSlots, type Quality } from "@/lib/templates/schema";
 import { validateTemplateForm, firstErrorKey, parseConfig, type FieldErrors } from "@/lib/templates/editor-validation";
 import { calculatePrice, formatKzt } from "@/lib/pricing";
 import { FaceMap } from "@/components/face-map";
+import { parseAkoolConfig, akoolSlots, type AkoolConfig } from "@/lib/templates/akool-config";
+import { AkoolPeople } from "./akool-people";
 import { saveTemplate, changeStatus, createUploadUrl } from "./actions";
 
 const e = kk.admin.editor;
@@ -75,17 +77,15 @@ export function TemplateEditor({
   mediaBase: string;
 }) {
   const router = useRouter();
-  const [t, setT] = useState<TemplateInput>(initial);
+  // Templates of the removed WaveSpeed provider are moved to Akool (they must be analysed again).
+  const [t, setT] = useState<TemplateInput>(() =>
+    initial.providerKey === "wavespeed" ? { ...initial, providerKey: "akool", providerConfig: {} } : initial);
   const [dirty, setDirty] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string; problems?: PublishProblem[] } | null>(null);
   const [pending, start] = useTransition();
-  // Only the keys the WaveSpeed head swap uses are kept; older keys are dropped on the next save.
-  const [configText, setConfigText] = useState(() => {
-    const c = (initial.providerConfig ?? {}) as Record<string, unknown>;
-    return JSON.stringify(initial.providerKey === "wavespeed"
-      ? { resolution: c.resolution ?? "720p", ...(c.videoSeconds !== undefined ? { videoSeconds: c.videoSeconds } : {}) }
-      : c);
-  });
+  const [configText, setConfigText] = useState(() =>
+    JSON.stringify(initial.providerKey === "akool" ? parseAkoolConfig(initial.providerConfig)
+      : initial.providerKey === "wavespeed" ? parseAkoolConfig({}) : initial.providerConfig ?? {}));
   // Errors appear after the first save/publish attempt and then update live as the admin types.
   const [mode, setMode] = useState<null | "save" | "publish">(null);
 
@@ -98,19 +98,17 @@ export function TemplateEditor({
     set("qualities", t.qualities.map((q, j) => (j === i ? { ...q, ...patch } : q)));
   const setPricing = (patch: Partial<TemplateInput["pricing"]>) => set("pricing", { ...t.pricing, ...patch });
 
-  // Provider config, edited through the structured WaveSpeed controls below.
+  // Provider config, edited only through the structured controls below.
   const cfg = parseConfig(configText);
-  const setCfg = (patch: Record<string, unknown>) => {
-    setConfigText(JSON.stringify({ ...(cfg ?? {}), ...patch }));
-    setDirty(true);
-  };
+  const isAkool = t.providerKey === "akool";
+  const akool = parseAkoolConfig(cfg);
+  const setAkool = (next: AkoolConfig) => { setConfigText(JSON.stringify(next)); setDirty(true); };
+  // Akool: customer photo slots = the people chosen from the video analysis (server derives them too).
+  const slots = isAkool ? akoolSlots(akool) : t.faceSlots;
   const setFaceCount = (n: number) => set("faceSlots", autoFaceSlots(n));
   const setProvider = (key: string | null) => {
     set("providerKey", key);
-    if (key === "wavespeed") {
-      setConfigText(JSON.stringify({ resolution: cfg?.resolution ?? "720p", ...(cfg?.videoSeconds !== undefined ? { videoSeconds: cfg.videoSeconds } : {}) }));
-      if (t.faceSlots.length > 1) set("faceSlots", autoFaceSlots(1));
-    }
+    setConfigText(JSON.stringify(key === "akool" ? parseAkoolConfig(cfg) : {}));
   };
 
   /** Client check first (shows red fields), then the authoritative server save. */
@@ -122,7 +120,8 @@ export function TemplateEditor({
       requestAnimationFrame(() => goTo(firstErrorKey(found)));
       return null;
     }
-    const payload = { ...t, providerConfig: cfg ?? {}, faceSlots: t.faceSlots.map((s, k) => ({ ...s, order: k })) };
+    const sent = slots.length ? slots : autoFaceSlots(1);
+    const payload = { ...t, providerConfig: cfg ?? {}, faceSlots: sent.map((s, k) => ({ ...s, order: k })) };
     const r = await saveTemplate(payload, id);
     if (!r.ok) {
       setMsg({ kind: "err", text: r.error === "forbidden" ? kk.admin.forbidden : r.error === "invalid" ? e.invalid : kk.errors.generic });
@@ -165,12 +164,9 @@ export function TemplateEditor({
   });
 
   const qualityPrices = t.qualities.filter((q) => q.available).map((q) => {
-    try { return { q, total: calculatePrice(t.pricing, q, t.faceSlots.length).totalKzt }; }
+    try { return { q, total: calculatePrice(t.pricing, q, Math.max(1, slots.length)).totalKzt }; }
     catch { return { q, total: null }; }
   });
-  const wsSeconds = typeof cfg?.videoSeconds === "number" ? (cfg.videoSeconds as number) : undefined;
-  const wsRate = cfg?.resolution === "480p" ? 0.04 : 0.08;
-  const wsCost = wsSeconds ? (Math.min(120, Math.max(3, Math.ceil(wsSeconds))) * wsRate).toFixed(2) : null;
 
   return (
     <div className="space-y-6 pb-56 sm:pb-28">
@@ -210,19 +206,58 @@ export function TemplateEditor({
         </div>
       </Section>
 
-      <Section title={e.sections.faces} field="ws.faces" error={err("ws.faces")}>
-        <div className="grid gap-6 lg:grid-cols-[1fr_minmax(0,320px)]">
-          <div>
-            <span className={labelCls}>{e.peopleCount}<span className="text-danger" aria-hidden> *</span></span>
-            <div className="flex items-center gap-3">
-              <button type="button" aria-label={e.fewer} disabled={t.faceSlots.length <= 1} onClick={() => setFaceCount(t.faceSlots.length - 1)} className="h-11 w-11 rounded-full border border-line text-xl font-semibold hover:border-ink disabled:opacity-30">−</button>
-              <output className="w-10 text-center font-display text-3xl font-bold" aria-live="polite">{t.faceSlots.length}</output>
-              <button type="button" aria-label={e.more} disabled={t.faceSlots.length >= (t.providerKey === "wavespeed" ? 1 : 10)} onClick={() => setFaceCount(t.faceSlots.length + 1)} className="h-11 w-11 rounded-full border border-line text-xl font-semibold hover:border-ink disabled:opacity-30">+</button>
-            </div>
-            <p className="mt-4 max-w-md text-sm text-muted">{e.faceHint}</p>
-          </div>
-          <FaceMap slots={t.faceSlots} />
+      <Section title={e.sections.provider}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label={e.providerKey} field="providerKey" required error={err("providerKey")}>
+            <select className={inputCls(err("providerKey"))} value={t.providerKey ?? ""} onChange={(ev) => setProvider(ev.target.value || null)}>
+              <option value="">—</option>
+              <option value="dev">dev (демо)</option>
+              <option value="akool">Akool — бүкіл басты ауыстыру (Head Swap)</option>
+            </select>
+          </Field>
+          <Field label={e.maxUpload} field="maxUploadBytes" required error={err("maxUploadBytes")}>
+            <Num value={Math.round(t.maxUploadBytes / 1024 / 1024)} min={1} error={err("maxUploadBytes")} onChange={(v) => set("maxUploadBytes", (v ?? 0) * 1024 * 1024)} />
+          </Field>
+
+          {isAkool && (
+            <Field label={e.akool.resolution} className="sm:col-span-2">
+              <select className={`${inputCls()} sm:max-w-xs`} value={akool.resolution} onChange={(ev) => setAkool({ ...akool, resolution: ev.target.value as AkoolConfig["resolution"] })}>
+                <option value="720p">720p</option>
+                <option value="480p">480p</option>
+              </select>
+              <span className="mt-1 block text-xs text-muted">{e.akool.creditsHint}</span>
+            </Field>
+          )}
         </div>
+      </Section>
+
+      <Section title={isAkool ? e.akool.title : e.sections.faces}>
+        {isAkool ? (
+          <div className="grid gap-6 lg:grid-cols-[1fr_minmax(0,320px)]">
+            <AkoolPeople
+              videoPath={t.previewVideoPath}
+              mediaBase={mediaBase}
+              cfg={akool}
+              onChange={setAkool}
+              analysisError={err("akool.analysis")}
+              peopleError={err("akool.people")}
+            />
+            {slots.length > 0 && <FaceMap slots={slots} mediaBase={mediaBase} />}
+          </div>
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-[1fr_minmax(0,320px)]">
+            <div>
+              <span className={labelCls}>{e.peopleCount}<span className="text-danger" aria-hidden> *</span></span>
+              <div className="flex items-center gap-3">
+                <button type="button" aria-label={e.fewer} disabled={t.faceSlots.length <= 1} onClick={() => setFaceCount(t.faceSlots.length - 1)} className="h-11 w-11 rounded-full border border-line text-xl font-semibold hover:border-ink disabled:opacity-30">−</button>
+                <output className="w-10 text-center font-display text-3xl font-bold" aria-live="polite">{t.faceSlots.length}</output>
+                <button type="button" aria-label={e.more} disabled={t.faceSlots.length >= 10} onClick={() => setFaceCount(t.faceSlots.length + 1)} className="h-11 w-11 rounded-full border border-line text-xl font-semibold hover:border-ink disabled:opacity-30">+</button>
+              </div>
+              <p className="mt-4 max-w-md text-sm text-muted">{e.faceHint}</p>
+            </div>
+            <FaceMap slots={t.faceSlots} />
+          </div>
+        )}
       </Section>
 
       <Section title={e.sections.qualities} field="qualities" error={err("qualities")}>
@@ -342,39 +377,6 @@ export function TemplateEditor({
         </div>
       </Section>
 
-      <Section title={e.sections.provider}>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={e.providerKey} field="providerKey" required error={err("providerKey")}>
-            <select className={inputCls(err("providerKey"))} value={t.providerKey ?? ""} onChange={(ev) => setProvider(ev.target.value || null)}>
-              <option value="">—</option>
-              <option value="dev">dev (демо)</option>
-              <option value="wavespeed">WaveSpeed AI — бүкіл басты ауыстыру</option>
-            </select>
-          </Field>
-          <Field label={e.maxUpload} field="maxUploadBytes" required error={err("maxUploadBytes")}>
-            <Num value={Math.round(t.maxUploadBytes / 1024 / 1024)} min={1} error={err("maxUploadBytes")} onChange={(v) => set("maxUploadBytes", (v ?? 0) * 1024 * 1024)} />
-          </Field>
-
-          {t.providerKey === "wavespeed" && cfg && (
-            <div className={`rounded-xl border p-4 sm:col-span-2 ${err("ws.videoSeconds") || err("ws.resolution") ? "border-danger" : "border-brand/30 bg-brand-soft/50"}`}>
-              <h3 className="font-semibold">{e.ws.title}</h3>
-              <p className="mt-1 text-sm text-muted">{e.ws.intro}</p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <Field label={e.ws.resolution} field="ws.resolution" error={err("ws.resolution")}>
-                  <select className={inputCls(err("ws.resolution"))} value={String(cfg.resolution ?? "720p")} onChange={(ev) => setCfg({ resolution: ev.target.value })}>
-                    <option value="720p">720p — $0.08/сек</option>
-                    <option value="480p">480p — $0.04/сек</option>
-                  </select>
-                </Field>
-                <Field label={e.ws.seconds} field="ws.videoSeconds" required error={err("ws.videoSeconds")}>
-                  <Num value={wsSeconds} min={1} error={err("ws.videoSeconds")} onChange={(v) => setCfg({ videoSeconds: v })} />
-                  <span className="mt-1 block text-xs text-muted">{wsCost ? e.ws.cost(wsCost) : e.ws.secondsHint}</span>
-                </Field>
-              </div>
-            </div>
-          )}
-        </div>
-      </Section>
 
       {/* Sticky action bar */}
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">

@@ -76,7 +76,8 @@ export function parseRow(r: Row): TemplateDetail | null {
     previewUrl: mediaUrl(r.preview_video_path),
     isTrending: r.is_trending,
     category: cat ? { id: cat.id, title: cat.title_kk, slug: cat.slug } : null,
-    faceSlots: orderedSlots(slots.data),
+    // Person previews (Akool) as absolute public URLs, so any component can show them.
+    faceSlots: orderedSlots(slots.data).map((s) => (s.previewImagePath ? { ...s, previewImagePath: mediaUrl(s.previewImagePath)! } : s)),
     qualities: qualities.data,
     pricing: pricing.data,
     maxUploadBytes: r.max_upload_bytes,

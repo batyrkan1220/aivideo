@@ -48,12 +48,14 @@ describe("template editor validation", () => {
     expect(validateTemplateForm(ok(), "{oops", false).providerConfig).toBe(M.jsonInvalid);
   });
 
-  it("WaveSpeed: single person and video length to publish", () => {
-    const multi = { ...ok(), providerKey: "wavespeed", faceSlots: autoFaceSlots(2) };
-    const bad = validateTemplateForm(multi, "{}", true);
-    expect(bad["ws.faces"]).toBe(M.wsHeadSingle);
-    expect(bad["ws.videoSeconds"]).toBe(M.wsSeconds);
-    const one = { ...ok(), providerKey: "wavespeed", faceSlots: autoFaceSlots(1) };
-    expect(validateTemplateForm(one, JSON.stringify({ resolution: "720p", videoSeconds: 19 }), true)).toEqual({});
+  it("Akool: analysis of the current video and at least one person to publish", () => {
+    const t = { ...ok(), providerKey: "akool" };
+    expect(validateTemplateForm(t, "{}", false)).toEqual({});           // draft: fine
+    expect(validateTemplateForm(t, "{}", true)["akool.analysis"]).toBe(M.akoolNotAnalyzed);
+    const analysis = { id: "a1", videoPath: "p.mp4", videoUrl: "https://x/p.mp4", people: [{ objId: 0, previewPath: "people/a1/0.jpg" }, { objId: 1, previewPath: "people/a1/1.jpg" }] };
+    expect(validateTemplateForm(t, JSON.stringify({ analysis, selected: [] }), true)["akool.people"]).toBe(M.akoolNoPeople);
+    expect(validateTemplateForm(t, JSON.stringify({ analysis, selected: [1, 0] }), true)).toEqual({});
+    const changed = { ...t, previewVideoPath: "other.mp4" };
+    expect(validateTemplateForm(changed, JSON.stringify({ analysis, selected: [0] }), false)["akool.analysis"]).toBe(M.akoolVideoChanged);
   });
 });

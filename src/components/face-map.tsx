@@ -1,10 +1,28 @@
-import type { FaceSlot } from "@/lib/templates/schema";
+import { slotPreviewSrc, type FaceSlot } from "@/lib/templates/schema";
+import { kk } from "@/lib/i18n/kk";
 
 /**
- * Visual face-position diagram: each slot is drawn at its configured (x, y)
- * on a 16:9 stage, numbered in the same order the upload slots appear.
+ * Which photo goes to which person.
+ *  - Akool templates (slots carry a preview of the person from the video): thumbnails, numbered.
+ *  - Others: positions drawn left → right on a 16:9 stage.
  */
-export function FaceMap({ slots }: { slots: FaceSlot[] }) {
+export function FaceMap({ slots, mediaBase }: { slots: FaceSlot[]; mediaBase?: string }) {
+  const withPreview = slots.length > 0 && slots.every((s) => s.previewImagePath);
+  if (withPreview) {
+    return (
+      <ol className="grid max-w-md grid-cols-3 gap-3 sm:grid-cols-5">
+        {slots.map((s, i) => (
+          <li key={s.key} className="text-center">
+            <div className="relative aspect-[3/4] overflow-hidden rounded-xl border-2 border-brand bg-paper">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={slotPreviewSrc(s.previewImagePath, mediaBase)!} alt={kk.upload.personInVideo(i + 1)} className="h-full w-full object-cover" />
+              <span className="absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">{i + 1}</span>
+            </div>
+          </li>
+        ))}
+      </ol>
+    );
+  }
   return (
     <div className="space-y-3">
       <div className="relative aspect-[16/7] w-full max-w-md overflow-hidden rounded-card border border-line bg-white" aria-hidden>

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { faceSlotSchema, qualitySchema, pricingConfigSchema, validateFaceSlots, autoFaceSlots } from "./schema";
+import { parseAkoolConfig, akoolSlots, akoolProblems } from "./akool-config";
 
 /** Everything an admin can edit on a template. Validated on the server on every save. */
 export const templateInputSchema = z.object({
@@ -22,7 +23,8 @@ export type TemplateInput = z.infer<typeof templateInputSchema>;
 
 export type PublishProblem =
   | "missing_cover" | "missing_preview" | "invalid_face_slots" | "no_available_quality"
-  | "duplicate_quality_key" | "missing_provider" | "price_out_of_range";
+  | "duplicate_quality_key" | "missing_provider" | "price_out_of_range"
+  | "akool_not_analyzed" | "akool_video_changed" | "akool_no_people";
 
 /** A template may be published only when it is complete and coherent. */
 export function publishProblems(t: TemplateInput): PublishProblem[] {
@@ -35,6 +37,7 @@ export function publishProblems(t: TemplateInput): PublishProblem[] {
   if (!t.providerKey) p.push("missing_provider");
   const { minPriceKzt, maxPriceKzt } = t.pricing;
   if (maxPriceKzt !== undefined && maxPriceKzt < minPriceKzt) p.push("price_out_of_range");
+  if (t.providerKey === "akool") p.push(...akoolProblems(parseAkoolConfig(t.providerConfig), t.previewVideoPath));
   return p;
 }
 
@@ -89,8 +92,17 @@ export function rowToInput(r: {
 
 /** Input → DB columns. Face count is always derived from the slot list. */
 export function inputToRow(t: TemplateInput) {
-  // Layout is always automatic: left → right, face_1..face_N.
-  const slots = autoFaceSlots(t.faceSlots.length);
+  // Slots are always derived on the server, never trusted from the browser:
+  //  - Akool: one slot per person the admin selected from the video analysis;
+  //  - others: automatic left → right layout, face_1..face_N.
+  let slots = autoFaceSlots(t.faceSlots.length);
+  let config = t.providerConfig;
+  if (t.providerKey === "akool") {
+    const cfg = parseAkoolConfig(t.providerConfig);
+    config = cfg;
+    const derived = akoolSlots(cfg);
+    slots = derived.length ? derived : autoFaceSlots(1);
+  }
   return {
     title_kk: t.titleKk,
     description_kk: t.descriptionKk,
@@ -105,7 +117,7 @@ export function inputToRow(t: TemplateInput) {
     supported_qualities_json: t.qualities,
     pricing_config_json: t.pricing,
     provider_key: t.providerKey,
-    provider_config_json: t.providerConfig,
+    provider_config_json: config,
     max_upload_bytes: t.maxUploadBytes,
   };
 }

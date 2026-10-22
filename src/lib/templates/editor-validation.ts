@@ -1,4 +1,5 @@
 import type { TemplateInput } from "./admin-schema";
+import { parseAkoolConfig, akoolSlots, AKOOL_MAX_PEOPLE } from "./akool-config";
 
 /**
  * Field-level validation for the admin template editor. Mirrors the server schema
@@ -28,8 +29,10 @@ export const M = {
   providerMissing: "Провайдерді таңдаңыз.",
   jsonInvalid: "JSON қате жазылған.",
   uploadSize: "1 мен 10 МБ аралығында.",
-  wsHeadSingle: "WaveSpeed тек 1 адамдық үлгіде жұмыс істейді. Адам санын 1 етіңіз.",
-  wsSeconds: "Видео ұзақтығын секундпен енгізіңіз (1–120, шығынды есептеу үшін).",
+  akoolNotAnalyzed: "Жариялау үшін видеодағы адамдарды анықтаңыз.",
+  akoolVideoChanged: "Үлгі видео ауысты. Адамдарды қайта анықтаңыз.",
+  akoolNoPeople: "Фотосы ауыстырылатын кемінде 1 адамды таңдаңыз.",
+  akoolTooMany: "Ең көбі 5 адам таңдауға болады.",
 } as const;
 
 const KEY_RE = /^[a-z0-9_]+$/;
@@ -105,11 +108,13 @@ export function validateTemplateForm(t: TemplateInput, configText: string, forPu
   const cfg = parseConfig(configText);
   if (!cfg) e.providerConfig = M.jsonInvalid;
 
-  if (t.providerKey === "wavespeed" && cfg) {
-    if (t.faceSlots.length > 1) e["ws.faces"] = M.wsHeadSingle;
-    if (cfg.resolution !== undefined && cfg.resolution !== "480p" && cfg.resolution !== "720p") e["ws.resolution"] = M.required;
-    const sec = cfg.videoSeconds;
-    if (forPublish && (typeof sec !== "number" || !(sec > 0) || sec > 120)) e["ws.videoSeconds"] = M.wsSeconds;
+  // Akool rules: the current template video must be analysed, then 1–5 people chosen.
+  if (t.providerKey === "akool" && cfg) {
+    const ak = parseAkoolConfig(cfg);
+    if (!ak.analysis) { if (forPublish) e["akool.analysis"] = M.akoolNotAnalyzed; }
+    else if (ak.analysis.videoPath !== t.previewVideoPath) e["akool.analysis"] = M.akoolVideoChanged;
+    else if (!akoolSlots(ak).length) { if (forPublish) e["akool.people"] = M.akoolNoPeople; }
+    if (ak.selected.length > AKOOL_MAX_PEOPLE) e["akool.people"] = M.akoolTooMany;
   }
   return e;
 }
@@ -117,12 +122,10 @@ export function validateTemplateForm(t: TemplateInput, configText: string, forPu
 /** Visual order of fields, so "go to first error" lands on the top-most one. */
 export function firstErrorKey(errors: FieldErrors): string | null {
   const order = [
-    "titleKk", "descriptionKk", "cover", "preview", "ws.faces", "qualities",
+    "titleKk", "descriptionKk", "cover", "preview", "providerKey", "maxUploadBytes", "akool.analysis", "akool.people", "qualities",
     ...Object.keys(errors).filter((k) => k.startsWith("quality.")).sort(),
     "pricing.basePriceKzt", "pricing.platformFeeKzt", "pricing.includedFaces", "pricing.extraFacePriceKzt",
     "pricing.discount.value", "pricing.discount.endsAt", "pricing.minPriceKzt", "pricing.maxPriceKzt",
-    "providerKey", "maxUploadBytes",
-    "ws.resolution", "ws.videoSeconds",
     "providerConfig",
   ];
   return order.find((k) => errors[k]) ?? Object.keys(errors)[0] ?? null;

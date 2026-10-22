@@ -7,6 +7,8 @@ export const faceSlotSchema = z.object({
   labelKk: z.string().min(1),
   position: z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) }),
   providerInput: z.string().min(1),
+  /** Akool: preview of the person in the video this photo replaces (template-media path). */
+  previewImagePath: z.string().max(300).optional(),
   order: z.number().int().min(0),
 });
 
@@ -84,4 +86,10 @@ export function autoFaceSlots(n: number): FaceSlot[] {
 /** Slots always rendered and sent in admin-defined order — never reordered implicitly. */
 export function orderedSlots(slots: FaceSlot[]): FaceSlot[] {
   return [...slots].sort((a, b) => a.order - b.order);
+}
+
+/** Image src for a slot's person preview: absolute URL as-is, else relative to the media base. */
+export function slotPreviewSrc(path: string | undefined, mediaBase = ""): string | null {
+  if (!path) return null;
+  return /^https?:\/\//.test(path) ? path : `${mediaBase}/${path}`;
 }

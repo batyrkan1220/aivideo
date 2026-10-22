@@ -1,6 +1,6 @@
 import "server-only";
 import { devProvider } from "./dev";
-import { wavespeedProvider } from "./wavespeed";
+import { akoolProvider } from "./akool";
 import type { GenerationProvider } from "./types";
 
 /**
@@ -12,7 +12,7 @@ import type { GenerationProvider } from "./types";
  */
 const providers: Record<string, GenerationProvider> = {
   dev: devProvider,
-  wavespeed: wavespeedProvider,
+  akool: akoolProvider,
 };
 
 export function generationProvider(key: string | null | undefined): GenerationProvider | null {

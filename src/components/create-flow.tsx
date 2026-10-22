@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { kk } from "@/lib/i18n/kk";
 import { calculatePrice, formatKzt } from "@/lib/pricing";
-import type { FaceSlot, PricingConfig, Quality } from "@/lib/templates/schema";
+import { slotPreviewSrc, type FaceSlot, type PricingConfig, type Quality } from "@/lib/templates/schema";
 import { PHOTO_TYPES, validatePhotoMeta, type PhotoError } from "@/lib/uploads/validate";
 import { requestPhotoUpload, confirmPhotoUpload, removePhotoUpload, createOrder } from "@/lib/orders/actions";
 
@@ -151,7 +151,7 @@ export function CreateFlow({
         <ol className={`mt-4 grid gap-3 ${gridCols} ${slots.length > 3 ? "sm:grid-cols-4" : ""}`}>
           {slots.map((s, i) => (
             <li key={s.key}>
-              <SlotCard index={i} slot={s} st={state[s.key]} onPick={(f) => onPick(s, f)} onRemove={() => onRemove(s)} />
+              <SlotCard index={i} slot={s} st={state[s.key]} mediaBase={`${supabaseUrl}/storage/v1/object/public/template-media`} onPick={(f) => onPick(s, f)} onRemove={() => onRemove(s)} />
             </li>
           ))}
         </ol>
@@ -233,8 +233,8 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function SlotCard({
-  index, slot, st, onPick, onRemove,
-}: { index: number; slot: FaceSlot; st: SlotState; onPick: (f: File | undefined) => void; onRemove: () => void }) {
+  index, slot, st, mediaBase, onPick, onRemove,
+}: { index: number; slot: FaceSlot; st: SlotState; mediaBase: string; onPick: (f: File | undefined) => void; onRemove: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const busy = st.phase === "uploading" || st.phase === "verifying";
   const preview = "preview" in st ? st.preview : undefined;
@@ -243,6 +243,14 @@ function SlotCard({
 
   return (
     <div>
+      {slot.previewImagePath && (
+        // Akool: which person in the video this photo replaces.
+        <div className="mb-2 flex items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={slotPreviewSrc(slot.previewImagePath, mediaBase)!} alt={kk.upload.personInVideo(index + 1)} className="h-12 w-10 rounded-lg border border-line object-cover" />
+          <span className="text-xs leading-tight text-muted">{kk.upload.replacesPerson}</span>
+        </div>
+      )}
       <button
         type="button"
         disabled={busy}
