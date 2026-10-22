@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { connection } from "next/server";
 import { kk } from "@/lib/i18n/kk";
 import { env } from "@/lib/env";
 import { getSessionUser } from "@/lib/auth/session";
@@ -36,6 +37,7 @@ export default function CreateOwnPage() {
 }
 
 async function Flow() {
+  await connection(); // request-time only: reads settings and the session, never at build time
   const cv = kk.customVideo;
   const [user, s, id, ap] = await Promise.all([getSessionUser(), customVideoSettings(), customTemplateId(), akoolPricingSettings()]);
   const t = s.enabled && id ? await getTemplateForAdmin(id) : null;

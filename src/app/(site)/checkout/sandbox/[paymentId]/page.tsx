@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { kk } from "@/lib/i18n/kk";
@@ -21,6 +22,7 @@ export default function SandboxCheckout({ params }: { params: Promise<{ paymentI
 }
 
 async function Inner({ params }: { params: Promise<{ paymentId: string }> }) {
+  await connection(); // request-time only (reads env + database)
   if (env().APP_ENV === "production") notFound();
   const { paymentId } = await params;
   const user = await requireUser(`/checkout/sandbox/${paymentId}`);
