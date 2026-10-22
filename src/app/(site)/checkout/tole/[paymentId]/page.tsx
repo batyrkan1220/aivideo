@@ -85,7 +85,7 @@ async function Inner({ params }: { params: Promise<{ paymentId: string }> }) {
     return (
       <div className={card}>
         {header}
-        <p className="mt-5 text-sm text-muted">{pay.provider_outcome === "outcome_unknown" ? kk.tole.unknown : kk.tole.preparing}</p>
+        {pay.provider_outcome === "outcome_unknown" && <p className="mt-5 text-sm text-muted">{kk.tole.unknown}</p>}
         <ToleStatus paymentId={pay.id} orderId={pay.order_id} ready={false} />
       </div>
     );

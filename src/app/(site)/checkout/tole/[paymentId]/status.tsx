@@ -10,7 +10,7 @@ export function ToleStatus({ paymentId, orderId, ready }: { paymentId: string; o
 
   useEffect(() => {
     let stop = false;
-    let delay = 4_000;
+    let delay = 3_000;
     const tick = async () => {
       if (stop || document.hidden) { if (!stop) setTimeout(tick, delay); return; }
       try {
@@ -29,9 +29,29 @@ export function ToleStatus({ paymentId, orderId, ready }: { paymentId: string; o
     return () => { stop = true; clearTimeout(t); };
   }, [paymentId, orderId, ready, router]);
 
+  if (done === "failed") {
+    return <p className="mt-4 text-center text-sm font-semibold text-danger" aria-live="polite">{kk.tole.failed}</p>;
+  }
+  if (done === "paid") {
+    return (
+      <p className="mt-4 flex items-center justify-center gap-2 text-sm font-semibold text-success" aria-live="polite">
+        <Spinner className="text-success" />{kk.tole.paid}
+      </p>
+    );
+  }
   return (
-    <p className="mt-4 text-center text-sm text-muted" aria-live="polite">
-      {done === "paid" ? kk.tole.paid : done === "failed" ? kk.tole.failed : ready ? kk.tole.waiting : null}
-    </p>
+    <div className="mt-5 flex flex-col items-center gap-3 rounded-card bg-brand-soft/60 px-4 py-5 text-center" aria-live="polite" role="status">
+      <Spinner className="h-8 w-8 text-brand" />
+      <p className="text-sm font-medium text-ink">{ready ? kk.tole.waiting : kk.tole.preparing}</p>
+    </div>
+  );
+}
+
+function Spinner({ className = "" }: { className?: string }) {
+  return (
+    <svg className={`h-5 w-5 animate-spin ${className}`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.2" strokeWidth="3" />
+      <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
   );
 }
