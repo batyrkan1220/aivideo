@@ -9,6 +9,7 @@ import { mediaUrl } from "@/lib/templates/queries";
 import { kk } from "@/lib/i18n/kk";
 import { generationProvider } from "./index";
 import { ProviderError } from "./types";
+import { isTestPaymentProvider } from "@/lib/payments/types";
 
 type Job = {
   id: string; order_id: string; provider: string; provider_job_id: string | null; status: string;
@@ -89,7 +90,7 @@ async function submitJob(job: Job) {
   if (provider.capabilities().producesRealVideo) {
     const { data: pay } = await db.from("payments").select("provider")
       .eq("order_id", order.id).eq("status", "succeeded").maybeSingle();
-    if (pay?.provider === "sandbox") {
+    if (isTestPaymentProvider(pay?.provider)) {
       const { data: prof } = await db.from("profiles").select("role").eq("id", order.user_id).maybeSingle();
       if (!prof || prof.role === "user") return failJob(job, "sandbox_payment_real_provider");
     }

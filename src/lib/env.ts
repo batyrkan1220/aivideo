@@ -9,12 +9,18 @@ const schema = z.object({
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
   // Optional so login/signup work without it; supabaseAdmin() fails loudly if missing.
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
-  PAYMENT_PROVIDER: z.enum(["sandbox", "kaspi"]).default("sandbox"),
+  // tole = Tole Payments (Kaspi QR) live; tole_sandbox = Tole /v1/sandbox/* with a test key.
+  PAYMENT_PROVIDER: z.enum(["sandbox", "kaspi", "tole", "tole_sandbox"]).default("sandbox"),
   PAYMENT_WEBHOOK_SECRET: z.string().min(16).optional(),
   KASPI_MERCHANT_ID: z.string().optional(),
   KASPI_API_KEY: z.string().optional(),
   KASPI_WEBHOOK_SECRET: z.string().optional(),
   KASPI_API_BASE_URL: z.string().url().optional(),
+  // Tole Payments — server-only secrets (never exposed to the browser or logs).
+  TOLE_API_KEY: z.string().min(10).optional(),
+  TOLE_CONNECTION_ID: z.string().uuid().optional(),
+  TOLE_WEBHOOK_SECRET: z.string().min(16).optional(),
+  TOLE_API_BASE_URL: z.string().url().default("https://api.tolepay.kz/v1"),
   AI_PROVIDER: z.string().default("dev"),
   AKOOL_API_KEY: z.string().min(10).optional(),
   AKOOL_API_BASE_URL: z.string().url().default("https://openapi.akool.com"),
@@ -39,7 +45,7 @@ export function env() {
       throw new Error("Invalid environment: " + parsed.error.issues.map((i) => i.path.join(".")).join(", "));
     }
     cached = parsed.data;
-    if (cached.APP_ENV === "production" && (cached.PAYMENT_PROVIDER === "sandbox" || cached.AI_PROVIDER === "dev")) {
+    if (cached.APP_ENV === "production" && (cached.PAYMENT_PROVIDER === "sandbox" || cached.PAYMENT_PROVIDER === "tole_sandbox" || cached.AI_PROVIDER === "dev")) {
       throw new Error("Sandbox payment / dev AI provider are not allowed in production");
     }
   }

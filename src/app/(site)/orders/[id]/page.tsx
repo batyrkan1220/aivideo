@@ -8,6 +8,7 @@ import { supabaseServer, supabaseAdmin } from "@/lib/supabase/server";
 import { formatKzt, type PriceBreakdown } from "@/lib/pricing";
 import { autoFaceLabel } from "@/lib/templates/schema";
 import { env } from "@/lib/env";
+import { isTestPaymentProvider } from "@/lib/payments/types";
 import { PayButton } from "@/components/pay-button";
 import { GenerationStatus } from "@/components/generation-status";
 import { ConfirmSubmit } from "@/components/account-forms";
@@ -198,7 +199,8 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
           <PayButton
             orderId={o.id}
             label={o.payment_status === "pending" ? `${kk.order.pay} ${formatKzt(o.amount_kzt)}` : kk.order.payAgain}
-            sandbox={env().PAYMENT_PROVIDER === "sandbox"}
+            sandbox={isTestPaymentProvider(env().PAYMENT_PROVIDER)}
+            askPhone={env().PAYMENT_PROVIDER === "tole" || env().PAYMENT_PROVIDER === "tole_sandbox"}
           />
         )}
       </section>

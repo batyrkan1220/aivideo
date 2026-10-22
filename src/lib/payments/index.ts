@@ -2,11 +2,14 @@ import "server-only";
 import { env } from "@/lib/env";
 import { sandboxProvider } from "./sandbox";
 import { kaspiProvider } from "./kaspi";
+import { toleProvider, toleSandboxProvider } from "./tole/provider";
 import type { PaymentProvider } from "./types";
 
 const providers: Record<string, PaymentProvider> = {
   sandbox: sandboxProvider,
   kaspi: kaspiProvider,
+  tole: toleProvider,
+  tole_sandbox: toleSandboxProvider,
 };
 
 /** Active provider for NEW payments (PAYMENT_PROVIDER). */

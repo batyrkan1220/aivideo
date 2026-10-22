@@ -12,8 +12,10 @@ import { handlePaymentWebhook } from "./process";
 import { signSandbox } from "./sandbox";
 import { PaymentProviderNotConfigured } from "./types";
 import { allow } from "@/lib/security/rate-limit";
+import { normalizeKzPhone } from "./phone";
 
-export type CheckoutState = { error?: "unauthorized" | "not_payable" | "price_changed" | "provider_unavailable" | "rate_limited" | "generic" };
+export type CheckoutState = { error?: "unauthorized" | "not_payable" | "price_changed" | "provider_unavailable" | "rate_limited" | "phone_invalid" | "generic" };
+
 
 /**
  * Starts (or resumes) payment for an order. Safe to call repeatedly:
@@ -47,23 +49,32 @@ export async function startCheckout(_: CheckoutState, fd: FormData): Promise<Che
   }
 
   const provider = activePaymentProvider();
+  const needsPhone = provider.key === "tole" || provider.key === "tole_sandbox";
+  const phone = needsPhone ? normalizeKzPhone(String(fd.get("phone") ?? "")) : null;
+  if (needsPhone && !phone) return { error: "phone_invalid" };
 
   // Resume an existing, still-valid pending payment (page refresh, double click, back button).
   const { data: existing } = await db.from("payments")
-    .select("id,redirect_url,expires_at,provider").eq("order_id", o.id).eq("status", "pending")
+    .select("id,redirect_url,expires_at,provider,provider_outcome,idempotency_key").eq("order_id", o.id).eq("status", "pending")
     .order("created_at", { ascending: false }).limit(1).maybeSingle();
-  if (existing?.redirect_url && existing.provider === provider.key &&
+  const sameProvider = existing?.provider === provider.key;
+  // A create that timed out may or may not exist at the provider: replay it with the SAME
+  // idempotency key (returns the original result) instead of creating a second payment.
+  const replay = sameProvider && existing?.provider_outcome === "timeout";
+  if (!replay && existing?.redirect_url && sameProvider &&
       (!existing.expires_at || new Date(existing.expires_at).getTime() > Date.now() + 60_000)) {
     redirect(existing.redirect_url);
   }
 
-  const paymentId = randomUUID();
-  const idempotencyKey = `${o.id}:${paymentId}`;
-  const { error: insErr } = await db.from("payments").insert({
-    id: paymentId, order_id: o.id, provider: provider.key, amount_kzt: o.amount_kzt,
-    currency: "KZT", status: "pending", idempotency_key: idempotencyKey,
-  });
-  if (insErr) { console.error("[checkout.insert]", insErr.code); return { error: "generic" }; }
+  const paymentId = replay ? existing!.id : randomUUID();
+  const idempotencyKey = replay ? existing!.idempotency_key : `${o.id}:${paymentId}`;
+  if (!replay) {
+    const { error: insErr } = await db.from("payments").insert({
+      id: paymentId, order_id: o.id, provider: provider.key, amount_kzt: o.amount_kzt,
+      currency: "KZT", status: "pending", idempotency_key: idempotencyKey,
+    });
+    if (insErr) { console.error("[checkout.insert]", insErr.code); return { error: "generic" }; }
+  }
 
   let created;
   try {
@@ -72,17 +83,22 @@ export async function startCheckout(_: CheckoutState, fd: FormData): Promise<Che
       description: `TrendMe ${o.public_order_number}`,
       returnUrl: `${env().NEXT_PUBLIC_APP_URL}/orders/${o.id}`,
       idempotencyKey,
+      customerPhone: phone ?? undefined,
     });
   } catch (err) {
-    await db.from("payments").update({ status: "failed", failure_reason: "create_failed" }).eq("id", paymentId);
+    await db.from("payments").update({ status: "failed", failure_reason: "create_failed", provider_outcome: null }).eq("id", paymentId);
     console.error("[checkout.provider]", err instanceof Error ? err.message : err);
     return { error: err instanceof PaymentProviderNotConfigured ? "provider_unavailable" : "generic" };
   }
 
   await db.from("payments").update({
-    provider_payment_id: created.providerPaymentId,
+    provider_payment_id: created.providerPaymentId ?? null,
     redirect_url: created.redirectUrl,
     expires_at: created.expiresAt ?? null,
+    provider_command_id: created.providerCommandId ?? null,
+    provider_operation_id: created.providerOperationId ?? null,
+    provider_outcome: created.providerOutcome ?? null,
+    provider_phone_last4: created.phoneLast4 ?? null,
   }).eq("id", paymentId);
   await db.from("orders").update({ payment_status: "pending" }).eq("id", o.id);
 
@@ -119,5 +135,36 @@ export async function completeSandboxPayment(fd: FormData) {
   });
   const headers = new Headers({ "x-sandbox-signature": signSandbox(body) });
   await handlePaymentWebhook("sandbox", body, headers);
+  redirect(`/orders/${pay.order_id}`);
+}
+
+/**
+ * Tole: cancel the unpaid Kaspi invoice so the customer can pay from another number.
+ * Uses a stable idempotency key per local payment; an unknown outcome is not repeated.
+ */
+export async function cancelToleInvoiceAction(fd: FormData) {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+  const paymentId = z.string().uuid().safeParse(fd.get("paymentId"));
+  if (!paymentId.success) redirect("/account");
+  const db = supabaseAdmin();
+  const { data: pay } = await db.from("payments")
+    .select("id,order_id,provider,status,provider_operation_id,orders!inner(user_id)").eq("id", paymentId.data).maybeSingle();
+  const owner = pay && (Array.isArray(pay.orders) ? pay.orders[0]?.user_id : (pay.orders as { user_id: string } | null)?.user_id);
+  if (!pay || owner !== user.id || (pay.provider !== "tole" && pay.provider !== "tole_sandbox")) redirect("/account");
+  if (pay.status === "pending" && pay.provider_operation_id) {
+    const { cancelToleInvoice } = await import("./tole/provider");
+    try {
+      const kind = await cancelToleInvoice(pay.provider === "tole" ? "live" : "sandbox", pay.provider_operation_id, pay.id);
+      if (kind === "done") {
+        await db.rpc("apply_payment_event", {
+          p_provider: pay.provider, p_provider_payment_id: pay.provider_operation_id, p_status: "cancelled",
+          p_amount_kzt: 0, p_currency: "KZT", p_reason: "customer_cancelled",
+        });
+      }
+    } catch (err) {
+      console.error("[tole.cancel]", err instanceof Error ? err.message : "error");
+    }
+  }
   redirect(`/orders/${pay.order_id}`);
 }

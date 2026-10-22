@@ -2,10 +2,11 @@ import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { track } from "@/lib/analytics";
 import { paymentProvider } from "./index";
+import { PaymentRetryLater } from "./types";
 
 export type WebhookOutcome =
   | { http: 200; result: "applied" | "noop" | "duplicate" }
-  | { http: 400 | 401 | 404 | 409; result: string };
+  | { http: 400 | 401 | 404 | 409 | 503; result: string };
 
 /**
  * Single entry point for provider callbacks:
@@ -16,7 +17,13 @@ export async function handlePaymentWebhook(providerKey: string, rawBody: string,
   const provider = paymentProvider(providerKey);
   if (!provider) return { http: 404, result: "unknown_provider" };
 
-  const event = await provider.verifyWebhook(rawBody, headers);
+  let event;
+  try {
+    event = await provider.verifyWebhook(rawBody, headers);
+  } catch (err) {
+    if (err instanceof PaymentRetryLater) return { http: 503, result: "retry" }; // not accepted → sender redelivers
+    throw err;
+  }
   if (!event) return { http: 401, result: "invalid_signature" };
 
   const db = supabaseAdmin();
@@ -27,6 +34,13 @@ export async function handlePaymentWebhook(providerKey: string, rawBody: string,
     if (dupErr.code === "23505") return { http: 200, result: "duplicate" };
     console.error("[webhook.insert]", dupErr.code);
     return { http: 409, result: "retry" };
+  }
+
+  // Authentic, durably recorded, but nothing to change (e.g. payment.created).
+  if (event.ignore) {
+    await db.from("webhook_events").update({ processed_at: new Date().toISOString() })
+      .eq("provider", provider.key).eq("event_id", event.eventId);
+    return { http: 200, result: "noop" };
   }
 
   const { data: result, error } = await db.rpc("apply_payment_event", {

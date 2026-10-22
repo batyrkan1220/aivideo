@@ -16,6 +16,9 @@ export default defineConfig({
       SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key",
       APP_ENV: "development",
       AKOOL_API_KEY: "test-akool-key-123",
+      TOLE_API_KEY: "tole_sk_test_unit_only",
+      TOLE_CONNECTION_ID: "11111111-2222-4333-8444-555555555555",
+      TOLE_WEBHOOK_SECRET: "whsec_unit_test_secret_0123456789",
     },
   },
 });

@@ -3,11 +3,23 @@ import { useActionState } from "react";
 import { kk } from "@/lib/i18n/kk";
 import { startCheckout, type CheckoutState } from "@/lib/payments/actions";
 
-export function PayButton({ orderId, label, sandbox }: { orderId: string; label: string; sandbox: boolean }) {
+export function PayButton({ orderId, label, sandbox, askPhone = false }: { orderId: string; label: string; sandbox: boolean; askPhone?: boolean }) {
   const [state, action, pending] = useActionState<CheckoutState, FormData>(startCheckout, {});
   return (
     <form action={action} className="mt-5">
       <input type="hidden" name="orderId" value={orderId} />
+      {askPhone && (
+        <label className="mb-3 block">
+          <span className="mb-1 block text-sm font-medium">{kk.tole.phoneLabel}</span>
+          <input
+            name="phone" type="tel" inputMode="tel" autoComplete="tel" required
+            placeholder={kk.tole.phonePlaceholder}
+            aria-invalid={state.error === "phone_invalid"}
+            className={`h-12 w-full rounded-xl border bg-white px-4 text-base text-ink outline-none focus:border-brand ${state.error === "phone_invalid" ? "border-danger" : "border-line"}`}
+          />
+          <span className="mt-1 block text-xs opacity-80">{kk.tole.phoneHint}</span>
+        </label>
+      )}
       <button
         disabled={pending}
         className="h-13 w-full rounded-full bg-flash font-semibold text-ink transition-opacity hover:opacity-90 disabled:opacity-60"

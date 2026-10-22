@@ -14,7 +14,7 @@
 | БД, аутентификация, файлдар | Supabase: PostgreSQL + RLS, Auth, Storage (жабық бакеттер), Vault |
 | Фондық жұмыстар | БД-кезек `generation_jobs` + `pg_cron`/`pg_net` → `/api/worker/tick` |
 | Хостинг | Render (web service, `main` тармағынан авто-деплой) |
-| Төлем | `PaymentProvider` интерфейсі: `sandbox` (дайын), `kaspi` (мерчант құжаттамасын күтуде) |
+| Төлем | `PaymentProvider` интерфейсі: `tole` / `tole_sandbox` (Kaspi шоты, Tole Payments), `sandbox` (ішкі сынақ) |
 | AI генерация | `GenerationProvider` интерфейсі: `akool` (Akool Character Swap V5, 1–5 адам), `dev` демо адаптері (видео жасамайды) |
 
 ```
@@ -88,20 +88,26 @@ Supabase → Authentication → URL Configuration: **Site URL** = сайт ад�
 
 ---
 
-## Kaspi Pay қосу
+## Kaspi төлемі — Tole Payments (қосылған)
 
-Kaspi интернет-эквайринг API құжаттамасы мен кілттерін тек мерчант шартынан кейін береді, сондықтан адаптер болжаммен жазылмаған.
+Төлем **Kaspi шоты** арқылы: клиент Kaspi нөмірін енгізеді → Tole оның Kaspi қосымшасына шот жібереді → клиент «Счета на оплату» бөлімінде төлейді → Tole қолтаңбалы webhook жібереді. QR қолданылмайды.
 
-1. Kaspi-мен мерчант шартын жасасып, API құжаттамасын, `merchant id`, API кілті және callback қолтаңба құпиясын алыңыз.
-2. `src/lib/payments/kaspi.ts` файлын толтырыңыз:
-   - `createPayment` — төлем/шот жасап, `{ providerPaymentId, redirectUrl }` қайтарады;
-   - `verifyWebhook` — Kaspi қолтаңбасын тексеріп, статусты `succeeded | failed | cancelled | refunded`-ке сәйкестендіреді (тексерілмесе `null`);
-   - `refund` — ақша қайтару.
-3. Kaspi кабинетінде callback адресі: `https://<сайт>/api/payments/webhook/kaspi`.
-4. Render-ге: `KASPI_MERCHANT_ID`, `KASPI_API_KEY`, `KASPI_WEBHOOK_SECRET`, `KASPI_API_BASE_URL`, `PAYMENT_PROVIDER=kaspi`, `APP_ENV=production`.
-5. Kaspi sandbox ортасында толық тізбекті тексеріңіз.
+- Контракт: OpenAPI https://api.tolepay.kz/v1/openapi.json · нұсқаулық https://tolepay.kz/ru/docs
+- Код: `src/lib/payments/tole/` (`client.ts` — типтелген HTTP адаптер, `provider.ts` — PaymentProvider, `reconcile.ts` — сверка, `log.ts` — құпиясыз лог), бет `src/app/(site)/checkout/tole/[paymentId]`.
+- Провайдерлер: `tole` (live) және `tole_sandbox` (`/v1/sandbox/*`, сынақ кілті + `TOLE_CONNECTION_ID`). `APP_ENV=production` кезінде sandbox-қа тыйым.
+- Айнымалылар: `TOLE_API_KEY`, `TOLE_CONNECTION_ID`, `TOLE_WEBHOOK_SECRET`, `TOLE_API_BASE_URL` (тек серверде).
+- Webhook URL (Tole кабинетінде құру): `https://trendme.kz/api/payments/webhook/tole` (sandbox үшін `…/webhook/tole_sandbox`).
 
-Webhook-тан кейінгі өңдеу (idempotency, сома/валюта тексерісі, қос төлемнен қорғау) провайдерге тәуелсіз — `src/lib/payments/process.ts` және `apply_payment_event` SQL функциясы.
+Ережелер:
+- `POST /invoices` — `Idempotency-Key = <orderId>:<paymentId>` (біздің төлем id-ден, қайталауда өзгермейді).
+- `201` → дайын; `202 in_progress` → `Retry-After` сақталып, `GET /commands/{commandId}` шектеулі уақыт сұралады; `202 outcome_unknown` → **қайталанбайды**, команда мен payment intent арқылы сверка. Timeout → нәтиже белгісіз: клиент «Қайталау» басқанда **сол кілтпен** қайта жіберіледі (Tole түпнұсқа нәтижені қайтарады).
+- Тек оқу сұраулары қайталанады (экспоненциалды күту, 429 `Retry-After`). 4xx, төлем мутациялары, белгісіз нәтиже — автоматты қайталанбайды. Барлық сұрауда timeout бар.
+- Webhook: шикі body бойынша `v1=hex(HMAC-SHA256(secret, "<webhook-id>.<webhook-timestamp>.<body>"))`, ±5 мин timestamp, `webhook-id` бойынша қайталанбау (`webhook_events`), жазылғаннан кейін ғана 2xx. Live режимде күй мен сома `GET /payment-intents/invoices/{id}`-ден алынады; оқу сәтсіз болса 503 → Tole қайта жібереді.
+- Сақталатыны: `provider_payment_id`/`provider_operation_id` (Tole id), `provider_command_id`, `provider_outcome`, телефонның соңғы 4 цифры. Толық телефон сақталмайды, логқа жазылмайды.
+- Sandbox smoke: `TOLE_API_KEY=tole_sk_test_… TOLE_CONNECTION_ID=… TOLE_TEST_PHONE=+77001234567 bash scripts/tole-sandbox-smoke.sh`
+- Sandbox-та тапсырыс бетінде «Сынақ: Төленді» батырмасы бар (`/sandbox/payment-intents/{id}/simulate`).
+
+Live-та тексерілуі керек: Tole `data.id` (invoice) мен webhook-тағы `paymentIntentId` бір UUID екені (құжатта анық жазылмаған; сәйкес келмесе webhook `not_found` қайтарады). Қайтару (refund) әзірге автоматты емес.
 
 ## Akool Character Swap V5 (қосылған)
 
@@ -150,7 +156,7 @@ Mock тесттер (`src/**/*.test.ts`) нақты провайдерлерге
 
 ## Белгілі шектеулер / қалған жұмыс
 
-- **Kaspi Pay** — мерчант шарты мен API құжаттамасы керек (қазір sandbox).
+- **Kaspi төлемі** — Tole Payments арқылы; live кілт пен webhook-ты қосып, sandbox-та тексеру керек.
 - Supabase Auth: **Leaked password protection**-ды қосыңыз (Authentication → Passwords).
 - Құқықтық беттер (құпиялылық, шарттар, қайтару) — мәтіні заңгермен дайындалуы керек.
 - Транзакциялық хаттар (төлем, видео дайын) — пошта провайдері таңдалғаннан кейін.

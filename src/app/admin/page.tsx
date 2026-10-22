@@ -6,6 +6,7 @@ import { can } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { formatKzt } from "@/lib/pricing";
 import { env } from "@/lib/env";
+import { isTestPaymentProvider } from "@/lib/payments/types";
 
 const S = ru.admin.stats;
 type SP = { from?: string; to?: string };
@@ -71,7 +72,7 @@ async function Overview({ searchParams }: { searchParams: Promise<SP> }) {
         </form>
       </div>
 
-      {env().PAYMENT_PROVIDER === "sandbox" && (
+      {isTestPaymentProvider(env().PAYMENT_PROVIDER) && (
         <p className="rounded-card bg-flash/20 p-4 text-sm font-medium">{S.sandboxNote}</p>
       )}
       {s.duplicate_charges > 0 && (
