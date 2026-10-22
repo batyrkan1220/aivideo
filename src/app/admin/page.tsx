@@ -8,6 +8,7 @@ import { formatKzt } from "@/lib/pricing";
 import { env } from "@/lib/env";
 import { isTestPaymentProvider } from "@/lib/payments/types";
 import { TelegramSetup } from "./telegram/setup";
+import { ToleCheckPanel } from "./tole/check";
 
 const S = ru.admin.stats;
 type SP = { from?: string; to?: string };
@@ -73,6 +74,7 @@ async function Overview({ searchParams }: { searchParams: Promise<SP> }) {
         </form>
       </div>
 
+      {can(u.role, "users.manage") && <ToleCheckPanel />}
       {can(u.role, "users.manage") && (
         <TelegramSetup configured={!!env().TELEGRAM_BOT_TOKEN} appUrl={env().NEXT_PUBLIC_APP_URL} />
       )}
