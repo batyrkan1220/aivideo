@@ -32,14 +32,14 @@ export function MobileNav() {
                   // Centre action: big raised icon button, no text (label kept for screen readers).
                   <>
                     <span
-                      className={`relative -mt-7 flex h-16 w-16 items-center justify-center rounded-[1.4rem] bg-gradient-to-br from-[#7a5cff] to-brand-dark text-white shadow-xl shadow-brand/40 ring-[5px] ring-white transition-transform active:scale-95 ${on ? "scale-105" : ""}`}
+                      className={`relative -mt-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#7a5cff] to-brand-dark text-white shadow-lg shadow-brand/30 ring-4 ring-white transition-transform active:scale-95 ${on ? "scale-105" : ""}`}
                     >
-                      <svg viewBox="0 0 32 32" className="h-9 w-9" fill="none" aria-hidden>
+                      <svg viewBox="0 0 32 32" className="h-7 w-7" fill="none" aria-hidden>
                         <rect x="4" y="8" width="18" height="17" rx="4.5" stroke="currentColor" strokeWidth="2.4" />
                         <path d="M22 14.2 27.2 11v11l-5.2-3.2" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" />
                         <path d="M11.5 13.2v6.6l5.4-3.3z" fill="currentColor" />
                       </svg>
-                      <svg viewBox="0 0 24 24" className="absolute -right-1.5 -top-1.5 h-6 w-6 drop-shadow" aria-hidden>
+                      <svg viewBox="0 0 24 24" className="absolute -right-1 -top-1 h-4 w-4 drop-shadow" aria-hidden>
                         <path d="M12 1.5c.9 5.6 3.4 8.1 9 9-5.6.9-8.1 3.4-9 9-.9-5.6-3.4-8.1-9-9 5.6-.9 8.1-3.4 9-9z" fill="#ffc93c" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round" />
                       </svg>
                     </span>
