@@ -6,8 +6,8 @@ import { getSessionUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { formatKzt } from "@/lib/pricing";
-import { partnerDaily, partnerPeriod, partnerPeriodTotals, partnerTotals } from "@/lib/partners";
-import { CreatePartnerForm } from "./forms";
+import { partnerDaily, partnerDefaults, partnerPeriod, partnerPeriodTotals, partnerTotals } from "@/lib/partners";
+import { CreatePartnerForm, PartnerDefaultsForm } from "./forms";
 import { PeriodForm, DailyTable, Tile } from "./ui";
 
 export const metadata = { title: ru.admin.partners.title };
@@ -27,11 +27,12 @@ async function Content({ searchParams }: { searchParams: Promise<SP> }) {
   if (!u || !can(u.role, "users.manage")) return <p className="py-16 text-center text-muted">{ru.admin.forbidden}</p>;
   const T = ru.admin.partners;
   const per = partnerPeriod(await searchParams);
-  const [{ data: partners }, period, all, daily] = await Promise.all([
+  const [{ data: partners }, period, all, daily, defaults] = await Promise.all([
     supabaseAdmin().from("partners").select("id,name,code,percent,active,telegram_username,telegram_id").order("created_at", { ascending: false }),
     partnerPeriodTotals(per.fromIso, per.toIso),
     partnerTotals(),
     partnerDaily(null, per.fromIso, per.toIso),
+    partnerDefaults(),
   ]);
   const sum = (k: "visits" | "users" | "buyers" | "paidOrders" | "revenueKzt" | "earnedKzt") => [...period.values()].reduce((n, t) => n + t[k], 0);
   const balance = [...all.values()].reduce((n, t) => n + t.balanceKzt, 0);
@@ -45,6 +46,8 @@ async function Content({ searchParams }: { searchParams: Promise<SP> }) {
         </div>
         <CreatePartnerForm />
       </div>
+
+      <PartnerDefaultsForm value={defaults} />
 
       <PeriodForm from={per.from} to={per.to} />
 

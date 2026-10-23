@@ -1,7 +1,7 @@
 "use client";
 import { useActionState, useState } from "react";
 import { ru } from "@/lib/i18n/ru";
-import { createPartner, updatePartner, addPayout, createTeliksLogin, resetTeliksLogin, type PartnerState, type TeliksState } from "./actions";
+import { createPartner, updatePartner, addPayout, createTeliksLogin, resetTeliksLogin, savePartnerDefaults, type PartnerState, type TeliksState } from "./actions";
 
 const input = "mt-1 h-10 w-full rounded-xl border border-line px-3 text-base sm:text-sm";
 type P = { id: string; name: string; code: string; telegram_username: string | null; percent: number; contact: string | null; notes: string | null; active: boolean };
@@ -122,5 +122,22 @@ export function TeliksAccessForm({ id, email, teliksUrl }: { id: string; email: 
       )}
       {err && <p className="text-sm text-danger">{T.teliksErrors[err]}</p>}
     </div>
+  );
+}
+
+export function PartnerDefaultsForm({ value }: { value: { percent: number; autoActivate: boolean } }) {
+  const T = ru.admin.partners;
+  const [state, action, pending] = useActionState<PartnerState, FormData>(savePartnerDefaults, {});
+  return (
+    <form action={action} className="flex flex-wrap items-end gap-4 rounded-card border border-line bg-white p-5">
+      <div className="w-full">
+        <h2 className="font-semibold">{T.defaultsTitle}</h2>
+        <p className="mt-1 text-sm text-muted">{T.defaultsHint}</p>
+      </div>
+      <label className="text-sm"><span className="font-medium">{T.percent}</span><input name="percent" inputMode="decimal" defaultValue={value.percent} className={input} /></label>
+      <label className="flex h-10 items-center gap-2 text-sm font-medium"><input type="checkbox" name="autoActivate" defaultChecked={value.autoActivate} className="h-4 w-4 accent-brand" /> {T.autoActivate}</label>
+      <button disabled={pending} className="h-10 rounded-full bg-ink px-4 text-sm font-semibold text-white disabled:opacity-50">{pending ? ru.common.loading : T.save}</button>
+      <Status state={state} />
+    </form>
   );
 }

@@ -205,6 +205,8 @@ export const ru = {
       referredUsers: (n: number) => `Клиенты партнёра (${n})`,
       settings: "Настройки партнёра", empty: "Партнёров пока нет.", noData: "Пока нет данных за этот период.", copy: "Копировать",
       errors: { forbidden: "Нет прав.", invalid: "Проверьте поля.", code_taken: "Такой код уже занят.", failed: "Не удалось сохранить." },
+      defaultsTitle: "Регистрация в Teliks", defaultsHint: "Партнёр может сам зарегистрироваться на teliks.ink — сразу получает свою ссылку на бот с этим процентом. Процент конкретного партнёра можно изменить позже.",
+      autoActivate: "Активировать сразу (иначе — после вашей проверки)",
       teliks: "Кабинет Teliks", teliksHint: "Партнёр входит на teliks.ink и видит только свою статистику, ссылку, начисления и баланс, а также подаёт заявки на выплату.",
       teliksNotConfigured: "Не подключено: добавьте в Render переменные TELIKS_SUPABASE_URL, TELIKS_SUPABASE_SERVICE_ROLE_KEY и TELIKS_API_SECRET.",
       teliksEmail: "Email для входа в Teliks", teliksCreate: "Создать доступ", teliksLogin: "Логин", teliksReset: "Новый пароль",

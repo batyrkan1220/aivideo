@@ -1,8 +1,8 @@
-import { timingSafeEqual } from "node:crypto";
 import { connection, NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { partnerApiAuthorized as authorized } from "@/lib/partners/api-auth";
 import { botUsername, CODE_RE, partnerDaily, partnerLinks, partnerPeriodTotals, partnerTotals } from "@/lib/partners";
 
 /**
@@ -12,14 +12,6 @@ import { botUsername, CODE_RE, partnerDaily, partnerLinks, partnerPeriodTotals, 
  *
  * GET /api/partner-api/summary?code=<partner code>&from=YYYY-MM-DD&to=YYYY-MM-DD   (≤ 92 days)
  */
-function authorized(req: NextRequest) {
-  const secret = env().TELIKS_API_SECRET;
-  const got = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!secret || !got) return false;
-  const a = Buffer.from(got), b = Buffer.from(secret);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
-
 const q = z.object({
   code: z.string().regex(CODE_RE),
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

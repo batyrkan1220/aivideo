@@ -6,7 +6,7 @@ import { z } from "zod";
 import { audit, getSessionUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { CODE_RE } from "@/lib/partners";
+import { CODE_RE, PARTNER_DEFAULTS_KEY } from "@/lib/partners";
 import { createTeliksAccount, processTeliksPayout, resetTeliksPassword, syncTeliksPartner } from "@/lib/partners/teliks";
 
 export type PartnerState = { ok?: boolean; error?: "forbidden" | "invalid" | "code_taken" | "failed" };
@@ -114,4 +114,17 @@ export async function processPayoutRequest(fd: FormData) {
   }
   revalidatePath(`/admin/partners/${p.data.id}`);
   revalidatePath("/admin/partners");
+}
+
+export async function savePartnerDefaults(_: PartnerState, fd: FormData): Promise<PartnerState> {
+  const u = await admin();
+  if (!u) return { error: "forbidden" };
+  const percent = Number(String(fd.get("percent") ?? "").replace(",", "."));
+  if (!Number.isFinite(percent) || percent < 0 || percent > 90) return { error: "invalid" };
+  const value = { percent, autoActivate: fd.get("autoActivate") === "on" };
+  const { error } = await supabaseAdmin().from("site_settings").upsert({ key: PARTNER_DEFAULTS_KEY, value, updated_by: u.id, updated_at: new Date().toISOString() });
+  if (error) return { error: "failed" };
+  await audit(u.id, "partner.defaults", "site_settings", null, value);
+  revalidatePath("/admin/partners");
+  return { ok: true };
 }

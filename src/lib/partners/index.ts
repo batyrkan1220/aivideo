@@ -194,3 +194,16 @@ export async function partnerDaily(partnerId: string | null, fromIso: string, to
     revenueKzt: Number(r.revenue_kzt), earnedKzt: Number(r.earned_kzt),
   }));
 }
+
+/** Defaults for partners who register themselves in Teliks (admin-editable). */
+export const PARTNER_DEFAULTS_KEY = "partner_defaults";
+export async function partnerDefaults(): Promise<{ percent: number; autoActivate: boolean }> {
+  try {
+    const { data } = await supabaseAdmin().from("site_settings").select("value").eq("key", PARTNER_DEFAULTS_KEY).maybeSingle();
+    const v = (data?.value ?? {}) as { percent?: unknown; autoActivate?: unknown };
+    const percent = Number(v.percent);
+    return { percent: Number.isFinite(percent) && percent >= 0 && percent <= 90 ? percent : 20, autoActivate: v.autoActivate !== false };
+  } catch {
+    return { percent: 20, autoActivate: true };
+  }
+}
