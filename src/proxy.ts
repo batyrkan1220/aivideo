@@ -55,17 +55,12 @@ export async function proxy(request: NextRequest) {
       }).catch(() => {});
     }
   }
-  // CPA network: Offer18 tracking link → https://trendme.kz/?o18={tid} (first click kept 30 days).
-  const o18 = request.nextUrl.searchParams.get("o18");
-  if (o18 && /^[A-Za-z0-9_-]{4,64}$/.test(o18) && !request.cookies.get("tm_cpa")) {
-    response.cookies.set("tm_cpa", o18, { maxAge: 30 * 86400, path: "/", httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production" });
-  }
   return response;
 }
 
 export const config = {
   // Skip static assets, images and webhook endpoints (those verify signatures instead).
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|api/payments/webhook|api/generation/webhook|api/worker|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/payments/webhook|api/generation/webhook|api/worker|api/partner-api|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4)$).*)",
   ],
 };

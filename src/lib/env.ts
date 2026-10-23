@@ -23,6 +23,11 @@ const schema = z.object({
   TOLE_API_BASE_URL: z.string().url().default("https://api.tolepay.kz/v1"),
   // Telegram bot / Mini App — server-only.
   TELEGRAM_BOT_TOKEN: z.string().regex(/^\d+:[A-Za-z0-9_-]{30,}$/).optional(),
+  // Teliks partner cabinet: shared secret for its server-to-server API calls, and its own Supabase.
+  TELIKS_API_SECRET: z.string().trim().min(32).optional(),
+  TELIKS_SUPABASE_URL: z.string().trim().url().optional(),
+  TELIKS_SUPABASE_SERVICE_ROLE_KEY: z.string().trim().min(20).optional(),
+  TELIKS_URL: z.string().trim().url().default("https://teliks.ink"),
   AI_PROVIDER: z.string().default("dev"),
   AKOOL_API_KEY: z.string().min(10).optional(),
   AKOOL_API_BASE_URL: z.string().url().default("https://openapi.akool.com"),
@@ -40,6 +45,7 @@ const schema = z.object({
 const OPTIONAL_INTEGRATION_KEYS = new Set([
   "TOLE_API_KEY", "TOLE_CONNECTION_ID", "TOLE_WEBHOOK_SECRET", "TOLE_API_BASE_URL",
   "AKOOL_API_KEY", "AKOOL_API_BASE_URL", "TELEGRAM_BOT_TOKEN",
+  "TELIKS_API_SECRET", "TELIKS_SUPABASE_URL", "TELIKS_SUPABASE_SERVICE_ROLE_KEY", "TELIKS_URL",
   "KASPI_MERCHANT_ID", "KASPI_API_KEY", "KASPI_WEBHOOK_SECRET", "KASPI_API_BASE_URL",
 ]);
 
@@ -64,7 +70,7 @@ export function env() {
       throw new Error("Invalid environment: " + parsed.error.issues.map((i) => i.path.join(".")).join(", "));
     }
     cached = parsed.data;
-    console.log(`[env] payment=${cached.PAYMENT_PROVIDER} tole_key=${cached.TOLE_API_KEY ? (cached.TOLE_API_KEY.startsWith("tole_sk_test_") ? "test" : cached.TOLE_API_KEY.startsWith("tole_sk_live_") ? "live" : "unknown_format") : "none"} tole_connection=${cached.TOLE_CONNECTION_ID ? "set" : "none"} tole_webhook_secret=${cached.TOLE_WEBHOOK_SECRET ? "set" : "none"} ai=${cached.AI_PROVIDER} telegram=${cached.TELEGRAM_BOT_TOKEN ? "on" : "off"}`);
+    console.log(`[env] payment=${cached.PAYMENT_PROVIDER} tole_key=${cached.TOLE_API_KEY ? (cached.TOLE_API_KEY.startsWith("tole_sk_test_") ? "test" : cached.TOLE_API_KEY.startsWith("tole_sk_live_") ? "live" : "unknown_format") : "none"} tole_connection=${cached.TOLE_CONNECTION_ID ? "set" : "none"} tole_webhook_secret=${cached.TOLE_WEBHOOK_SECRET ? "set" : "none"} ai=${cached.AI_PROVIDER} telegram=${cached.TELEGRAM_BOT_TOKEN ? "on" : "off"} teliks_api=${cached.TELIKS_API_SECRET ? "on" : "off"} teliks_db=${cached.TELIKS_SUPABASE_URL && cached.TELIKS_SUPABASE_SERVICE_ROLE_KEY ? "on" : "off"}`);
     if (cached.APP_ENV === "production" && (cached.PAYMENT_PROVIDER === "sandbox" || cached.PAYMENT_PROVIDER === "tole_sandbox" || cached.AI_PROVIDER === "dev")) {
       throw new Error("Sandbox payment / dev AI provider are not allowed in production");
     }

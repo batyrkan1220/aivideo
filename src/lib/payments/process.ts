@@ -6,7 +6,6 @@ import { PaymentRetryLater } from "./types";
 import { notifyOrderOwner } from "@/lib/telegram/bot";
 import { notifyAdmins } from "@/lib/telegram/admin";
 import { notifyPartnerCommission } from "@/lib/partners";
-import { sendCpaEvent } from "@/lib/cpa";
 
 export type WebhookOutcome =
   | { http: 200; result: "applied" | "noop" | "duplicate" }
@@ -73,7 +72,6 @@ export async function handlePaymentWebhook(providerKey: string, rawBody: string,
         await notifyOrderOwner(pay.order_id, "paid");
         await notifyAdmins(pay.order_id, "paid");
         await notifyPartnerCommission(pay.order_id);
-        await sendCpaEvent("sale", { orderId: pay.order_id });
       }
     }
     if (event.status === "failed") await track("payment_failed", { orderId: pay?.order_id });

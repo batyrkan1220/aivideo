@@ -1,7 +1,7 @@
 "use client";
 import { useActionState, useState } from "react";
 import { ru } from "@/lib/i18n/ru";
-import { createPartner, updatePartner, addPayout, type PartnerState } from "./actions";
+import { createPartner, updatePartner, addPayout, createTeliksLogin, resetTeliksLogin, type PartnerState, type TeliksState } from "./actions";
 
 const input = "mt-1 h-10 w-full rounded-xl border border-line px-3 text-base sm:text-sm";
 type P = { id: string; name: string; code: string; telegram_username: string | null; percent: number; contact: string | null; notes: string | null; active: boolean };
@@ -88,6 +88,39 @@ export function CopyLink({ label, url }: { label: string; url: string }) {
       <button type="button" className="shrink-0 font-semibold text-brand" onClick={() => { void navigator.clipboard?.writeText(url).then(() => { setDone(true); setTimeout(() => setDone(false), 1500); }); }}>
         {done ? "✓" : ru.admin.partners.copy}
       </button>
+    </div>
+  );
+}
+
+export function TeliksAccessForm({ id, email, teliksUrl }: { id: string; email: string | null; teliksUrl: string }) {
+  const T = ru.admin.partners;
+  const [cState, create, cPending] = useActionState<TeliksState, FormData>(createTeliksLogin, {});
+  const [rState, reset, rPending] = useActionState<TeliksState, FormData>(resetTeliksLogin, {});
+  const pw = cState.password ?? rState.password;
+  const err = cState.error ?? rState.error;
+  return (
+    <div className="space-y-3">
+      {email ? (
+        <form action={reset} className="flex flex-wrap items-center gap-3 text-sm">
+          <input type="hidden" name="id" value={id} />
+          <span>{T.teliksLogin}: <b>{email}</b></span>
+          <button disabled={rPending} className="rounded-full border border-line px-3 py-1.5 font-semibold hover:border-ink disabled:opacity-50">{rPending ? ru.common.loading : T.teliksReset}</button>
+        </form>
+      ) : (
+        <form action={create} className="flex flex-wrap items-end gap-3">
+          <input type="hidden" name="id" value={id} />
+          <label className="min-w-56 flex-1 text-sm"><span className="font-medium">{T.teliksEmail}</span><input name="email" type="email" required className={input} /></label>
+          <button disabled={cPending} className="h-10 rounded-full bg-ink px-4 text-sm font-semibold text-white disabled:opacity-50">{cPending ? ru.common.loading : T.teliksCreate}</button>
+        </form>
+      )}
+      {pw && (
+        <div className="rounded-xl bg-flash/20 p-4 text-sm">
+          <p className="font-semibold">{T.teliksPasswordOnce}</p>
+          <CopyLink label={T.teliksPassword} url={pw} />
+          <p className="mt-2 text-xs text-muted">{T.teliksSend(teliksUrl)}</p>
+        </div>
+      )}
+      {err && <p className="text-sm text-danger">{T.teliksErrors[err]}</p>}
     </div>
   );
 }

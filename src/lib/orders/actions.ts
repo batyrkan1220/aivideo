@@ -12,7 +12,6 @@ import { track } from "@/lib/analytics";
 import { allow } from "@/lib/security/rate-limit";
 import { customVideoSettings } from "@/lib/custom-video/settings";
 import { attributeFromCookie } from "@/lib/partners";
-import { cpaAttributeFromCookie } from "@/lib/cpa";
 import { akoolTierPrices, applyAkoolPricing } from "@/lib/pricing-akool";
 import { AKOOL_MAX_PEOPLE } from "@/lib/templates/akool-config";
 import { akoolPricingSettings } from "@/lib/pricing-akool/settings";
@@ -174,7 +173,6 @@ export async function createOrder(raw: unknown): Promise<
   const tv = await loadPublishedVersion(p.data.templateId);
   if (!tv) return { ok: false, error: "template_unavailable" };
   await attributeFromCookie(user.id); // partner program (website ?ref= links)
-  await cpaAttributeFromCookie(user.id); // CPA network (website ?o18= links)
 
   const db = supabaseAdmin();
   const now = Date.now();
