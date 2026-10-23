@@ -38,6 +38,7 @@ async function AdminNav() {
       {can(u.role, "templates.manage") && <Link href="/admin/home" className="rounded-full px-3 py-2 hover:bg-brand-soft">{ru.admin.nav.home}</Link>}
       {can(u.role, "orders.view") && <Link href="/admin/orders" className="rounded-full px-3 py-2 hover:bg-brand-soft">{ru.admin.nav.orders}</Link>}
       {can(u.role, "users.manage") && <Link href="/admin/users" className="rounded-full px-3 py-2 hover:bg-brand-soft">{ru.admin.nav.users}</Link>}
+      {can(u.role, "users.manage") && <Link href="/admin/partners" className="rounded-full px-3 py-2 hover:bg-brand-soft">{ru.admin.nav.partners}</Link>}
       {can(u.role, "users.manage") && <Link href="/admin/bot" className="rounded-full px-3 py-2 hover:bg-brand-soft">{ru.admin.nav.bot}</Link>}
       {can(u.role, "audit.view") && <Link href="/admin/audit" className="rounded-full px-3 py-2 hover:bg-brand-soft">{ru.admin.nav.audit}</Link>}
     </nav>

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { checkWebhookSecret, sendMessage, tg } from "@/lib/telegram/bot";
 import { handleAdminCallback, handleAdminMessage, isBotAdmin } from "@/lib/telegram/admin";
 import { botMessage } from "@/lib/telegram/messages";
+import { codeFromPayload, linkPartnerTelegram, partnerSelfReport, touchFromBot } from "@/lib/partners";
 
 /**
  * Telegram bot updates. Authentic only with our X-Telegram-Bot-Api-Secret-Token (set via setWebhook).
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest) {
   }
   const update = (await req.json().catch(() => null)) as
     | {
-        message?: { chat?: { id?: number; type?: string }; text?: string; from?: { id?: number; first_name?: string } };
+        message?: { chat?: { id?: number; type?: string }; text?: string; from?: { id?: number; first_name?: string; username?: string } };
         callback_query?: { id: string; data?: string; from?: { id?: number }; message?: { chat?: { id?: number; type?: string } } };
       }
     | null;
@@ -36,6 +37,18 @@ export async function POST(req: NextRequest) {
   // Admin commands (/admin, /stats, /orders, /problems, /order TV-…) — only for listed Telegram ids.
   if (msg.text && (await isBotAdmin(msg.from?.id)) && (await handleAdminMessage(chatId, msg.text))) {
     return NextResponse.json({ ok: true });
+  }
+
+  // Partner program: a partner writing to the bot gets linked; /start p_<code> remembers who invited.
+  if (msg.from?.id) {
+    await linkPartnerTelegram(msg.from.username, msg.from.id).catch(() => {});
+    const payload = msg.text?.startsWith("/start ") ? msg.text.slice(7) : null;
+    const code = codeFromPayload(payload);
+    if (code) await touchFromBot(msg.from.id, code).catch(() => {});
+    if (msg.text?.trim().startsWith("/partner")) {
+      const report = await partnerSelfReport(msg.from.id);
+      if (report) { await tg("sendMessage", { chat_id: chatId, text: report, parse_mode: "HTML", link_preview_options: { is_disabled: true } }); return NextResponse.json({ ok: true }); }
+    }
   }
 
   const name = msg.from?.first_name?.slice(0, 40) ?? "";

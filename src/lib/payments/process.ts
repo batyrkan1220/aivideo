@@ -5,6 +5,7 @@ import { paymentProvider } from "./index";
 import { PaymentRetryLater } from "./types";
 import { notifyOrderOwner } from "@/lib/telegram/bot";
 import { notifyAdmins } from "@/lib/telegram/admin";
+import { notifyPartnerCommission } from "@/lib/partners";
 
 export type WebhookOutcome =
   | { http: 200; result: "applied" | "noop" | "duplicate" }
@@ -67,7 +68,11 @@ export async function handlePaymentWebhook(providerKey: string, rawBody: string,
       .eq("provider", provider.key).eq("provider_payment_id", event.providerPaymentId).single();
     if (event.status === "succeeded") {
       await track("payment_succeeded", { orderId: pay?.order_id });
-      if (pay?.order_id) { await notifyOrderOwner(pay.order_id, "paid"); await notifyAdmins(pay.order_id, "paid"); }
+      if (pay?.order_id) {
+        await notifyOrderOwner(pay.order_id, "paid");
+        await notifyAdmins(pay.order_id, "paid");
+        await notifyPartnerCommission(pay.order_id);
+      }
     }
     if (event.status === "failed") await track("payment_failed", { orderId: pay?.order_id });
     return { http: 200, result: "applied" };

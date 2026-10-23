@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { allow, clientIp } from "@/lib/security/rate-limit";
 import { verifyInitData } from "@/lib/telegram/init-data";
 import { signInTelegramUser } from "@/lib/telegram/session";
+import { attributeTelegramUser } from "@/lib/partners";
 
 /**
  * Mini App sign-in: the client posts Telegram's signed `initData`; we verify it with the bot
@@ -25,11 +26,17 @@ export async function POST(req: NextRequest) {
   const current = await getSessionUser();
   if (current) {
     const { data: p } = await supabaseAdmin().from("profiles").select("telegram_id").eq("id", current.id).maybeSingle();
-    if (Number(p?.telegram_id) === v.user.id) return NextResponse.json({ ok: true, signedIn: false });
+    if (Number(p?.telegram_id) === v.user.id) {
+      await attributeTelegramUser(current.id, v.user.id, new URLSearchParams(initData).get("start_param"));
+      return NextResponse.json({ ok: true, signedIn: false });
+    }
   }
 
+  // Partner program: Mini App opened via t.me/<bot>?startapp=p_<code> (covered by the signature).
+  const startParam = new URLSearchParams(initData).get("start_param");
   try {
-    await signInTelegramUser(v.user);
+    const userId = await signInTelegramUser(v.user);
+    await attributeTelegramUser(userId, v.user.id, startParam);
     return NextResponse.json({ ok: true, signedIn: true });
   } catch (err) {
     console.error(JSON.stringify({ src: "telegram", event: "sign_in_failed", reason: err instanceof Error ? err.message : "error" }));

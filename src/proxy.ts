@@ -41,6 +41,20 @@ export async function proxy(request: NextRequest) {
     url.search = `?next=${encodeURIComponent(path)}`;
     return NextResponse.redirect(url);
   }
+  // Partner program: keep the first ?ref=<code> for 60 days (applied to the account when ordering).
+  // Set after getUser(): a session refresh replaces `response`.
+  const ref = request.nextUrl.searchParams.get("ref")?.toLowerCase();
+  if (ref && /^[a-z0-9]{4,24}$/.test(ref) && !request.cookies.get("tm_ref")) {
+    response.cookies.set("tm_ref", ref, { maxAge: 60 * 86400, path: "/", httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production" });
+    // Count the visit (first time only, best effort, never blocks the page for long).
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (key) {
+      await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/partner_visit`, {
+        method: "POST", headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_code: ref, p_source: "site" }), signal: AbortSignal.timeout(1500),
+      }).catch(() => {});
+    }
+  }
   return response;
 }
 
