@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { NextResponse, type NextRequest } from "next/server";
+import { connection, NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/server";
@@ -27,6 +27,7 @@ const q = z.object({
 });
 
 export async function GET(req: NextRequest) {
+  await connection(); // request-time only
   if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const p = q.safeParse(Object.fromEntries(req.nextUrl.searchParams));
   if (!p.success) return NextResponse.json({ error: "bad_request" }, { status: 400 });
