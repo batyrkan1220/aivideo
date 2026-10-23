@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   const fromIso = new Date(fromMs).toISOString(), toIso = new Date(toMs).toISOString();
 
   const db = supabaseAdmin();
-  const [{ data: partners }, period, all, daily, bot, { data: comms }] = await Promise.all([
+  const [{ data: partners }, period, all, daily, bot, { data: comms }, { data: orders }] = await Promise.all([
     db.from("partners").select("id,code,name,percent,active,telegram_username,created_at").order("created_at", { ascending: false }),
     partnerPeriodTotals(fromIso, toIso),
     partnerTotals(),
@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
     botUsername(),
     db.from("partner_commissions").select("partner_id,order_amount_kzt,percent,commission_kzt,status,created_at,orders(public_order_number)")
       .gte("created_at", fromIso).lt("created_at", toIso).order("created_at", { ascending: false }).limit(1000),
+    db.rpc("partner_orders", { p_from: fromIso, p_to: toIso }),
   ]);
   const codeOf = new Map((partners ?? []).map((x) => [x.id, x.code]));
   const num = (o: unknown) => ((Array.isArray(o) ? o[0] : o) as { public_order_number?: string } | null)?.public_order_number ?? "";
@@ -53,5 +54,7 @@ export async function GET(req: NextRequest) {
       time: c.created_at, code: codeOf.get(c.partner_id) ?? "", order: num(c.orders), amountKzt: c.order_amount_kzt,
       percent: Number(c.percent), commissionKzt: c.commission_kzt, status: c.status,
     })),
+    // Every order of a partner-referred customer (any payment status) — the conversions log in Teliks.
+    orders: (Array.isArray(orders) ? orders : []) as unknown[],
   }, { headers: { "Cache-Control": "no-store" } });
 }
