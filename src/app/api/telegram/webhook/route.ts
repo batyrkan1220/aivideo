@@ -44,7 +44,11 @@ export async function POST(req: NextRequest) {
     await linkPartnerTelegram(msg.from.username, msg.from.id).catch(() => {});
     const payload = msg.text?.startsWith("/start ") ? msg.text.slice(7) : null;
     const code = codeFromPayload(payload);
-    if (code) await touchFromBot(msg.from.id, code).catch(() => {});
+    if (payload !== null || msg.text?.trim() === "/start") {
+      // Diagnostics without personal data: did the partner code arrive and was it applied?
+      const r = code ? await touchFromBot(msg.from.id, code).catch(() => "error" as const) : "no_code";
+      console.log(JSON.stringify({ src: "partners", event: "bot_start", result: r }));
+    }
     if (msg.text?.trim().startsWith("/partner")) {
       const report = await partnerSelfReport(msg.from.id);
       if (report) { await tg("sendMessage", { chat_id: chatId, text: report, parse_mode: "HTML", link_preview_options: { is_disabled: true } }); return NextResponse.json({ ok: true }); }

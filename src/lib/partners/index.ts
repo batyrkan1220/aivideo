@@ -41,14 +41,18 @@ export async function attributeProfile(userId: string, partner: Partner, telegra
 }
 
 /** Bot /start p_<code>: remember the Telegram user (they may not have an account yet). */
-export async function touchFromBot(telegramId: number, code: string) {
+export async function touchFromBot(telegramId: number, code: string): Promise<"unknown_code" | "self" | "new" | "existing_user" | "already_referred"> {
   const partner = await partnerByCode(code);
-  if (!partner || partner.telegram_id === telegramId) return;
+  if (!partner) return "unknown_code";
+  if (partner.telegram_id === telegramId) return "self";
   const db = supabaseAdmin();
   await db.from("partner_touches").upsert({ telegram_id: telegramId, partner_id: partner.id }, { onConflict: "telegram_id", ignoreDuplicates: true });
   await recordVisit(partner.id, "bot");
-  const { data: prof } = await db.from("profiles").select("id").eq("telegram_id", telegramId).maybeSingle();
-  if (prof) await attributeProfile(prof.id, partner, telegramId);
+  const { data: prof } = await db.from("profiles").select("id,referred_by").eq("telegram_id", telegramId).maybeSingle();
+  if (!prof) return "new";
+  if (prof.referred_by) return "already_referred";
+  await attributeProfile(prof.id, partner, telegramId);
+  return "existing_user";
 }
 
 /** After Mini App sign-in: partner from the start parameter, else from an earlier bot touch. */
