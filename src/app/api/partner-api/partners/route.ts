@@ -9,14 +9,16 @@ import { partnerDefaults } from "@/lib/partners";
  * Self-registration from the Teliks cabinet: creates the TrendMe partner (default % from the
  * admin settings) and returns its code. Teliks has already created the login in its Supabase.
  *
- * POST /api/partner-api/partners  { name, email, teliksUserId, telegram?, contact? }
+ * Teliks keeps the account data (email, phone, payout details) in its own Supabase; TrendMe
+ * stores only what it needs: name, code, %, Telegram username (self-referral check) and an
+ * opaque Teliks id (so a retried sign-up returns the same partner).
+ *
+ * POST /api/partner-api/partners  { name, teliksUserId, telegram? }
  */
 const body = z.object({
   name: z.string().trim().min(1).max(80),
-  email: z.string().trim().toLowerCase().email().max(254),
   teliksUserId: z.string().uuid(),
   telegram: z.string().trim().max(40).optional(),
-  contact: z.string().trim().max(200).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -37,8 +39,8 @@ export async function POST(req: NextRequest) {
     const code = randomBytes(4).toString("hex");
     const { error } = await db.from("partners").insert({
       code, name: p.data.name, percent: d.percent, active: d.autoActivate,
-      telegram_username: telegram, contact: p.data.contact || null,
-      teliks_user_id: p.data.teliksUserId, teliks_email: p.data.email, notes: "Регистрация через Teliks",
+      telegram_username: telegram,
+      teliks_user_id: p.data.teliksUserId, notes: "Регистрация через Teliks",
     });
     if (!error) return NextResponse.json({ code, active: d.autoActivate });
     if (error.code !== "23505") { console.error("[partner-api.create]", error.code); break; }

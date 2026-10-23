@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     const code = codeFromPayload(payload);
     if (payload !== null || msg.text?.trim() === "/start") {
       // Diagnostics without personal data: did the partner code arrive and was it applied?
-      const r = code ? await touchFromBot(msg.from.id, code).catch(() => "error" as const) : "no_code";
+      const r = code ? await touchFromBot(msg.from.id, code, msg.from.username).catch(() => "error" as const) : "no_code";
       console.log(JSON.stringify({ src: "partners", event: "bot_start", result: r }));
     }
     if (msg.text?.trim().startsWith("/partner")) {

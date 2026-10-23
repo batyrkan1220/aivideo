@@ -9,10 +9,7 @@ import { can } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { formatKzt } from "@/lib/pricing";
 import { botUsername, partnerDaily, partnerLinks, partnerPeriod, partnerPeriodTotals, partnerTotals } from "@/lib/partners";
-import { CopyLink, EditPartnerForm, PayoutForm, TeliksAccessForm } from "../forms";
-import { processPayoutRequest } from "../actions";
-import { teliksConfigured, teliksPayoutDetails, teliksPayoutRequests } from "@/lib/partners/teliks";
-import { env } from "@/lib/env";
+import { CopyLink, EditPartnerForm, PayoutForm } from "../forms";
 import { DailyTable, PeriodForm, Tile } from "../ui";
 
 type SP = { from?: string; to?: string };
@@ -37,7 +34,7 @@ async function Content({ params, searchParams }: { params: Promise<{ id: string 
   const { data: p } = await db.from("partners").select("*").eq("id", id).maybeSingle();
   if (!p) notFound();
 
-  const [period, all, daily, bot, { data: users }, { data: comms }, { data: payouts }, requests, payDetails] = await Promise.all([
+  const [period, all, daily, bot, { data: users }, { data: comms }, { data: payouts }] = await Promise.all([
     partnerPeriodTotals(per.fromIso, per.toIso),
     partnerTotals(),
     partnerDaily(id, per.fromIso, per.toIso),
@@ -45,8 +42,6 @@ async function Content({ params, searchParams }: { params: Promise<{ id: string 
     db.from("profiles").select("id,display_name,telegram_username,email,referred_at").eq("referred_by", id).order("referred_at", { ascending: false }).limit(100),
     db.from("partner_commissions").select("order_id,user_id,order_amount_kzt,percent,commission_kzt,status,created_at,orders(public_order_number)").eq("partner_id", id).order("created_at", { ascending: false }).limit(100),
     db.from("partner_payouts").select("amount_kzt,note,created_at").eq("partner_id", id).order("created_at", { ascending: false }).limit(50),
-    teliksPayoutRequests(p.teliks_user_id).catch(() => []),
-    teliksPayoutDetails(p.teliks_user_id).catch(() => null),
   ]);
   const t = period.get(id);
   const a = all.get(id);
@@ -95,35 +90,7 @@ async function Content({ params, searchParams }: { params: Promise<{ id: string 
         <DailyTable rows={daily} />
       </section>
 
-      <section>
-        <h2 className="mb-1 font-semibold">{T.teliks}</h2>
-        <p className="mb-3 text-sm text-muted">{T.teliksHint}</p>
-        <div className="space-y-4 rounded-card border border-line bg-white p-5">
-          {teliksConfigured() ? <TeliksAccessForm id={id} email={p.teliks_email} teliksUrl={env().TELIKS_URL} /> : <p className="text-sm text-danger">{T.teliksNotConfigured}</p>}
-          {p.teliks_user_id && (
-            <div>
-              <h3 className="text-sm font-semibold">{T.requests}</h3>
-              {payDetails?.method && <p className="mt-1 text-xs text-muted">{T.details}: {payDetails.method} · {payDetails.value}</p>}
-              {requests.length ? (
-                <ul className="mt-2 divide-y divide-line text-sm">
-                  {requests.map((r) => (
-                    <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
-                      <span>{fmt.format(new Date(r.created_at))} · <b>{formatKzt(r.amount_kzt)}</b> · {r.method} {r.details}</span>
-                      {r.status === "processing" ? (
-                        <form action={processPayoutRequest} className="flex gap-2">
-                          <input type="hidden" name="id" value={id} /><input type="hidden" name="request" value={r.id} />
-                          <button name="action" value="paid" className="rounded-full bg-success px-3 py-1 text-xs font-semibold text-white">{T.markPaid}</button>
-                          <button name="action" value="rejected" className="rounded-full border border-line px-3 py-1 text-xs font-semibold">{T.reject}</button>
-                        </form>
-                      ) : <span className={r.status === "paid" ? "text-success" : "text-muted"}>{T.requestStatus[r.status] ?? r.status}</span>}
-                    </li>
-                  ))}
-                </ul>
-              ) : <p className="mt-1 text-sm text-muted">{T.requestsNone}</p>}
-            </div>
-          )}
-        </div>
-      </section>
+      {p.teliks_user_id && <p className="rounded-card bg-brand-soft p-4 text-sm">{T.teliksSource}</p>}
 
       <section>
         <h2 className="mb-3 font-semibold">{T.payouts}</h2>

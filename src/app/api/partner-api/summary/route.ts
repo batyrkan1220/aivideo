@@ -3,7 +3,7 @@ import { z } from "zod";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { partnerApiAuthorized as authorized } from "@/lib/partners/api-auth";
-import { botUsername, CODE_RE, partnerDaily, partnerLinks, partnerPeriodTotals, partnerTotals } from "@/lib/partners";
+import { botUsername, CODE_RE, partnerDaily, partnerLinks, partnerOneTotals } from "@/lib/partners";
 
 /**
  * Server-to-server API for the Teliks partner cabinet (teliks.ink).
@@ -32,24 +32,21 @@ export async function GET(req: NextRequest) {
   const { data: partner } = await db.from("partners").select("id,code,name,percent,active").eq("code", p.data.code).maybeSingle();
   if (!partner) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-  const [period, all, daily, bot, { data: comms }] = await Promise.all([
-    partnerPeriodTotals(fromIso, toIso),
-    partnerTotals(),
+  const [one, daily, bot, { data: comms }] = await Promise.all([
+    partnerOneTotals(partner.id, fromIso, toIso),
     partnerDaily(partner.id, fromIso, toIso),
     botUsername(),
     db.from("partner_commissions").select("order_amount_kzt,percent,commission_kzt,status,created_at,orders(public_order_number)")
       .eq("partner_id", partner.id).gte("created_at", fromIso).lt("created_at", toIso).order("created_at", { ascending: false }).limit(2000),
   ]);
-  const t = period.get(partner.id);
-  const a = all.get(partner.id);
   const num = (o: unknown) => ((Array.isArray(o) ? o[0] : o) as { public_order_number?: string } | null)?.public_order_number ?? "";
 
   return NextResponse.json({
     partner: { code: partner.code, name: partner.name, percent: Number(partner.percent), active: partner.active },
     links: partnerLinks(partner.code, bot),
     currency: "KZT",
-    period: t ?? { visits: 0, users: 0, buyers: 0, paidOrders: 0, revenueKzt: 0, earnedKzt: 0, reversedKzt: 0, paidOutKzt: 0 },
-    lifetime: { earnedKzt: a?.earnedKzt ?? 0, reversedKzt: a?.reversedKzt ?? 0, paidOutKzt: a?.paidOutKzt ?? 0 },
+    period: one.period,
+    lifetime: one.lifetime,
     daily,
     commissions: (comms ?? []).map((c) => ({
       time: c.created_at, order: num(c.orders), amountKzt: c.order_amount_kzt, percent: Number(c.percent),

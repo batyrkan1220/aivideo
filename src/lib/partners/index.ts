@@ -35,16 +35,27 @@ export async function recordVisit(partnerId: string, source: "bot" | "app" | "si
 /** Sets the profile's partner once (first touch). Partners cannot refer themselves. */
 export async function attributeProfile(userId: string, partner: Partner, telegramId?: number | null) {
   if (partner.telegram_id && telegramId && partner.telegram_id === telegramId) return;
+  // Also by username: a partner who registered in Teliks may not have written to the bot yet.
+  const db = supabaseAdmin();
+  const [{ data: prof }, { data: pa }] = await Promise.all([
+    db.from("profiles").select("telegram_username").eq("id", userId).maybeSingle(),
+    db.from("partners").select("telegram_username").eq("id", partner.id).maybeSingle(),
+  ]);
+  if (prof?.telegram_username && pa?.telegram_username && prof.telegram_username.toLowerCase() === pa.telegram_username.toLowerCase()) return;
   await supabaseAdmin().from("profiles")
     .update({ referred_by: partner.id, referred_at: new Date().toISOString() })
     .eq("id", userId).is("referred_by", null);
 }
 
 /** Bot /start p_<code>: remember the Telegram user (they may not have an account yet). */
-export async function touchFromBot(telegramId: number, code: string): Promise<"unknown_code" | "self" | "new" | "existing_user" | "already_referred"> {
+export async function touchFromBot(telegramId: number, code: string, username?: string): Promise<"unknown_code" | "self" | "new" | "existing_user" | "already_referred"> {
   const partner = await partnerByCode(code);
   if (!partner) return "unknown_code";
   if (partner.telegram_id === telegramId) return "self";
+  if (username) {
+    const { data: pa } = await supabaseAdmin().from("partners").select("telegram_username").eq("id", partner.id).maybeSingle();
+    if (pa?.telegram_username && pa.telegram_username.toLowerCase() === username.toLowerCase()) return "self";
+  }
   const db = supabaseAdmin();
   await db.from("partner_touches").upsert({ telegram_id: telegramId, partner_id: partner.id }, { onConflict: "telegram_id", ignoreDuplicates: true });
   await recordVisit(partner.id, "bot");
@@ -146,7 +157,8 @@ export async function partnerTotals(): Promise<Map<string, PartnerTotals>> {
 export async function partnerSelfReport(telegramId: number): Promise<string | null> {
   const { data: p } = await supabaseAdmin().from("partners").select("id,code,name,percent,active").eq("telegram_id", telegramId).maybeSingle();
   if (!p) return null;
-  const t = (await partnerTotals()).get(p.id);
+  const one = await partnerOneTotals(p.id, new Date(0).toISOString(), new Date(Date.now() + 86400_000).toISOString());
+  const t = { visits: one.period.visits, users: one.period.users, paidOrders: one.period.paidOrders, revenueKzt: one.period.revenueKzt, earnedKzt: one.lifetime.earnedKzt, paidOutKzt: one.lifetime.paidOutKzt, balanceKzt: one.lifetime.earnedKzt - one.lifetime.paidOutKzt };
   const links = partnerLinks(p.code, await botUsername());
   return [
     `🤝 <b>${escapeHtml(p.name)}</b> — серіктестік бағдарлама${p.active ? "" : " (тоқтатылған)"}`,
@@ -206,4 +218,15 @@ export async function partnerDefaults(): Promise<{ percent: number; autoActivate
   } catch {
     return { percent: 20, autoActivate: true };
   }
+}
+
+/** One partner: period totals and lifetime earned / reversed / paid out. */
+export async function partnerOneTotals(partnerId: string, fromIso: string, toIso: string) {
+  const { data } = await supabaseAdmin().rpc("partner_stats_one", { p_partner: partnerId, p_from: fromIso, p_to: toIso });
+  const r = ((Array.isArray(data) ? data[0] : data) ?? {}) as Record<string, number | string>;
+  const n = (k: string) => Number(r[k] ?? 0);
+  return {
+    period: { visits: n("visits"), users: n("users"), buyers: n("buyers"), paidOrders: n("paid_orders"), revenueKzt: n("revenue_kzt"), earnedKzt: n("earned_kzt"), reversedKzt: n("reversed_kzt"), paidOutKzt: n("paid_out_kzt") },
+    lifetime: { earnedKzt: n("life_earned_kzt"), reversedKzt: n("life_reversed_kzt"), paidOutKzt: n("life_paid_out_kzt") },
+  };
 }
