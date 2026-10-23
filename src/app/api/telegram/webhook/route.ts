@@ -3,6 +3,7 @@ import { checkWebhookSecret, sendMessage, tg } from "@/lib/telegram/bot";
 import { handleAdminCallback, handleAdminMessage, isBotAdmin } from "@/lib/telegram/admin";
 import { botMessage } from "@/lib/telegram/messages";
 import { codeFromPayload, linkPartnerTelegram, partnerSelfReport, touchFromBot } from "@/lib/partners";
+import { clickFromPayload, cpaTouchFromBot } from "@/lib/cpa";
 
 /**
  * Telegram bot updates. Authentic only with our X-Telegram-Bot-Api-Secret-Token (set via setWebhook).
@@ -44,7 +45,13 @@ export async function POST(req: NextRequest) {
     await linkPartnerTelegram(msg.from.username, msg.from.id).catch(() => {});
     const payload = msg.text?.startsWith("/start ") ? msg.text.slice(7) : null;
     const code = codeFromPayload(payload);
-    if (payload !== null || msg.text?.trim() === "/start") {
+    // CPA network (Offer18 / Teliks): /start o18_<click id>
+    const cpaClick = clickFromPayload(payload);
+    if (cpaClick) {
+      await cpaTouchFromBot(msg.from.id, cpaClick).catch(() => {});
+      console.log(JSON.stringify({ src: "cpa", event: "bot_start" }));
+    }
+    if (!cpaClick && (payload !== null || msg.text?.trim() === "/start")) {
       // Diagnostics without personal data: did the partner code arrive and was it applied?
       const r = code ? await touchFromBot(msg.from.id, code).catch(() => "error" as const) : "no_code";
       console.log(JSON.stringify({ src: "partners", event: "bot_start", result: r }));
