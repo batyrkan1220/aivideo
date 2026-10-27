@@ -20,7 +20,7 @@ type SlotState =
   | { phase: "empty" }
   | { phase: "uploading"; preview: string; progress: number }
   | { phase: "verifying"; preview: string }
-  | { phase: "ready"; preview: string; assetId: string }
+  | { phase: "ready"; preview: string; assetId: string; issues?: PhotoIssue[] }
   | { phase: "warn"; preview: string; issues: PhotoIssue[] }
   | { phase: "error"; preview?: string; message: string };
 
@@ -117,7 +117,7 @@ export function CreateFlow({
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const previews = useRef<string[]>([]);
-  const pendingFiles = useRef<Record<string, File>>({}); // photo waiting for "upload anyway"
+  const pickSeq = useRef<Record<string, number>>({}); // latest pick per slot (older results are dropped)
 
   useEffect(() => () => previews.current.forEach((u) => URL.revokeObjectURL(u)), []);
   useEffect(() => { preloadFaceDetector(); }, []);
@@ -205,29 +205,34 @@ export function CreateFlow({
     const dims = await readDimensions(file);
     const localErr: PhotoError | null = validatePhotoMeta({ contentType: file.type, size: file.size, ...dims }, limits);
     if (localErr) { setSlot(slot.key, { phase: "error", preview, message: errText(localErr) }); return; }
-    // Quality hints before uploading: dark, blurry, several faces… — the customer decides.
-    const issues = await checkPhoto(file, framing);
-    if (issues.length) { pendingFiles.current[slot.key] = file; setSlot(slot.key, { phase: "warn", preview, issues }); return; }
-    await upload(slot, file, preview);
+    // Upload and quality check run at the same time: the customer waits for the slower one only.
+    const seq = (pickSeq.current[slot.key] ?? 0) + 1;
+    pickSeq.current[slot.key] = seq;
+    const checkP = checkPhoto(file, framing).catch(() => [] as PhotoIssue[]);
+    const assetId = await upload(slot, file, preview);
+    if (!assetId) return;
+    if (pickSeq.current[slot.key] !== seq) { void removePhotoUpload(assetId); return; } // replaced meanwhile
+    setSlot(slot.key, { phase: "verifying", preview });
+    const issues = await checkP;
+    if (pickSeq.current[slot.key] !== seq) { void removePhotoUpload(assetId); return; }
+    if (issues.some((x) => BLOCKING.includes(x))) {
+      void removePhotoUpload(assetId); // a group photo cannot be used
+      setSlot(slot.key, { phase: "warn", preview, issues: issues.filter((x) => BLOCKING.includes(x)) });
+      return;
+    }
+    setSlot(slot.key, { phase: "ready", preview, assetId, issues });
   };
 
-  const uploadAnyway = (slot: FaceSlot) => {
-    const st = state[slot.key] ?? EMPTY;
-    const file = pendingFiles.current[slot.key];
-    if (st.phase !== "warn" || !file || st.issues.some((i) => BLOCKING.includes(i))) return;
-    delete pendingFiles.current[slot.key];
-    void upload(slot, file, st.preview);
-  };
-
-  const upload = async (slot: FaceSlot, file: File, preview: string) => {
+  /** Uploads the photo; returns the asset id or null (the slot then shows the error). */
+  const upload = async (slot: FaceSlot, file: File, preview: string): Promise<string | null> => {
     setSlot(slot.key, { phase: "uploading", preview, progress: 0 });
     const dims = await readDimensions(file);
 
     const req = await requestPhotoUpload({ templateId, slotKey: slot.key, contentType: file.type, size: file.size, ...dims });
     if (!req.ok) {
-      if (req.error === "unauthorized") { router.push(`/login?next=/templates/${templateId}`); return; }
+      if (req.error === "unauthorized") { router.push(`/login?next=/templates/${templateId}`); return null; }
       setSlot(slot.key, { phase: "error", preview, message: errText(req.error) });
-      return;
+      return null;
     }
     try {
       const url = `${supabaseUrl}/storage/v1/object/upload/sign/user-uploads/${req.path}?token=${encodeURIComponent(req.token)}`;
@@ -235,17 +240,16 @@ export function CreateFlow({
     } catch {
       void removePhotoUpload(req.assetId);
       setSlot(slot.key, { phase: "error", preview, message: c.errors.upload_failed });
-      return;
+      return null;
     }
-    setSlot(slot.key, { phase: "verifying", preview });
     const conf = await confirmPhotoUpload(req.assetId);
-    if (!conf.ok) { setSlot(slot.key, { phase: "error", preview, message: errText(conf.error) }); return; }
-    setSlot(slot.key, { phase: "ready", preview, assetId: req.assetId });
+    if (!conf.ok) { setSlot(slot.key, { phase: "error", preview, message: errText(conf.error) }); return null; }
+    return req.assetId;
   };
 
   const onRemove = (slot: FaceSlot) => {
     const s = state[slot.key] ?? EMPTY;
-    delete pendingFiles.current[slot.key];
+    pickSeq.current[slot.key] = (pickSeq.current[slot.key] ?? 0) + 1;
     if (s.phase === "ready") void removePhotoUpload(s.assetId);
     setSlot(slot.key, { phase: "empty" });
   };
@@ -364,13 +368,13 @@ export function CreateFlow({
           </div>
         ) : slots.length === 1 ? (
           <div className="mt-3">
-            <SinglePhoto slot={slots[0]} st={state[slots[0].key] ?? EMPTY} onPick={(f) => pickPhoto(slots[0], f)} onRemove={() => onRemove(slots[0])} onAnyway={() => uploadAnyway(slots[0])} />
+            <SinglePhoto slot={slots[0]} st={state[slots[0].key] ?? EMPTY} onPick={(f) => pickPhoto(slots[0], f)} onRemove={() => onRemove(slots[0])} />
           </div>
         ) : (
           <ol className={`mt-3 grid gap-3 ${gridCols} ${slots.length > 3 ? "sm:grid-cols-4" : ""}`}>
             {slots.map((s, i) => (
               <li key={s.key}>
-                <SlotCard index={i} slot={s} st={state[s.key] ?? EMPTY} mediaBase={`${supabaseUrl}/storage/v1/object/public/template-media`} onPick={(f) => pickPhoto(s, f)} onRemove={() => onRemove(s)} onAnyway={() => uploadAnyway(s)} />
+                <SlotCard index={i} slot={s} st={state[s.key] ?? EMPTY} mediaBase={`${supabaseUrl}/storage/v1/object/public/template-media`} onPick={(f) => pickPhoto(s, f)} onRemove={() => onRemove(s)} />
               </li>
             ))}
           </ol>
@@ -534,7 +538,7 @@ function VideoPicker({ st, limits, onPick, onRemove }: { st: VideoState; limits:
 }
 
 /** One-person templates: a big, thumb-friendly photo picker with live upload state. */
-function SinglePhoto({ slot, st, onPick, onRemove, onAnyway }: { slot: FaceSlot; st: SlotState; onPick: (f: File | undefined) => void; onRemove: () => void; onAnyway: () => void }) {
+function SinglePhoto({ slot, st, onPick, onRemove }: { slot: FaceSlot; st: SlotState; onPick: (f: File | undefined) => void; onRemove: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const busy = st.phase === "uploading" || st.phase === "verifying";
   const preview = "preview" in st ? st.preview : undefined;
@@ -564,7 +568,7 @@ function SinglePhoto({ slot, st, onPick, onRemove, onAnyway }: { slot: FaceSlot;
         </span>
         <span className="min-w-0 flex-1">
           <span className="block font-semibold">
-            {st.phase === "ready" ? `✓ ${c.photoReady}` : st.phase === "warn" ? (st.issues.some((i) => BLOCKING.includes(i)) ? `✕ ${pc.blockedTitle}` : `⚠ ${pc.title}`) : busy ? (st.phase === "uploading" && st.progress > 0 ? `${kk.upload.uploading} ${st.progress}%` : c.verifying) : c.pickTitle}
+            {st.phase === "ready" ? `✓ ${c.photoReady}` : st.phase === "warn" ? `✕ ${pc.blockedTitle}` : busy ? (st.phase === "uploading" && st.progress > 0 ? `${kk.upload.uploading} ${st.progress}%` : c.verifying) : c.pickTitle}
           </span>
           <span className="mt-0.5 block text-sm text-muted">{st.phase === "ready" ? kk.upload.replace : st.phase === "warn" ? pc.other : c.pickText}</span>
           {st.phase === "uploading" && (
@@ -581,21 +585,19 @@ function SinglePhoto({ slot, st, onPick, onRemove, onAnyway }: { slot: FaceSlot;
           {st.message} <button type="button" className="ml-1 font-semibold underline" onClick={onRemove}>{kk.upload.remove}</button>
         </p>
       )}
-      {st.phase === "warn" && <PhotoWarn issues={st.issues} onOther={() => inputRef.current?.click()} onAnyway={onAnyway} />}
+      {(st.phase === "warn" || (st.phase === "ready" && st.issues?.length)) && <PhotoWarn issues={st.issues ?? []} onOther={() => inputRef.current?.click()} />}
     </div>
   );
 }
 
-/** Soft quality warning: what is wrong with the photo, choose another or upload anyway. */
-function PhotoWarn({ issues, onOther, onAnyway, compact = false }: { issues: PhotoIssue[]; onOther: () => void; onAnyway: () => void; compact?: boolean }) {
+/** Quality note: a blocking problem (photo refused) or soft hints shown under an uploaded photo. */
+function PhotoWarn({ issues, onOther, compact = false }: { issues: PhotoIssue[]; onOther: () => void; compact?: boolean }) {
   const blocked = issues.some((i) => BLOCKING.includes(i));
   return (
-    <div className={`mt-2 rounded-xl border ${blocked ? "border-red-300 bg-red-50" : "border-amber-300 bg-amber-50"} ${compact ? "p-2 text-xs" : "p-3 text-sm"}`} role="alert">
-      <ul className="space-y-1">{issues.map((i) => <li key={i} className="flex gap-1.5"><span aria-hidden>⚠</span><span>{pc.issues[i]}</span></li>)}</ul>
-      <div className={`mt-2 flex flex-wrap gap-2 ${compact ? "" : ""}`}>
-        <button type="button" className="rounded-full bg-ink px-3 py-1.5 font-semibold text-white" onClick={onOther}>{pc.other}</button>
-        {!blocked && <button type="button" className="rounded-full px-3 py-1.5 font-semibold text-muted underline" onClick={onAnyway}>{pc.anyway}</button>}
-      </div>
+    <div className={`mt-2 rounded-xl border ${blocked ? "border-red-300 bg-red-50" : "border-amber-300 bg-amber-50"} ${compact ? "p-2 text-xs" : "p-3 text-sm"}`} role={blocked ? "alert" : "status"}>
+      {!blocked && <p className="mb-1 font-semibold">{pc.softTitle}</p>}
+      <ul className="space-y-1">{issues.map((i) => <li key={i} className="flex gap-1.5"><span aria-hidden>{blocked ? "✕" : "⚠"}</span><span>{pc.issues[i]}</span></li>)}</ul>
+      <button type="button" className={`mt-2 rounded-full px-3 py-1.5 font-semibold ${blocked ? "bg-ink text-white" : "bg-white text-ink ring-1 ring-line"}`} onClick={onOther}>{pc.other}</button>
     </div>
   );
 }
@@ -610,8 +612,8 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function SlotCard({
-  index, slot, st, mediaBase, onPick, onRemove, onAnyway,
-}: { index: number; slot: FaceSlot; st: SlotState; mediaBase: string; onPick: (f: File | undefined) => void; onRemove: () => void; onAnyway: () => void }) {
+  index, slot, st, mediaBase, onPick, onRemove,
+}: { index: number; slot: FaceSlot; st: SlotState; mediaBase: string; onPick: (f: File | undefined) => void; onRemove: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const busy = st.phase === "uploading" || st.phase === "verifying";
   const preview = "preview" in st ? st.preview : undefined;
@@ -667,7 +669,7 @@ function SlotCard({
       />
       <p className="mt-2 text-sm font-medium leading-tight">{slot.labelKk}</p>
       {st.phase === "error" && <p className="mt-1 text-xs text-danger" role="alert">{st.message}</p>}
-      {st.phase === "warn" && <PhotoWarn compact issues={st.issues} onOther={() => inputRef.current?.click()} onAnyway={onAnyway} />}
+      {(st.phase === "warn" || (st.phase === "ready" && st.issues?.length)) && <PhotoWarn compact issues={st.issues ?? []} onOther={() => inputRef.current?.click()} />}
       {(st.phase === "ready" || st.phase === "error") && (
         <div className="mt-1 flex gap-3 text-xs">
           <button type="button" className="font-semibold text-brand hover:underline" onClick={() => inputRef.current?.click()}>{kk.upload.replace}</button>

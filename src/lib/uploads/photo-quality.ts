@@ -67,13 +67,22 @@ function loadFaceApi() {
     try {
       const fa = await import("@vladmandic/face-api/dist/face-api.esm.js");
       await fa.nets.tinyFaceDetector.loadFromUri("/models/face");
+      // Warm-up: the first run compiles the GPU shaders for both input sizes (seconds on a
+      // phone). Doing it now means the customer's photo is checked at full speed.
+      const warm = document.createElement("canvas");
+      warm.width = warm.height = 64;
+      for (const inputSize of [416, 608]) await fa.detectAllFaces(warm, new fa.TinyFaceDetectorOptions({ inputSize, scoreThreshold: 0.9 }));
       return fa as unknown as typeof import("@vladmandic/face-api");
     } catch { faceApi = null; return null; }
   })();
   return faceApi;
 }
-/** Starts loading the detector early (e.g. when the photo step is shown). */
-export function preloadFaceDetector() { void loadFaceApi(); }
+/** Loads and warms up the detector in the background, when the browser is idle. */
+export function preloadFaceDetector() {
+  const go = () => void loadFaceApi();
+  const idle = (globalThis as unknown as { requestIdleCallback?: (cb: () => void, o?: object) => void }).requestIdleCallback;
+  if (idle) idle(go, { timeout: 2500 }); else setTimeout(go, 800);
+}
 
 type Box = { x: number; y: number; w: number; h: number };
 const iou = (a: Box, b: Box) => {
@@ -95,7 +104,7 @@ async function detectFaces(canvas: HTMLCanvasElement, bmp: ImageBitmap): Promise
       const run = async (c: HTMLCanvasElement, size: number, score: number) =>
         (await fa.detectAllFaces(c, new fa.TinyFaceDetectorOptions({ inputSize: size, scoreThreshold: score }))).map((d) => ({ x: d.box.x, y: d.box.y, w: d.box.width, h: d.box.height }));
       const W = canvas.width, H = canvas.height;
-      const boxes: Box[] = await run(canvas, 608, 0.45);
+      const boxes: Box[] = await run(canvas, 416, 0.45);
       // Group / full-length photos: faces are tiny in the whole frame. Look again in 2×2
       // overlapping tiles, where each face is twice as big for the detector.
       // Only when nothing or one small face was found (a big single face = a normal portrait).
@@ -109,6 +118,9 @@ async function detectFaces(canvas: HTMLCanvasElement, bmp: ImageBitmap): Promise
             tx.clearRect(0, 0, tw, th);
             tx.drawImage(canvas, ox, oy, tw, th, 0, 0, tw, th);
             mergeBoxes(boxes, (await run(tile, 608, 0.5)).map((b) => ({ ...b, x: b.x + ox, y: b.y + oy })));
+            // Two real people found → the answer is known, skip the remaining tiles.
+            const ws = boxes.map((b) => b.w).sort((p, q) => q - p);
+            if (ws.length > 1 && ws[1] >= ws[0] * 0.35) break;
           }
         }
       }
