@@ -11,6 +11,8 @@ import { startCheckout } from "@/lib/payments/actions";
 import { normalizeKzPhone } from "@/lib/payments/phone";
 import { useSavedPhone, savePhone } from "@/lib/payments/saved-phone";
 import { compressPhoto } from "@/lib/uploads/compress";
+import { checkPhoto, type Framing, type PhotoIssue } from "@/lib/uploads/photo-quality";
+import { PhotoGuide } from "@/components/photo-guide";
 import { AKOOL_MAX_PEOPLE } from "@/lib/templates/akool-config";
 import { requestVideoUpload, confirmVideoUpload, removeVideoUpload, checkVideoAnalysis, type VideoError, type AnalysisResult } from "@/lib/custom-video/actions";
 
@@ -19,9 +21,11 @@ type SlotState =
   | { phase: "uploading"; preview: string; progress: number }
   | { phase: "verifying"; preview: string }
   | { phase: "ready"; preview: string; assetId: string }
+  | { phase: "warn"; preview: string; issues: PhotoIssue[] }
   | { phase: "error"; preview?: string; message: string };
 
 const c = kk.create;
+const pc = kk.create.photoCheck;
 const EMPTY: SlotState = { phase: "empty" };
 const cv = kk.customVideo;
 const videoErr = (e: VideoError, l: { maxSeconds: number; maxMb: number }) =>
@@ -81,7 +85,7 @@ function readVideoDuration(url: string): Promise<number | null> {
 }
 
 export function CreateFlow({
-  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, customVideo, akoolPricing,
+  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, customVideo, akoolPricing, framing = "auto",
 }: {
   templateId: string;
   slots: FaceSlot[];
@@ -98,6 +102,8 @@ export function CreateFlow({
   customVideo?: { maxSeconds: number; maxMb: number };
   /** With customVideo: the price is computed from the uploaded video's length and the quality. */
   akoolPricing?: AkoolPricing;
+  /** What photo the template needs (face / waist-up / full body); "auto" = like the person in the video. */
+  framing?: Framing;
 }) {
   const router = useRouter();
   const [state, setState] = useState<Record<string, SlotState>>(() =>
@@ -111,6 +117,7 @@ export function CreateFlow({
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const previews = useRef<string[]>([]);
+  const pendingFiles = useRef<Record<string, File>>({}); // photo waiting for "upload anyway"
 
   useEffect(() => () => previews.current.forEach((u) => URL.revokeObjectURL(u)), []);
 
@@ -192,11 +199,28 @@ export function CreateFlow({
 
     const preview = URL.createObjectURL(file);
     previews.current.push(preview);
-    setSlot(slot.key, { phase: "uploading", preview, progress: 0 });
+    setSlot(slot.key, { phase: "verifying", preview });
     file = await compressPhoto(file, minDimension);
     const dims = await readDimensions(file);
     const localErr: PhotoError | null = validatePhotoMeta({ contentType: file.type, size: file.size, ...dims }, limits);
     if (localErr) { setSlot(slot.key, { phase: "error", preview, message: errText(localErr) }); return; }
+    // Quality hints before uploading: dark, blurry, several faces… — the customer decides.
+    const issues = await checkPhoto(file, framing);
+    if (issues.length) { pendingFiles.current[slot.key] = file; setSlot(slot.key, { phase: "warn", preview, issues }); return; }
+    await upload(slot, file, preview);
+  };
+
+  const uploadAnyway = (slot: FaceSlot) => {
+    const st = state[slot.key] ?? EMPTY;
+    const file = pendingFiles.current[slot.key];
+    if (st.phase !== "warn" || !file) return;
+    delete pendingFiles.current[slot.key];
+    void upload(slot, file, st.preview);
+  };
+
+  const upload = async (slot: FaceSlot, file: File, preview: string) => {
+    setSlot(slot.key, { phase: "uploading", preview, progress: 0 });
+    const dims = await readDimensions(file);
 
     const req = await requestPhotoUpload({ templateId, slotKey: slot.key, contentType: file.type, size: file.size, ...dims });
     if (!req.ok) {
@@ -220,6 +244,7 @@ export function CreateFlow({
 
   const onRemove = (slot: FaceSlot) => {
     const s = state[slot.key] ?? EMPTY;
+    delete pendingFiles.current[slot.key];
     if (s.phase === "ready") void removePhotoUpload(s.assetId);
     setSlot(slot.key, { phase: "empty" });
   };
@@ -328,6 +353,7 @@ export function CreateFlow({
         <StepTitle n={++step} done={missing === 0}>{pickMode && slots.length > 1 ? cv.whoTitle : slots.length > 1 ? c.stepPhotos(slots.length) : c.stepPhoto}</StepTitle>
         {pickMode && slots.length > 1 ? <p className="mt-1 text-sm text-muted">{cv.whoText(slots.length)}</p>
           : slots.length > 1 && <p className="mt-1 text-sm text-muted">{c.photosHint}</p>}
+        <PhotoGuide framing={framing} />
         {customVideo && !readyVideoId ? (
           <p className="mt-3 rounded-xl bg-paper px-4 py-5 text-center text-sm text-muted">{cv.photoAfterVideo}</p>
         ) : analysing ? (
@@ -337,20 +363,17 @@ export function CreateFlow({
           </div>
         ) : slots.length === 1 ? (
           <div className="mt-3">
-            <SinglePhoto slot={slots[0]} st={state[slots[0].key] ?? EMPTY} onPick={(f) => pickPhoto(slots[0], f)} onRemove={() => onRemove(slots[0])} />
+            <SinglePhoto slot={slots[0]} st={state[slots[0].key] ?? EMPTY} onPick={(f) => pickPhoto(slots[0], f)} onRemove={() => onRemove(slots[0])} onAnyway={() => uploadAnyway(slots[0])} />
           </div>
         ) : (
           <ol className={`mt-3 grid gap-3 ${gridCols} ${slots.length > 3 ? "sm:grid-cols-4" : ""}`}>
             {slots.map((s, i) => (
               <li key={s.key}>
-                <SlotCard index={i} slot={s} st={state[s.key] ?? EMPTY} mediaBase={`${supabaseUrl}/storage/v1/object/public/template-media`} onPick={(f) => pickPhoto(s, f)} onRemove={() => onRemove(s)} />
+                <SlotCard index={i} slot={s} st={state[s.key] ?? EMPTY} mediaBase={`${supabaseUrl}/storage/v1/object/public/template-media`} onPick={(f) => pickPhoto(s, f)} onRemove={() => onRemove(s)} onAnyway={() => uploadAnyway(s)} />
               </li>
             ))}
           </ol>
         )}
-        <ul className="mt-3 grid gap-1 text-xs text-muted sm:grid-cols-3">
-          {c.tips.map((tip) => <li key={tip} className="flex gap-1.5"><span className="text-success">✓</span>{tip}</li>)}
-        </ul>
       </section>
 
       {/* Quality = Akool output resolution; the picker only appears when there is a real choice. */}
@@ -510,7 +533,7 @@ function VideoPicker({ st, limits, onPick, onRemove }: { st: VideoState; limits:
 }
 
 /** One-person templates: a big, thumb-friendly photo picker with live upload state. */
-function SinglePhoto({ slot, st, onPick, onRemove }: { slot: FaceSlot; st: SlotState; onPick: (f: File | undefined) => void; onRemove: () => void }) {
+function SinglePhoto({ slot, st, onPick, onRemove, onAnyway }: { slot: FaceSlot; st: SlotState; onPick: (f: File | undefined) => void; onRemove: () => void; onAnyway: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const busy = st.phase === "uploading" || st.phase === "verifying";
   const preview = "preview" in st ? st.preview : undefined;
@@ -521,7 +544,7 @@ function SinglePhoto({ slot, st, onPick, onRemove }: { slot: FaceSlot; st: SlotS
         disabled={busy}
         onClick={() => inputRef.current?.click()}
         aria-label={`${slot.labelKk}: ${preview ? kk.upload.replace : kk.upload.choose}`}
-        className={`flex w-full items-center gap-4 rounded-xl border-2 p-3 text-left transition-colors ${st.phase === "ready" ? "border-success bg-emerald-50" : st.phase === "error" ? "border-danger bg-red-50" : "border-dashed border-brand/40 bg-brand-soft/50 hover:border-brand"}`}
+        className={`flex w-full items-center gap-4 rounded-xl border-2 p-3 text-left transition-colors ${st.phase === "ready" ? "border-success bg-emerald-50" : st.phase === "error" ? "border-danger bg-red-50" : st.phase === "warn" ? "border-amber-400 bg-amber-50" : "border-dashed border-brand/40 bg-brand-soft/50 hover:border-brand"}`}
       >
         <span className="relative h-24 w-[4.5rem] shrink-0 overflow-hidden rounded-lg bg-white">
           {preview ? (
@@ -540,9 +563,9 @@ function SinglePhoto({ slot, st, onPick, onRemove }: { slot: FaceSlot; st: SlotS
         </span>
         <span className="min-w-0 flex-1">
           <span className="block font-semibold">
-            {st.phase === "ready" ? `✓ ${c.photoReady}` : busy ? (st.phase === "uploading" && st.progress > 0 ? `${kk.upload.uploading} ${st.progress}%` : c.verifying) : c.pickTitle}
+            {st.phase === "ready" ? `✓ ${c.photoReady}` : st.phase === "warn" ? `⚠ ${pc.title}` : busy ? (st.phase === "uploading" && st.progress > 0 ? `${kk.upload.uploading} ${st.progress}%` : c.verifying) : c.pickTitle}
           </span>
-          <span className="mt-0.5 block text-sm text-muted">{st.phase === "ready" ? kk.upload.replace : c.pickText}</span>
+          <span className="mt-0.5 block text-sm text-muted">{st.phase === "ready" ? kk.upload.replace : st.phase === "warn" ? pc.other : c.pickText}</span>
           {st.phase === "uploading" && (
             <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-black/10">
               <span className="block h-full rounded-full bg-brand transition-[width]" style={{ width: `${Math.max(8, st.progress)}%` }} />
@@ -557,6 +580,20 @@ function SinglePhoto({ slot, st, onPick, onRemove }: { slot: FaceSlot; st: SlotS
           {st.message} <button type="button" className="ml-1 font-semibold underline" onClick={onRemove}>{kk.upload.remove}</button>
         </p>
       )}
+      {st.phase === "warn" && <PhotoWarn issues={st.issues} onOther={() => inputRef.current?.click()} onAnyway={onAnyway} />}
+    </div>
+  );
+}
+
+/** Soft quality warning: what is wrong with the photo, choose another or upload anyway. */
+function PhotoWarn({ issues, onOther, onAnyway, compact = false }: { issues: PhotoIssue[]; onOther: () => void; onAnyway: () => void; compact?: boolean }) {
+  return (
+    <div className={`mt-2 rounded-xl border border-amber-300 bg-amber-50 ${compact ? "p-2 text-xs" : "p-3 text-sm"}`} role="alert">
+      <ul className="space-y-1">{issues.map((i) => <li key={i} className="flex gap-1.5"><span aria-hidden>⚠</span><span>{pc.issues[i]}</span></li>)}</ul>
+      <div className={`mt-2 flex flex-wrap gap-2 ${compact ? "" : ""}`}>
+        <button type="button" className="rounded-full bg-ink px-3 py-1.5 font-semibold text-white" onClick={onOther}>{pc.other}</button>
+        <button type="button" className="rounded-full px-3 py-1.5 font-semibold text-muted underline" onClick={onAnyway}>{pc.anyway}</button>
+      </div>
     </div>
   );
 }
@@ -571,13 +608,13 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function SlotCard({
-  index, slot, st, mediaBase, onPick, onRemove,
-}: { index: number; slot: FaceSlot; st: SlotState; mediaBase: string; onPick: (f: File | undefined) => void; onRemove: () => void }) {
+  index, slot, st, mediaBase, onPick, onRemove, onAnyway,
+}: { index: number; slot: FaceSlot; st: SlotState; mediaBase: string; onPick: (f: File | undefined) => void; onRemove: () => void; onAnyway: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const busy = st.phase === "uploading" || st.phase === "verifying";
   const preview = "preview" in st ? st.preview : undefined;
   const border =
-    st.phase === "ready" ? "border-success" : st.phase === "error" ? "border-danger" : "border-line border-dashed";
+    st.phase === "ready" ? "border-success" : st.phase === "error" ? "border-danger" : st.phase === "warn" ? "border-amber-400" : "border-line border-dashed";
 
   return (
     <div>
@@ -628,6 +665,7 @@ function SlotCard({
       />
       <p className="mt-2 text-sm font-medium leading-tight">{slot.labelKk}</p>
       {st.phase === "error" && <p className="mt-1 text-xs text-danger" role="alert">{st.message}</p>}
+      {st.phase === "warn" && <PhotoWarn compact issues={st.issues} onOther={() => inputRef.current?.click()} onAnyway={onAnyway} />}
       {(st.phase === "ready" || st.phase === "error") && (
         <div className="mt-1 flex gap-3 text-xs">
           <button type="button" className="font-semibold text-brand hover:underline" onClick={() => inputRef.current?.click()}>{kk.upload.replace}</button>

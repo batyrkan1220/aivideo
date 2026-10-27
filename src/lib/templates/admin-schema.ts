@@ -55,7 +55,7 @@ export function emptyTemplate(): TemplateInput {
     qualities: [{ key: "standard", labelKk: "Стандарт", resolution: "720x1280", fps: 30, providerQuality: "standard", surchargeKzt: 0, available: true }],
     pricing: { basePriceKzt: 0, chargeExtraFaces: false, extraFacePriceKzt: 0, includedFaces: 1, platformFeeKzt: 0, minPriceKzt: 0 },
     providerKey: "akool",
-    providerConfig: { resolution: "720p", selected: [] },
+    providerConfig: { resolution: "720p", framing: "half", selected: [] },
     maxUploadBytes: 10 * 1024 * 1024,
   };
 }

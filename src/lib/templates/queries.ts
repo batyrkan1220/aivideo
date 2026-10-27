@@ -1,4 +1,5 @@
 import "server-only";
+import type { PhotoFraming } from "./akool-config";
 import { after, connection } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -42,17 +43,19 @@ export type TemplateDetail = TemplateCard & {
   durationSec: number | null;
   /** false = automatic price not known yet (video length still being read). */
   priced: boolean;
+  /** What photo the customer needs (Akool swaps face, hair, body and outfit). */
+  photoFraming: PhotoFraming;
 };
 
 const CARD_COLUMNS =
-  "id,title_kk,description_kk,required_face_count,cover_asset_path,preview_video_path,supported_qualities_json,pricing_config_json,face_slots_json,max_upload_bytes,is_trending,provider_key,video_duration_sec,categories(id,title_kk,slug)";
+  "id,title_kk,description_kk,required_face_count,cover_asset_path,preview_video_path,supported_qualities_json,pricing_config_json,face_slots_json,max_upload_bytes,is_trending,provider_key,video_duration_sec,photo_framing:provider_config_json->>framing,categories(id,title_kk,slug)";
 
 type Row = {
   id: string; title_kk: string; description_kk: string; required_face_count: number;
   cover_asset_path: string | null; preview_video_path: string | null;
   supported_qualities_json: unknown; pricing_config_json: unknown; face_slots_json: unknown;
   max_upload_bytes: number; is_trending: boolean;
-  provider_key?: string | null; video_duration_sec?: number | string | null;
+  provider_key?: string | null; video_duration_sec?: number | string | null; photo_framing?: string | null;
   categories: { id: string; title_kk: string; slug: string } | { id: string; title_kk: string; slug: string }[] | null;
 };
 
@@ -103,6 +106,7 @@ export function parseRow(r: Row, akoolPricing: AkoolPricing = DEFAULT_AKOOL_PRIC
     maxUploadBytes: r.max_upload_bytes,
     durationSec: r.video_duration_sec == null ? null : Number(r.video_duration_sec),
     priced,
+    photoFraming: r.photo_framing === "face" || r.photo_framing === "full" ? r.photo_framing : "half",
   };
 }
 

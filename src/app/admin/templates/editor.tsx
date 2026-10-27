@@ -228,6 +228,12 @@ export function TemplateEditor({
           />
           {slots.length > 0 && <FaceMap slots={slots} mediaBase={mediaBase} />}
         </div>
+        <Field label={e.akool.framing} className="mt-6 sm:max-w-md">
+          <select className={inputCls()} value={akool.framing ?? "half"} onChange={(ev) => setAkool({ ...akool, framing: ev.target.value as AkoolConfig["framing"] })}>
+            {(["face", "half", "full"] as const).map((k) => <option key={k} value={k}>{e.akool.framingOptions[k]}</option>)}
+          </select>
+          <span className="mt-1 block text-xs text-muted">{e.akool.framingHint}</span>
+        </Field>
         <Field label={e.akool.resolution} className="mt-6 sm:max-w-xs">
           <select className={inputCls()} value={akool.resolution} onChange={(ev) => setAkool({ ...akool, resolution: ev.target.value as AkoolConfig["resolution"] })}>
             <option value="720p">720p</option>

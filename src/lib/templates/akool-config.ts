@@ -22,6 +22,9 @@ export const akoolPersonSchema = z.object({
 
 export const akoolConfigSchema = z.object({
   resolution: z.enum(["480p", "720p"]).default("720p"),
+  // What photo the customer needs: Character Swap replaces face, hair, body and outfit, so the photo
+  // should frame the person like the template does.
+  framing: z.enum(["face", "half", "full"]).default("half"),
   analysis: z.object({
     id: z.string().regex(/^[a-fA-F0-9]{24}$/),
     videoPath: z.string().min(1).max(300),   // template preview video path that was analysed
@@ -32,11 +35,12 @@ export const akoolConfigSchema = z.object({
   selected: z.array(z.number().int().min(0)).max(AKOOL_MAX_PEOPLE).default([]),
 });
 export type AkoolConfig = z.infer<typeof akoolConfigSchema>;
+export type PhotoFraming = AkoolConfig["framing"];
 export type AkoolPerson = z.infer<typeof akoolPersonSchema>;
 
 export function parseAkoolConfig(raw: unknown): AkoolConfig {
   const p = akoolConfigSchema.safeParse(raw ?? {});
-  return p.success ? p.data : { resolution: "720p", selected: [] };
+  return p.success ? p.data : { resolution: "720p", framing: "half", selected: [] };
 }
 
 export function akoolSlotLabel(i: number, n: number) {
