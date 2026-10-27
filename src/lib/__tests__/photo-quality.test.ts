@@ -21,3 +21,13 @@ describe("assessGray", () => {
     expect(assessGray(img((x) => 40 + x * 2.5), W, H)).toContain("blurry");
   });
 });
+
+import { faceIssues } from "@/lib/uploads/photo-quality";
+describe("faceIssues", () => {
+  it("no detector → no verdict", () => expect(faceIssues(null, "half")).toEqual([]));
+  it("no face", () => expect(faceIssues([], "half")).toEqual(["no_face"]));
+  it("group photo is refused", () => expect(faceIssues([0.12, 0.11, 0.1, 0.13, 0.09], "half")).toEqual(["many_faces"]));
+  it("a tiny face in the background does not count", () => expect(faceIssues([0.3, 0.05], "half")).toEqual([]));
+  it("face too small for a close-up template", () => expect(faceIssues([0.1], "face")).toEqual(["face_small"]));
+  it("full-body photo may have a small face", () => expect(faceIssues([0.06], "full")).toEqual([]));
+});

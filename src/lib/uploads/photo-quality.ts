@@ -8,6 +8,8 @@ export type PhotoIssue = "dark" | "bright" | "flat" | "blurry" | "no_face" | "ma
 export type Framing = "face" | "half" | "full" | "auto";
 
 const SIDE = 256;
+/** Issues that block the upload (the photo cannot work), the rest are warnings. */
+export const BLOCKING: PhotoIssue[] = ["many_faces"];
 
 /** gray: one byte per pixel, row-major. */
 export function assessGray(gray: ArrayLike<number>, w: number, h: number): PhotoIssue[] {
@@ -38,8 +40,66 @@ export function assessGray(gray: ArrayLike<number>, w: number, h: number): Photo
   return out;
 }
 
-type Face = { boundingBox: { width: number; height: number } };
-type Detector = { detect: (img: ImageBitmap) => Promise<Face[]> };
+type NativeFace = { boundingBox: { width: number } };
+type NativeDetector = { detect: (img: ImageBitmap | HTMLCanvasElement) => Promise<NativeFace[]> };
+
+/** Faces as widths relative to the image width, or null when no detector could run. */
+export type FaceWidths = number[] | null;
+
+/**
+ * Faces that count: a real second person, not a tiny face on a poster in the background
+ * (smaller than 35 % of the biggest face).
+ */
+export function faceIssues(faces: FaceWidths, framing: Framing): PhotoIssue[] {
+  if (!faces) return [];
+  if (faces.length === 0) return ["no_face"];
+  const big = Math.max(...faces);
+  const people = faces.filter((w) => w >= big * 0.35).length;
+  if (people > 1) return ["many_faces"];
+  if (big < (framing === "full" ? 0.04 : framing === "face" ? 0.18 : 0.08)) return ["face_small"];
+  return [];
+}
+
+// Tiny Face Detector (face-api, ~190 KB model in /models/face), loaded on the first photo only.
+let faceApi: Promise<typeof import("@vladmandic/face-api") | null> | null = null;
+function loadFaceApi() {
+  faceApi ??= (async () => {
+    try {
+      const fa = await import("@vladmandic/face-api/dist/face-api.esm.js");
+      await fa.nets.tinyFaceDetector.loadFromUri("/models/face");
+      return fa as unknown as typeof import("@vladmandic/face-api");
+    } catch { faceApi = null; return null; }
+  })();
+  return faceApi;
+}
+/** Starts loading the detector early (e.g. when the photo step is shown). */
+export function preloadFaceDetector() { void loadFaceApi(); }
+
+async function detectFaces(canvas: HTMLCanvasElement, bmp: ImageBitmap): Promise<FaceWidths> {
+  const fa = await loadFaceApi();
+  if (fa) {
+    try {
+      const opts = new fa.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.45 });
+      const res = await fa.detectAllFaces(canvas, opts);
+      if (res.length) return res.map((d) => d.box.width / canvas.width);
+      // A close-up whose face fills the frame is often missed: retry with a border around it.
+      const pad = document.createElement("canvas");
+      pad.width = canvas.width * 2; pad.height = canvas.height * 2;
+      const px = pad.getContext("2d");
+      if (!px) return [];
+      px.fillStyle = "#808080"; px.fillRect(0, 0, pad.width, pad.height);
+      px.drawImage(canvas, canvas.width / 2, canvas.height / 2);
+      const again = await fa.detectAllFaces(pad, new fa.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.4 }));
+      return again.map((d) => Math.min(1, d.box.width / canvas.width));
+    } catch { /* fall through to the browser detector */ }
+  }
+  const FD = (globalThis as unknown as { FaceDetector?: new (o: object) => NativeDetector }).FaceDetector;
+  if (!FD) return null;
+  try {
+    const faces = await new FD({ fastMode: true, maxDetectedFaces: 10 }).detect(bmp);
+    return faces.map((f) => f.boundingBox.width / bmp.width);
+  } catch { return null; }
+}
 
 export async function checkPhoto(file: File, framing: Framing = "auto"): Promise<PhotoIssue[]> {
   try {
@@ -57,19 +117,12 @@ export async function checkPhoto(file: File, framing: Framing = "auto"): Promise
     for (let i = 0, j = 0; i < gray.length; i++, j += 4) gray[i] = (rgba[j] * 299 + rgba[j + 1] * 587 + rgba[j + 2] * 114) / 1000;
     const issues = assessGray(gray, w, h);
     if (framing === "full" && bmp.width > bmp.height * 1.15) issues.push("landscape");
-    // Face detector (Shape Detection API) where the browser has it; otherwise skipped.
-    const FD = (globalThis as unknown as { FaceDetector?: new (o: object) => Detector }).FaceDetector;
-    if (FD) {
-      try {
-        const faces = await new FD({ fastMode: true, maxDetectedFaces: 5 }).detect(bmp);
-        if (faces.length === 0) issues.push("no_face");
-        else if (faces.length > 1) issues.push("many_faces");
-        else {
-          const rel = faces[0].boundingBox.width / bmp.width;
-          if (rel < (framing === "full" ? 0.05 : framing === "face" ? 0.2 : 0.1)) issues.push("face_small");
-        }
-      } catch { /* detector unavailable on this device */ }
-    }
+    // Faces: a larger copy for the detector (small faces in group photos need pixels).
+    const ds = Math.min(1, 640 / Math.max(bmp.width, bmp.height));
+    const fc = document.createElement("canvas");
+    fc.width = Math.max(1, Math.round(bmp.width * ds)); fc.height = Math.max(1, Math.round(bmp.height * ds));
+    fc.getContext("2d")?.drawImage(bmp, 0, 0, fc.width, fc.height);
+    issues.push(...faceIssues(await detectFaces(fc, bmp), framing));
     bmp.close();
     return issues;
   } catch {

@@ -11,7 +11,7 @@ import { startCheckout } from "@/lib/payments/actions";
 import { normalizeKzPhone } from "@/lib/payments/phone";
 import { useSavedPhone, savePhone } from "@/lib/payments/saved-phone";
 import { compressPhoto } from "@/lib/uploads/compress";
-import { checkPhoto, type Framing, type PhotoIssue } from "@/lib/uploads/photo-quality";
+import { checkPhoto, preloadFaceDetector, BLOCKING, type Framing, type PhotoIssue } from "@/lib/uploads/photo-quality";
 import { PhotoGuide } from "@/components/photo-guide";
 import { AKOOL_MAX_PEOPLE } from "@/lib/templates/akool-config";
 import { requestVideoUpload, confirmVideoUpload, removeVideoUpload, checkVideoAnalysis, type VideoError, type AnalysisResult } from "@/lib/custom-video/actions";
@@ -120,6 +120,7 @@ export function CreateFlow({
   const pendingFiles = useRef<Record<string, File>>({}); // photo waiting for "upload anyway"
 
   useEffect(() => () => previews.current.forEach((u) => URL.revokeObjectURL(u)), []);
+  useEffect(() => { preloadFaceDetector(); }, []);
 
   const setSlot = (key: string, s: SlotState) => setState((prev) => ({ ...prev, [key]: s }));
   const [video, setVideo] = useState<VideoState>({ phase: "empty" });
@@ -213,7 +214,7 @@ export function CreateFlow({
   const uploadAnyway = (slot: FaceSlot) => {
     const st = state[slot.key] ?? EMPTY;
     const file = pendingFiles.current[slot.key];
-    if (st.phase !== "warn" || !file) return;
+    if (st.phase !== "warn" || !file || st.issues.some((i) => BLOCKING.includes(i))) return;
     delete pendingFiles.current[slot.key];
     void upload(slot, file, st.preview);
   };
@@ -563,7 +564,7 @@ function SinglePhoto({ slot, st, onPick, onRemove, onAnyway }: { slot: FaceSlot;
         </span>
         <span className="min-w-0 flex-1">
           <span className="block font-semibold">
-            {st.phase === "ready" ? `✓ ${c.photoReady}` : st.phase === "warn" ? `⚠ ${pc.title}` : busy ? (st.phase === "uploading" && st.progress > 0 ? `${kk.upload.uploading} ${st.progress}%` : c.verifying) : c.pickTitle}
+            {st.phase === "ready" ? `✓ ${c.photoReady}` : st.phase === "warn" ? (st.issues.some((i) => BLOCKING.includes(i)) ? `✕ ${pc.blockedTitle}` : `⚠ ${pc.title}`) : busy ? (st.phase === "uploading" && st.progress > 0 ? `${kk.upload.uploading} ${st.progress}%` : c.verifying) : c.pickTitle}
           </span>
           <span className="mt-0.5 block text-sm text-muted">{st.phase === "ready" ? kk.upload.replace : st.phase === "warn" ? pc.other : c.pickText}</span>
           {st.phase === "uploading" && (
@@ -587,12 +588,13 @@ function SinglePhoto({ slot, st, onPick, onRemove, onAnyway }: { slot: FaceSlot;
 
 /** Soft quality warning: what is wrong with the photo, choose another or upload anyway. */
 function PhotoWarn({ issues, onOther, onAnyway, compact = false }: { issues: PhotoIssue[]; onOther: () => void; onAnyway: () => void; compact?: boolean }) {
+  const blocked = issues.some((i) => BLOCKING.includes(i));
   return (
-    <div className={`mt-2 rounded-xl border border-amber-300 bg-amber-50 ${compact ? "p-2 text-xs" : "p-3 text-sm"}`} role="alert">
+    <div className={`mt-2 rounded-xl border ${blocked ? "border-red-300 bg-red-50" : "border-amber-300 bg-amber-50"} ${compact ? "p-2 text-xs" : "p-3 text-sm"}`} role="alert">
       <ul className="space-y-1">{issues.map((i) => <li key={i} className="flex gap-1.5"><span aria-hidden>⚠</span><span>{pc.issues[i]}</span></li>)}</ul>
       <div className={`mt-2 flex flex-wrap gap-2 ${compact ? "" : ""}`}>
         <button type="button" className="rounded-full bg-ink px-3 py-1.5 font-semibold text-white" onClick={onOther}>{pc.other}</button>
-        <button type="button" className="rounded-full px-3 py-1.5 font-semibold text-muted underline" onClick={onAnyway}>{pc.anyway}</button>
+        {!blocked && <button type="button" className="rounded-full px-3 py-1.5 font-semibold text-muted underline" onClick={onAnyway}>{pc.anyway}</button>}
       </div>
     </div>
   );
