@@ -56,7 +56,7 @@ export function faceIssues(faces: FaceWidths, framing: Framing): PhotoIssue[] {
   const big = Math.max(...faces);
   const people = faces.filter((w) => w >= big * 0.35).length;
   if (people > 1) return ["many_faces"];
-  if (big < (framing === "full" ? 0.04 : framing === "face" ? 0.18 : 0.08)) return ["face_small"];
+  if (big < (framing === "full" ? 0.03 : framing === "face" ? 0.18 : 0.08)) return ["face_small"];
   return [];
 }
 
@@ -75,22 +75,52 @@ function loadFaceApi() {
 /** Starts loading the detector early (e.g. when the photo step is shown). */
 export function preloadFaceDetector() { void loadFaceApi(); }
 
+type Box = { x: number; y: number; w: number; h: number };
+const iou = (a: Box, b: Box) => {
+  const x = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x));
+  const y = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+  const i = x * y;
+  return i / (a.w * a.h + b.w * b.h - i || 1);
+};
+/** Adds boxes that are not the same face as one already found. */
+export function mergeBoxes(into: Box[], add: Box[]) {
+  for (const b of add) if (!into.some((a) => iou(a, b) > 0.25 || (Math.abs(a.x + a.w / 2 - b.x - b.w / 2) < a.w / 2 && Math.abs(a.y + a.h / 2 - b.y - b.h / 2) < a.h / 2))) into.push(b);
+  return into;
+}
+
 async function detectFaces(canvas: HTMLCanvasElement, bmp: ImageBitmap): Promise<FaceWidths> {
   const fa = await loadFaceApi();
   if (fa) {
     try {
-      const opts = new fa.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.45 });
-      const res = await fa.detectAllFaces(canvas, opts);
-      if (res.length) return res.map((d) => d.box.width / canvas.width);
+      const run = async (c: HTMLCanvasElement, size: number, score: number) =>
+        (await fa.detectAllFaces(c, new fa.TinyFaceDetectorOptions({ inputSize: size, scoreThreshold: score }))).map((d) => ({ x: d.box.x, y: d.box.y, w: d.box.width, h: d.box.height }));
+      const W = canvas.width, H = canvas.height;
+      const boxes: Box[] = await run(canvas, 608, 0.45);
+      // Group / full-length photos: faces are tiny in the whole frame. Look again in 2×2
+      // overlapping tiles, where each face is twice as big for the detector.
+      // Only when nothing or one small face was found (a big single face = a normal portrait).
+      if (boxes.length === 0 || (boxes.length === 1 && boxes[0].w / W < 0.12)) {
+        const tw = Math.round(W * 0.58), th = Math.round(H * 0.58);
+        const tile = document.createElement("canvas");
+        tile.width = tw; tile.height = th;
+        const tx = tile.getContext("2d");
+        if (tx) {
+          for (const [ox, oy] of [[0, 0], [W - tw, 0], [0, H - th], [W - tw, H - th]]) {
+            tx.clearRect(0, 0, tw, th);
+            tx.drawImage(canvas, ox, oy, tw, th, 0, 0, tw, th);
+            mergeBoxes(boxes, (await run(tile, 608, 0.5)).map((b) => ({ ...b, x: b.x + ox, y: b.y + oy })));
+          }
+        }
+      }
+      if (boxes.length) return boxes.map((b) => b.w / W);
       // A close-up whose face fills the frame is often missed: retry with a border around it.
       const pad = document.createElement("canvas");
-      pad.width = canvas.width * 2; pad.height = canvas.height * 2;
+      pad.width = W * 2; pad.height = H * 2;
       const px = pad.getContext("2d");
       if (!px) return [];
       px.fillStyle = "#808080"; px.fillRect(0, 0, pad.width, pad.height);
-      px.drawImage(canvas, canvas.width / 2, canvas.height / 2);
-      const again = await fa.detectAllFaces(pad, new fa.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.4 }));
-      return again.map((d) => Math.min(1, d.box.width / canvas.width));
+      px.drawImage(canvas, W / 2, H / 2);
+      return (await run(pad, 416, 0.4)).map((b) => Math.min(1, b.w / W));
     } catch { /* fall through to the browser detector */ }
   }
   const FD = (globalThis as unknown as { FaceDetector?: new (o: object) => NativeDetector }).FaceDetector;
@@ -118,7 +148,7 @@ export async function checkPhoto(file: File, framing: Framing = "auto"): Promise
     const issues = assessGray(gray, w, h);
     if (framing === "full" && bmp.width > bmp.height * 1.15) issues.push("landscape");
     // Faces: a larger copy for the detector (small faces in group photos need pixels).
-    const ds = Math.min(1, 640 / Math.max(bmp.width, bmp.height));
+    const ds = Math.min(1, 1280 / Math.max(bmp.width, bmp.height));
     const fc = document.createElement("canvas");
     fc.width = Math.max(1, Math.round(bmp.width * ds)); fc.height = Math.max(1, Math.round(bmp.height * ds));
     fc.getContext("2d")?.drawImage(bmp, 0, 0, fc.width, fc.height);

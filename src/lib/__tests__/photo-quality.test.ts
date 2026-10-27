@@ -31,3 +31,13 @@ describe("faceIssues", () => {
   it("face too small for a close-up template", () => expect(faceIssues([0.1], "face")).toEqual(["face_small"]));
   it("full-body photo may have a small face", () => expect(faceIssues([0.06], "full")).toEqual([]));
 });
+
+import { mergeBoxes } from "@/lib/uploads/photo-quality";
+describe("mergeBoxes", () => {
+  it("keeps one box for the same face found twice (whole image + tile)", () => {
+    expect(mergeBoxes([{ x: 100, y: 100, w: 40, h: 40 }], [{ x: 104, y: 98, w: 38, h: 42 }])).toHaveLength(1);
+  });
+  it("adds a different face", () => {
+    expect(mergeBoxes([{ x: 100, y: 100, w: 40, h: 40 }], [{ x: 300, y: 100, w: 40, h: 40 }])).toHaveLength(2);
+  });
+});
