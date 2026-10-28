@@ -69,7 +69,7 @@ export function env() {
       throw new Error("Invalid environment: " + parsed.error.issues.map((i) => i.path.join(".")).join(", "));
     }
     cached = parsed.data;
-    console.log(`[env] payment=${cached.PAYMENT_PROVIDER} tole_key=${cached.TOLE_API_KEY ? (cached.TOLE_API_KEY.startsWith("tole_sk_test_") ? "test" : cached.TOLE_API_KEY.startsWith("tole_sk_live_") ? "live" : "unknown_format") : "none"} tole_connection=${cached.TOLE_CONNECTION_ID ? "set" : "none"} tole_webhook_secret=${cached.TOLE_WEBHOOK_SECRET ? "set" : "none"} ai=${cached.AI_PROVIDER} telegram=${cached.TELEGRAM_BOT_TOKEN ? "on" : "off"} teliks_api=${cached.TELIKS_API_SECRET ? "on" : "off"}`);
+    console.log(`[env] payment=${cached.PAYMENT_PROVIDER} tole_key=${cached.TOLE_API_KEY ? (cached.TOLE_API_KEY.startsWith("tole_sk_test_") ? "test" : cached.TOLE_API_KEY.startsWith("tole_sk_live_") ? "live" : "unknown_format") : "none"} tole_connection=${cached.TOLE_CONNECTION_ID ? "set" : "none"} tole_webhook_secret=${cached.TOLE_WEBHOOK_SECRET ? "set" : "none"} ai=${cached.AI_PROVIDER} muapi=${cached.MUAPI_API_KEY ? "set" : "none"} telegram=${cached.TELEGRAM_BOT_TOKEN ? "on" : "off"} teliks_api=${cached.TELIKS_API_SECRET ? "on" : "off"}`);
     if (cached.APP_ENV === "production" && (cached.PAYMENT_PROVIDER === "sandbox" || cached.PAYMENT_PROVIDER === "tole_sandbox" || cached.AI_PROVIDER === "dev")) {
       throw new Error("Sandbox payment / dev AI provider are not allowed in production");
     }

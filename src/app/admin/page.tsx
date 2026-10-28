@@ -10,6 +10,7 @@ import { isTestPaymentProvider } from "@/lib/payments/types";
 import { TelegramSetup } from "./telegram/setup";
 import { ToleCheckPanel } from "./tole/check";
 import { CustomVideoForm } from "./custom-video/form";
+import { MuapiStatus } from "./muapi/status";
 import { SeedancePricingForm } from "./seedance-pricing/form";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { customVideoSettings } from "@/lib/custom-video/settings";
@@ -78,6 +79,7 @@ async function Overview({ searchParams }: { searchParams: Promise<SP> }) {
         </form>
       </div>
 
+      {can(u.role, "templates.manage") && <MuapiStatus />}
       {can(u.role, "templates.manage") && <SeedancePricingForm value={await seedancePricingSettings()} />}
       {can(u.role, "templates.manage") && <CustomVideoForm value={await customVideoSettings()} />}
       {can(u.role, "users.manage") && <ToleCheckPanel />}

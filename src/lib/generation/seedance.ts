@@ -137,3 +137,20 @@ export const seedanceProvider: GenerationProvider = {
     return { state: status === "queued" || status === "pending" || status === "created" ? "queued" : "processing" };
   },
 };
+
+/** Admin check: is the muapi key accepted, and what is the account balance (USD)? Never returns the key. */
+export async function muapiStatus(): Promise<{ state: "none" | "ok" | "auth" | "error"; balance?: number }> {
+  const k = env().MUAPI_API_KEY;
+  if (!k) return { state: "none" };
+  try {
+    const res = await fetch(`${env().MUAPI_API_BASE_URL}/api/v1/account/balance`, {
+      headers: { "x-api-key": k }, signal: AbortSignal.timeout(8_000), cache: "no-store",
+    });
+    if (res.status === 401 || res.status === 403) return { state: "auth" };
+    if (!res.ok) return { state: "error" };
+    const b = Number(((await res.json().catch(() => ({}))) as { balance?: unknown }).balance);
+    return { state: "ok", balance: Number.isFinite(b) ? b : undefined };
+  } catch {
+    return { state: "error" };
+  }
+}
