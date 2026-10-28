@@ -3,7 +3,7 @@ import { z } from "zod";
 import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { formatKzt } from "@/lib/pricing";
-import { akoolPricingSettings } from "@/lib/pricing-akool/settings";
+import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { tg, escapeHtml } from "./bot";
 
 /**
@@ -61,12 +61,12 @@ async function stats(days: number) {
   const [{ data: s }, { count: users }, { data: jobs }, ap] = await Promise.all([
     db.rpc("admin_stats", { p_from: from.toISOString(), p_to: now.toISOString() }),
     db.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", from.toISOString()),
-    db.from("generation_jobs").select("provider_credits").gte("created_at", from.toISOString()).not("provider_credits", "is", null),
-    akoolPricingSettings(),
+    db.from("generation_jobs").select("provider_cost").gte("created_at", from.toISOString()).not("provider_cost", "is", null),
+    seedancePricingSettings(),
   ]);
   const st = (s ?? {}) as Record<string, number | null> & { top_templates?: { title: string; paid: number }[] };
-  const credits = (jobs ?? []).reduce((n, j) => n + (j.provider_credits ?? 0), 0);
-  const cost = Math.round(credits * ap.tengePerCredit);
+  const usd = (jobs ?? []).reduce((n, j) => n + (Number(j.provider_cost) || 0), 0);
+  const cost = Math.round(usd * ap.tengePerUsd);
   const revenue = Number(st.revenue_kzt ?? 0) - Number(st.refunds_kzt ?? 0);
   const label = days === 1 ? "Бүгін" : `Соңғы ${days} күн`;
   const top = (st.top_templates ?? []).slice(0, 3).map((t, i) => `${i + 1}. ${escapeHtml(t.title)} — ${t.paid}`).join("\n");
@@ -76,7 +76,7 @@ async function stats(days: number) {
     `🧾 Тапсырыс: <b>${st.orders_total ?? 0}</b> · төленді: <b>${st.orders_paid ?? 0}</b>`,
     `💰 Түсім: <b>${formatKzt(Number(st.revenue_kzt ?? 0))}</b>${st.refunds_count ? ` · қайтарым: ${formatKzt(Number(st.refunds_kzt ?? 0))} (${st.refunds_count})` : ""}`,
     `🎬 Дайын видео: <b>${st.generations_completed ?? 0}</b> · жасалмады: <b>${st.generations_failed ?? 0}</b>`,
-    `🤖 Akool: <b>${credits}</b> кредит ≈ ${formatKzt(cost)}`,
+    `🤖 AI (Seedance): <b>$${usd.toFixed(2)}</b> ≈ ${formatKzt(cost)}`,
     `📈 Таза пайда ≈ <b>${formatKzt(revenue - cost)}</b>`,
     `👤 Жаңа қолданушы: <b>${users ?? 0}</b>`,
     ...(Number(st.duplicate_charges ?? 0) > 0 ? ["", `🚨 Қайталанған төлем: <b>${st.duplicate_charges}</b> — сайттағы админкадан тексеріңіз`] : []),
@@ -122,16 +122,17 @@ async function orderDetails(raw: string) {
   if (!/^\d{1,9}$/.test(n)) return { text: "Нөмірді былай жазыңыз: <code>/order TV-100014</code>" };
   const db = supabaseAdmin();
   const { data: o } = await db.from("orders")
-    .select("id,public_order_number,created_at,completed_at,amount_kzt,quality,face_count,payment_status,generation_status,template_snapshot_json,user_id,profiles(email,telegram_username,display_name),payments(provider,status,provider_phone_last4,failure_reason,created_at),generation_jobs(status,error_code,provider_credits,attempt_count)")
+    .select("id,public_order_number,created_at,completed_at,amount_kzt,quality,face_count,payment_status,generation_status,template_snapshot_json,user_id,profiles(email,telegram_username,display_name),payments(provider,status,provider_phone_last4,failure_reason,created_at),generation_jobs(status,error_code,provider_cost,attempt_count)")
     .eq("public_order_number", `TV-${n}`).maybeSingle();
   if (!o) return { text: `TV-${n} табылмады.` };
   const prof = (Array.isArray(o.profiles) ? o.profiles[0] : o.profiles) as { email?: string; telegram_username?: string; display_name?: string } | null;
   const who = prof?.telegram_username ? `@${escapeHtml(prof.telegram_username)}` : prof?.email && !prof.email.endsWith("@telegram.trendme.kz") ? escapeHtml(prof.email) : prof?.display_name ? escapeHtml(prof.display_name) : "—";
   const pays = ((o.payments ?? []) as { provider: string; status: string; provider_phone_last4: string | null; failure_reason: string | null; created_at: string }[])
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
-  const jobs = (o.generation_jobs ?? []) as { status: string; error_code: string | null; provider_credits: number | null; attempt_count: number }[];
-  const credits = jobs.reduce((s, j) => s + (j.provider_credits ?? 0), 0);
-  const ap = await akoolPricingSettings();
+  const jobs = (o.generation_jobs ?? []) as { status: string; error_code: string | null; provider_cost: number | null; attempt_count: number }[];
+  const usd = jobs.reduce((s, j) => s + (Number(j.provider_cost) || 0), 0);
+  const ap = await seedancePricingSettings();
+  const cost = Math.round(usd * ap.tengePerUsd);
   const snap = o.template_snapshot_json as { user_video_path?: string } | null;
   const lines = [
     `🧾 <b>${o.public_order_number}</b> · ${title(o.template_snapshot_json)}${snap?.user_video_path ? " (өз видеосы)" : ""}`,
@@ -140,7 +141,7 @@ async function orderDetails(raw: string) {
     `💰 ${formatKzt(o.amount_kzt)} · ${escapeHtml(o.quality ?? "")} · ${o.face_count} адам`,
     `💳 ${PAY[o.payment_status] ?? o.payment_status}${pays[0] ? ` · ${escapeHtml(pays[0].provider)}${pays[0].provider_phone_last4 ? ` · ••${escapeHtml(pays[0].provider_phone_last4)}` : ""}${pays[0].failure_reason ? ` · ${escapeHtml(pays[0].failure_reason)}` : ""}` : ""}`,
     `🎬 ${GEN[o.generation_status] || "төлемді күтуде"}${jobs.find((j) => j.error_code) ? ` · ${escapeHtml(jobs.find((j) => j.error_code)!.error_code!)}` : ""}${jobs.length ? ` · әрекет: ${Math.max(...jobs.map((j) => j.attempt_count))}` : ""}`,
-    ...(credits ? [`🤖 Akool: ${credits} кредит ≈ ${formatKzt(Math.round(credits * ap.tengePerCredit))} · пайда ≈ ${formatKzt(o.amount_kzt - Math.round(credits * ap.tengePerCredit))}`] : []),
+    ...(usd ? [`🤖 AI: $${usd.toFixed(2)} ≈ ${formatKzt(cost)} · пайда ≈ ${formatKzt(o.amount_kzt - cost)}`] : []),
   ];
   return { text: lines.join("\n"), markup: { inline_keyboard: [[siteButton(`/admin/orders/${o.id}`)]] } };
 }

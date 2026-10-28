@@ -7,7 +7,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { env } from "@/lib/env";
 import { emptyTemplate, rowToInput } from "@/lib/templates/admin-schema";
 import { TemplateEditor } from "./editor";
-import { akoolPricingSettings } from "@/lib/pricing-akool/settings";
+import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 
 /** Server part of the editor: permission check + data loading. `id` null = new template. */
 export async function EditorLoader({ id }: { id: string | null }) {
@@ -19,13 +19,13 @@ export async function EditorLoader({ id }: { id: string | null }) {
   const { data: cats } = await db.from("categories").select("id,title_kk").order("sort_order");
   const categories = (cats ?? []).map((c) => ({ id: c.id, title: c.title_kk }));
   const mediaBase = `${env().NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/template-media`;
-  const akoolPricing = await akoolPricingSettings();
+  const seedancePricing = await seedancePricingSettings();
 
   if (!id) {
     return (
       <>
         <h1 className="mb-6 font-display text-2xl font-bold">{ru.admin.editor.createTitle}</h1>
-        <TemplateEditor id={null} initial={emptyTemplate()} status="draft" categories={categories} mediaBase={mediaBase} akoolPricing={akoolPricing} />
+        <TemplateEditor id={null} initial={emptyTemplate()} status="draft" categories={categories} mediaBase={mediaBase} seedancePricing={seedancePricing} />
       </>
     );
   }
@@ -42,7 +42,7 @@ export async function EditorLoader({ id }: { id: string | null }) {
           {ru.admin.status[row.status as keyof typeof ru.admin.status]}
         </span>
       </div>
-      <TemplateEditor key={row.updated_at} id={id} initial={rowToInput(row)} status={row.status} categories={categories} mediaBase={mediaBase} akoolPricing={akoolPricing} />
+      <TemplateEditor key={row.updated_at} id={id} initial={rowToInput(row)} status={row.status} categories={categories} mediaBase={mediaBase} seedancePricing={seedancePricing} />
     </>
   );
 }

@@ -8,7 +8,7 @@ import { customTemplateId, customVideoSettings } from "@/lib/custom-video/settin
 import { CreateFlow } from "@/components/create-flow";
 import { ButtonLink } from "@/components/ui/button";
 import { formatKzt } from "@/lib/pricing";
-import { akoolPricingSettings } from "@/lib/pricing-akool/settings";
+import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 
 export const metadata = { title: kk.customVideo.title };
 
@@ -39,7 +39,7 @@ export default function CreateOwnPage() {
 async function Flow() {
   await connection(); // request-time only: reads settings and the session, never at build time
   const cv = kk.customVideo;
-  const [user, s, id, ap] = await Promise.all([getSessionUser(), customVideoSettings(), customTemplateId(), akoolPricingSettings()]);
+  const [user, s, id, ap] = await Promise.all([getSessionUser(), customVideoSettings(), customTemplateId(), seedancePricingSettings()]);
   const t = s.enabled && id ? await getTemplateForAdmin(id) : null;
   if (!t) {
     return (
@@ -70,7 +70,8 @@ async function Flow() {
       slots={t.faceSlots}
       qualities={t.qualities}
       pricing={t.pricing}
-      akoolPricing={ap}
+      seedancePricing={ap}
+      allowWish={t.allowWish}
       maxUploadBytes={Math.min(t.maxUploadBytes, e.UPLOAD_MAX_BYTES)}
       minDimension={e.UPLOAD_MIN_DIMENSION}
       maxDimension={e.UPLOAD_MAX_DIMENSION}

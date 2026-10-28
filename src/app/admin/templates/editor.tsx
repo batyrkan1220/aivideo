@@ -7,18 +7,15 @@ import { supabaseBrowser } from "@/lib/supabase/client";
 import type { TemplateInput, PublishProblem } from "@/lib/templates/admin-schema";
 import { autoFaceSlots } from "@/lib/templates/schema";
 import { validateTemplateForm, firstErrorKey, type FieldErrors } from "@/lib/templates/editor-validation";
-import { parseAkoolConfig, akoolSlots, type AkoolConfig } from "@/lib/templates/akool-config";
+import { parseSeedanceConfig, seedanceSlots, SEEDANCE_MAX_PEOPLE, type SeedanceConfig } from "@/lib/templates/seedance-config";
 import { calculatePrice, formatKzt } from "@/lib/pricing";
-import { akoolTierPrices, type AkoolPricing } from "@/lib/pricing-akool";
+import { seedancePriceKzt, seedanceCostKzt, SEEDANCE_QUALITY, type SeedancePricing } from "@/lib/pricing-seedance";
 import { FaceMap } from "@/components/face-map";
-import { AkoolPeople } from "./akool-people";
 import { saveTemplate, changeStatus, createUploadUrl } from "./actions";
 
 const e = ru.admin.editor;
 type Status = "draft" | "published" | "disabled" | "archived";
 
-/** Akool sets the output quality itself; templates keep one fixed internal quality for pricing. */
-const FIXED_QUALITY = { key: "standard", labelKk: "Стандарт", providerQuality: "standard", surchargeKzt: 0, available: true };
 
 const baseInput = "w-full rounded-xl border bg-white px-3 py-2 text-base outline-none sm:text-sm";
 const inputCls = (err?: string) =>
@@ -72,24 +69,20 @@ function goTo(key: string | null) {
 }
 
 export function TemplateEditor({
-  id, initial, status, categories, mediaBase, akoolPricing,
+  id, initial, status, categories, mediaBase, seedancePricing,
 }: {
   id: string | null;
   initial: TemplateInput;
   status: Status;
   categories: { id: string; title: string }[];
   mediaBase: string;
-  akoolPricing: AkoolPricing;
+  seedancePricing: SeedancePricing;
 }) {
   const router = useRouter();
   const [duration, setDuration] = useState<number | null>(null);
-  // Every template is an Akool template: one fixed quality, Akool provider, Akool config.
-  const [t, setT] = useState<TemplateInput>(() => ({
-    ...initial,
-    providerKey: "akool",
-    qualities: [initial.qualities.find((q) => q.available) ?? FIXED_QUALITY].map((q) => ({ ...q, surchargeKzt: 0, available: true })),
-  }));
-  // Template video length → automatic Akool price preview.
+  // Every template is a Seedance template: one quality (720p), Seedance provider and config.
+  const [t, setT] = useState<TemplateInput>(() => ({ ...initial, providerKey: "seedance", qualities: [SEEDANCE_QUALITY] }));
+  // Template video length → automatic price preview.
   useEffect(() => {
     if (!t.previewVideoPath) return;
     const v = document.createElement("video");
@@ -98,25 +91,25 @@ export function TemplateEditor({
     v.src = /^https?:/.test(t.previewVideoPath) ? t.previewVideoPath : `${mediaBase}/${t.previewVideoPath}`;
     return () => { v.onloadedmetadata = null; v.removeAttribute("src"); };
   }, [t.previewVideoPath, mediaBase]);
-  const [akool, setAkoolState] = useState<AkoolConfig>(() =>
-    parseAkoolConfig(initial.providerKey === "akool" ? initial.providerConfig : {}));
+  const [sd, setSdState] = useState<SeedanceConfig>(() =>
+    parseSeedanceConfig(initial.providerKey === "seedance" ? initial.providerConfig : {}));
   const [dirty, setDirty] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string; problems?: PublishProblem[] } | null>(null);
   const [pending, start] = useTransition();
   // Errors appear after the first save/publish attempt and then update live as the admin types.
   const [mode, setMode] = useState<null | "save" | "publish">(null);
 
-  const configText = JSON.stringify(akool);
+  const configText = JSON.stringify(sd);
   const errors: FieldErrors = mode ? validateTemplateForm(t, configText, mode === "publish") : {};
   const err = (k: string) => errors[k];
   const errorCount = Object.keys(errors).length;
 
   const set = <K extends keyof TemplateInput>(k: K, v: TemplateInput[K]) => { setT((p) => ({ ...p, [k]: v })); setDirty(true); };
   const setPricing = (patch: Partial<TemplateInput["pricing"]>) => set("pricing", { ...t.pricing, ...patch });
-  const setAkool = (next: AkoolConfig) => { setAkoolState(next); setDirty(true); };
+  const setSd = (patch: Partial<SeedanceConfig>) => { setSdState((p) => ({ ...p, ...patch })); setDirty(true); };
 
-  // Customer photo slots = the people chosen from the Akool analysis (the server derives them too).
-  const slots = akoolSlots(akool);
+  // Customer photo slots = the number of people to replace, left → right (the server derives them too).
+  const slots = seedanceSlots(sd.people);
 
   /** Client check first (shows red fields), then the authoritative server save. */
   const persist = async (forPublish: boolean): Promise<string | null> => {
@@ -135,7 +128,7 @@ export function TemplateEditor({
       cover = blob ? await uploadCover(blob) : null;
       if (cover) set("coverAssetPath", cover);
     }
-    const payload = { ...t, coverAssetPath: cover, providerKey: "akool", providerConfig: akool, faceSlots: sent };
+    const payload = { ...t, coverAssetPath: cover, providerKey: "seedance", providerConfig: sd, faceSlots: sent };
     const r = await saveTemplate(payload, id);
     if (!r.ok) {
       setMsg({ kind: "err", text: r.error === "forbidden" ? ru.admin.forbidden : r.error === "invalid" ? e.invalid : ru.errors.generic });
@@ -177,9 +170,8 @@ export function TemplateEditor({
     else router.refresh();
   });
 
-  let total: number | null = null;
-  const tiers = akoolTierPrices(duration, Number(t.pricing.basePriceKzt) || 0, akoolPricing);
-  try { total = calculatePrice(t.pricing, t.qualities[0], Math.max(1, slots.length)).totalKzt; } catch { total = null; }
+  const autoPrice = seedancePriceKzt(duration, Number(t.pricing.basePriceKzt) || 0, seedancePricing);
+  const costKzt = duration ? seedanceCostKzt(duration, seedancePricing) : null;
 
   return (
     <div className="space-y-6 pb-56 sm:pb-28">
@@ -216,56 +208,70 @@ export function TemplateEditor({
         <VideoField error={err("preview")} path={t.previewVideoPath} mediaBase={mediaBase} onUploaded={(p) => set("previewVideoPath", p)} onCover={(p) => set("coverAssetPath", p)} />
       </Section>
 
-      <Section title={e.akool.title}>
-        <div className="grid gap-6 lg:grid-cols-[1fr_minmax(0,320px)]">
-          <AkoolPeople
-            videoPath={t.previewVideoPath}
-            mediaBase={mediaBase}
-            cfg={akool}
-            onChange={setAkool}
-            analysisError={err("akool.analysis")}
-            peopleError={err("akool.people")}
-          />
+      <Section title={e.seedance.title}>
+        <p className="text-sm text-muted">{e.seedance.intro}</p>
+        <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_minmax(0,320px)]">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label={e.seedance.people}>
+              <select className={inputCls()} value={sd.people} onChange={(ev) => setSd({ people: Number(ev.target.value) })}>
+                {Array.from({ length: SEEDANCE_MAX_PEOPLE }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+              <span className="mt-1 block text-xs text-muted">{e.seedance.peopleHint}</span>
+            </Field>
+            <Field label={e.seedance.aspect}>
+              <select className={inputCls()} value={sd.aspectRatio} onChange={(ev) => setSd({ aspectRatio: ev.target.value as SeedanceConfig["aspectRatio"] })}>
+                {(Object.keys(e.seedance.aspectOptions) as SeedanceConfig["aspectRatio"][]).map((k) => <option key={k} value={k}>{e.seedance.aspectOptions[k]}</option>)}
+              </select>
+            </Field>
+            <Field label={e.seedance.framing} className="sm:col-span-2">
+              <select className={inputCls()} value={sd.framing} onChange={(ev) => setSd({ framing: ev.target.value as SeedanceConfig["framing"] })}>
+                {(["face", "half", "full"] as const).map((k) => <option key={k} value={k}>{e.seedance.framingOptions[k]}</option>)}
+              </select>
+              <span className="mt-1 block text-xs text-muted">{e.seedance.framingHint}</span>
+            </Field>
+            <Field label={e.seedance.prompt} field="seedance.prompt" error={err("seedance.prompt")} className="sm:col-span-2">
+              <textarea className={`${inputCls(err("seedance.prompt"))} min-h-24`} value={sd.prompt} maxLength={1500} onChange={(ev) => setSd({ prompt: ev.target.value })} />
+              <span className="mt-1 block text-xs text-muted">{e.seedance.promptHint}</span>
+            </Field>
+            <label className="flex items-center gap-2 text-sm sm:col-span-2">
+              <input type="checkbox" className="h-4 w-4 accent-brand" checked={sd.allowWish} onChange={(ev) => setSd({ allowWish: ev.target.checked })} />
+              {e.seedance.allowWish}
+            </label>
+            <p className={`text-xs sm:col-span-2 ${duration !== null && (duration < 3.5 || duration > 30.5) ? "font-semibold text-danger" : "text-muted"}`}>
+              {e.seedance.durationHint}{duration !== null ? ` · ${Math.round(duration * 10) / 10} сек` : ""}
+            </p>
+          </div>
           {slots.length > 0 && <FaceMap slots={slots} mediaBase={mediaBase} />}
         </div>
-        <Field label={e.akool.framing} className="mt-6 sm:max-w-md">
-          <select className={inputCls()} value={akool.framing ?? "half"} onChange={(ev) => setAkool({ ...akool, framing: ev.target.value as AkoolConfig["framing"] })}>
-            {(["face", "half", "full"] as const).map((k) => <option key={k} value={k}>{e.akool.framingOptions[k]}</option>)}
-          </select>
-          <span className="mt-1 block text-xs text-muted">{e.akool.framingHint}</span>
-        </Field>
-        <Field label={e.akool.resolution} className="mt-6 sm:max-w-xs">
-          <select className={inputCls()} value={akool.resolution} onChange={(ev) => setAkool({ ...akool, resolution: ev.target.value as AkoolConfig["resolution"] })}>
-            <option value="720p">720p</option>
-            <option value="480p">480p</option>
-          </select>
-          <span className="mt-1 block text-xs text-muted">{e.akool.creditsHint}</span>
-        </Field>
       </Section>
 
       <Section title={e.sections.pricing}>
-        <div className="grid gap-6 lg:grid-cols-[1fr_minmax(0,260px)]">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={e.basePrice} field="pricing.basePriceKzt" required error={err("pricing.basePriceKzt")}>
-              <Num value={t.pricing.basePriceKzt} min={0} error={err("pricing.basePriceKzt")} onChange={(v) => setPricing({ basePriceKzt: v as number })} />
-            </Field>
+        <div className="rounded-xl bg-brand-soft p-4">
+          <p className="text-sm font-semibold">{e.pricePreview}</p>
+          <p className="mt-1 font-display text-3xl font-bold">
+            {autoPrice === null ? "—" : formatKzt(calculatePrice({ ...t.pricing, basePriceKzt: autoPrice, chargeExtraFaces: false }, { ...SEEDANCE_QUALITY }, Math.max(1, slots.length)).totalKzt)}
+          </p>
+          <p className="mt-1 text-sm text-muted">
+            {duration === null ? e.durationUnknown
+              : duration > 30.5 || duration < 3.5 ? e.durationBad
+              : !t.pricing.basePriceKzt && autoPrice !== null
+                ? e.autoPrice(formatKzt(autoPrice), Math.round(duration), formatKzt(costKzt ?? 0))
+                : e.manualPrice(formatKzt(costKzt ?? 0))}
+          </p>
+          {autoPrice !== null && costKzt !== null && <p className={`mt-1 text-sm font-medium ${autoPrice - costKzt >= 0 ? "text-success" : "text-danger"}`}>{e.profit(formatKzt(autoPrice - costKzt))}</p>}
+        </div>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <Field label={e.basePrice} field="pricing.basePriceKzt" required error={err("pricing.basePriceKzt")}>
+            <Num value={t.pricing.basePriceKzt} min={0} error={err("pricing.basePriceKzt")} onChange={(v) => setPricing({ basePriceKzt: v as number })} />
+            <span className="mt-1 block text-xs text-muted">{e.basePriceHint}</span>
+          </Field>
+        </div>
+        <details className="mt-4 rounded-xl border border-line p-3">
+          <summary className="cursor-pointer text-sm font-medium">{e.pricingAdvanced}</summary>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
             <Field label={e.platformFee} field="pricing.platformFeeKzt" error={err("pricing.platformFeeKzt")}>
               <Num value={t.pricing.platformFeeKzt} min={0} error={err("pricing.platformFeeKzt")} onChange={(v) => setPricing({ platformFeeKzt: v ?? 0 })} />
             </Field>
-            <label className="flex items-center gap-2 text-sm sm:col-span-2">
-              <input type="checkbox" className="h-4 w-4 accent-brand" checked={t.pricing.chargeExtraFaces} onChange={(ev) => setPricing({ chargeExtraFaces: ev.target.checked })} />
-              {e.chargeExtra}
-            </label>
-            {t.pricing.chargeExtraFaces && (
-              <>
-                <Field label={e.includedFaces} field="pricing.includedFaces" required error={err("pricing.includedFaces")}>
-                  <Num value={t.pricing.includedFaces} min={1} error={err("pricing.includedFaces")} onChange={(v) => setPricing({ includedFaces: v as number })} />
-                </Field>
-                <Field label={e.extraFacePrice} field="pricing.extraFacePriceKzt" required error={err("pricing.extraFacePriceKzt")}>
-                  <Num value={t.pricing.extraFacePriceKzt} min={0} error={err("pricing.extraFacePriceKzt")} onChange={(v) => setPricing({ extraFacePriceKzt: v as number })} />
-                </Field>
-              </>
-            )}
             <Field label={e.discount}>
               <select
                 className={inputCls()}
@@ -297,27 +303,7 @@ export function TemplateEditor({
               <Num value={t.pricing.maxPriceKzt} min={1} error={err("pricing.maxPriceKzt")} onChange={(v) => setPricing({ maxPriceKzt: v })} />
             </Field>
           </div>
-          <div className="rounded-xl bg-brand-soft p-4 lg:self-start">
-            <p className="text-sm font-semibold">{e.pricePreview}</p>
-            {tiers ? (
-              <dl className="mt-2 space-y-1">
-                {(["720p", "480p"] as const).map((r) => (
-                  <div key={r} className="flex items-baseline justify-between gap-3">
-                    <dt className="text-sm text-muted">{r}</dt>
-                    <dd className="font-display text-xl font-bold">{formatKzt(calculatePrice({ ...t.pricing, basePriceKzt: tiers[r] }, { ...t.qualities[0], surchargeKzt: 0 }, Math.max(1, slots.length)).totalKzt)}</dd>
-                  </div>
-                ))}
-              </dl>
-            ) : (
-              <p className="mt-2 font-display text-2xl font-bold">{total === null || Number.isNaN(total) || !t.pricing.basePriceKzt ? "—" : formatKzt(total)}</p>
-            )}
-            <p className="mt-2 text-xs text-muted">
-              {duration === null ? e.durationUnknown : !t.pricing.basePriceKzt && tiers
-                ? e.autoPrice(formatKzt(tiers["720p"]), formatKzt(tiers["480p"]), Math.round(duration))
-                : tiers ? e.manualPrice(formatKzt(tiers["480p"])) : null}
-            </p>
-          </div>
-        </div>
+        </details>
       </Section>
 
       {/* Sticky action bar */}

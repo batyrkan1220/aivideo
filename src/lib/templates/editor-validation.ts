@@ -1,5 +1,4 @@
 import type { TemplateInput } from "./admin-schema";
-import { parseAkoolConfig, akoolSlots, AKOOL_MAX_PEOPLE } from "./akool-config";
 
 /**
  * Field-level validation for the admin template editor. Mirrors the server schema
@@ -28,10 +27,7 @@ export const M = {
   providerMissing: "Выберите провайдера.",
   jsonInvalid: "Ошибка в настройках провайдера.",
   uploadSize: "От 1 до 10 МБ.",
-  akoolNotAnalyzed: "Для публикации найдите людей в видео.",
-  akoolVideoChanged: "Видео заменено. Найдите людей заново.",
-  akoolNoPeople: "Выберите хотя бы одного человека для замены.",
-  akoolTooMany: "Можно выбрать максимум 5 человек.",
+  promptLong: "Текст — не больше 1500 символов.",
 } as const;
 
 const KEY_RE = /^[a-z0-9_]+$/;
@@ -106,14 +102,8 @@ export function validateTemplateForm(t: TemplateInput, configText: string, forPu
   const cfg = parseConfig(configText);
   if (!cfg) e.providerConfig = M.jsonInvalid;
 
-  // Akool rules: either no analysis (one person, auto) or an analysis of the CURRENT video with 1–5 people chosen.
-  if (t.providerKey === "akool" && cfg) {
-    const ak = parseAkoolConfig(cfg);
-    // No analysis = auto mode for one person (allowed).
-    if (!ak.analysis) { /* ok */ }
-    else if (ak.analysis.videoPath !== t.previewVideoPath) e["akool.analysis"] = M.akoolVideoChanged;
-    else if (!akoolSlots(ak).length) { if (forPublish) e["akool.people"] = M.akoolNoPeople; }
-    if (ak.selected.length > AKOOL_MAX_PEOPLE) e["akool.people"] = M.akoolTooMany;
+  if (t.providerKey === "seedance" && cfg && typeof cfg.prompt === "string" && cfg.prompt.trim().length > 1500) {
+    e["seedance.prompt"] = M.promptLong;
   }
   return e;
 }
@@ -121,7 +111,7 @@ export function validateTemplateForm(t: TemplateInput, configText: string, forPu
 /** Visual order of fields, so "go to first error" lands on the top-most one. */
 export function firstErrorKey(errors: FieldErrors): string | null {
   const order = [
-    "titleKk", "descriptionKk", "preview", "providerKey", "maxUploadBytes", "akool.analysis", "akool.people", "qualities",
+    "titleKk", "descriptionKk", "preview", "providerKey", "maxUploadBytes", "seedance.prompt", "qualities",
     ...Object.keys(errors).filter((k) => k.startsWith("quality.")).sort(),
     "pricing.basePriceKzt", "pricing.platformFeeKzt", "pricing.includedFaces", "pricing.extraFacePriceKzt",
     "pricing.discount.value", "pricing.discount.endsAt", "pricing.minPriceKzt", "pricing.maxPriceKzt",

@@ -16,7 +16,7 @@ export async function fetchVideoDuration(url: string): Promise<number | null> {
   }
 }
 
-/** Fills templates.video_duration_sec when missing (used for automatic Akool prices). */
+/** Fills templates.video_duration_sec when missing (used for automatic prices). */
 export async function ensureTemplateDuration(templateId: string, videoUrl: string | null): Promise<number | null> {
   if (!videoUrl) return null;
   const d = await fetchVideoDuration(videoUrl);

@@ -1,5 +1,5 @@
 "use server";
-import { ensureTemplateDuration } from "@/lib/pricing-akool/duration";
+import { ensureTemplateDuration } from "@/lib/templates/duration";
 import { mediaUrl } from "@/lib/templates/queries";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -52,7 +52,7 @@ export async function saveTemplate(raw: unknown, id: string | null): Promise<Sav
   const { error } = await db.from("templates").update(row).eq("id", id);
   if (error) { console.error("[admin.template.update]", error.code, error.message); return { ok: false, error: "generic" }; }
 
-  // Video length drives automatic Akool prices: re-read it whenever the video changes.
+  // Video length drives automatic prices: re-read it whenever the video changes.
   if (row.preview_video_path && (row.preview_video_path !== before.preview_video_path || before.video_duration_sec == null)) {
     await ensureTemplateDuration(id, mediaUrl(row.preview_video_path));
   }
@@ -108,7 +108,7 @@ export async function changeStatus(
     const { data: r } = await db.from("templates").select("*").eq("id", id).single();
     if (!r) return { ok: false, error: "generic" };
     const input = templateInputSchema.safeParse(rowToInput(r));
-    const problems = input.success ? publishProblems(input.data) : (["invalid_face_slots"] as PublishProblem[]);
+    const problems = input.success ? publishProblems(input.data, r.video_duration_sec == null ? null : Number(r.video_duration_sec)) : (["invalid_face_slots"] as PublishProblem[]);
     if (problems.length) return { ok: false, error: "generic", problems };
     const { error } = await db.from("templates")
       .update({ status: "published", published_at: r.published_at ?? new Date().toISOString() }).eq("id", id);

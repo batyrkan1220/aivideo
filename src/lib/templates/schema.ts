@@ -7,7 +7,7 @@ export const faceSlotSchema = z.object({
   labelKk: z.string().min(1),
   position: z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) }),
   providerInput: z.string().min(1),
-  /** Akool: preview of the person in the video this photo replaces (template-media path). */
+  /** Optional preview of the person in the video this photo replaces (template-media path). */
   previewImagePath: z.string().max(300).optional(),
   order: z.number().int().min(0),
 });

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { faceSlotSchema, qualitySchema, pricingConfigSchema, validateFaceSlots, autoFaceSlots } from "./schema";
-import { parseAkoolConfig, akoolSlots, akoolProblems } from "./akool-config";
+import { parseSeedanceConfig, seedanceSlots, SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC } from "./seedance-config";
 
 /** Everything an admin can edit on a template. Validated on the server on every save. */
 export const templateInputSchema = z.object({
@@ -24,10 +24,10 @@ export type TemplateInput = z.infer<typeof templateInputSchema>;
 export type PublishProblem =
   | "missing_cover" | "missing_preview" | "invalid_face_slots" | "no_available_quality"
   | "duplicate_quality_key" | "missing_provider" | "price_out_of_range"
-  | "akool_not_analyzed" | "akool_video_changed" | "akool_no_people";
+  | "bad_duration";
 
-/** A template may be published only when it is complete and coherent. */
-export function publishProblems(t: TemplateInput): PublishProblem[] {
+/** A template may be published only when it is complete and coherent. durationSec = template video length. */
+export function publishProblems(t: TemplateInput, durationSec?: number | null): PublishProblem[] {
   const p: PublishProblem[] = [];
   if (!t.previewVideoPath) p.push("missing_preview");
   if (validateFaceSlots(t.faceSlots, t.faceSlots.length).length) p.push("invalid_face_slots");
@@ -36,11 +36,12 @@ export function publishProblems(t: TemplateInput): PublishProblem[] {
   if (!t.providerKey) p.push("missing_provider");
   const { minPriceKzt, maxPriceKzt } = t.pricing;
   if (maxPriceKzt !== undefined && maxPriceKzt < minPriceKzt) p.push("price_out_of_range");
-  if (t.providerKey === "akool") p.push(...akoolProblems(parseAkoolConfig(t.providerConfig), t.previewVideoPath));
+  // Seedance: the template video is the motion reference, 4–30 s.
+  if (t.providerKey === "seedance" && durationSec != null && (durationSec < SEEDANCE_MIN_SEC - 0.5 || durationSec > SEEDANCE_MAX_SEC + 0.5)) p.push("bad_duration");
   return p;
 }
 
-/** Default config for a new template: Akool, one fixed quality (Akool controls output quality). */
+/** Default config for a new template: Seedance (muapi), one quality (720p). */
 export function emptyTemplate(): TemplateInput {
   return {
     titleKk: "",
@@ -52,10 +53,10 @@ export function emptyTemplate(): TemplateInput {
     coverAssetPath: null,
     previewVideoPath: null,
     faceSlots: autoFaceSlots(1),
-    qualities: [{ key: "standard", labelKk: "Стандарт", resolution: "720x1280", fps: 30, providerQuality: "standard", surchargeKzt: 0, available: true }],
+    qualities: [{ key: "720p", labelKk: "Жоғары сапа · 720p", resolution: "720p", providerQuality: "720p", surchargeKzt: 0, available: true }],
     pricing: { basePriceKzt: 0, chargeExtraFaces: false, extraFacePriceKzt: 0, includedFaces: 1, platformFeeKzt: 0, minPriceKzt: 0 },
-    providerKey: "akool",
-    providerConfig: { resolution: "720p", framing: "half", selected: [] },
+    providerKey: "seedance",
+    providerConfig: { people: 1, framing: "half", aspectRatio: "adaptive", prompt: "", allowWish: true },
     maxUploadBytes: 10 * 1024 * 1024,
   };
 }
@@ -92,15 +93,14 @@ export function rowToInput(r: {
 /** Input → DB columns. Face count is always derived from the slot list. */
 export function inputToRow(t: TemplateInput) {
   // Slots are always derived on the server, never trusted from the browser:
-  //  - Akool: one slot per person the admin selected from the video analysis;
+  //  - Seedance: one slot per person to replace (left → right), from the config;
   //  - others: automatic left → right layout, face_1..face_N.
   let slots = autoFaceSlots(t.faceSlots.length);
   let config = t.providerConfig;
-  if (t.providerKey === "akool") {
-    const cfg = parseAkoolConfig(t.providerConfig);
+  if (t.providerKey === "seedance") {
+    const cfg = parseSeedanceConfig(t.providerConfig);
     config = cfg;
-    const derived = akoolSlots(cfg);
-    slots = derived.length ? derived : autoFaceSlots(1);
+    slots = seedanceSlots(cfg.people);
   }
   return {
     title_kk: t.titleKk,

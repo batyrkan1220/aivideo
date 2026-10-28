@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { kk } from "@/lib/i18n/kk";
 import { calculatePrice, formatKzt } from "@/lib/pricing";
-import { akoolTierPrices, applyAkoolPricing, type AkoolPricing } from "@/lib/pricing-akool";
+import { applySeedancePricing, seedanceAutoPriceKzt, type SeedancePricing } from "@/lib/pricing-seedance";
 import { slotPreviewSrc, type FaceSlot, type PricingConfig, type Quality } from "@/lib/templates/schema";
 import { PHOTO_TYPES, validatePhotoMeta, type PhotoError } from "@/lib/uploads/validate";
 import { requestPhotoUpload, confirmPhotoUpload, removePhotoUpload, createOrder } from "@/lib/orders/actions";
@@ -13,8 +13,8 @@ import { useSavedPhone, savePhone } from "@/lib/payments/saved-phone";
 import { compressPhoto } from "@/lib/uploads/compress";
 import { checkPhoto, preloadFaceDetector, BLOCKING, type Framing, type PhotoIssue } from "@/lib/uploads/photo-quality";
 import { PhotoGuide } from "@/components/photo-guide";
-import { AKOOL_MAX_PEOPLE } from "@/lib/templates/akool-config";
-import { requestVideoUpload, confirmVideoUpload, removeVideoUpload, checkVideoAnalysis, type VideoError, type AnalysisResult } from "@/lib/custom-video/actions";
+import { seedanceSlots, SEEDANCE_MAX_PEOPLE } from "@/lib/templates/seedance-config";
+import { requestVideoUpload, confirmVideoUpload, removeVideoUpload, type VideoError } from "@/lib/custom-video/actions";
 
 type SlotState =
   | { phase: "empty" }
@@ -85,7 +85,7 @@ function readVideoDuration(url: string): Promise<number | null> {
 }
 
 export function CreateFlow({
-  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, customVideo, akoolPricing, framing = "auto",
+  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, customVideo, seedancePricing, framing = "auto", allowWish = false,
 }: {
   templateId: string;
   slots: FaceSlot[];
@@ -101,7 +101,9 @@ export function CreateFlow({
   /** "Өз видеом": the customer uploads their own video first. */
   customVideo?: { maxSeconds: number; maxMb: number };
   /** With customVideo: the price is computed from the uploaded video's length and the quality. */
-  akoolPricing?: AkoolPricing;
+  seedancePricing?: SeedancePricing;
+  /** The customer may write a wish for the AI (background, outfit, style). */
+  allowWish?: boolean;
   /** What photo the template needs (face / waist-up / full body); "auto" = like the person in the video. */
   framing?: Framing;
 }) {
@@ -163,33 +165,11 @@ export function CreateFlow({
     setVideo({ phase: "empty" });
   };
 
-  // Akool person analysis of the uploaded video → one photo per person the customer wants to replace.
-  const [analysis, setAnalysis] = useState<{ videoId: string; result: AnalysisResult } | null>(null);
+  // "Өз видеом": the customer says how many people in their video to replace (photos left → right).
   const readyVideoId = video.phase === "ready" ? video.videoId : null;
-  useEffect(() => {
-    if (!readyVideoId) return;
-    let stop = false;
-    let tries = 0;
-    const tick = async () => {
-      if (stop) return;
-      const r = await checkVideoAnalysis(readyVideoId).catch(() => ({ status: "processing" }) as AnalysisResult);
-      if (stop) return;
-      tries++;
-      const result: AnalysisResult = r.status === "processing" && tries > 60 ? { status: "unavailable" } : r;
-      setAnalysis({ videoId: readyVideoId, result });
-      if (result.status === "processing") setTimeout(tick, 3000);
-    };
-    void tick();
-    return () => { stop = true; };
-  }, [readyVideoId]);
-  const an = analysis && analysis.videoId === readyVideoId ? analysis.result : readyVideoId ? ({ status: "processing" } as AnalysisResult) : null;
-  const people = an?.status === "done" ? an.people : null;
-  const analysing = !!customVideo && !!readyVideoId && an?.status === "processing";
-  const peopleSlots: FaceSlot[] | null = people
-    ? people.map((p, i) => ({ key: `p_${p.objId}`, order: i, labelKk: kk.upload.personInVideo(i + 1), position: { x: 0.5, y: 0.42 }, providerInput: `obj_${p.objId}`, previewImagePath: p.previewUrl ?? undefined }))
-    : null;
-  const slots = peopleSlots ?? baseSlots;
-  const pickMode = !!peopleSlots; // choose who to replace (1–5), not "fill every slot"
+  const [peopleCount, setPeopleCount] = useState(1);
+  const slots = customVideo ? seedanceSlots(peopleCount, "p_") : baseSlots;
+  const [wish, setWish] = useState("");
   const limits = { maxBytes: maxUploadBytes, minDimension, maxDimension };
 
   const onPick = async (slot: FaceSlot, file: File | undefined) => {
@@ -255,15 +235,14 @@ export function CreateFlow({
   };
 
   const readyCount = slots.filter((s) => (state[s.key] ?? EMPTY).phase === "ready").length;
-  const missing = analysing ? 1 : pickMode ? (readyCount > 0 ? 0 : 1) : slots.length - readyCount;
-  const faceCount = pickMode ? Math.max(1, readyCount) : slots.length;
+  const missing = slots.length - readyCount;
+  const faceCount = slots.length;
   const pickPhoto = (slot: FaceSlot, f: File | undefined) => {
-    if (pickMode && (state[slot.key] ?? EMPTY).phase !== "ready" && readyCount >= AKOOL_MAX_PEOPLE) { setFormError(cv.errors.maxPeople); return; }
     void onPick(slot, f);
   };
   // "Өз видеом": price appears once the video length is known (seconds × credits × tenge).
-  const dyn = customVideo && akoolPricing && video.phase === "ready"
-    ? applyAkoolPricing(pricing, akoolTierPrices(video.durationSec, 0, akoolPricing)!) : null;
+  const dyn = customVideo && seedancePricing && video.phase === "ready"
+    ? applySeedancePricing(pricing, seedanceAutoPriceKzt(video.durationSec, seedancePricing)) : null;
   const waitingForVideo = !!customVideo && !dyn;
   const effPricing = dyn?.pricing ?? pricing;
   const effQualities = (dyn?.qualities ?? qualities).filter((q) => q.available);
@@ -283,10 +262,6 @@ export function CreateFlow({
     if (pending) return;
     if (blocker === "video") {
       if (!busyVideo) videoRef.current?.querySelector<HTMLInputElement>('input[type="file"]')?.click();
-      return;
-    }
-    if (blocker === "photo" && analysing) {
-      photosRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     if (blocker === "photo" && !busyUpload) {
@@ -315,11 +290,11 @@ export function CreateFlow({
     for (const s of slots) {
       const st = state[s.key] ?? EMPTY;
       if (st.phase === "ready") { assets[s.key] = st.assetId; continue; }
-      if (!pickMode) { setFormError(c.errors.photos_missing); return; }
+      setFormError(c.errors.photos_missing); return;
     }
     if (!Object.keys(assets).length) { setFormError(c.errors.photos_missing); return; }
     if (customVideo && video.phase !== "ready") { setFormError(cv.errors.missing); return; }
-    const r = await createOrder({ templateId, quality, assets, consent: true, ...(customVideo && video.phase === "ready" ? { videoId: video.videoId } : {}) });
+    const r = await createOrder({ templateId, quality, assets, consent: true, ...(allowWish && wish.trim() ? { wish: wish.trim() } : {}), ...(customVideo && video.phase === "ready" ? { videoId: video.videoId } : {}) });
     if (!r.ok) {
       if (r.error === "unauthorized") { router.push(customVideo ? "/login?next=/create" : `/login?next=/templates/${templateId}`); return; }
       if (r.error === "video_missing") { setVideo({ phase: "empty" }); setFormError(cv.errors.missing); return; }
@@ -355,17 +330,28 @@ export function CreateFlow({
 
       {/* Step: photos */}
       <section ref={photosRef} className={`rounded-card border bg-white p-4 transition-shadow sm:p-5 ${nudge === "photo" ? "border-brand ring-4 ring-brand/20" : "border-line"}`}>
-        <StepTitle n={++step} done={missing === 0}>{pickMode && slots.length > 1 ? cv.whoTitle : slots.length > 1 ? c.stepPhotos(slots.length) : c.stepPhoto}</StepTitle>
-        {pickMode && slots.length > 1 ? <p className="mt-1 text-sm text-muted">{cv.whoText(slots.length)}</p>
-          : slots.length > 1 && <p className="mt-1 text-sm text-muted">{c.photosHint}</p>}
+        <StepTitle n={++step} done={missing === 0}>{slots.length > 1 ? c.stepPhotos(slots.length) : c.stepPhoto}</StepTitle>
+        {slots.length > 1 && <p className="mt-1 text-sm text-muted">{c.photosHint}</p>}
+        {customVideo && readyVideoId && (
+          <div className="mt-3">
+            <p className="text-sm font-medium">{cv.howMany}</p>
+            <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label={cv.howMany}>
+              {Array.from({ length: SEEDANCE_MAX_PEOPLE }, (_, i) => i + 1).map((n) => (
+                <button key={n} type="button" role="radio" aria-checked={peopleCount === n}
+                  onClick={() => {
+                    // Fewer people: drop the photos of the people no longer replaced.
+                    for (const s of seedanceSlots(peopleCount, "p_").slice(n)) onRemove(s);
+                    setPeopleCount(n);
+                  }}
+                  className={`h-10 min-w-10 rounded-full px-3 text-sm font-semibold ${peopleCount === n ? "bg-ink text-white" : "bg-paper text-ink ring-1 ring-line"}`}>{n}</button>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-muted">{cv.howManyHint}</p>
+          </div>
+        )}
         <PhotoGuide framing={framing} />
         {customVideo && !readyVideoId ? (
           <p className="mt-3 rounded-xl bg-paper px-4 py-5 text-center text-sm text-muted">{cv.photoAfterVideo}</p>
-        ) : analysing ? (
-          <div className="mt-3 flex items-center gap-3 rounded-xl bg-brand-soft/60 px-4 py-5" role="status">
-            <span className="h-6 w-6 shrink-0 animate-spin rounded-full border-[3px] border-brand/25 border-t-brand" aria-hidden />
-            <span className="text-sm font-medium">{cv.analysing}</span>
-          </div>
         ) : slots.length === 1 ? (
           <div className="mt-3">
             <SinglePhoto slot={slots[0]} st={state[slots[0].key] ?? EMPTY} onPick={(f) => pickPhoto(slots[0], f)} onRemove={() => onRemove(slots[0])} />
@@ -381,7 +367,25 @@ export function CreateFlow({
         )}
       </section>
 
-      {/* Quality = Akool output resolution; the picker only appears when there is a real choice. */}
+      {/* Customer's wish for the AI: background, outfit, style (optional). */}
+      {allowWish && (
+        <section className="rounded-card border border-line bg-white p-4 sm:p-5">
+          <StepTitle n={++step} done={!!wish.trim()}>{c.wish.title}</StepTitle>
+          <p className="mt-1 text-sm text-muted">{c.wish.hint}</p>
+          <textarea value={wish} onChange={(e) => setWish(e.target.value.slice(0, 300))} maxLength={300} rows={2}
+            placeholder={c.wish.placeholder} aria-label={c.wish.title}
+            className="mt-3 w-full rounded-xl border border-line bg-white px-3 py-2 text-base outline-none focus:border-brand" />
+          <div className="mt-2 flex flex-wrap gap-2">
+            {c.wish.examples.map((x) => (
+              <button key={x} type="button" onClick={() => setWish((w) => (w.trim() ? `${w.trim()}; ${x}` : x).slice(0, 300))}
+                className="rounded-full bg-paper px-3 py-1.5 text-xs font-medium ring-1 ring-line hover:ring-brand">+ {x}</button>
+            ))}
+          </div>
+          <p className="mt-1 text-right text-xs text-muted">{wish.length}/300</p>
+        </section>
+      )}
+
+      {/* Quality: one tier (720p); the picker only appears when there is a real choice. */}
       {effQualities.length > 1 && <section className="rounded-card border border-line bg-white p-4 sm:p-5">
         <StepTitle n={++step} done>{c.qualityTitle}</StepTitle>
         <div role="radiogroup" className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line">
@@ -623,7 +627,7 @@ function SlotCard({
   return (
     <div>
       {slot.previewImagePath && (
-        // Akool: which person in the video this photo replaces.
+        // Which person in the video this photo replaces (when the slot has a preview).
         <div className="mb-2 flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={slotPreviewSrc(slot.previewImagePath, mediaBase)!} alt={kk.upload.personInVideo(index + 1)} className="h-12 w-10 rounded-lg border border-line object-cover" />

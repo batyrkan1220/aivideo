@@ -126,17 +126,20 @@ async function submitJob(job: Job) {
     faces.push({ slotKey: s.key, providerInput: s.providerInput, imageUrl: signed.signedUrl });
   }
   let templateVideoUrl = mediaUrl((snap.preview_video_path as string) ?? null) ?? "";
-  if (typeof snap.akool_video_url === "string" && snap.akool_video_url) {
-    // Өз видеом with person analysis: Akool requires the exact URL that was analysed.
-    templateVideoUrl = snap.akool_video_url;
-  } else if (typeof snap.user_video_path === "string" && snap.user_video_path) {
+  if (typeof snap.user_video_path === "string" && snap.user_video_path) {
     // "Өз видеом": the customer's own private video, shared with the provider via a signed URL.
     const { data: signedVideo } = await db.storage.from("user-videos").createSignedUrl(snap.user_video_path, 24 * 3600);
     if (!signedVideo) return delay(job, backoffMs(job.attempt_count));
     templateVideoUrl = signedVideo.signedUrl;
   }
   const quality = (snap.quality as { providerQuality?: string } | undefined)?.providerQuality ?? "standard";
-  const input = { templateVideoUrl, faces, quality, config: (snap.provider_config_json as Record<string, unknown>) ?? {} };
+  // Provider config of the paid version + what the order adds: reference length and the customer's wish.
+  const config = {
+    ...((snap.provider_config_json as Record<string, unknown>) ?? {}),
+    durationSec: Number(snap.video_duration_sec ?? snap.user_video_duration_sec) || null,
+    ...(typeof snap.customer_wish === "string" ? { wish: snap.customer_wish } : {}),
+  };
+  const input = { templateVideoUrl, faces, quality, config };
 
   const problems = provider.validateInputs(input);
   if (problems.length) return failJob(job, "invalid_inputs", { safe_error_message: safeMessage("invalid_inputs") });

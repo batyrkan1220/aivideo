@@ -26,8 +26,10 @@ const schema = z.object({
   // Teliks partner cabinet (separate server + Supabase): shared secret for its API calls only.
   TELIKS_API_SECRET: z.string().trim().min(32).optional(),
   AI_PROVIDER: z.string().default("dev"),
-  AKOOL_API_KEY: z.string().min(10).optional(),
-  AKOOL_API_BASE_URL: z.string().url().default("https://openapi.akool.com"),
+  // muapi.ai — Seedance 2.5 Omni Reference (Intl, 720p): the AI video provider.
+  MUAPI_API_KEY: z.string().transform((v) => v.trim().replace(/^["']|["']$/g, "").trim()).pipe(z.string().min(10)).optional(),
+  MUAPI_API_BASE_URL: z.string().url().default("https://api.muapi.ai"),
+  MUAPI_MODEL: z.string().regex(/^[a-z0-9.-]+$/).default("seedance-2.5-intl-omni-reference"),
   UPLOAD_MAX_BYTES: z.coerce.number().int().positive().default(10 * 1024 * 1024),
   UPLOAD_MIN_DIMENSION: z.coerce.number().int().positive().default(256),
   UPLOAD_MAX_DIMENSION: z.coerce.number().int().positive().default(8192),
@@ -41,7 +43,7 @@ const schema = z.object({
 
 const OPTIONAL_INTEGRATION_KEYS = new Set([
   "TOLE_API_KEY", "TOLE_CONNECTION_ID", "TOLE_WEBHOOK_SECRET", "TOLE_API_BASE_URL",
-  "AKOOL_API_KEY", "AKOOL_API_BASE_URL", "TELEGRAM_BOT_TOKEN",
+  "MUAPI_API_KEY", "MUAPI_API_BASE_URL", "MUAPI_MODEL", "TELEGRAM_BOT_TOKEN",
   "TELIKS_API_SECRET",
   "KASPI_MERCHANT_ID", "KASPI_API_KEY", "KASPI_WEBHOOK_SECRET", "KASPI_API_BASE_URL",
 ]);

@@ -3,7 +3,7 @@ import { kk } from "@/lib/i18n/kk";
 
 /**
  * Which photo goes to which person.
- *  - Akool templates (slots carry a preview of the person from the video): thumbnails, numbered.
+ *  - templates whose slots carry a preview of the person from the video: thumbnails, numbered.
  *  - Others: positions drawn left → right on a 16:9 stage.
  */
 export function FaceMap({ slots, mediaBase }: { slots: FaceSlot[]; mediaBase?: string }) {

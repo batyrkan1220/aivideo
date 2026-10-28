@@ -46,7 +46,7 @@ export interface GenerationProvider {
   capabilities(): ProviderCapabilities;
   /** Returns problem codes; empty = inputs acceptable. */
   validateInputs(input: Omit<SubmitInput, "jobId">): string[];
-  /** credits = provider credits charged (e.g. Akool deduction_credit), for the admin cost view. */
+  /** cost = provider USD charged (spend limit, admin cost view); credits = provider credits, if it bills in credits. */
   submit(input: SubmitInput): Promise<{ providerJobId: string; cost?: number; credits?: number; state?: ProviderState }>;
   getStatus(providerJobId: string, ctx: { startedAt: Date | null; state: ProviderState }): Promise<ProviderJobStatus>;
   cancel?(providerJobId: string): Promise<void>;

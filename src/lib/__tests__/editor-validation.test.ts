@@ -48,14 +48,9 @@ describe("template editor validation", () => {
     expect(validateTemplateForm(ok(), "{oops", false).providerConfig).toBe(M.jsonInvalid);
   });
 
-  it("Akool: analysis of the current video and at least one person to publish", () => {
-    const t = { ...ok(), providerKey: "akool" };
-    expect(validateTemplateForm(t, "{}", false)).toEqual({});           // draft: fine
-    expect(validateTemplateForm(t, "{}", true)).toEqual({});             // publish without analysis: auto, 1 person
-    const analysis = { id: "6700000000000000000000a1", videoPath: "p.mp4", videoUrl: "https://x/p.mp4", people: [{ objId: 0, previewPath: "people/a1/0.jpg" }, { objId: 1, previewPath: "people/a1/1.jpg" }] };
-    expect(validateTemplateForm(t, JSON.stringify({ analysis, selected: [] }), true)["akool.people"]).toBe(M.akoolNoPeople);
-    expect(validateTemplateForm(t, JSON.stringify({ analysis, selected: [1, 0] }), true)).toEqual({});
-    const changed = { ...t, previewVideoPath: "other.mp4" };
-    expect(validateTemplateForm(changed, JSON.stringify({ analysis, selected: [0] }), false)["akool.analysis"]).toBe(M.akoolVideoChanged);
+  it("Seedance: prompt length is limited", () => {
+    const t = { ...ok(), providerKey: "seedance" };
+    expect(validateTemplateForm(t, JSON.stringify({ people: 2, prompt: "night city" }), true)).toEqual({});
+    expect(validateTemplateForm(t, JSON.stringify({ prompt: "x".repeat(1501) }), false)["seedance.prompt"]).toBe(M.promptLong);
   });
 });

@@ -73,6 +73,7 @@ async function CreateSection({ t }: { t: TemplateDetail }) {
       anonKey={e.NEXT_PUBLIC_SUPABASE_ANON_KEY}
       askPhone={e.PAYMENT_PROVIDER === "tole" || e.PAYMENT_PROVIDER === "tole_sandbox"}
       framing={t.photoFraming}
+      allowWish={t.allowWish}
     />
   );
 }

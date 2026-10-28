@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC } from "@/lib/templates/seedance-config";
 
 export const CUSTOM_VIDEO_KEY = "custom_video";
 export const customVideoSettingsSchema = z.object({
@@ -10,16 +11,19 @@ export const customVideoSettingsSchema = z.object({
   maxMb: z.number().int().min(5).max(50).default(50),
 });
 export type CustomVideoSettings = z.infer<typeof customVideoSettingsSchema>;
-export const MIN_VIDEO_SECONDS = 2;
+/** Seedance: the customer's video is the motion reference (4–30 s). */
+export const MIN_VIDEO_SECONDS = SEEDANCE_MIN_SEC;
 export const VIDEO_TYPES = ["video/mp4", "video/quicktime"] as const;
 
 export async function customVideoSettings(): Promise<CustomVideoSettings> {
   try {
     const { data } = await supabaseAdmin().from("site_settings").select("value").eq("key", CUSTOM_VIDEO_KEY).maybeSingle();
     const p = customVideoSettingsSchema.safeParse(data?.value ?? {});
-    return p.success ? p.data : customVideoSettingsSchema.parse({});
+    const v = p.success ? p.data : customVideoSettingsSchema.parse({});
+    return { ...v, maxSeconds: Math.min(v.maxSeconds, SEEDANCE_MAX_SEC) };
   } catch {
-    return customVideoSettingsSchema.parse({});
+    const v = customVideoSettingsSchema.parse({});
+    return { ...v, maxSeconds: Math.min(v.maxSeconds, SEEDANCE_MAX_SEC) };
   }
 }
 

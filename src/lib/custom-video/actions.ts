@@ -6,8 +6,6 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { track } from "@/lib/analytics";
 import { customVideoSettings, MIN_VIDEO_SECONDS, VIDEO_TYPES } from "./settings";
 import { mp4DurationSec, sniffVideoType } from "./mp4";
-import { env } from "@/lib/env";
-import { akoolStartAnalysis, akoolGetAnalysis } from "@/lib/generation/akool";
 
 export type VideoError = "bad_type" | "too_large" | "too_long" | "too_short" | "unreadable" | "disabled" | "rate_limited" | "unauthorized" | "generic";
 const BUCKET = "user-videos";
@@ -75,89 +73,7 @@ export async function confirmVideoUpload(videoId: string): Promise<{ ok: true; d
   if (dur > s.maxSeconds + 0.5) return reject("too_long");
   if (dur < MIN_VIDEO_SECONDS) return reject("too_short");
   await db.from("order_videos").update({ verified_at: new Date().toISOString(), mime_type: type, file_size: bytes.byteLength, duration_sec: dur }).eq("id", v.id);
-  await startAnalysis(v.id, v.storage_path);
   return { ok: true, durationSec: dur };
-}
-
-/**
- * Akool rule: the video is analysed first; Akool returns every person it found (obj_id + preview).
- * The customer then gives one photo per person to replace, and the task must reuse the SAME url.
- * Without Akool (dev / not configured) the order falls back to replacing the main person.
- */
-async function startAnalysis(videoId: string, storagePath: string) {
-  const db = supabaseAdmin();
-  if (env().AI_PROVIDER !== "akool" || !env().AKOOL_API_KEY) {
-    await db.from("order_videos").update({ analysis_status: "unavailable" }).eq("id", videoId);
-    return;
-  }
-  const { data: signed } = await db.storage.from(BUCKET).createSignedUrl(storagePath, URL_TTL_SEC);
-  if (!signed) { await db.from("order_videos").update({ analysis_status: "unavailable" }).eq("id", videoId); return; }
-  try {
-    const id = await akoolStartAnalysis(signed.signedUrl);
-    await db.from("order_videos").update({ analysis_status: "processing", akool_analysis_id: id, akool_video_url: signed.signedUrl }).eq("id", videoId);
-  } catch (err) {
-    console.error("[video.analysis.start]", err instanceof Error ? err.message : err);
-    await db.from("order_videos").update({ analysis_status: "unavailable" }).eq("id", videoId);
-  }
-}
-
-const URL_TTL_SEC = 30 * 24 * 3600; // = order_videos retention; Akool needs the same URL at task time
-const IMG_EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
-
-export type VideoPerson = { objId: number; previewUrl: string | null };
-export type AnalysisResult =
-  | { status: "processing" }
-  | { status: "done"; people: VideoPerson[] }
-  | { status: "unavailable" };
-
-/** Polls the analysis; on completion stores the people (previews copied privately, Akool URLs expire). */
-export async function checkVideoAnalysis(videoId: string): Promise<AnalysisResult> {
-  const user = await getSessionUser();
-  if (!user || !z.string().uuid().safeParse(videoId).success) return { status: "unavailable" };
-  const db = supabaseAdmin();
-  const { data: v } = await db.from("order_videos").select("id,analysis_status,akool_analysis_id,akool_people")
-    .eq("id", videoId).eq("user_id", user.id).maybeSingle();
-  if (!v || !v.analysis_status || v.analysis_status === "unavailable" || v.analysis_status === "failed") return { status: "unavailable" };
-  if (v.analysis_status === "done") return { status: "done", people: await signPeople((v.akool_people ?? []) as StoredPerson[]) };
-
-  let res;
-  try { res = await akoolGetAnalysis(v.akool_analysis_id!); }
-  catch (err) { console.error("[video.analysis.check]", err instanceof Error ? err.message : err); return { status: "processing" }; }
-  if (res.state === "processing") return { status: "processing" };
-  if (res.state === "failed" || !res.people.length) {
-    await db.from("order_videos").update({ analysis_status: "failed" }).eq("id", v.id);
-    return { status: "unavailable" };
-  }
-  const people: StoredPerson[] = [];
-  for (const p of res.people.slice(0, 12)) {
-    if (!p.imgUrl) { people.push({ objId: p.objId }); continue; }
-    try {
-      const r = await fetch(p.imgUrl, { signal: AbortSignal.timeout(20_000) });
-      const type = (r.headers.get("content-type") ?? "").split(";")[0].trim();
-      if (!r.ok || !IMG_EXT[type]) throw new Error(`preview ${r.status}`);
-      const buf = new Uint8Array(await r.arrayBuffer());
-      if (buf.byteLength > 5 * 1024 * 1024) throw new Error("preview too large");
-      const path = `${user.id}/people/${v.akool_analysis_id}/${p.objId}.${IMG_EXT[type]}`;
-      const { error } = await db.storage.from("user-uploads").upload(path, buf, { contentType: type, upsert: true });
-      if (error) throw new Error(error.message);
-      people.push({ objId: p.objId, previewPath: path });
-    } catch (err) {
-      console.error("[video.analysis.preview]", err instanceof Error ? err.message : err);
-      people.push({ objId: p.objId });
-    }
-  }
-  await db.from("order_videos").update({ analysis_status: "done", akool_people: people }).eq("id", v.id);
-  return { status: "done", people: await signPeople(people) };
-}
-
-type StoredPerson = { objId: number; previewPath?: string };
-async function signPeople(people: StoredPerson[]): Promise<VideoPerson[]> {
-  const db = supabaseAdmin();
-  return Promise.all(people.map(async (p) => {
-    if (!p.previewPath) return { objId: p.objId, previewUrl: null };
-    const { data } = await db.storage.from("user-uploads").createSignedUrl(p.previewPath, 3600);
-    return { objId: p.objId, previewUrl: data?.signedUrl ?? null };
-  }));
 }
 
 export async function removeVideoUpload(videoId: string): Promise<{ ok: boolean }> {

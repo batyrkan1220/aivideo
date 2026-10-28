@@ -12,10 +12,11 @@ import { track } from "@/lib/analytics";
 import { allow } from "@/lib/security/rate-limit";
 import { customVideoSettings } from "@/lib/custom-video/settings";
 import { attributeFromCookie } from "@/lib/partners";
-import { akoolTierPrices, applyAkoolPricing } from "@/lib/pricing-akool";
-import { AKOOL_MAX_PEOPLE } from "@/lib/templates/akool-config";
-import { akoolPricingSettings } from "@/lib/pricing-akool/settings";
-import { ensureTemplateDuration } from "@/lib/pricing-akool/duration";
+import { seedancePriceKzt, applySeedancePricing } from "@/lib/pricing-seedance";
+import { parseSeedanceConfig, seedanceSlots, SEEDANCE_MAX_PEOPLE, SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC } from "@/lib/templates/seedance-config";
+import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
+import { ensureTemplateDuration } from "@/lib/templates/duration";
+import { cleanWish } from "@/lib/generation/seedance";
 import { mediaUrl } from "@/lib/templates/queries";
 
 type Fail<E extends string> = { ok: false; error: E | "unauthorized" | "generic" };
@@ -69,8 +70,8 @@ export async function requestPhotoUpload(raw: unknown): Promise<
   const p = requestSchema.safeParse(raw);
   if (!p.success) return { ok: false, error: "generic" };
   const tv = await loadPublishedVersion(p.data.templateId);
-  // Өз видеом: one photo per person Akool found in the customer's video (slot p_<obj_id>).
-  const customPersonSlot = tv?.template.kind === "custom" && /^p_\d{1,4}$/.test(p.data.slotKey);
+  // Өз видеом: the customer chooses how many people to replace (slots p_1…p_5, left → right).
+  const customPersonSlot = tv?.template.kind === "custom" && new RegExp(`^p_[1-${SEEDANCE_MAX_PEOPLE}]$`).test(p.data.slotKey);
   if (!tv || (!customPersonSlot && !tv.slots.some((s) => s.key === p.data.slotKey))) return { ok: false, error: "template_unavailable" };
 
   const problem = validatePhotoMeta(p.data, limits(tv.maxUploadBytes));
@@ -156,6 +157,8 @@ const orderSchema = z.object({
   consent: z.literal(true),
   /** "Өз видеом" orders: the customer's own verified video. */
   videoId: z.string().uuid().optional(),
+  /** Customer's wish for the AI (background, outfit, style…). */
+  wish: z.string().max(600).optional(),
 });
 
 export async function createOrder(raw: unknown): Promise<
@@ -177,7 +180,7 @@ export async function createOrder(raw: unknown): Promise<
   const db = supabaseAdmin();
   const now = Date.now();
 
-  // Custom video: the customer's own verified, unattached video (+ Akool person analysis).
+  // Custom video: the customer's own verified, unattached video = the motion reference.
   const custom = tv.template.kind === "custom";
   let snapshotExtra: Record<string, unknown> = {};
   let durationSec: number | null = null;
@@ -187,35 +190,21 @@ export async function createOrder(raw: unknown): Promise<
     if (!cs.enabled) return { ok: false, error: "template_unavailable" };
     if (!p.data.videoId) return { ok: false, error: "video_missing" };
     const { data: v } = await db.from("order_videos")
-      .select("id,storage_path,verified_at,expires_at,duration_sec,analysis_status,akool_analysis_id,akool_video_url,akool_people")
+      .select("id,storage_path,verified_at,expires_at,duration_sec")
       .eq("id", p.data.videoId).eq("user_id", user.id).is("order_id", null).maybeSingle();
     if (!v?.verified_at || new Date(v.expires_at).getTime() < now) return { ok: false, error: "video_missing" };
     durationSec = Number(v.duration_sec);
-    snapshotExtra = { user_video_path: v.storage_path, user_video_duration_sec: durationSec };
-    const people = (v.analysis_status === "done" ? (v.akool_people ?? []) : []) as { objId: number }[];
-    if (people.length) {
-      // Akool rule: replace the people the customer gave photos for; the task reuses the analysed URL.
-      const chosen = Object.keys(p.data.assets).map((k) => Number(/^p_(\d{1,4})$/.exec(k)?.[1] ?? NaN));
-      if (!chosen.length || chosen.length > AKOOL_MAX_PEOPLE || chosen.some((id) => !people.some((x) => x.objId === id))) {
-        return { ok: false, error: "photos_missing" };
-      }
-      const order = people.map((x) => x.objId).filter((id) => chosen.includes(id));
-      slots = order.map((id, i) => ({
-        key: `p_${id}`, order: i, labelKk: `${people.findIndex((x) => x.objId === id) + 1}-адам`,
-        position: { x: 0.5, y: 0.42 }, providerInput: `obj_${id}`,
-      }));
-      snapshotExtra = {
-        ...snapshotExtra,
-        akool_video_url: v.akool_video_url,
-        face_slots_json: slots,
-        required_face_count: slots.length,
-        provider_config_json: {
-          resolution: "720p",
-          analysis: { id: v.akool_analysis_id, videoPath: v.storage_path, videoUrl: v.akool_video_url, people: people.map((x) => ({ objId: x.objId })) },
-          selected: order,
-        },
-      };
+    // People to replace = photos given, numbered p_1…p_n from the left without gaps.
+    const n = Object.keys(p.data.assets).length;
+    if (n < 1 || n > SEEDANCE_MAX_PEOPLE || Object.keys(p.data.assets).some((k) => !new RegExp(`^p_[1-${n}]$`).test(k))) {
+      return { ok: false, error: "photos_missing" };
     }
+    slots = seedanceSlots(n, "p_");
+    snapshotExtra = {
+      user_video_path: v.storage_path, user_video_duration_sec: durationSec,
+      face_slots_json: slots, required_face_count: n,
+      provider_config_json: { ...parseSeedanceConfig(tv.snapshot.provider_config_json), people: n },
+    };
   } else if (p.data.videoId) {
     return { ok: false, error: "generic" };
   }
@@ -237,20 +226,24 @@ export async function createOrder(raw: unknown): Promise<
     if (new Date(a.expires_at).getTime() < now) return { ok: false, error: "photos_expired" };
   }
 
-  // Akool: quality = output resolution, price from video length × credits (or manual 720p price).
+  if (tv.snapshot.provider_key !== "seedance" && tv.snapshot.provider_key !== "dev") return { ok: false, error: "template_unavailable" };
+  // Seedance: one quality (720p), price from the reference video length (or a manual template price).
   let pricing = tv.pricing;
   let qualities = tv.qualities;
-  if (tv.snapshot.provider_key === "akool") {
+  if (tv.snapshot.provider_key === "seedance") {
     if (!custom) {
       durationSec = tv.template.video_duration_sec == null ? null : Number(tv.template.video_duration_sec);
       if (durationSec === null) durationSec = await ensureTemplateDuration(tv.template.id, mediaUrl((tv.snapshot.preview_video_path as string) ?? null));
     }
-    const tiers = akoolTierPrices(durationSec, custom ? 0 : tv.pricing.basePriceKzt, await akoolPricingSettings());
-    if (!tiers) return { ok: false, error: "template_unavailable" };
-    const eff = applyAkoolPricing(tv.pricing, tiers);
+    if (durationSec === null || durationSec < SEEDANCE_MIN_SEC - 0.5 || durationSec > SEEDANCE_MAX_SEC + 0.5) return { ok: false, error: custom ? "video_missing" : "template_unavailable" };
+    const price = seedancePriceKzt(durationSec, custom ? 0 : tv.pricing.basePriceKzt, await seedancePricingSettings());
+    if (price === null) return { ok: false, error: "template_unavailable" };
+    const eff = applySeedancePricing(tv.pricing, price);
     pricing = eff.pricing;
     qualities = eff.qualities;
-    snapshotExtra = { ...snapshotExtra, pricing_config_json: pricing, video_duration_sec: durationSec };
+    const cfg = parseSeedanceConfig((snapshotExtra.provider_config_json as unknown) ?? tv.snapshot.provider_config_json);
+    const wish = cfg.allowWish ? cleanWish(p.data.wish) : "";
+    snapshotExtra = { ...snapshotExtra, pricing_config_json: pricing, video_duration_sec: durationSec, ...(wish ? { customer_wish: wish } : {}) };
   }
   const quality = qualities.find((q) => q.key === p.data.quality && q.available) ?? (qualities.length === 1 ? qualities[0] : undefined);
   if (!quality) return { ok: false, error: "quality_unavailable" };

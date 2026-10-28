@@ -1,5 +1,5 @@
 import "server-only";
-import type { PhotoFraming } from "./akool-config";
+import { SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC, type PhotoFraming } from "./seedance-config";
 import { after, connection } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -7,9 +7,9 @@ import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { faceSlotSchema, qualitySchema, pricingConfigSchema, orderedSlots, type FaceSlot, type Quality } from "./schema";
 import { startingPrice } from "@/lib/pricing";
-import { akoolTierPrices, applyAkoolPricing, DEFAULT_AKOOL_PRICING, type AkoolPricing } from "@/lib/pricing-akool";
-import { akoolPricingSettings } from "@/lib/pricing-akool/settings";
-import { ensureTemplateDuration } from "@/lib/pricing-akool/duration";
+import { seedancePriceKzt, applySeedancePricing, DEFAULT_SEEDANCE_PRICING, type SeedancePricing } from "@/lib/pricing-seedance";
+import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
+import { ensureTemplateDuration } from "./duration";
 
 /** Cookie-less anon client for public catalog reads (RLS: published templates only). */
 function supabasePublic() {
@@ -39,23 +39,25 @@ export type TemplateDetail = TemplateCard & {
   qualities: Quality[];
   pricing: z.infer<typeof pricingConfigSchema>;
   maxUploadBytes: number;
-  /** Template video length (Akool automatic pricing). */
+  /** Template video length (automatic Seedance pricing). */
   durationSec: number | null;
   /** false = automatic price not known yet (video length still being read). */
   priced: boolean;
-  /** What photo the customer needs (Akool swaps face, hair, body and outfit). */
+  /** What photo the customer needs (the AI takes face, hair, body type and outfit from it). */
   photoFraming: PhotoFraming;
+  /** The customer may write a wish for the AI (background, outfit, style). */
+  allowWish: boolean;
 };
 
 const CARD_COLUMNS =
-  "id,title_kk,description_kk,required_face_count,cover_asset_path,preview_video_path,supported_qualities_json,pricing_config_json,face_slots_json,max_upload_bytes,is_trending,provider_key,video_duration_sec,photo_framing:provider_config_json->>framing,categories(id,title_kk,slug)";
+  "id,title_kk,description_kk,required_face_count,cover_asset_path,preview_video_path,supported_qualities_json,pricing_config_json,face_slots_json,max_upload_bytes,is_trending,provider_key,video_duration_sec,photo_framing:provider_config_json->>framing,allow_wish:provider_config_json->>allowWish,categories(id,title_kk,slug)";
 
 type Row = {
   id: string; title_kk: string; description_kk: string; required_face_count: number;
   cover_asset_path: string | null; preview_video_path: string | null;
   supported_qualities_json: unknown; pricing_config_json: unknown; face_slots_json: unknown;
   max_upload_bytes: number; is_trending: boolean;
-  provider_key?: string | null; video_duration_sec?: number | string | null; photo_framing?: string | null;
+  provider_key?: string | null; video_duration_sec?: number | string | null; photo_framing?: string | null; allow_wish?: string | null;
   categories: { id: string; title_kk: string; slug: string } | { id: string; title_kk: string; slug: string }[] | null;
 };
 
@@ -66,7 +68,7 @@ export function mediaUrl(path: string | null): string | null {
   return `${env().NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/template-media/${path.replace(/^\/+/, "")}`;
 }
 
-export function parseRow(r: Row, akoolPricing: AkoolPricing = DEFAULT_AKOOL_PRICING): TemplateDetail | null {
+export function parseRow(r: Row, seedancePricing: SeedancePricing = DEFAULT_SEEDANCE_PRICING): TemplateDetail | null {
   const parsedQ = z.array(qualitySchema).safeParse(r.supported_qualities_json);
   const parsedP = pricingConfigSchema.safeParse(r.pricing_config_json);
   const slots = z.array(faceSlotSchema).safeParse(r.face_slots_json);
@@ -77,14 +79,18 @@ export function parseRow(r: Row, akoolPricing: AkoolPricing = DEFAULT_AKOOL_PRIC
   let qualities = parsedQ;
   let pricing = parsedP;
   let priced = true;
-  if (r.provider_key === "akool") {
-    // Akool: quality = output resolution; price from video length (or manual 720p price).
+  if (r.provider_key === "seedance") {
+    // Seedance: one quality (720p); price from the video length (or a manual price).
     const duration = r.video_duration_sec == null ? null : Number(r.video_duration_sec);
-    const tiers = akoolTierPrices(duration, parsedP.data.basePriceKzt, akoolPricing);
-    const eff = applyAkoolPricing(parsedP.data, tiers ?? { "720p": 0, "480p": 0 });
+    // A video outside Seedance's 4–30 s cannot be generated: no price, so it cannot be ordered.
+    const usable = duration === null || (duration >= SEEDANCE_MIN_SEC - 0.5 && duration <= SEEDANCE_MAX_SEC + 0.5);
+    const price = usable ? seedancePriceKzt(duration, parsedP.data.basePriceKzt, seedancePricing) : null;
+    const eff = applySeedancePricing(parsedP.data, price ?? 0);
     qualities = { success: true, data: eff.qualities } as typeof parsedQ;
     pricing = { success: true, data: eff.pricing } as typeof parsedP;
-    priced = tiers !== null;
+    priced = price !== null;
+  } else if (r.provider_key !== "dev") {
+    priced = false; // a provider this build does not run (e.g. old Akool rows) is never sold
   }
   const cat = Array.isArray(r.categories) ? r.categories[0] : r.categories;
   const available = qualities.data.filter((q) => q.available);
@@ -99,7 +105,7 @@ export function parseRow(r: Row, akoolPricing: AkoolPricing = DEFAULT_AKOOL_PRIC
     previewUrl: mediaUrl(r.preview_video_path),
     isTrending: r.is_trending,
     category: cat ? { id: cat.id, title: cat.title_kk, slug: cat.slug } : null,
-    // Person previews (Akool) as absolute public URLs, so any component can show them.
+    // Slot preview images (if any) as absolute public URLs, so any component can show them.
     faceSlots: orderedSlots(slots.data).map((s) => (s.previewImagePath ? { ...s, previewImagePath: mediaUrl(s.previewImagePath)! } : s)),
     qualities: qualities.data,
     pricing: pricing.data,
@@ -107,23 +113,24 @@ export function parseRow(r: Row, akoolPricing: AkoolPricing = DEFAULT_AKOOL_PRIC
     durationSec: r.video_duration_sec == null ? null : Number(r.video_duration_sec),
     priced,
     photoFraming: r.photo_framing === "face" || r.photo_framing === "full" ? r.photo_framing : "half",
+    allowWish: r.allow_wish !== "false",
   };
 }
 
-/** Parses rows; Akool templates whose video length is unknown get it filled after the response. */
+/** Parses rows; templates whose video length is unknown get it filled after the response. */
 async function toCards(rows: Row[] | null): Promise<TemplateDetail[]> {
-  const s = await akoolPricingSettings();
-  const missing = (rows ?? []).filter((r) => r.provider_key === "akool" && r.video_duration_sec == null && r.preview_video_path).slice(0, 3);
+  const s = await seedancePricingSettings();
+  const missing = (rows ?? []).filter((r) => r.provider_key === "seedance" && r.video_duration_sec == null && r.preview_video_path).slice(0, 3);
   if (missing.length) after(async () => { for (const r of missing) await ensureTemplateDuration(r.id, mediaUrl(r.preview_video_path)); });
   return (rows ?? []).map((r) => parseRow(r, s)).filter((t): t is TemplateDetail => t !== null);
 }
 
 async function parseOne(r: Row): Promise<TemplateDetail | null> {
-  if (r.provider_key === "akool" && r.video_duration_sec == null && r.preview_video_path) {
+  if (r.provider_key === "seedance" && r.video_duration_sec == null && r.preview_video_path) {
     const d = await ensureTemplateDuration(r.id, mediaUrl(r.preview_video_path));
     if (d) r = { ...r, video_duration_sec: d };
   }
-  return parseRow(r, await akoolPricingSettings());
+  return parseRow(r, await seedancePricingSettings());
 }
 
 export async function listCategories(): Promise<Category[]> {

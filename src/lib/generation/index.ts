@@ -1,6 +1,6 @@
 import "server-only";
 import { devProvider } from "./dev";
-import { akoolProvider } from "./akool";
+import { seedanceProvider } from "./seedance";
 import type { GenerationProvider } from "./types";
 
 /**
@@ -12,7 +12,7 @@ import type { GenerationProvider } from "./types";
  */
 const providers: Record<string, GenerationProvider> = {
   dev: devProvider,
-  akool: akoolProvider,
+  seedance: seedanceProvider,
 };
 
 export function generationProvider(key: string | null | undefined): GenerationProvider | null {
