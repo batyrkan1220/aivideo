@@ -7,38 +7,76 @@ import { kk } from "@/lib/i18n/kk";
  * where the `muted` attribute from server HTML is not always honoured. Pauses off-screen.
  * With `soundToggle`, a small button lets the viewer turn the sound on.
  */
-export function AutoVideo(props: { src: string; poster?: string; controls?: boolean; soundToggle?: boolean; className?: string }) {
+const SOUND_KEY = "trendme.videoSound";
+const soundOff = () => { try { return sessionStorage.getItem(SOUND_KEY) === "off"; } catch { return false; } };
+const rememberSound = (on: boolean) => { try { sessionStorage.setItem(SOUND_KEY, on ? "on" : "off"); } catch { /* ignore */ } };
+
+/**
+ * `preferSound`: start with sound. Opening the page is a tap, so most browsers and the Telegram
+ * WebView allow it; where they refuse, the video plays muted and the sound turns on at the
+ * viewer's first touch. Once the viewer mutes it, it stays muted for the session.
+ */
+export function AutoVideo(props: { src: string; poster?: string; controls?: boolean; soundToggle?: boolean; preferSound?: boolean; className?: string }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [muted, setMuted] = useState(true);
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
-    v.muted = true;
-    v.defaultMuted = true;
-    v.setAttribute("muted", "");
+    const wantSound = !!props.preferSound && !soundOff();
+    const playMuted = () => {
+      v.muted = true;
+      v.defaultMuted = true;
+      v.setAttribute("muted", "");
+      setMuted(true);
+      v.play().catch(() => {});
+    };
+    const playWithSound = () => {
+      v.muted = false;
+      v.removeAttribute("muted");
+      return v.play().then(() => { setMuted(false); return true; }).catch(() => false);
+    };
     const tryPlay = () => { v.play().catch(() => {}); };
+    // Blocked autoplay with sound: turn the sound on at the first touch anywhere.
+    const unmuteOnTouch = (e: Event) => {
+      if ((e.target as Element | null)?.closest?.("[data-sound-toggle]")) return; // the toggle handles itself
+      document.removeEventListener("pointerdown", unmuteOnTouch);
+      if (!soundOff()) void playWithSound();
+    };
+    if (wantSound) {
+      void playWithSound().then((ok) => {
+        if (ok) return;
+        playMuted();
+        document.addEventListener("pointerdown", unmuteOnTouch, { passive: true });
+      });
+    } else {
+      playMuted();
+    }
     const io = new IntersectionObserver(([e]) => (e.isIntersecting ? tryPlay() : v.pause()), { threshold: 0.25 });
     io.observe(v);
     v.addEventListener("loadeddata", tryPlay);
     // Some WebViews only allow playback after the first touch.
     document.addEventListener("touchstart", tryPlay, { once: true, passive: true });
-    return () => { io.disconnect(); v.removeEventListener("loadeddata", tryPlay); document.removeEventListener("touchstart", tryPlay); };
-  }, [props.src]);
+    return () => {
+      io.disconnect(); v.removeEventListener("loadeddata", tryPlay);
+      document.removeEventListener("touchstart", tryPlay); document.removeEventListener("pointerdown", unmuteOnTouch);
+    };
+  }, [props.src, props.preferSound]);
 
   const toggle = () => {
     const v = ref.current;
     if (!v) return;
     v.muted = !v.muted;
     setMuted(v.muted);
+    rememberSound(!v.muted);
     if (!v.muted) v.play().catch(() => {});
   };
 
   return (
     <>
-      <video ref={ref} src={props.src} poster={props.poster} controls={props.controls} muted loop playsInline autoPlay preload="auto" className={props.className} />
+      <video ref={ref} src={props.src} poster={props.poster} controls={props.controls} muted={!props.preferSound} loop playsInline autoPlay preload="auto" className={props.className} />
       {props.soundToggle && (
         <button
-          type="button" onClick={toggle} aria-label={muted ? kk.video.soundOn : kk.video.soundOff}
+          type="button" onClick={toggle} data-sound-toggle aria-label={muted ? kk.video.soundOn : kk.video.soundOff}
           className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
         >
           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>

@@ -49,7 +49,7 @@ export function TemplateDetailView({ t, cta }: { t: TemplateDetail; cta?: React.
       <figure className="mx-auto w-full max-w-[min(100%,calc(52svh*9/16))] md:sticky md:top-24 md:max-w-none md:self-start">
         <div className="relative aspect-[9/16] overflow-hidden rounded-card bg-ink">
           {t.previewUrl ? (
-            <AutoVideo src={t.previewUrl} poster={t.coverUrl ?? undefined} soundToggle className="h-full w-full object-cover" />
+            <AutoVideo src={t.previewUrl} poster={t.coverUrl ?? undefined} soundToggle preferSound className="h-full w-full object-cover" />
           ) : t.coverUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={t.coverUrl} alt="" className="h-full w-full object-cover" />
