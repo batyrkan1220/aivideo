@@ -238,7 +238,7 @@ export async function createOrder(raw: unknown): Promise<
     }
     const cfg = parseSeedanceConfig((snapshotExtra.provider_config_json as unknown) ?? tv.snapshot.provider_config_json);
     if (durationSec === null || durationSec < SEEDANCE_MIN_SEC - 0.5 || durationSec > maxSecFor(cfg.mode) + 0.5) return { ok: false, error: custom ? "video_missing" : "template_unavailable" };
-    if (["kling", "k4", "kd"].includes(cfg.mode) && slots.length > 1) return { ok: false, error: "photos_missing" }; // Kling: one photo
+    if (["kling", "k4"].includes(cfg.mode) && slots.length > 1) return { ok: false, error: "photos_missing" }; // Kling: one photo
     const price = seedancePriceKzt(durationSec, custom ? 0 : tv.pricing.basePriceKzt, await seedancePricingSettings(), { mode: cfg.mode, people: slots.length, prepare: cfg.prepare, faceSwap: cfg.faceSwap });
     if (price === null) return { ok: false, error: "template_unavailable" };
     const eff = applySeedancePricing(tv.pricing, price);

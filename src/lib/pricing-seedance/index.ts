@@ -60,7 +60,7 @@ export function seedanceCostUsd(durationSec: number, s: SeedancePricing, o: Cost
   const sec = Math.min(durationSec, 120);
   if (o.mode === "kd") {
     const out = Math.min(30, Math.max(3, Math.round(durationSec)));
-    const swap = o.faceSwap !== false && durationSec <= 29.5 ? faceSwapCostUsd(durationSec, s) : 0;
+    const swap = o.faceSwap === true && durationSec <= 29.5 ? faceSwapCostUsd(durationSec, s) : 0;
     return Math.round((out * s.kdUsdPerSec + swap) * 10_000) / 10_000;
   }
   if (o.mode === "k4") {

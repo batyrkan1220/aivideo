@@ -52,14 +52,14 @@ export type TemplateDetail = TemplateCard & {
 };
 
 const CARD_COLUMNS =
-  "id,title_kk,description_kk,required_face_count,cover_asset_path,preview_video_path,supported_qualities_json,pricing_config_json,face_slots_json,max_upload_bytes,is_trending,provider_key,video_duration_sec,photo_framing:provider_config_json->>framing,allow_wish:provider_config_json->>allowWish,seedance_mode:provider_config_json->>mode,seedance_prepare:provider_config_json->>prepare,categories(id,title_kk,slug)";
+  "id,title_kk,description_kk,required_face_count,cover_asset_path,preview_video_path,supported_qualities_json,pricing_config_json,face_slots_json,max_upload_bytes,is_trending,provider_key,video_duration_sec,photo_framing:provider_config_json->>framing,allow_wish:provider_config_json->>allowWish,seedance_mode:provider_config_json->>mode,seedance_prepare:provider_config_json->>prepare,seedance_faceswap:provider_config_json->>faceSwap,categories(id,title_kk,slug)";
 
 type Row = {
   id: string; title_kk: string; description_kk: string; required_face_count: number;
   cover_asset_path: string | null; preview_video_path: string | null;
   supported_qualities_json: unknown; pricing_config_json: unknown; face_slots_json: unknown;
   max_upload_bytes: number; is_trending: boolean;
-  provider_key?: string | null; video_duration_sec?: number | string | null; photo_framing?: string | null; allow_wish?: string | null; seedance_mode?: string | null; seedance_prepare?: string | null;
+  provider_key?: string | null; video_duration_sec?: number | string | null; photo_framing?: string | null; allow_wish?: string | null; seedance_mode?: string | null; seedance_prepare?: string | null; seedance_faceswap?: string | null;
   categories: { id: string; title_kk: string; slug: string } | { id: string; title_kk: string; slug: string }[] | null;
 };
 
@@ -86,7 +86,7 @@ export function parseRow(r: Row, seedancePricing: SeedancePricing = DEFAULT_SEED
     const duration = r.video_duration_sec == null ? null : Number(r.video_duration_sec);
     // A video outside Seedance's 4–30 s cannot be generated: no price, so it cannot be ordered.
     const usable = duration === null || (duration >= SEEDANCE_MIN_SEC - 0.5 && duration <= maxSecFor(parseSeedanceMode(r.seedance_mode)) + 0.5);
-    const price = usable ? seedancePriceKzt(duration, parsedP.data.basePriceKzt, seedancePricing, { mode: parseSeedanceMode(r.seedance_mode), people: r.required_face_count, prepare: r.seedance_prepare !== "false" }) : null;
+    const price = usable ? seedancePriceKzt(duration, parsedP.data.basePriceKzt, seedancePricing, { mode: parseSeedanceMode(r.seedance_mode), people: r.required_face_count, prepare: r.seedance_prepare !== "false", faceSwap: r.seedance_faceswap === "true" }) : null;
     const eff = applySeedancePricing(parsedP.data, price ?? 0);
     qualities = { success: true, data: eff.qualities } as typeof parsedQ;
     pricing = { success: true, data: eff.pricing } as typeof parsedP;

@@ -26,7 +26,7 @@ export const seedanceConfigSchema = z.object({
   /** Kling official API: edit the template video (scene 1:1) or make a new one following it. */
   klingMode: z.enum(["edit", "reference"]).default("edit"),
   /** Face swap pass after the video model (muapi ai-video-face-swap). */
-  faceSwap: z.boolean().default(true),
+  faceSwap: z.boolean().default(false),
   /** How many people in the video are replaced (one customer photo each, left → right). */
   people: z.number().int().min(1).max(SEEDANCE_MAX_PEOPLE).default(1),
   /** What photo the customer needs (shown on the order page). */

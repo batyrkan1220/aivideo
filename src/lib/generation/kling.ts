@@ -40,20 +40,26 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
 export type KlingMode = "edit" | "reference";
 
 /** Edit = the template video itself is edited (scene 1:1); reference = a new video following its motion. */
-export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "template", adminPrompt: string, wish: string): string {
+export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "template", adminPrompt: string, wish: string, people = 1, positions: string[] = []): string {
+  const refs = Array.from({ length: people }, (_, i) => `@image_${i + 1}`);
   const look = outfit === "template"
-    ? "Keep the clothing of the original person in @video_1."
-    : "Use the clothing of the person in @image_1.";
+    ? "Keep the clothing of the original people in @video_1."
+    : `Use the clothing of the people in ${refs.join(", ")}.`;
+  const who = people === 1
+    ? "replace the main person with the person from @image_1."
+    : `replace ${refs.map((r, i) => `the person ${positions[i]?.trim() || `number ${i + 1} from the left`} with the person from ${r}`).join(", and ")}.`;
+  const same = `Each new person must look 100% identical to their reference image (${refs.join(", ")}) in every frame: preserve the facial features, face shape, eyes, eyebrows, nose, mouth, teeth, ears, moles, hairstyle, hair color, skin tone, age and body proportions exactly. Do not beautify, stylize or change the faces.`;
   const parts = mode === "edit"
     ? [
-        "Edit @video_1: replace the main person with the person from @image_1.",
-        "The new person must look 100% identical to @image_1 in every frame: preserve the facial features, face shape, eyes, eyebrows, nose, mouth, teeth, ears, moles, hairstyle, hair color, skin tone, age and body proportions from @image_1 exactly. Do not beautify, stylize or change the face.",
+        `Edit @video_1: ${who}`,
+        same,
         look,
         "Keep everything else in @video_1 unchanged: background, location, other people, objects, lighting, camera movement, framing, cuts, motion, timing and sound.",
       ]
     : [
         "Follow the motion, actions, timing, camera movement, framing and cuts of @video_1, and recreate its location, background and lighting.",
-        "The main person is the person from @image_1 and must look 100% identical to @image_1 in every frame: preserve the facial features, face shape, eyes, nose, mouth, hairstyle, skin tone, age and body exactly. Do not beautify, stylize or change the face.",
+        `In the new video, ${who.replace(/\.$/, "")}.`,
+        same,
         look,
       ];
   parts.push("Photorealistic, natural, sharp face, no text, no watermark.");
@@ -62,7 +68,7 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   return parts.join(" ");
 }
 
-export async function submitKlingOmni(opts: { videoUrl: string; photoUrl: string; mode: KlingMode; prompt: string; durationSec: number; aspectRatio: string }): Promise<string> {
+export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: string[]; mode: KlingMode; prompt: string; durationSec: number; aspectRatio: string }): Promise<string> {
   const duration = Math.min(30, Math.max(3, Math.round(opts.durationSec)));
   const d = await call<{ data?: { id?: string } }>("/omni-video/kling-4.0", {
     method: "POST",
@@ -70,7 +76,7 @@ export async function submitKlingOmni(opts: { videoUrl: string; photoUrl: string
       contents: [
         { type: "prompt", text: opts.prompt },
         { type: opts.mode === "edit" ? "base_video" : "feature_video", url: opts.videoUrl, id: "video_1" },
-        { type: "refer_image", url: opts.photoUrl, id: "image_1" },
+        ...opts.photoUrls.slice(0, 5).map((url, i) => ({ type: "refer_image", url, id: `image_${i + 1}` })),
       ],
       // Vertical 720p for phones unless the template asks for another format.
       settings: { resolution: "720p", duration, aspect_ratio: ["16:9", "1:1", "21:9"].includes(opts.aspectRatio) ? opts.aspectRatio : "9:16" },

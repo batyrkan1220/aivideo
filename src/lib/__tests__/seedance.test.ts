@@ -288,7 +288,7 @@ describe("seedance provider", () => {
       calls.push({ url, init, body: init?.body ? JSON.parse(String(init.body)) : undefined });
       return new Response(JSON.stringify(replies.shift()), { status: 200 });
     }));
-    const r = await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { mode: "kd", durationSec: 8.1 } });
+    const r = await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { mode: "kd", durationSec: 8.1, faceSwap: true } });
     expect(calls[0].url).toBe("https://api-singapore.klingai.com/omni-video/kling-4.0");
     expect((calls[0].init?.headers as Record<string, string>).Authorization).toBe(`Bearer ${"g".repeat(20)}`);
     const body = calls[0].body as { contents: { type: string; url?: string; id?: string; text?: string }[]; settings: { resolution: string; duration: number } };

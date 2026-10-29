@@ -153,7 +153,8 @@ export const seedanceProvider: GenerationProvider = {
     const d = Number((input.config as { durationSec?: unknown }).durationSec);
     if (cfg.data.mode === "swap") return problems; // face swap only: no Seedance length limits
     if (cfg.data.mode === "pvr" && input.faces.length > 3) problems.push("too_many_faces");
-    if (["kling", "k4", "kd"].includes(cfg.data.mode) && input.faces.length > 1) problems.push("too_many_faces"); // one photo
+    if (cfg.data.mode === "kd" && input.faces.length > 5) problems.push("too_many_faces");
+    if (["kling", "k4"].includes(cfg.data.mode) && input.faces.length > 1) problems.push("too_many_faces"); // one photo
     if (!(d > 0)) problems.push("unknown_duration");
     else if (d < SEEDANCE_MIN_SEC - 0.5 || d > maxSecFor(cfg.data.mode) + 0.5) problems.push("bad_duration");
     return problems;
@@ -168,9 +169,10 @@ export const seedanceProvider: GenerationProvider = {
     if (cfg.mode === "kd") {
       // Kling 4.0 via Kling's own API. "edit": the template video itself is edited (scene kept 1:1);
       // "reference": a new video following its motion. Then the face swap (up to ~29 s).
-      const prompt = buildKlingDirectPrompt(cfg.klingMode, cfg.outfit, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : "");
-      const id = await submitKlingOmni({ videoUrl: input.templateVideoUrl, photoUrl: faceUrls[0], mode: cfg.klingMode, prompt, durationSec, aspectRatio: cfg.aspectRatio });
-      const swap = cfg.faceSwap && durationSec <= FACE_SWAP_LIMIT_SEC;
+      const n = Math.min(5, faceUrls.length);
+      const prompt = buildKlingDirectPrompt(cfg.klingMode, cfg.outfit, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : "", n, cfg.positions);
+      const id = await submitKlingOmni({ videoUrl: input.templateVideoUrl, photoUrls: faceUrls.slice(0, n), mode: cfg.klingMode, prompt, durationSec, aspectRatio: cfg.aspectRatio });
+      const swap = cfg.faceSwap && n === 1 && durationSec <= FACE_SWAP_LIMIT_SEC;
       return {
         providerJobId: id,
         cost: seedanceCostUsd(durationSec, pricing, { mode: "kd", faceSwap: swap }),

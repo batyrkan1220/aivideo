@@ -123,7 +123,7 @@ export function TemplateEditor({
     const biggest = Math.max(...kept.map((p) => p.size));
     const where = (i: number) => (n === 1 ? "" : i === 0 ? "on the left" : i === n - 1 ? "on the right" : "in the center");
     const patch: Partial<SeedanceConfig> = { people: n };
-    if (sd.mode === "pvr") patch.positions = kept.map((_, i) => where(i));
+    if (sd.mode === "pvr" || sd.mode === "kd") patch.positions = kept.map((_, i) => where(i));
     setSd(patch);
     const desc = kept.map((p, i) => e.seedance.detectPerson(i + 1, n === 1 ? "" : e.seedance.positionOptions[where(i) as keyof typeof e.seedance.positionOptions], p.size === biggest && n > 1)).join(" · ");
     setPeople({ busy: false, text: e.seedance.detectFound(found.length, n, desc) });
@@ -242,7 +242,7 @@ export function TemplateEditor({
         <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_minmax(0,320px)]">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={e.seedance.mode} className="sm:col-span-2">
-              <select className={inputCls()} value={sd.mode} onChange={(ev) => { const m = ev.target.value as SeedanceConfig["mode"]; setSd(m === "kling" || m === "k4" || m === "kd" ? { mode: m, people: 1 } : m === "pvr" ? { mode: m, people: Math.min(sd.people, 3) } : { mode: m }); }}>
+              <select className={inputCls()} value={sd.mode} onChange={(ev) => { const m = ev.target.value as SeedanceConfig["mode"]; setSd(m === "kling" || m === "k4" ? { mode: m, people: 1 } : m === "pvr" ? { mode: m, people: Math.min(sd.people, 3) } : { mode: m }); }}>
                 {(["kd", "wan", "k4", "pvr", "kling", "swap", "scene"] as const).map((k) => <option key={k} value={k}>{e.seedance.modeOptions[k]}</option>)}
               </select>
               <span className="mt-1 block text-xs text-muted">{e.seedance.modeHint[sd.mode]}</span>
@@ -254,7 +254,7 @@ export function TemplateEditor({
               </details>
             </Field>
             <Field label={e.seedance.people}>
-              <select className={inputCls()} value={sd.people} disabled={sd.mode === "kling" || sd.mode === "k4" || sd.mode === "kd"} onChange={(ev) => setSd({ people: Number(ev.target.value) })}>
+              <select className={inputCls()} value={sd.people} disabled={sd.mode === "kling" || sd.mode === "k4"} onChange={(ev) => setSd({ people: Number(ev.target.value) })}>
                 {Array.from({ length: sd.mode === "pvr" ? 3 : SEEDANCE_MAX_PEOPLE }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
               <span className="mt-1 block text-xs text-muted">{sd.mode === "wan" || sd.mode === "swap" ? e.seedance.peopleHintSwap : e.seedance.peopleHint}</span>
@@ -317,7 +317,7 @@ export function TemplateEditor({
                     <input className={inputCls()} maxLength={40} placeholder={`${i + 1}-адам (сол жақтан)`}
                       value={sd.labels[i] ?? ""}
                       onChange={(ev) => { const l = [...sd.labels]; while (l.length < sd.people) l.push(""); l[i] = ev.target.value; setSd({ labels: l.slice(0, sd.people) }); }} />
-                    {sd.mode === "pvr" && (
+                    {(sd.mode === "pvr" || sd.mode === "kd") && (
                       <select className={inputCls()} value={sd.positions[i] ?? ""}
                         onChange={(ev) => { const p = [...sd.positions]; while (p.length < sd.people) p.push(""); p[i] = ev.target.value; setSd({ positions: p.slice(0, sd.people) }); }}>
                         <option value="">{e.seedance.positionAuto(i + 1)}</option>
