@@ -129,8 +129,9 @@ async function submitJob(job: Job) {
   // The template's cover = a frame of its video (Kling: the customer is put into this scene first).
   let templateFrameUrl: string | null = null;
   if (!snap.user_video_path && order.template_id) {
-    const { data: tpl } = await db.from("templates").select("cover_asset_path").eq("id", order.template_id).maybeSingle();
-    templateFrameUrl = mediaUrl(tpl?.cover_asset_path ?? null);
+    const { data: tpl } = await db.from("templates").select("cover_asset_path,frame:provider_config_json->>framePath").eq("id", order.template_id).maybeSingle();
+    const t = tpl as { cover_asset_path: string | null; frame: string | null } | null;
+    templateFrameUrl = mediaUrl(t?.frame ?? t?.cover_asset_path ?? null);
   }
   if (typeof snap.user_video_path === "string" && snap.user_video_path) {
     // "Өз видеом": the customer's own private video, shared with the provider via a signed URL.

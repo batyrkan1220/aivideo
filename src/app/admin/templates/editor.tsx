@@ -128,7 +128,14 @@ export function TemplateEditor({
       cover = blob ? await uploadCover(blob) : null;
       if (cover) set("coverAssetPath", cover);
     }
-    const payload = { ...t, coverAssetPath: cover, providerKey: "seedance", providerConfig: sd, faceSlots: sent };
+    // Kling: a full-size frame of the video = the scene the customer is put into.
+    let cfg = sd;
+    if (sd.mode === "kling" && !sd.framePath && t.previewVideoPath) {
+      const blob = await captureCover(`${mediaBase}/${t.previewVideoPath}`, 1280);
+      const framePath = blob ? await uploadCover(blob) : null;
+      if (framePath) { cfg = { ...sd, framePath }; setSdState(cfg); }
+    }
+    const payload = { ...t, coverAssetPath: cover, providerKey: "seedance", providerConfig: cfg, faceSlots: sent };
     const r = await saveTemplate(payload, id);
     if (!r.ok) {
       setMsg({ kind: "err", text: r.error === "forbidden" ? ru.admin.forbidden : r.error === "invalid" ? e.invalid : ru.errors.generic });
@@ -206,7 +213,7 @@ export function TemplateEditor({
       </Section>
 
       <Section title={e.sections.media}>
-        <VideoField error={err("preview")} path={t.previewVideoPath} mediaBase={mediaBase} onUploaded={(p) => set("previewVideoPath", p)} onCover={(p) => set("coverAssetPath", p)} />
+        <VideoField error={err("preview")} path={t.previewVideoPath} mediaBase={mediaBase} onUploaded={(p) => { set("previewVideoPath", p); setSd({ framePath: null }); }} onCover={(p) => set("coverAssetPath", p)} />
       </Section>
 
       <Section title={e.seedance.title}>
@@ -373,7 +380,7 @@ function fromLocal(v: string) {
  * Grabs one frame of the video as a small JPEG. Catalog cards show this image instead of
  * downloading every video, which keeps pages with many templates fast.
  */
-async function captureCover(source: File | string): Promise<Blob | null> {
+async function captureCover(source: File | string, maxWidth = 540): Promise<Blob | null> {
   const v = document.createElement("video");
   v.muted = true;
   v.playsInline = true;
@@ -385,12 +392,12 @@ async function captureCover(source: File | string): Promise<Blob | null> {
     await new Promise<void>((res, rej) => { v.onloadeddata = () => res(); v.onerror = () => rej(new Error("load")); });
     v.currentTime = Math.min(0.5, (v.duration || 1) / 2);
     await new Promise<void>((res, rej) => { v.onseeked = () => res(); v.onerror = () => rej(new Error("seek")); });
-    const w = Math.min(540, v.videoWidth || 540);
+    const w = Math.min(maxWidth, v.videoWidth || maxWidth);
     const h = Math.round(w * ((v.videoHeight || 960) / (v.videoWidth || 540)));
     const c = document.createElement("canvas");
     c.width = w; c.height = h;
     c.getContext("2d")!.drawImage(v, 0, 0, w, h);
-    return await new Promise<Blob | null>((res) => c.toBlob(res, "image/jpeg", 0.8));
+    return await new Promise<Blob | null>((res) => c.toBlob(res, "image/jpeg", maxWidth > 540 ? 0.92 : 0.8));
   } catch {
     return null;
   } finally {

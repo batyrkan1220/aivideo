@@ -32,6 +32,8 @@ export const seedanceConfigSchema = z.object({
   prompt: z.string().trim().max(1500).default(""),
   /** Customer may describe a wish (background, outfit…). */
   allowWish: z.boolean().default(true),
+  /** Kling: a full-size frame of the template video (storage path), the scene the customer is put into. */
+  framePath: z.string().max(300).nullable().default(null),
 });
 export type SeedanceConfig = z.infer<typeof seedanceConfigSchema>;
 export type SeedanceMode = SeedanceConfig["mode"];
