@@ -115,7 +115,7 @@ export function parseRow(r: Row, seedancePricing: SeedancePricing = DEFAULT_SEED
     durationSec: r.video_duration_sec == null ? null : Number(r.video_duration_sec),
     priced,
     photoFraming: r.photo_framing === "face" || r.photo_framing === "full" ? r.photo_framing : "half",
-    allowWish: ["scene", "kling", "k4"].includes(parseSeedanceMode(r.seedance_mode)) && r.allow_wish !== "false",
+    allowWish: ["scene", "kling", "k4", "kd"].includes(parseSeedanceMode(r.seedance_mode)) && r.allow_wish !== "false",
     seedanceMode: parseSeedanceMode(r.seedance_mode),
   };
 }

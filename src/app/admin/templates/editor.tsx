@@ -198,7 +198,7 @@ export function TemplateEditor({
     else router.refresh();
   });
 
-  const costOpts = { mode: sd.mode, people: sd.people, prepare: sd.prepare };
+  const costOpts = { mode: sd.mode, people: sd.people, prepare: sd.prepare, faceSwap: sd.faceSwap };
   const autoPrice = seedancePriceKzt(duration, Number(t.pricing.basePriceKzt) || 0, seedancePricing, costOpts);
   const costKzt = duration ? seedanceCostKzt(duration, seedancePricing, costOpts) : null;
 
@@ -242,8 +242,8 @@ export function TemplateEditor({
         <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_minmax(0,320px)]">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={e.seedance.mode} className="sm:col-span-2">
-              <select className={inputCls()} value={sd.mode} onChange={(ev) => { const m = ev.target.value as SeedanceConfig["mode"]; setSd(m === "kling" || m === "k4" ? { mode: m, people: 1 } : m === "pvr" ? { mode: m, people: Math.min(sd.people, 3) } : { mode: m }); }}>
-                {(["wan", "k4", "pvr", "kling", "swap", "scene"] as const).map((k) => <option key={k} value={k}>{e.seedance.modeOptions[k]}</option>)}
+              <select className={inputCls()} value={sd.mode} onChange={(ev) => { const m = ev.target.value as SeedanceConfig["mode"]; setSd(m === "kling" || m === "k4" || m === "kd" ? { mode: m, people: 1 } : m === "pvr" ? { mode: m, people: Math.min(sd.people, 3) } : { mode: m }); }}>
+                {(["kd", "wan", "k4", "pvr", "kling", "swap", "scene"] as const).map((k) => <option key={k} value={k}>{e.seedance.modeOptions[k]}</option>)}
               </select>
               <span className="mt-1 block text-xs text-muted">{e.seedance.modeHint[sd.mode]}</span>
               <details className="mt-2 rounded-xl bg-paper px-3 py-2 text-xs">
@@ -254,7 +254,7 @@ export function TemplateEditor({
               </details>
             </Field>
             <Field label={e.seedance.people}>
-              <select className={inputCls()} value={sd.people} disabled={sd.mode === "kling" || sd.mode === "k4"} onChange={(ev) => setSd({ people: Number(ev.target.value) })}>
+              <select className={inputCls()} value={sd.people} disabled={sd.mode === "kling" || sd.mode === "k4" || sd.mode === "kd"} onChange={(ev) => setSd({ people: Number(ev.target.value) })}>
                 {Array.from({ length: sd.mode === "pvr" ? 3 : SEEDANCE_MAX_PEOPLE }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
               <span className="mt-1 block text-xs text-muted">{sd.mode === "wan" || sd.mode === "swap" ? e.seedance.peopleHintSwap : e.seedance.peopleHint}</span>
@@ -264,6 +264,26 @@ export function TemplateEditor({
               </button>
               {people.text && <span className="mt-1 block text-xs font-medium">{people.text}</span>}
             </Field>
+            {sd.mode === "kd" && (
+              <div className="grid gap-3 rounded-xl border border-line p-3 sm:col-span-2 sm:grid-cols-2">
+                <Field label={e.seedance.klingMode}>
+                  <select className={inputCls()} value={sd.klingMode} onChange={(ev) => setSd({ klingMode: ev.target.value as SeedanceConfig["klingMode"] })}>
+                    <option value="edit">{e.seedance.klingModeOptions.edit}</option>
+                    <option value="reference">{e.seedance.klingModeOptions.reference}</option>
+                  </select>
+                </Field>
+                <Field label={e.seedance.outfit}>
+                  <select className={inputCls()} value={sd.outfit} onChange={(ev) => setSd({ outfit: ev.target.value as SeedanceConfig["outfit"] })}>
+                    <option value="photo">{e.seedance.outfitOptions.photo}</option>
+                    <option value="template">{e.seedance.outfitOptions.template}</option>
+                  </select>
+                </Field>
+                <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                  <input type="checkbox" className="h-4 w-4 accent-brand" checked={sd.faceSwap} onChange={(ev) => setSd({ faceSwap: ev.target.checked })} />
+                  {e.seedance.faceSwap}
+                </label>
+              </div>
+            )}
             {sd.mode === "k4" && (
               <Field label={e.seedance.outfit} className="sm:col-span-2">
                 <select className={inputCls()} value={sd.outfit} onChange={(ev) => setSd({ outfit: ev.target.value as SeedanceConfig["outfit"] })}>
@@ -319,7 +339,7 @@ export function TemplateEditor({
               </select>
               <span className="mt-1 block text-xs text-muted">{e.seedance.framingHint}</span>
             </Field>
-            {(sd.mode === "scene" || sd.mode === "kling" || sd.mode === "k4") && <>
+            {(sd.mode === "scene" || sd.mode === "kling" || sd.mode === "k4" || sd.mode === "kd") && <>
             <Field label={e.seedance.prompt} field="seedance.prompt" error={err("seedance.prompt")} className="sm:col-span-2">
               <textarea className={`${inputCls(err("seedance.prompt"))} min-h-24`} value={sd.prompt} maxLength={1500} onChange={(ev) => setSd({ prompt: ev.target.value })} />
               <span className="mt-1 block text-xs text-muted">{e.seedance.promptHint}</span>

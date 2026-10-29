@@ -30,6 +30,8 @@ export const seedancePricingSchema = z.object({
   pvrUsdPerSec: z.number().min(0).max(10).default(0.03),
   /** Kling 4.0 reference-to-video with a reference video, 720p: per (reference + output) second, min 2× output. */
   k4UsdPerSec: z.number().min(0).max(10).default(0.094),
+  /** Kling official API, Kling 4.0 with video input, 720p: 0.6 unit/s × $0.14 (output seconds). */
+  kdUsdPerSec: z.number().min(0).max(10).default(0.084),
   /** Kling: the customer put into the template frame first (nano-banana-pro-edit 2k $0.12 + image face swap $0.02). */
   composeUsd: z.number().min(0).max(5).default(0.14),
 });
@@ -50,12 +52,17 @@ export function seedanceBilledSec(durationSec: number): number {
 }
 
 /** What the template does: "scene" = Seedance + face swap (default here), "swap" = face swap only. */
-export type CostOpts = { mode?: "swap" | "scene" | "kling" | "wan" | "pvr" | "k4"; people?: number; prepare?: boolean };
+export type CostOpts = { mode?: "swap" | "scene" | "kling" | "wan" | "pvr" | "k4" | "kd"; people?: number; prepare?: boolean; faceSwap?: boolean };
 
 export function seedanceCostUsd(durationSec: number, s: SeedancePricing, o: CostOpts = {}): number {
   // Kling: per output second + putting the customer into the template frame first.
   if (o.mode === "kling") return Math.round((Math.ceil(Math.min(durationSec, 30) - 1e-6) * s.klingUsdPerSec + s.composeUsd) * 10_000) / 10_000;
   const sec = Math.min(durationSec, 120);
+  if (o.mode === "kd") {
+    const out = Math.min(30, Math.max(3, Math.round(durationSec)));
+    const swap = o.faceSwap !== false && durationSec <= 29.5 ? faceSwapCostUsd(durationSec, s) : 0;
+    return Math.round((out * s.kdUsdPerSec + swap) * 10_000) / 10_000;
+  }
   if (o.mode === "k4") {
     const out = seedanceOutputSec(durationSec);
     const swap = durationSec <= 29.5 ? faceSwapCostUsd(durationSec, s) : 0; // face swap up to 600 frames (20 fps for long videos)

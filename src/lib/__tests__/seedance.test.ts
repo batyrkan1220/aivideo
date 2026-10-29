@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/env", () => ({ env: () => ({ REPLICATE_API_TOKEN: "r".repeat(20), MUAPI_API_KEY: "k".repeat(20), MUAPI_API_BASE_URL: "https://api.muapi.test", MUAPI_MODEL: "seedance-2.5-intl-omni-reference" }) }));
+vi.mock("@/lib/env", () => ({ env: () => ({ KLING_API_KEY: "g".repeat(20), REPLICATE_API_TOKEN: "r".repeat(20), MUAPI_API_KEY: "k".repeat(20), MUAPI_API_BASE_URL: "https://api.muapi.test", MUAPI_MODEL: "seedance-2.5-intl-omni-reference" }) }));
 vi.mock("@/lib/pricing-seedance/settings", async () => ({ seedancePricingSettings: async () => (await import("@/lib/pricing-seedance")).DEFAULT_SEEDANCE_PRICING }));
 
 import { seedanceProvider, buildPrompt, cleanWish } from "@/lib/generation/seedance";
@@ -273,6 +273,37 @@ describe("seedance provider", () => {
     const s1 = await seedanceProvider.getStatus("k4-1", { startedAt: null, state: r.state ?? null });
     expect(s1).toMatchObject({ state: "processing", next: { providerJobId: "fs-4" } });
     expect(calls[2].body).toMatchObject({ video_url: "https://cdn/k4.mp4", image_url: "https://s/1.jpg", target_index: 0 });
+    vi.unstubAllGlobals();
+  });
+
+  it("kd mode: Kling official API edits the template video, then a face swap", async () => {
+    const calls: { url: string; init?: RequestInit; body?: unknown }[] = [];
+    const replies = [
+      { code: 0, data: { id: "kt-1", status: "submitted" } },
+      { code: 0, data: [{ id: "kt-1", status: "processing" }] },
+      { code: 0, data: [{ id: "kt-1", status: "succeeded", outputs: [{ type: "video", url: "https://kling.cdn/out.mp4" }] }] },
+      { request_id: "fs-k" },
+    ];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, init, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      return new Response(JSON.stringify(replies.shift()), { status: 200 });
+    }));
+    const r = await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { mode: "kd", durationSec: 8.1 } });
+    expect(calls[0].url).toBe("https://api-singapore.klingai.com/omni-video/kling-4.0");
+    expect((calls[0].init?.headers as Record<string, string>).Authorization).toBe(`Bearer ${"g".repeat(20)}`);
+    const body = calls[0].body as { contents: { type: string; url?: string; id?: string; text?: string }[]; settings: { resolution: string; duration: number } };
+    expect(body.contents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "base_video", url: "https://cdn/v.mp4", id: "video_1" }),
+      expect.objectContaining({ type: "refer_image", url: "https://s/1.jpg", id: "image_1" }),
+    ]));
+    expect(body.contents[0].text).toContain("Edit @video_1");
+    expect(body.settings).toMatchObject({ resolution: "720p", duration: 8 });
+    expect(r.cost).toBeCloseTo(8 * 0.084 + 8.1 * 0.094, 3);
+    expect(await seedanceProvider.getStatus("kt-1", { startedAt: null, state: r.state ?? null })).toEqual({ state: "processing" });
+    expect(calls[1].url).toBe("https://api-singapore.klingai.com/tasks?task_ids=kt-1");
+    const s2 = await seedanceProvider.getStatus("kt-1", { startedAt: null, state: r.state ?? null });
+    expect(s2).toMatchObject({ state: "processing", next: { providerJobId: "fs-k" } });
+    expect(calls[3].body).toMatchObject({ video_url: "https://kling.cdn/out.mp4", image_url: "https://s/1.jpg" });
     vi.unstubAllGlobals();
   });
 
