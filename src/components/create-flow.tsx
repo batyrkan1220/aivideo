@@ -11,8 +11,7 @@ import { startCheckout } from "@/lib/payments/actions";
 import { normalizeKzPhone } from "@/lib/payments/phone";
 import { useSavedPhone, savePhone } from "@/lib/payments/saved-phone";
 import { compressPhoto } from "@/lib/uploads/compress";
-import { checkPhoto, preloadFaceDetector, BLOCKING, type Framing, type PhotoIssue } from "@/lib/uploads/photo-quality";
-import { PhotoGuide } from "@/components/photo-guide";
+import type { Framing } from "@/lib/uploads/photo-quality";
 import { seedanceSlots, SEEDANCE_MAX_PEOPLE } from "@/lib/templates/seedance-config";
 import { requestVideoUpload, confirmVideoUpload, removeVideoUpload, type VideoError } from "@/lib/custom-video/actions";
 
@@ -20,12 +19,10 @@ type SlotState =
   | { phase: "empty" }
   | { phase: "uploading"; preview: string; progress: number }
   | { phase: "verifying"; preview: string }
-  | { phase: "ready"; preview: string; assetId: string; issues?: PhotoIssue[] }
-  | { phase: "warn"; preview: string; issues: PhotoIssue[] }
+  | { phase: "ready"; preview: string; assetId: string }
   | { phase: "error"; preview?: string; message: string };
 
 const c = kk.create;
-const pc = kk.create.photoCheck;
 const EMPTY: SlotState = { phase: "empty" };
 const cv = kk.customVideo;
 const videoErr = (e: VideoError, l: { maxSeconds: number; maxMb: number }) =>
@@ -85,7 +82,7 @@ function readVideoDuration(url: string): Promise<number | null> {
 }
 
 export function CreateFlow({
-  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, freeOrders = false, customVideo, seedancePricing, framing = "auto", allowWish = false, seedanceMode = "wan",
+  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, freeOrders = false, customVideo, seedancePricing, allowWish = false, seedanceMode = "wan",
 }: {
   templateId: string;
   slots: FaceSlot[];
@@ -126,7 +123,6 @@ export function CreateFlow({
   const pickSeq = useRef<Record<string, number>>({}); // latest pick per slot (older results are dropped)
 
   useEffect(() => () => previews.current.forEach((u) => URL.revokeObjectURL(u)), []);
-  useEffect(() => { preloadFaceDetector(); }, []);
 
   const setSlot = (key: string, s: SlotState) => setState((prev) => ({ ...prev, [key]: s }));
   const [video, setVideo] = useState<VideoState>({ phase: "empty" });
@@ -189,22 +185,12 @@ export function CreateFlow({
     const dims = await readDimensions(file);
     const localErr: PhotoError | null = validatePhotoMeta({ contentType: file.type, size: file.size, ...dims }, limits);
     if (localErr) { setSlot(slot.key, { phase: "error", preview, message: errText(localErr) }); return; }
-    // Upload and quality check run at the same time: the customer waits for the slower one only.
     const seq = (pickSeq.current[slot.key] ?? 0) + 1;
     pickSeq.current[slot.key] = seq;
-    const checkP = checkPhoto(file, framing).catch(() => [] as PhotoIssue[]);
     const assetId = await upload(slot, file, preview);
     if (!assetId) return;
     if (pickSeq.current[slot.key] !== seq) { void removePhotoUpload(assetId); return; } // replaced meanwhile
-    setSlot(slot.key, { phase: "verifying", preview });
-    const issues = await checkP;
-    if (pickSeq.current[slot.key] !== seq) { void removePhotoUpload(assetId); return; }
-    if (issues.some((x) => BLOCKING.includes(x))) {
-      void removePhotoUpload(assetId); // a group photo cannot be used
-      setSlot(slot.key, { phase: "warn", preview, issues: issues.filter((x) => BLOCKING.includes(x)) });
-      return;
-    }
-    setSlot(slot.key, { phase: "ready", preview, assetId, issues });
+    setSlot(slot.key, { phase: "ready", preview, assetId });
   };
 
   /** Uploads the photo; returns the asset id or null (the slot then shows the error). */
@@ -354,7 +340,6 @@ export function CreateFlow({
             <p className="mt-1 text-xs text-muted">{cv.howManyHint}</p>
           </div>
         )}
-        <PhotoGuide framing={framing} />
         {customVideo && !readyVideoId ? (
           <p className="mt-3 rounded-xl bg-paper px-4 py-5 text-center text-sm text-muted">{cv.photoAfterVideo}</p>
         ) : slots.length === 1 ? (
@@ -558,7 +543,7 @@ function SinglePhoto({ slot, st, onPick, onRemove }: { slot: FaceSlot; st: SlotS
         disabled={busy}
         onClick={() => inputRef.current?.click()}
         aria-label={`${slot.labelKk}: ${preview ? kk.upload.replace : kk.upload.choose}`}
-        className={`flex w-full items-center gap-4 rounded-xl border-2 p-3 text-left transition-colors ${st.phase === "ready" ? "border-success bg-emerald-50" : st.phase === "error" ? "border-danger bg-red-50" : st.phase === "warn" ? "border-amber-400 bg-amber-50" : "border-dashed border-brand/40 bg-brand-soft/50 hover:border-brand"}`}
+        className={`flex w-full items-center gap-4 rounded-xl border-2 p-3 text-left transition-colors ${st.phase === "ready" ? "border-success bg-emerald-50" : st.phase === "error" ? "border-danger bg-red-50" : "border-dashed border-brand/40 bg-brand-soft/50 hover:border-brand"}`}
       >
         <span className="relative h-24 w-[4.5rem] shrink-0 overflow-hidden rounded-lg bg-white">
           {preview ? (
@@ -577,9 +562,9 @@ function SinglePhoto({ slot, st, onPick, onRemove }: { slot: FaceSlot; st: SlotS
         </span>
         <span className="min-w-0 flex-1">
           <span className="block font-semibold">
-            {st.phase === "ready" ? `✓ ${c.photoReady}` : st.phase === "warn" ? `✕ ${pc.blockedTitle}` : busy ? (st.phase === "uploading" && st.progress > 0 ? `${kk.upload.uploading} ${st.progress}%` : c.verifying) : c.pickTitle}
+            {st.phase === "ready" ? `✓ ${c.photoReady}` : busy ? (st.phase === "uploading" && st.progress > 0 ? `${kk.upload.uploading} ${st.progress}%` : c.verifying) : c.pickTitle}
           </span>
-          <span className="mt-0.5 block text-sm text-muted">{st.phase === "ready" ? kk.upload.replace : st.phase === "warn" ? pc.other : c.pickText}</span>
+          <span className="mt-0.5 block text-sm text-muted">{st.phase === "ready" ? kk.upload.replace : c.pickText}</span>
           {st.phase === "uploading" && (
             <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-black/10">
               <span className="block h-full rounded-full bg-brand transition-[width]" style={{ width: `${Math.max(8, st.progress)}%` }} />
@@ -594,19 +579,6 @@ function SinglePhoto({ slot, st, onPick, onRemove }: { slot: FaceSlot; st: SlotS
           {st.message} <button type="button" className="ml-1 font-semibold underline" onClick={onRemove}>{kk.upload.remove}</button>
         </p>
       )}
-      {(st.phase === "warn" || (st.phase === "ready" && st.issues?.length)) && <PhotoWarn issues={st.issues ?? []} onOther={() => inputRef.current?.click()} />}
-    </div>
-  );
-}
-
-/** Quality note: a blocking problem (photo refused) or soft hints shown under an uploaded photo. */
-function PhotoWarn({ issues, onOther, compact = false }: { issues: PhotoIssue[]; onOther: () => void; compact?: boolean }) {
-  const blocked = issues.some((i) => BLOCKING.includes(i));
-  return (
-    <div className={`mt-2 rounded-xl border ${blocked ? "border-red-300 bg-red-50" : "border-amber-300 bg-amber-50"} ${compact ? "p-2 text-xs" : "p-3 text-sm"}`} role={blocked ? "alert" : "status"}>
-      {!blocked && <p className="mb-1 font-semibold">{pc.softTitle}</p>}
-      <ul className="space-y-1">{issues.map((i) => <li key={i} className="flex gap-1.5"><span aria-hidden>{blocked ? "✕" : "⚠"}</span><span>{pc.issues[i]}</span></li>)}</ul>
-      <button type="button" className={`mt-2 rounded-full px-3 py-1.5 font-semibold ${blocked ? "bg-ink text-white" : "bg-white text-ink ring-1 ring-line"}`} onClick={onOther}>{pc.other}</button>
     </div>
   );
 }
@@ -627,7 +599,7 @@ function SlotCard({
   const busy = st.phase === "uploading" || st.phase === "verifying";
   const preview = "preview" in st ? st.preview : undefined;
   const border =
-    st.phase === "ready" ? "border-success" : st.phase === "error" ? "border-danger" : st.phase === "warn" ? "border-amber-400" : "border-line border-dashed";
+    st.phase === "ready" ? "border-success" : st.phase === "error" ? "border-danger" : "border-line border-dashed";
 
   return (
     <div>
@@ -678,7 +650,6 @@ function SlotCard({
       />
       <p className="mt-2 text-sm font-medium leading-tight">{slot.labelKk}</p>
       {st.phase === "error" && <p className="mt-1 text-xs text-danger" role="alert">{st.message}</p>}
-      {(st.phase === "warn" || (st.phase === "ready" && st.issues?.length)) && <PhotoWarn compact issues={st.issues ?? []} onOther={() => inputRef.current?.click()} />}
       {(st.phase === "ready" || st.phase === "error") && (
         <div className="mt-1 flex gap-3 text-xs">
           <button type="button" className="font-semibold text-brand hover:underline" onClick={() => inputRef.current?.click()}>{kk.upload.replace}</button>
