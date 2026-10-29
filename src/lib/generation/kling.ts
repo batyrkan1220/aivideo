@@ -97,3 +97,24 @@ export async function getKlingTask(id: string): Promise<ProviderJobStatus & { vi
   }
   return { state: status === "submitted" ? "queued" : "processing" };
 }
+
+export type KlingStatus = { state: "none" | "ok" | "auth" | "error"; packs?: { name: string; remaining: number; total: number; for40: boolean }[] };
+
+/** Admin check: key accepted + active resource packs (does one cover Kling 4.0?). Never returns the key. */
+export async function klingStatus(): Promise<KlingStatus> {
+  if (!env().KLING_API_KEY) return { state: "none" };
+  try {
+    const now = Date.now();
+    const d = await call<{ data?: { resource_pack_subscribe_infos?: { resource_pack_name?: string; resource_pack_tier?: string; resource_pack_applicable_models?: string; total_quantity?: number; remaining_quantity?: number; status?: string }[] } }>(
+      `/account/costs?start_time=${now - 365 * 86400_000}&end_time=${now}`);
+    const packs = (d.data?.resource_pack_subscribe_infos ?? []).filter((p) => p.status === "online").map((p) => ({
+      name: String(p.resource_pack_name ?? ""),
+      remaining: Number(p.remaining_quantity) || 0,
+      total: Number(p.total_quantity) || 0,
+      for40: p.resource_pack_tier === "flagship" || /4\.0/.test(String(p.resource_pack_applicable_models ?? "")),
+    }));
+    return { state: "ok", packs };
+  } catch (err) {
+    return { state: err instanceof ProviderError && err.code === "provider_auth" ? "auth" : "error" };
+  }
+}
