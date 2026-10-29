@@ -12,7 +12,19 @@ export type TelegramWebApp = {
   showConfirm?(message: string, cb: (ok: boolean) => void): void;
   close?(): void;
   BackButton: { show(): void; hide(): void; onClick(cb: () => void): void; offClick(cb: () => void): void };
+  HapticFeedback?: { impactOccurred(style: "light" | "medium" | "heavy" | "rigid" | "soft"): void; notificationOccurred(type: "error" | "success" | "warning"): void; selectionChanged(): void };
 };
+
+/** Telegram vibration feedback; does nothing outside the Mini App. */
+export function haptic(kind: "tap" | "success" | "error" | "select") {
+  try {
+    const h = window.Telegram?.WebApp?.HapticFeedback;
+    if (!h) return;
+    if (kind === "tap") h.impactOccurred("medium");
+    else if (kind === "select") h.selectionChanged();
+    else h.notificationOccurred(kind);
+  } catch { /* old Telegram clients */ }
+}
 declare global { interface Window { Telegram?: { WebApp?: TelegramWebApp } } }
 
 export const TG_READY_EVENT = "trendme:tg-ready";

@@ -3,7 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { kk } from "@/lib/i18n/kk";
 import { getTemplate } from "@/lib/templates/queries";
-import { TemplateDetailView, QualityPriceList } from "@/components/template-detail";
+import { TemplateDetailView } from "@/components/template-detail";
+import { formatKzt } from "@/lib/pricing";
 import { track } from "@/lib/analytics";
 import { CreateFlow } from "@/components/create-flow";
 import { isFreeOrderUser } from "@/lib/orders/free";
@@ -43,18 +44,32 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
 async function CreateSection({ t }: { t: TemplateDetail }) {
   const user = await getSessionUser();
   if (!user) {
+    const price = t.startingPriceKzt;
+    const next = encodeURIComponent(`/templates/${t.id}`);
     return (
-      <div className="space-y-6">
-      <QualityPriceList t={t} />
-      <div className="rounded-card bg-brand-soft p-6">
-        <h2 className="font-display text-lg font-bold">{kk.create.loginTitle}</h2>
-        <p className="mt-1 text-sm text-muted">{kk.create.loginText}</p>
-        <div className="mt-4 flex flex-wrap gap-3">
-          <ButtonLink href={`/login?next=/templates/${t.id}`} size="lg">{kk.auth.login}</ButtonLink>
-          <ButtonLink href={`/signup?next=/templates/${t.id}`} size="lg" variant="secondary">{kk.auth.signup}</ButtonLink>
+      <>
+        <div className="rounded-card border border-line bg-white p-5">
+          <div className="flex items-baseline justify-between gap-4">
+            <h2 className="font-semibold">{kk.template.priceTitle}</h2>
+            {price !== null && <p className="font-display text-2xl font-bold">{formatKzt(price)}</p>}
+          </div>
+          <p className="mt-2 text-sm text-muted">{kk.create.loginText}</p>
+          <div className="mt-4 hidden gap-3 sm:flex">
+            <ButtonLink href={`/login?next=${next}`} size="lg">{kk.auth.login}</ButtonLink>
+            <ButtonLink href={`/signup?next=${next}`} size="lg" variant="secondary">{kk.auth.signup}</ButtonLink>
+          </div>
         </div>
-      </div>
-      </div>
+        {/* Phones: one big action always in reach, above the bottom tab bar. */}
+        <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-line bg-white/95 px-4 py-3 backdrop-blur sm:hidden">
+          <ButtonLink href={`/signup?next=${next}`} size="lg" className="w-full">
+            {kk.create.loginCta}{price !== null ? ` · ${formatKzt(price)}` : ""}
+          </ButtonLink>
+          <p className="mt-1.5 text-center text-xs text-muted">
+            {kk.create.haveAccount} <a href={`/login?next=${next}`} className="font-semibold text-brand">{kk.auth.login}</a>
+          </p>
+        </div>
+        <div className="h-24 sm:hidden" aria-hidden />
+      </>
     );
   }
   if (!t.priced) {

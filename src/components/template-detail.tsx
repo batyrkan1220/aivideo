@@ -66,7 +66,7 @@ export function TemplateDetailView({ t, cta }: { t: TemplateDetail; cta?: React.
             </p>
           </div>
         </div>
-        <figcaption className="mt-2 text-xs text-muted md:mt-3 md:text-sm">{kk.template.sampleNote}</figcaption>
+        <figcaption className="mt-3 hidden text-sm text-muted md:block">{kk.template.sampleNote}</figcaption>
       </figure>
 
       <div className="min-w-0">

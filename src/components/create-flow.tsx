@@ -13,6 +13,7 @@ import { useSavedPhone, savePhone } from "@/lib/payments/saved-phone";
 import { compressPhoto } from "@/lib/uploads/compress";
 import type { Framing } from "@/lib/uploads/photo-quality";
 import { seedanceSlots, SEEDANCE_MAX_PEOPLE } from "@/lib/templates/seedance-config";
+import { haptic } from "@/lib/telegram/client";
 import { requestVideoUpload, confirmVideoUpload, removeVideoUpload, type VideoError } from "@/lib/custom-video/actions";
 
 type SlotState =
@@ -184,13 +185,14 @@ export function CreateFlow({
     file = await compressPhoto(file, minDimension);
     const dims = await readDimensions(file);
     const localErr: PhotoError | null = validatePhotoMeta({ contentType: file.type, size: file.size, ...dims }, limits);
-    if (localErr) { setSlot(slot.key, { phase: "error", preview, message: errText(localErr) }); return; }
+    if (localErr) { haptic("error"); setSlot(slot.key, { phase: "error", preview, message: errText(localErr) }); return; }
     const seq = (pickSeq.current[slot.key] ?? 0) + 1;
     pickSeq.current[slot.key] = seq;
     const assetId = await upload(slot, file, preview);
     if (!assetId) return;
     if (pickSeq.current[slot.key] !== seq) { void removePhotoUpload(assetId); return; } // replaced meanwhile
     setSlot(slot.key, { phase: "ready", preview, assetId });
+    haptic("success");
   };
 
   /** Uploads the photo; returns the asset id or null (the slot then shows the error). */
@@ -250,6 +252,7 @@ export function CreateFlow({
   /** The pay button is always tappable: it points the user to whatever is still missing. */
   const onPay = () => {
     if (pending) return;
+    haptic(blocker ? "select" : "tap");
     if (blocker === "video") {
       if (!busyVideo) videoRef.current?.querySelector<HTMLInputElement>('input[type="file"]')?.click();
       return;
@@ -288,6 +291,7 @@ export function CreateFlow({
     if (!r.ok) {
       if (r.error === "unauthorized") { router.push(customVideo ? "/login?next=/create" : `/login?next=/templates/${templateId}`); return; }
       if (r.error === "video_missing") { setVideo({ phase: "empty" }); setFormError(cv.errors.missing); return; }
+      haptic("error");
       setFormError(errText(r.error));
       return;
     }
@@ -412,28 +416,24 @@ export function CreateFlow({
         </section>
       )}
 
-      {/* Step: pay. On phones the total + button stick above the bottom tab bar. */}
-      {(price || waitingForVideo) && (
+      {/* Price breakdown only when there is more than one line; the total and pay button stick at the bottom. */}
+      {price && (price.extraFacesKzt > 0 || price.platformFeeKzt > 0 || price.discountKzt > 0) && (
         <section className="rounded-card border border-line bg-white p-4 sm:p-5">
-          <StepTitle n={++step} done={false}>{c.stepPay}</StepTitle>
-          {price && (price.extraFacesKzt > 0 || price.platformFeeKzt > 0 || price.discountKzt > 0) && (
-            <dl className="mt-3 space-y-1.5 text-sm">
+            <dl className="space-y-1.5 text-sm">
               <Row label={`${kk.pricing.videoPrice}${selected ? ` · ${selected.labelKk}` : ""}`} value={formatKzt(price.basePriceKzt + price.qualitySurchargeKzt)} />
               {price.extraFacesKzt > 0 && <Row label={`${kk.pricing.extraFaces} (${price.extraFaces})`} value={`+${formatKzt(price.extraFacesKzt)}`} />}
               {price.platformFeeKzt > 0 && <Row label={kk.pricing.platformFee} value={`+${formatKzt(price.platformFeeKzt)}`} />}
               {price.discountKzt > 0 && <Row label={kk.pricing.discount} value={`−${formatKzt(price.discountKzt)}`} />}
             </dl>
-          )}
-          <label ref={consentRef} className={`mt-3 flex cursor-pointer gap-3 rounded-xl p-3 text-sm transition-colors ${nudge === "consent" ? "bg-flash/30 ring-2 ring-flash" : "bg-paper"}`}>
-            <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0 accent-brand" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-            <span className="text-muted">{customVideo ? cv.consent : kk.consent.combined}</span>
-          </label>
-          <p className="mt-3 text-xs text-muted">{c.afterPay}</p>
         </section>
       )}
 
       {(price || waitingForVideo) && (
-        <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 -mx-4 border-t border-line bg-white/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:rounded-card sm:border sm:p-4">
+        <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 -mx-4 border-t border-line bg-white/95 px-4 pb-2 pt-2.5 shadow-[0_-8px_24px_-12px_rgba(30,27,46,0.18)] backdrop-blur sm:static sm:mx-0 sm:rounded-card sm:border sm:p-4 sm:shadow-none">
+          <label ref={consentRef} className={`-mx-1 mb-2 flex cursor-pointer items-start gap-2.5 rounded-lg px-1 py-1 text-xs leading-snug transition-colors ${nudge === "consent" ? "bg-flash/40 ring-2 ring-flash" : ""}`}>
+            <input type="checkbox" className="mt-px h-[18px] w-[18px] shrink-0 accent-brand" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+            <span className="text-muted">{customVideo ? cv.consent : kk.consent.combined}</span>
+          </label>
           <div className="flex items-center gap-3">
             <div className="min-w-0 shrink-0">
               <p className="text-xs text-muted">{c.total}</p>
@@ -452,8 +452,8 @@ export function CreateFlow({
                 : freeOrders ? c.freeNow : price ? c.payNow(formatKzt(price.totalKzt)) : c.confirm}
             </button>
           </div>
-          <p className="mt-1.5 min-h-4 text-center text-xs text-danger" aria-live="polite">
-            {formError ?? (blocker ? <span className="text-muted">{hint}</span> : "")}
+          <p className="mt-1 min-h-4 text-center text-xs text-danger" aria-live="polite">
+            {formError ?? (blocker && blocker !== "consent" ? <span className="text-muted">{hint}</span> : !blocker ? <span className="text-muted">{c.afterPayShort}</span> : "")}
           </p>
         </div>
       )}
@@ -543,9 +543,9 @@ function SinglePhoto({ slot, st, onPick, onRemove }: { slot: FaceSlot; st: SlotS
         disabled={busy}
         onClick={() => inputRef.current?.click()}
         aria-label={`${slot.labelKk}: ${preview ? kk.upload.replace : kk.upload.choose}`}
-        className={`flex w-full items-center gap-4 rounded-xl border-2 p-3 text-left transition-colors ${st.phase === "ready" ? "border-success bg-emerald-50" : st.phase === "error" ? "border-danger bg-red-50" : "border-dashed border-brand/40 bg-brand-soft/50 hover:border-brand"}`}
+        className={`flex w-full items-center gap-4 rounded-2xl border-2 p-3 text-left transition-[colors,transform] active:scale-[0.99] ${st.phase === "ready" ? "border-success bg-emerald-50" : st.phase === "error" ? "border-danger bg-red-50" : "border-dashed border-brand/50 bg-brand-soft/60 hover:border-brand"}`}
       >
-        <span className="relative h-24 w-[4.5rem] shrink-0 overflow-hidden rounded-lg bg-white">
+        <span className="relative h-32 w-24 shrink-0 overflow-hidden rounded-xl bg-white shadow-sm">
           {preview ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={preview} alt="" className="h-full w-full object-cover" />
@@ -561,7 +561,7 @@ function SinglePhoto({ slot, st, onPick, onRemove }: { slot: FaceSlot; st: SlotS
           )}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block font-semibold">
+          <span className="block text-lg font-bold leading-tight">
             {st.phase === "ready" ? `✓ ${c.photoReady}` : busy ? (st.phase === "uploading" && st.progress > 0 ? `${kk.upload.uploading} ${st.progress}%` : c.verifying) : c.pickTitle}
           </span>
           <span className="mt-0.5 block text-sm text-muted">{st.phase === "ready" ? kk.upload.replace : c.pickText}</span>
