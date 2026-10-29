@@ -210,6 +210,9 @@ export const seedanceProvider: GenerationProvider = {
             return { state: "processing", next: { providerJobId: swapId, state: { stage: "swap", i, faces: st.faces, base: url, swap_cost: st.swap_cost }, cost: i === 0 ? 0 : st.swap_cost ?? 0 } };
           } catch (err) {
             console.error("[seedance] face swap submit failed", i, err instanceof ProviderError ? `${err.code} ${err.message}` : err instanceof Error ? err.message : err);
+            // Busy / rate limit / server error: the worker polls again in 30 s and resubmits this pass.
+            const fresh = !ctx?.startedAt || Date.now() - ctx.startedAt.getTime() < 60 * 60_000;
+            if (err instanceof ProviderError && err.retryable && fresh) throw err;
             return { state: "succeeded", outputUrl: url };
           }
         }
