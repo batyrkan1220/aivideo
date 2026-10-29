@@ -75,10 +75,13 @@ export function buildKlingPrompt(adminPrompt: string, wish: string): string {
 }
 
 /** Kling 4.0 reference-to-video: who (photo), where (template frame), how (template video). */
-export function buildK4Prompt(withFrame: boolean, adminPrompt: string, wish: string): string {
+export function buildK4Prompt(withFrame: boolean, adminPrompt: string, wish: string, outfit: "photo" | "template" = "photo"): string {
   const parts = [
     "Recreate @video_1 shot by shot: exactly the same motion, actions, timing, camera movement, framing and cuts.",
     "The main person is the person from @image_1: keep exactly the same face, facial features, hairstyle, skin tone, age and body as in @image_1.",
+    outfit === "template"
+      ? "The person wears exactly the same outfit as the main person in @video_1 (same clothes, colors, shoes and accessories)."
+      : "The person wears the same clothes as in @image_1.",
     withFrame ? "Use the same location, background, objects and lighting as in @video_1 and @image_2." : "Use the same location, background, objects and lighting as in @video_1.",
     "Photorealistic, natural, sharp face, no text, no watermark.",
   ];
@@ -140,7 +143,7 @@ export const seedanceProvider: GenerationProvider = {
       // photo = the person (@image_1); template frame = location (@image_2). Then a face swap pass.
       const images = [faceUrls[0], ...(input.templateFrameUrl ? [input.templateFrameUrl] : [])];
       const body = {
-        prompt: buildK4Prompt(!!input.templateFrameUrl, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : ""),
+        prompt: buildK4Prompt(!!input.templateFrameUrl, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : "", cfg.outfit),
         images_list: images,
         videos_list: [input.templateVideoUrl],
         duration: seedanceOutputSec(durationSec),

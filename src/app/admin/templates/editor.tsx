@@ -264,6 +264,14 @@ export function TemplateEditor({
               </button>
               {people.text && <span className="mt-1 block text-xs font-medium">{people.text}</span>}
             </Field>
+            {sd.mode === "k4" && (
+              <Field label={e.seedance.outfit} className="sm:col-span-2">
+                <select className={inputCls()} value={sd.outfit} onChange={(ev) => setSd({ outfit: ev.target.value as SeedanceConfig["outfit"] })}>
+                  <option value="photo">{e.seedance.outfitOptions.photo}</option>
+                  <option value="template">{e.seedance.outfitOptions.template}</option>
+                </select>
+              </Field>
+            )}
             {sd.mode === "wan" && (
               <div className="grid gap-2 rounded-xl border border-line p-3 sm:col-span-2">
                 <label className="flex items-center gap-2 text-sm font-medium">
