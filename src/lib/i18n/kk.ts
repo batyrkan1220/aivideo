@@ -243,6 +243,7 @@ export const kk = {
     summaryTitle: "Тапсырыс",
     confirm: "Тапсырысты растау",
     payNow: (price: string) => `Төлеу · ${price}`,
+    freeNow: "Тегін жасау · тест",
     paying: "Төлемге өтудеміз…",
     creating: "Тапсырыс жасалуда…",
     missingPhotos: (left: number) => `Тағы ${left} фото жүктеңіз.`,

@@ -85,7 +85,7 @@ function readVideoDuration(url: string): Promise<number | null> {
 }
 
 export function CreateFlow({
-  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, customVideo, seedancePricing, framing = "auto", allowWish = false,
+  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, freeOrders = false, customVideo, seedancePricing, framing = "auto", allowWish = false,
 }: {
   templateId: string;
   slots: FaceSlot[];
@@ -98,6 +98,8 @@ export function CreateFlow({
   anonKey: string;
   /** Kaspi invoice payments need the customer's Kaspi phone number. */
   askPhone?: boolean;
+  /** Admin-approved test/gift user: no payment step, the video is made right away. */
+  freeOrders?: boolean;
   /** "Өз видеом": the customer uploads their own video first. */
   customVideo?: { maxSeconds: number; maxMb: number };
   /** With customVideo: the price is computed from the uploaded video's length and the quality. */
@@ -114,7 +116,7 @@ export function CreateFlow({
   const [quality, setQuality] = useState(available[0]?.key ?? "");
   const [consent, setConsent] = useState(false);
   const [phone, setPhone] = useSavedPhone();
-  const needPhone = askPhone;
+  const needPhone = askPhone && !freeOrders;
   const phoneOk = !needPhone || !!normalizeKzPhone(phone);
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -301,11 +303,12 @@ export function CreateFlow({
       setFormError(errText(r.error));
       return;
     }
+    if (r.free) { router.push(`/orders/${r.orderId}`); return; }
     // One click: the order is created and payment starts right away (the action redirects to it).
-    if (askPhone) savePhone(phone);
+    if (needPhone) savePhone(phone);
     const fd = new FormData();
     fd.set("orderId", r.orderId);
-    if (askPhone) fd.set("phone", phone);
+    if (needPhone) fd.set("phone", phone);
     const pay = await startCheckout({}, fd);
     // Only reached when payment could not start: the order is saved, pay from its page.
     router.push(`/orders/${r.orderId}${pay?.error ? `?pay_error=${pay.error}` : ""}`);
@@ -456,10 +459,10 @@ export function CreateFlow({
               className={`flex h-13 flex-1 items-center justify-center gap-2 rounded-full px-5 font-semibold transition-all active:scale-[0.98] ${blocker === "photo" || blocker === "video" ? "bg-ink text-white" : "bg-brand text-white hover:bg-brand-dark"} ${pending || (blocker === "photo" && busyUpload) || (blocker === "video" && busyVideo) ? "opacity-70" : ""}`}
             >
               {pending && <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden />}
-              {pending ? c.paying
+              {pending ? (freeOrders ? c.creating : c.paying)
                 : blocker === "video" ? (busyVideo ? kk.upload.uploading : `🎬 ${cv.pickTitle}`)
                 : blocker === "photo" ? (busyUpload ? kk.upload.uploading : `📷 ${c.pickTitle}`)
-                : price ? c.payNow(formatKzt(price.totalKzt)) : c.confirm}
+                : freeOrders ? c.freeNow : price ? c.payNow(formatKzt(price.totalKzt)) : c.confirm}
             </button>
           </div>
           <p className="mt-1.5 min-h-4 text-center text-xs text-danger" aria-live="polite">

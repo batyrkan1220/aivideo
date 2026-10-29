@@ -5,14 +5,15 @@ import { getSessionUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { ActionForm } from "../orders/action-form";
-import { changeRole } from "../orders/actions";
+import { changeRole, setFreeOrders } from "../orders/actions";
 
 const U = ru.admin.users;
 
 export default function UsersPage() {
   return (
     <div>
-      <h1 className="mb-6 font-display text-2xl font-bold">{ru.admin.nav.users}</h1>
+      <h1 className="mb-2 font-display text-2xl font-bold">{ru.admin.nav.users}</h1>
+      <p className="mb-6 text-sm text-muted">{U.freeHint}</p>
       <Suspense fallback={<p className="text-muted">{ru.common.loading}</p>}>
         <List />
       </Suspense>
@@ -26,12 +27,14 @@ async function List() {
   if (!can(u.role, "users.manage")) return <p className="text-muted">{ru.admin.forbidden}</p>;
   const { data } = await supabaseAdmin().from("profiles")
     .select("id,email,display_name,role,created_at").order("created_at", { ascending: false }).limit(500);
+  const { data: freeRows } = await supabaseAdmin().from("free_order_users").select("user_id");
+  const free = new Set((freeRows ?? []).map((r) => r.user_id as string));
   const fmt = new Intl.DateTimeFormat("ru-RU", { dateStyle: "medium", timeZone: "Asia/Almaty" });
   return (
     <div className="overflow-x-auto rounded-card border border-line bg-white">
       <table className="w-full text-left text-sm">
         <thead className="border-b border-line text-muted">
-          <tr>{[U.colEmail, U.colName, U.colCreated, U.colRole].map((h) => <th key={h} className="px-4 py-3 font-medium">{h}</th>)}</tr>
+          <tr>{[U.colEmail, U.colName, U.colCreated, U.colRole, U.colFree].map((h) => <th key={h} className="px-4 py-3 font-medium">{h}</th>)}</tr>
         </thead>
         <tbody className="divide-y divide-line">
           {(data ?? []).map((p) => (
@@ -47,6 +50,11 @@ async function List() {
                     </select>
                   </ActionForm>
                 )}
+              </td>
+              <td className="px-4 py-3">
+                <ActionForm action={setFreeOrders} fields={{ userId: p.id, free: free.has(p.id) ? "0" : "1" }} label={free.has(p.id) ? U.freeOff : U.freeOn}>
+                  <span className={`text-xs font-medium ${free.has(p.id) ? "text-green-700" : "text-muted"}`}>{free.has(p.id) ? U.freeYes : U.freeNo}</span>
+                </ActionForm>
               </td>
             </tr>
           ))}

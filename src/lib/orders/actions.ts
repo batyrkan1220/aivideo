@@ -2,7 +2,8 @@
 import { randomUUID } from "node:crypto";
 import { imageSize } from "image-size";
 import { z } from "zod";
-import { getSessionUser } from "@/lib/auth/session";
+import { audit, getSessionUser } from "@/lib/auth/session";
+import { isFreeOrderUser, placeFreeOrder } from "./free";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { env } from "@/lib/env";
 import { calculatePrice } from "@/lib/pricing";
@@ -162,7 +163,7 @@ const orderSchema = z.object({
 });
 
 export async function createOrder(raw: unknown): Promise<
-  { ok: true; orderId: string } |
+  { ok: true; orderId: string; free?: boolean } |
   Fail<"consent_required" | "template_unavailable" | "quality_unavailable" | "photos_missing" | "photos_expired" | "rate_limited" | "video_missing">
 > {
   const user = await getSessionUser();
@@ -282,6 +283,12 @@ export async function createOrder(raw: unknown): Promise<
     }
   }
 
+  // Admin-approved test/gift users: no payment, generation is queued right away.
+  if (await isFreeOrderUser(user.id)) {
+    const free = await placeFreeOrder(order.id, user.id);
+    if (free) await audit(user.id, "order.free", "order", order.id);
+    return { ok: true, orderId: order.id, free };
+  }
   await track("checkout_initiated", { userId: user.id, templateId: tv.template.id, orderId: order.id, props: { quality: quality.key } });
   return { ok: true, orderId: order.id };
 }

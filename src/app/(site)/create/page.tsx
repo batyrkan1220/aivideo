@@ -6,6 +6,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getTemplateForAdmin } from "@/lib/templates/queries";
 import { customTemplateId, customVideoSettings } from "@/lib/custom-video/settings";
 import { CreateFlow } from "@/components/create-flow";
+import { isFreeOrderUser } from "@/lib/orders/free";
 import { ButtonLink } from "@/components/ui/button";
 import { formatKzt } from "@/lib/pricing";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
@@ -78,6 +79,7 @@ async function Flow() {
       supabaseUrl={e.NEXT_PUBLIC_SUPABASE_URL}
       anonKey={e.NEXT_PUBLIC_SUPABASE_ANON_KEY}
       askPhone={e.PAYMENT_PROVIDER === "tole" || e.PAYMENT_PROVIDER === "tole_sandbox"}
+      freeOrders={await isFreeOrderUser(user.id)}
       customVideo={{ maxSeconds: s.maxSeconds, maxMb: s.maxMb }}
     />
   );

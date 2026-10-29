@@ -6,6 +6,7 @@ import { getTemplate } from "@/lib/templates/queries";
 import { TemplateDetailView, QualityPriceList } from "@/components/template-detail";
 import { track } from "@/lib/analytics";
 import { CreateFlow } from "@/components/create-flow";
+import { isFreeOrderUser } from "@/lib/orders/free";
 import { getSessionUser } from "@/lib/auth/session";
 import { env } from "@/lib/env";
 import { ButtonLink } from "@/components/ui/button";
@@ -72,6 +73,7 @@ async function CreateSection({ t }: { t: TemplateDetail }) {
       supabaseUrl={e.NEXT_PUBLIC_SUPABASE_URL}
       anonKey={e.NEXT_PUBLIC_SUPABASE_ANON_KEY}
       askPhone={e.PAYMENT_PROVIDER === "tole" || e.PAYMENT_PROVIDER === "tole_sandbox"}
+      freeOrders={await isFreeOrderUser(user.id)}
       framing={t.photoFraming}
       allowWish={t.allowWish}
     />

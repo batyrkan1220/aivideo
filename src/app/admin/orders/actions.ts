@@ -123,3 +123,20 @@ export async function changeRole(_: AdminState, fd: FormData): Promise<AdminStat
   revalidatePath("/admin/users");
   return { ok: ru.admin.users.saved };
 }
+
+/** Lets a user order without payment (owner tests, gifts) — or takes that back. */
+export async function setFreeOrders(_: AdminState, fd: FormData): Promise<AdminState> {
+  const u = await staff("users.manage");
+  if (!u) return { error: E.forbidden };
+  const id = uuid(fd.get("userId"));
+  if (!id.success) return { error: E.generic };
+  const on = fd.get("free") === "1";
+  const db = supabaseAdmin();
+  const { error } = on
+    ? await db.from("free_order_users").upsert({ user_id: id.data, granted_by: u.id })
+    : await db.from("free_order_users").delete().eq("user_id", id.data);
+  if (error) return { error: E.generic };
+  await audit(u.id, on ? "user.free_orders_on" : "user.free_orders_off", "profile", id.data);
+  revalidatePath("/admin/users");
+  return { ok: ru.admin.users.saved };
+}
