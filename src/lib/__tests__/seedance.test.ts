@@ -206,7 +206,7 @@ describe("seedance provider", () => {
       calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
       return new Response(JSON.stringify(replies.shift()), { status: 200 });
     }));
-    const r = await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { durationSec: 8 } });
+    const r = await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { durationSec: 8, prepare: false } });
     expect(calls[0].url).toBe("https://api.muapi.test/api/v1/wan2.2-animate");
     expect(calls[0].body).toMatchObject({ image_url: "https://s/1.jpg", video_url: "https://cdn/v.mp4", mode: "replace", resolution: "720p" });
     expect(r.cost).toBeCloseTo(8 * 0.14 + 8 * 0.094, 4); // muapi: Wan 8 s = $1.12, face swap $0.75
@@ -215,6 +215,27 @@ describe("seedance provider", () => {
     expect(calls[2].body).toMatchObject({ video_url: "https://cdn/wan.mp4", image_url: "https://s/1.jpg", target_index: 0 });
     const n = (s1 as { next: { state: Record<string, unknown> } }).next.state;
     expect(await seedanceProvider.getStatus("fs-1", { startedAt: null, state: n })).toEqual({ state: "succeeded", outputUrl: "https://cdn/final.mp4" });
+    vi.unstubAllGlobals();
+  });
+
+  it("wan with prepare (default): Nano Banana Pro full-body image (template outfit) → Wan with it → face swap with the photo", async () => {
+    const calls: { url: string; body?: unknown }[] = [];
+    const replies = [{ request_id: "p-1" }, { status: "completed", outputs: ["https://cdn/full.jpg"] }, { request_id: "w-2" }, { status: "completed", outputs: ["https://cdn/wan.mp4"] }, { request_id: "fs-2" }];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      return new Response(JSON.stringify(replies.shift()), { status: 200 });
+    }));
+    const r = await seedanceProvider.submit({ jobId: "j", ...base, templateFrameUrl: "https://cdn/frame.jpg", faces, config: { durationSec: 8, outfit: "template" } });
+    expect(calls[0].url).toBe("https://api.muapi.test/api/v1/nano-banana-pro-edit");
+    expect(calls[0].body).toMatchObject({ images_list: ["https://s/1.jpg", "https://cdn/frame.jpg"], resolution: "2k" });
+    expect(r.cost).toBeCloseTo(0.12, 4);
+    const s1 = await seedanceProvider.getStatus("p-1", { startedAt: null, state: r.state ?? null });
+    expect(s1).toMatchObject({ state: "processing", next: { providerJobId: "w-2", state: { stage: "wan" } } });
+    expect((s1 as { next: { cost: number } }).next.cost).toBeCloseTo(8 * 0.14 + 8 * 0.094, 4);
+    expect(calls[2].body).toMatchObject({ image_url: "https://cdn/full.jpg", mode: "replace" });
+    const s2 = await seedanceProvider.getStatus("w-2", { startedAt: null, state: (s1 as { next: { state: Record<string, unknown> } }).next.state });
+    expect(s2).toMatchObject({ state: "processing", next: { providerJobId: "fs-2" } });
+    expect(calls[4].body).toMatchObject({ video_url: "https://cdn/wan.mp4", image_url: "https://s/1.jpg" }); // exact face from the photo
     vi.unstubAllGlobals();
   });
 

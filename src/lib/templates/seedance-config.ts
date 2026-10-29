@@ -36,6 +36,10 @@ export const seedanceConfigSchema = z.object({
   framePath: z.string().max(300).nullable().default(null),
   /** Photo labels for the customer, one per person (e.g. "Баланың фотосы", "Мамасының фотосы"). */
   labels: z.array(z.string().trim().max(40)).max(5).default([]),
+  /** Wan: Nano Banana Pro first makes a clean full-body image of the customer (face kept). */
+  prepare: z.boolean().default(true),
+  /** Wan + prepare: the outfit — the customer's own (photo) or the main person's in the template. */
+  outfit: z.enum(["photo", "template"]).default("photo"),
 });
 export type SeedanceConfig = z.infer<typeof seedanceConfigSchema>;
 export type SeedanceMode = SeedanceConfig["mode"];

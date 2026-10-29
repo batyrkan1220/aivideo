@@ -123,11 +123,20 @@ export const seedanceProvider: GenerationProvider = {
     if (cfg.mode === "wan") {
       // Wan 2.2 Animate "replace": template background/lighting stay, the person comes from the photo;
       // the face swap pass afterwards sharpens the likeness.
-      const body = { image_url: faceUrls[0], video_url: input.templateVideoUrl, mode: "replace", resolution: "720p", prompt: cfg.prompt || "" };
-      const d = await call<{ request_id?: string; id?: string }>("/api/v1/wan2.2-animate", { method: "POST", body: JSON.stringify(body) });
-      const id = d.request_id ?? d.id;
-      if (!id) throw new ProviderError("provider_bad_response", false, "wan: missing request_id");
-      return { providerJobId: id, cost: seedanceCostUsd(durationSec, pricing, { mode: "wan" }), state: { stage: "wan", i: 0, faces: faceUrls, swap_cost: faceSwapCostUsd(durationSec, pricing) } };
+      const wanCost = seedanceCostUsd(durationSec, pricing, { mode: "wan", prepare: false });
+      const wanState = { stage: "wan", i: 0, faces: faceUrls, swap_cost: faceSwapCostUsd(durationSec, pricing) };
+      if (cfg.prepare) {
+        // Step 0: Nano Banana Pro → a clean full-body image of the customer (face kept; outfit: own or template's).
+        const frame = cfg.outfit === "template" ? input.templateFrameUrl ?? null : null;
+        try {
+          const id = await submitPrep(faceUrls[0], frame);
+          return { providerJobId: id, cost: pricing.prepUsd, state: { stage: "prep", i: 0, faces: faceUrls, video: input.templateVideoUrl, prompt: cfg.prompt, next_cost: wanCost, swap_cost: wanState.swap_cost } };
+        } catch (err) {
+          console.error("[seedance] prep submit failed, Wan with the photo", err instanceof ProviderError ? `${err.code} ${err.message}` : err);
+        }
+      }
+      const id = await submitWan(faceUrls[0], input.templateVideoUrl, cfg.prompt);
+      return { providerJobId: id, cost: wanCost, state: wanState };
     }
     if (cfg.mode === "kling") {
       // Kling 3.0 Pro Motion Control builds the whole scene from its image. So first the customer is
@@ -171,6 +180,13 @@ export const seedanceProvider: GenerationProvider = {
     const st = parseState(ctx?.state);
     const d = await call<{ status?: string; outputs?: unknown[]; video?: unknown; error?: unknown }>(`/api/v1/predictions/${encodeURIComponent(providerJobId)}/result`);
     const status = String(d.status ?? "").toLowerCase();
+    // Wan step 0 (full-body image) done or failed → Wan with that image (or the photo itself).
+    if (st?.stage === "prep" && st.video && ["completed", "succeeded", "failed", "error", "cancelled"].includes(status)) {
+      const img = status === "completed" || status === "succeeded" ? outputUrl(d) : undefined;
+      if (!img) console.error("[seedance] prep failed, Wan with the photo", providerJobId, status, JSON.stringify(d.error ?? "").slice(0, 200));
+      const id = await submitWan(img ?? st.faces[0], st.video, st.prompt ?? "");
+      return { state: "processing", next: { providerJobId: id, state: { stage: "wan", i: 0, faces: st.faces, swap_cost: st.swap_cost }, cost: st.next_cost ?? 0 } };
+    }
     // Kling step 1 (the customer put into the template frame) done or failed → step 2: Kling.
     if (st?.stage === "compose" && st.video && ["completed", "succeeded", "failed", "error", "cancelled"].includes(status)) {
       const img = status === "completed" || status === "succeeded" ? outputUrl(d) : undefined;
@@ -233,11 +249,11 @@ export const seedanceProvider: GenerationProvider = {
 };
 
 
-type SeedanceState = { stage: "seedance" | "swap" | "kling" | "wan" | "compose" | "facefix"; i: number; faces: string[]; base?: string; video?: string; prompt?: string; next_cost?: number; swap_cost?: number };
+type SeedanceState = { stage: "seedance" | "swap" | "kling" | "wan" | "compose" | "facefix" | "prep"; i: number; faces: string[]; base?: string; video?: string; prompt?: string; next_cost?: number; swap_cost?: number };
 function parseState(s: unknown): SeedanceState | null {
   if (!s || typeof s !== "object") return null;
   const o = s as Record<string, unknown>;
-  if ((o.stage !== "seedance" && o.stage !== "swap" && o.stage !== "kling" && o.stage !== "wan" && o.stage !== "compose" && o.stage !== "facefix") || !Array.isArray(o.faces)) return null;
+  if ((o.stage !== "seedance" && o.stage !== "swap" && o.stage !== "kling" && o.stage !== "wan" && o.stage !== "compose" && o.stage !== "facefix" && o.stage !== "prep") || !Array.isArray(o.faces)) return null;
   return {
     stage: o.stage, i: Number(o.i) || 0,
     faces: o.faces.filter((x): x is string => typeof x === "string"),
@@ -253,6 +269,32 @@ function outputUrl(d: { outputs?: unknown[]; video?: unknown }): string | undefi
   const isUrl = (x: unknown): x is string => typeof x === "string" && /^https?:\/\//.test(x);
   const fromVideo = typeof d.video === "object" && d.video ? (d.video as { url?: unknown }).url : d.video;
   return (d.outputs ?? []).find(isUrl) ?? (isUrl(fromVideo) ? fromVideo : undefined);
+}
+
+async function submitWan(imageUrl: string, videoUrl: string, prompt: string): Promise<string> {
+  const d = await call<{ request_id?: string; id?: string }>("/api/v1/wan2.2-animate", {
+    method: "POST",
+    body: JSON.stringify({ image_url: imageUrl, video_url: videoUrl, mode: "replace", resolution: "720p", prompt: prompt || "" }),
+  });
+  const id = d.request_id ?? d.id;
+  if (!id) throw new ProviderError("provider_bad_response", false, "wan: missing request_id");
+  return id;
+}
+
+/** Nano Banana Pro: a clean full-body image of the customer for Wan (face kept; outfit own or the template's). */
+async function submitPrep(photoUrl: string, templateFrameUrl: string | null): Promise<string> {
+  const base = "Create one photorealistic full-body photo of the person from image 1, from head to feet, front view, natural standing pose, " +
+    "plain light background, soft even light. Keep exactly the same face, facial features, eyes, nose, mouth, skin tone, hairstyle, age and body proportions as in image 1. Sharp face, no text.";
+  const prompt = templateFrameUrl
+    ? `${base} Dress the person exactly in the outfit of the main person in image 2: same clothes, colors, shoes and accessories. Do not copy the face or the background of image 2.`
+    : `${base} Keep the same clothes as in image 1; if part of the outfit is not visible, complete it naturally in the same style.`;
+  const d = await call<{ request_id?: string; id?: string }>("/api/v1/nano-banana-pro-edit", {
+    method: "POST",
+    body: JSON.stringify({ prompt, images_list: templateFrameUrl ? [photoUrl, templateFrameUrl] : [photoUrl], resolution: "2k", output_format: "jpg" }),
+  });
+  const id = d.request_id ?? d.id;
+  if (!id) throw new ProviderError("provider_bad_response", false, "prep: missing request_id");
+  return id;
 }
 
 async function submitKling(imageUrl: string, videoUrl: string, prompt: string): Promise<string> {

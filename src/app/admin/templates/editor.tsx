@@ -177,7 +177,7 @@ export function TemplateEditor({
     else router.refresh();
   });
 
-  const costOpts = { mode: sd.mode, people: sd.people };
+  const costOpts = { mode: sd.mode, people: sd.people, prepare: sd.prepare };
   const autoPrice = seedancePriceKzt(duration, Number(t.pricing.basePriceKzt) || 0, seedancePricing, costOpts);
   const costKzt = duration ? seedanceCostKzt(duration, seedancePricing, costOpts) : null;
 
@@ -238,6 +238,23 @@ export function TemplateEditor({
               </select>
               <span className="mt-1 block text-xs text-muted">{sd.mode === "wan" || sd.mode === "swap" ? e.seedance.peopleHintSwap : e.seedance.peopleHint}</span>
             </Field>
+            {sd.mode === "wan" && (
+              <div className="grid gap-2 rounded-xl border border-line p-3 sm:col-span-2">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input type="checkbox" className="h-4 w-4 accent-brand" checked={sd.prepare} onChange={(ev) => setSd({ prepare: ev.target.checked })} />
+                  {e.seedance.prepare}
+                </label>
+                <span className="text-xs text-muted">{e.seedance.prepareHint}</span>
+                {sd.prepare && (
+                  <Field label={e.seedance.outfit}>
+                    <select className={inputCls()} value={sd.outfit} onChange={(ev) => setSd({ outfit: ev.target.value as SeedanceConfig["outfit"] })}>
+                      <option value="photo">{e.seedance.outfitOptions.photo}</option>
+                      <option value="template">{e.seedance.outfitOptions.template}</option>
+                    </select>
+                  </Field>
+                )}
+              </div>
+            )}
             {sd.people > 1 && (
               <div className="grid gap-2 sm:col-span-2">
                 <span className="text-sm font-medium">{e.seedance.labels}</span>
