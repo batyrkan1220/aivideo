@@ -252,7 +252,7 @@ async function submitCompose(frameUrl: string, photoUrl: string): Promise<string
     "position, size in the frame, clothing style of the scene, background, cars and objects, lighting, colors and camera angle. Photorealistic, sharp face.";
   const d = await call<{ request_id?: string; id?: string }>("/api/v1/nano-banana-2-edit", {
     method: "POST",
-    body: JSON.stringify({ prompt, image_urls: [frameUrl, photoUrl], resolution: "1k", output_format: "jpg" }),
+    body: JSON.stringify({ prompt, images_list: [frameUrl, photoUrl], resolution: "1k", output_format: "jpg" }),
   });
   const id = d.request_id ?? d.id;
   if (!id) throw new ProviderError("provider_bad_response", false, "compose: missing request_id");

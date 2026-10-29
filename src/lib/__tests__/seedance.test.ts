@@ -175,7 +175,7 @@ describe("seedance provider", () => {
     }));
     const r = await seedanceProvider.submit({ jobId: "j", ...base, templateFrameUrl: "https://cdn/cover.jpg", faces, config: { mode: "kling", durationSec: 8 } });
     expect(calls[0].url).toBe("https://api.muapi.test/api/v1/nano-banana-2-edit");
-    expect(calls[0].body).toMatchObject({ image_urls: ["https://cdn/cover.jpg", "https://s/1.jpg"] });
+    expect(calls[0].body).toMatchObject({ images_list: ["https://cdn/cover.jpg", "https://s/1.jpg"] });
     const s1 = await seedanceProvider.getStatus("c-1", { startedAt: null, state: r.state ?? null });
     expect(s1).toMatchObject({ state: "processing", next: { providerJobId: "k-2", state: { stage: "kling" } } });
     expect(calls[2].url).toBe("https://api.muapi.test/api/v1/kling-v3.0-pro-motion-control");
