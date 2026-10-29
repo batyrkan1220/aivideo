@@ -54,7 +54,7 @@ export async function submitPvr(videoUrl: string, images: string[], prompt: stri
 export async function getPvr(id: string): Promise<ProviderJobStatus> {
   const d = await call<{ status?: string; output?: unknown; error?: unknown }>(`/predictions/${encodeURIComponent(id)}`);
   const status = String(d.status ?? "");
-  if (status === "succeeded") {
+  if (status === "succeeded" || status === "successful") {
     const out = Array.isArray(d.output) ? d.output.find((x) => typeof x === "string") : d.output;
     if (typeof out !== "string" || !/^https?:\/\//.test(out)) return { state: "failed", errorCode: "provider_no_output", retryable: false };
     return { state: "succeeded", outputUrl: out };
