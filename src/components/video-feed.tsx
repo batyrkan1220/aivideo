@@ -45,7 +45,7 @@ export function VideoFeed({ title, category, initial, initialHasMore, exclude = 
   return (
     <>
       {title && <h2 className="mb-5 font-display text-xl font-bold tracking-tight sm:text-2xl">{title}</h2>}
-      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+      <ul className="grid grid-cols-3 gap-1.5 sm:gap-4 lg:grid-cols-4">
         {shown.map((t, i) => (
           <li key={t.id}><TemplateCard t={t} priority={i < priorityCount} /></li>
         ))}

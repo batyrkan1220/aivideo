@@ -105,7 +105,7 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
       onFocus={start}
       onBlur={stop}
     >
-      <div className="relative aspect-[9/16] overflow-hidden rounded-card bg-ink/90">
+      <div className="relative aspect-[9/16] overflow-hidden rounded-xl bg-ink/90 sm:rounded-card">
         {t.coverUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -128,20 +128,23 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
             className="absolute inset-0 h-full w-full object-cover"
           />
         )}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/75 to-transparent" />
-        <div className="absolute left-2.5 top-2.5 flex flex-col items-start gap-1.5 sm:left-3 sm:top-3">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent" />
+        <div className="absolute left-1.5 top-1.5 flex flex-col items-start gap-1 sm:left-3 sm:top-3 sm:gap-1.5">
           {t.isTrending && (
-            <span className="rounded-full bg-flash px-2.5 py-1 text-xs font-bold text-ink">{kk.catalog2.trendBadge}</span>
+            <span className="rounded-full bg-flash px-1.5 py-0.5 text-[10px] font-bold text-ink sm:px-2.5 sm:py-1 sm:text-xs">{kk.catalog2.trendBadge}</span>
           )}
-          <span className="rounded-full bg-black/55 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm">
-            {kk.catalog.faces(t.faceCount)}
+          {/* Phones (3 columns): a compact "👤 2"; wider screens: the full "2 бет фотосы". */}
+          <span className="flex items-center gap-0.5 rounded-full bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm sm:px-2.5 sm:py-1 sm:text-xs sm:font-medium" aria-label={kk.catalog.faces(t.faceCount)}>
+            <svg viewBox="0 0 24 24" className="h-3 w-3 sm:hidden" fill="currentColor" aria-hidden><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm-8.5 9a8.5 8.5 0 0 1 17 0z" /></svg>
+            <span className="sm:hidden">{t.faceCount}</span>
+            <span className="hidden sm:inline">{kk.catalog.faces(t.faceCount)}</span>
           </span>
         </div>
-        <div className="absolute inset-x-3 bottom-3 text-white">
-          <h3 className="line-clamp-2 font-display text-sm font-semibold leading-snug sm:text-base">{t.title}</h3>
+        <div className="absolute inset-x-1.5 bottom-1.5 text-white sm:inset-x-3 sm:bottom-3">
+          <h3 className="line-clamp-2 font-display text-[11px] font-semibold leading-tight sm:text-base sm:leading-snug">{t.title}</h3>
           {t.startingPriceKzt !== null && (
-            <p className="mt-1 text-sm text-white/85">
-              {formatKzt(t.startingPriceKzt)} {kk.catalog.from}
+            <p className="mt-0.5 text-[11px] font-medium text-white/90 sm:mt-1 sm:text-sm sm:font-normal">
+              {formatKzt(t.startingPriceKzt)}<span className="hidden sm:inline"> {kk.catalog.from}</span>
             </p>
           )}
         </div>
