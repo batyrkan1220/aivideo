@@ -237,13 +237,13 @@ export async function createOrder(raw: unknown): Promise<
       if (durationSec === null) durationSec = await ensureTemplateDuration(tv.template.id, mediaUrl((tv.snapshot.preview_video_path as string) ?? null));
     }
     if (durationSec === null || durationSec < SEEDANCE_MIN_SEC - 0.5 || durationSec > SEEDANCE_MAX_SEC + 0.5) return { ok: false, error: custom ? "video_missing" : "template_unavailable" };
-    const price = seedancePriceKzt(durationSec, custom ? 0 : tv.pricing.basePriceKzt, await seedancePricingSettings());
+    const cfg = parseSeedanceConfig((snapshotExtra.provider_config_json as unknown) ?? tv.snapshot.provider_config_json);
+    const price = seedancePriceKzt(durationSec, custom ? 0 : tv.pricing.basePriceKzt, await seedancePricingSettings(), { mode: cfg.mode, people: slots.length });
     if (price === null) return { ok: false, error: "template_unavailable" };
     const eff = applySeedancePricing(tv.pricing, price);
     pricing = eff.pricing;
     qualities = eff.qualities;
-    const cfg = parseSeedanceConfig((snapshotExtra.provider_config_json as unknown) ?? tv.snapshot.provider_config_json);
-    const wish = cfg.allowWish ? cleanWish(p.data.wish) : "";
+    const wish = cfg.mode === "scene" && cfg.allowWish ? cleanWish(p.data.wish) : "";
     snapshotExtra = { ...snapshotExtra, pricing_config_json: pricing, video_duration_sec: durationSec, ...(wish ? { customer_wish: wish } : {}) };
   }
   const quality = qualities.find((q) => q.key === p.data.quality && q.available) ?? (qualities.length === 1 ? qualities[0] : undefined);

@@ -73,6 +73,7 @@ async function Flow() {
       pricing={t.pricing}
       seedancePricing={ap}
       allowWish={t.allowWish}
+      seedanceMode={t.seedanceMode}
       maxUploadBytes={Math.min(t.maxUploadBytes, e.UPLOAD_MAX_BYTES)}
       minDimension={e.UPLOAD_MIN_DIMENSION}
       maxDimension={e.UPLOAD_MAX_DIMENSION}

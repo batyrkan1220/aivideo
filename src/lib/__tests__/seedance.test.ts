@@ -71,8 +71,8 @@ describe("seedance provider", () => {
   const base = { templateVideoUrl: "https://cdn/v.mp4", quality: "720p" };
   it("validates inputs", () => {
     expect(seedanceProvider.validateInputs({ ...base, faces, config: { durationSec: 8 } })).toEqual([]);
-    expect(seedanceProvider.validateInputs({ ...base, faces, config: {} })).toContain("unknown_duration");
-    expect(seedanceProvider.validateInputs({ ...base, faces, config: { durationSec: 40 } })).toContain("bad_duration");
+    expect(seedanceProvider.validateInputs({ ...base, faces, config: { mode: "scene" } })).toContain("unknown_duration");
+    expect(seedanceProvider.validateInputs({ ...base, faces, config: { mode: "scene", durationSec: 40 } })).toContain("bad_duration");
     expect(seedanceProvider.validateInputs({ ...base, faces: [{ ...faces[0], providerInput: "img_2" }], config: { durationSec: 8 } })).toContain("unmapped_slot");
   });
 
@@ -88,9 +88,9 @@ describe("seedance provider", () => {
       calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
       return new Response(JSON.stringify(replies.shift()), { status: 200 });
     }));
-    const r = await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { people: 1, durationSec: 8.2, wish: "beach", allowWish: true } });
+    const r = await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { mode: "scene", people: 1, durationSec: 8.2, wish: "beach", allowWish: true } });
     expect(r.providerJobId).toBe("req-1");
-    expect(r.cost).toBeCloseTo(seedanceCostUsd(8.2, S), 4);
+    expect(r.cost).toBeCloseTo(seedanceCostUsd(8.2, S, { mode: "scene" }), 4);
     expect(calls[0].url).toBe("https://api.muapi.test/api/v1/seedance-2.5-intl-omni-reference");
     expect(calls[0].body).toMatchObject({ images_list: ["https://s/1.jpg"], videos_list: ["https://cdn/v.mp4"], resolution: "720p", duration: 8, aspect_ratio: "adaptive" });
     expect(String((calls[0].body as { prompt: string }).prompt)).toContain("beach");
@@ -116,7 +116,7 @@ describe("seedance provider", () => {
       calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
       return new Response(JSON.stringify(replies.shift()), { status: 200 });
     }));
-    const r = await seedanceProvider.submit({ jobId: "j", ...base, faces: two, config: { people: 2, durationSec: 8 } });
+    const r = await seedanceProvider.submit({ jobId: "j", ...base, faces: two, config: { mode: "scene", people: 2, durationSec: 8 } });
     expect(r.state).toEqual({ stage: "seedance", faces: ["https://s/1.jpg", "https://s/2.jpg"] });
     const s1 = await seedanceProvider.getStatus("seed-1", { startedAt: null, state: r.state ?? null });
     expect(s1).toMatchObject({ state: "processing", next: { providerJobId: "swap-1", state: { stage: "swap", i: 0, base: "https://cdn/seed.mp4" } } });
@@ -128,6 +128,23 @@ describe("seedance provider", () => {
     expect(calls[4].body).toMatchObject({ video_url: "https://cdn/swap1.mp4", image_url: "https://s/2.jpg", target_index: 1 });
     const n2 = (s2 as { next: { state: Record<string, unknown> } }).next.state;
     expect(await seedanceProvider.getStatus("swap-2", { startedAt: null, state: n2 })).toEqual({ state: "succeeded", outputUrl: "https://cdn/swap1.mp4" });
+    vi.unstubAllGlobals();
+  });
+
+  it("swap mode: face swap straight on the template video, no Seedance", async () => {
+    const calls: { url: string; body?: unknown }[] = [];
+    const replies = [{ request_id: "swap-0" }, { status: "completed", outputs: ["https://cdn/swapped.mp4"] }];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      return new Response(JSON.stringify(replies.shift()), { status: 200 });
+    }));
+    expect(seedanceProvider.validateInputs({ ...base, faces, config: { durationSec: 47 } })).toEqual([]);
+    const r = await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { durationSec: 8 } });
+    expect(calls[0].url).toBe("https://api.muapi.test/api/v1/ai-video-face-swap");
+    expect(calls[0].body).toMatchObject({ video_url: "https://cdn/v.mp4", image_url: "https://s/1.jpg", target_index: 0 });
+    expect(r.cost).toBeCloseTo(0.1, 4);
+    expect(await seedanceProvider.getStatus("swap-0", { startedAt: null, state: r.state ?? null })).toEqual({ state: "succeeded", outputUrl: "https://cdn/swapped.mp4" });
+    expect(seedanceCostUsd(8, S, { mode: "swap", people: 2 })).toBeCloseTo(0.2, 4);
     vi.unstubAllGlobals();
   });
 

@@ -170,8 +170,9 @@ export function TemplateEditor({
     else router.refresh();
   });
 
-  const autoPrice = seedancePriceKzt(duration, Number(t.pricing.basePriceKzt) || 0, seedancePricing);
-  const costKzt = duration ? seedanceCostKzt(duration, seedancePricing) : null;
+  const costOpts = { mode: sd.mode, people: sd.people };
+  const autoPrice = seedancePriceKzt(duration, Number(t.pricing.basePriceKzt) || 0, seedancePricing, costOpts);
+  const costKzt = duration ? seedanceCostKzt(duration, seedancePricing, costOpts) : null;
 
   return (
     <div className="space-y-6 pb-56 sm:pb-28">
@@ -212,23 +213,30 @@ export function TemplateEditor({
         <p className="text-sm text-muted">{e.seedance.intro}</p>
         <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_minmax(0,320px)]">
           <div className="grid gap-4 sm:grid-cols-2">
+            <Field label={e.seedance.mode} className="sm:col-span-2">
+              <select className={inputCls()} value={sd.mode} onChange={(ev) => setSd({ mode: ev.target.value as SeedanceConfig["mode"] })}>
+                {(["swap", "scene"] as const).map((k) => <option key={k} value={k}>{e.seedance.modeOptions[k]}</option>)}
+              </select>
+              <span className="mt-1 block text-xs text-muted">{e.seedance.modeHint[sd.mode]}</span>
+            </Field>
             <Field label={e.seedance.people}>
               <select className={inputCls()} value={sd.people} onChange={(ev) => setSd({ people: Number(ev.target.value) })}>
                 {Array.from({ length: SEEDANCE_MAX_PEOPLE }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
               <span className="mt-1 block text-xs text-muted">{e.seedance.peopleHint}</span>
             </Field>
-            <Field label={e.seedance.aspect}>
+            {sd.mode === "scene" && <Field label={e.seedance.aspect}>
               <select className={inputCls()} value={sd.aspectRatio} onChange={(ev) => setSd({ aspectRatio: ev.target.value as SeedanceConfig["aspectRatio"] })}>
                 {(Object.keys(e.seedance.aspectOptions) as SeedanceConfig["aspectRatio"][]).map((k) => <option key={k} value={k}>{e.seedance.aspectOptions[k]}</option>)}
               </select>
-            </Field>
+            </Field>}
             <Field label={e.seedance.framing} className="sm:col-span-2">
               <select className={inputCls()} value={sd.framing} onChange={(ev) => setSd({ framing: ev.target.value as SeedanceConfig["framing"] })}>
                 {(["face", "half", "full"] as const).map((k) => <option key={k} value={k}>{e.seedance.framingOptions[k]}</option>)}
               </select>
               <span className="mt-1 block text-xs text-muted">{e.seedance.framingHint}</span>
             </Field>
+            {sd.mode === "scene" && <>
             <Field label={e.seedance.prompt} field="seedance.prompt" error={err("seedance.prompt")} className="sm:col-span-2">
               <textarea className={`${inputCls(err("seedance.prompt"))} min-h-24`} value={sd.prompt} maxLength={1500} onChange={(ev) => setSd({ prompt: ev.target.value })} />
               <span className="mt-1 block text-xs text-muted">{e.seedance.promptHint}</span>
@@ -237,8 +245,9 @@ export function TemplateEditor({
               <input type="checkbox" className="h-4 w-4 accent-brand" checked={sd.allowWish} onChange={(ev) => setSd({ allowWish: ev.target.checked })} />
               {e.seedance.allowWish}
             </label>
+            </>}
             <p className={`text-xs sm:col-span-2 ${duration !== null && (duration < 3.5 || duration > 30.5) ? "font-semibold text-danger" : "text-muted"}`}>
-              {e.seedance.durationHint}{duration !== null ? ` · ${Math.round(duration * 10) / 10} сек` : ""}
+              {sd.mode === "swap" ? e.seedance.durationHintSwap : e.seedance.durationHint}{duration !== null ? ` · ${Math.round(duration * 10) / 10} сек` : ""}
             </p>
           </div>
           {slots.length > 0 && <FaceMap slots={slots} mediaBase={mediaBase} />}

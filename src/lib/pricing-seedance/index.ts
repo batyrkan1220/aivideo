@@ -36,24 +36,29 @@ export function seedanceBilledSec(durationSec: number): number {
   return Math.ceil(Math.min(durationSec, 30) - 1e-6) + out;
 }
 
-export function seedanceCostUsd(durationSec: number, s: SeedancePricing): number {
-  return Math.round((seedanceBilledSec(durationSec) * s.usdPerSec * s.refFactor + s.faceSwapUsd) * 10_000) / 10_000;
+/** What the template does: "scene" = Seedance + face swap (default here), "swap" = face swap only. */
+export type CostOpts = { mode?: "swap" | "scene"; people?: number };
+
+export function seedanceCostUsd(durationSec: number, s: SeedancePricing, o: CostOpts = {}): number {
+  const swaps = Math.max(1, o.people ?? 1) * s.faceSwapUsd;
+  const scene = o.mode === "swap" ? 0 : seedanceBilledSec(durationSec) * s.usdPerSec * s.refFactor;
+  return Math.round((scene + swaps) * 10_000) / 10_000;
 }
 
-export function seedanceCostKzt(durationSec: number, s: SeedancePricing): number {
-  return Math.round(seedanceCostUsd(durationSec, s) * s.tengePerUsd);
+export function seedanceCostKzt(durationSec: number, s: SeedancePricing, o: CostOpts = {}): number {
+  return Math.round(seedanceCostUsd(durationSec, s, o) * s.tengePerUsd);
 }
 
-export function seedanceAutoPriceKzt(durationSec: number, s: SeedancePricing): number {
-  const raw = seedanceCostKzt(durationSec, s) * (1 + s.markupPercent / 100);
+export function seedanceAutoPriceKzt(durationSec: number, s: SeedancePricing, o: CostOpts = {}): number {
+  const raw = seedanceCostKzt(durationSec, s, o) * (1 + s.markupPercent / 100);
   return Math.max(s.minPriceKzt, Math.ceil(raw / s.roundToKzt) * s.roundToKzt);
 }
 
 /** Template price: a manual price (> 0) wins; otherwise automatic from the video length (null = unknown yet). */
-export function seedancePriceKzt(durationSec: number | null, manualKzt: number, s: SeedancePricing): number | null {
+export function seedancePriceKzt(durationSec: number | null, manualKzt: number, s: SeedancePricing, o: CostOpts = {}): number | null {
   if (manualKzt > 0) return manualKzt;
   if (durationSec === null || !(durationSec > 0)) return null;
-  return seedanceAutoPriceKzt(durationSec, s);
+  return seedanceAutoPriceKzt(durationSec, s, o);
 }
 
 /** Turns the price into the generic pricing model, so the calculator and checkout work unchanged. */

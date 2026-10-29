@@ -96,6 +96,7 @@ export const seedanceProvider: GenerationProvider = {
     const idx = input.faces.map((f) => imgIndex(f.providerInput));
     if (idx.some((x, i) => x !== i + 1)) problems.push("unmapped_slot");
     const d = Number((input.config as { durationSec?: unknown }).durationSec);
+    if (cfg.data.mode === "swap") return problems; // face swap only: no Seedance length limits
     if (!(d > 0)) problems.push("unknown_duration");
     else if (d < SEEDANCE_MIN_SEC - 0.5 || d > SEEDANCE_MAX_SEC + 0.5) problems.push("bad_duration");
     return problems;
@@ -105,6 +106,13 @@ export const seedanceProvider: GenerationProvider = {
     const cfg = seedanceConfigSchema.parse(input.config ?? {});
     const extra = input.config as { durationSec?: number; wish?: unknown };
     const durationSec = Number(extra.durationSec);
+    const pricing = await seedancePricingSettings();
+    const faceUrls = input.faces.map((f) => f.imageUrl);
+    if (cfg.mode === "swap") {
+      // Face swap only: the customer's face goes straight onto the template video.
+      const id = await submitFaceSwap(input.templateVideoUrl, faceUrls[0], 0);
+      return { providerJobId: id, cost: seedanceCostUsd(durationSec, pricing, { mode: "swap", people: 1 }), state: { stage: "swap", i: 0, faces: faceUrls } };
+    }
     const body = {
       prompt: buildPrompt(input.faces.length, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : ""),
       images_list: input.faces.map((f) => f.imageUrl),
@@ -118,8 +126,8 @@ export const seedanceProvider: GenerationProvider = {
     const id = d.request_id ?? d.id;
     if (!id) throw new ProviderError("provider_bad_response", false, "missing request_id");
     // Seedance does not keep a real person's face (ByteDance policy) → a face swap pass follows.
-    const state = { stage: "seedance", faces: input.faces.map((f) => f.imageUrl) };
-    return { providerJobId: id, cost: seedanceCostUsd(durationSec, await seedancePricingSettings()), state };
+    const state = { stage: "seedance", faces: faceUrls };
+    return { providerJobId: id, cost: seedanceCostUsd(durationSec, pricing, { mode: "scene", people: 1 }), state };
   },
 
   async getStatus(providerJobId, ctx): Promise<ProviderJobStatus> {
@@ -151,7 +159,9 @@ export const seedanceProvider: GenerationProvider = {
       const reason = JSON.stringify(d.error ?? "").slice(0, 300);
       if (st?.stage === "swap" && st.base) return swapFallback(providerJobId, st.base, reason);
       console.error("[seedance] task failed", providerJobId, reason);
-      const content = /sensitive|policy|moderat|safety|nsfw|real person|face|celebrit|inappropriate/i.test(reason);
+      const content = st?.stage === "swap"
+        ? /sensitive|policy|moderat|safety|nsfw|inappropriate/i.test(reason)
+        : /sensitive|policy|moderat|safety|nsfw|real person|face|celebrit|inappropriate/i.test(reason);
       return { state: "failed", errorCode: content ? "provider_content_rejected" : "provider_failed", retryable: false };
     }
     return { state: status === "queued" || status === "pending" || status === "created" ? "queued" : "processing" };

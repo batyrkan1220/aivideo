@@ -85,7 +85,7 @@ function readVideoDuration(url: string): Promise<number | null> {
 }
 
 export function CreateFlow({
-  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, freeOrders = false, customVideo, seedancePricing, framing = "auto", allowWish = false,
+  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, freeOrders = false, customVideo, seedancePricing, framing = "auto", allowWish = false, seedanceMode = "swap",
 }: {
   templateId: string;
   slots: FaceSlot[];
@@ -106,6 +106,8 @@ export function CreateFlow({
   seedancePricing?: SeedancePricing;
   /** The customer may write a wish for the AI (background, outfit, style). */
   allowWish?: boolean;
+  /** Template mode: face swap only or Seedance scene + face swap (custom-video price). */
+  seedanceMode?: "swap" | "scene";
   /** What photo the template needs (face / waist-up / full body); "auto" = like the person in the video. */
   framing?: Framing;
 }) {
@@ -244,7 +246,7 @@ export function CreateFlow({
   };
   // "Өз видеом": price appears once the video length is known (seconds × credits × tenge).
   const dyn = customVideo && seedancePricing && video.phase === "ready"
-    ? applySeedancePricing(pricing, seedanceAutoPriceKzt(video.durationSec, seedancePricing)) : null;
+    ? applySeedancePricing(pricing, seedanceAutoPriceKzt(video.durationSec, seedancePricing, { mode: seedanceMode, people: slots.length })) : null;
   const waitingForVideo = !!customVideo && !dyn;
   const effPricing = dyn?.pricing ?? pricing;
   const effQualities = (dyn?.qualities ?? qualities).filter((q) => q.available);

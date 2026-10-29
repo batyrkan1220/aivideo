@@ -66,6 +66,11 @@ export function SeedancePricingForm({ value }: { value: SeedancePricing }) {
               </tbody>
             </table>
             <p className="mt-1 text-xs text-muted">{P.tableHint}</p>
+            {(() => {
+              const o = { mode: "swap" as const, people: 1 };
+              const cost = seedanceCostKzt(10, s, o), price = seedanceAutoPriceKzt(10, s, o);
+              return <p className="mt-2 rounded-xl bg-paper px-3 py-2 text-sm">{P.swapLine(formatKzt(cost), formatKzt(price), formatKzt(price - cost))}</p>;
+            })()}
           </div>
         )}
         <div className="flex items-center gap-3">
