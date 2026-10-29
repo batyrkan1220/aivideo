@@ -36,8 +36,22 @@ export async function videoFrameJpeg(videoUrl: string, atSec = 0.5): Promise<Uin
   }
 }
 
+/**
+ * Fits a video into the face swap's 600-frame limit without cutting it when possible: lowers the
+ * frame rate (30 → down to 20 fps), 720p, < 10 MB; only videos over ~29 s are cut.
+ */
+export function faceSwapFit(durationSec: number) {
+  const fps = Math.max(20, Math.min(30, Math.floor(590 / Math.max(1, durationSec))));
+  return { fps, maxSec: Math.min(durationSec + 1, 590 / fps) };
+}
+
+export async function fitVideoForFaceSwap(input: Uint8Array, durationSec: number): Promise<Uint8Array | null> {
+  const { fps, maxSec } = faceSwapFit(durationSec);
+  return trimVideoMp4(input, maxSec, fps);
+}
+
 /** The first `maxSec` seconds of an MP4 (re-encoded, sound kept): for tools with a length limit. */
-export async function trimVideoMp4(input: Uint8Array, maxSec: number): Promise<Uint8Array | null> {
+export async function trimVideoMp4(input: Uint8Array, maxSec: number, fps = 30): Promise<Uint8Array | null> {
   const ffmpeg = (await import("ffmpeg-static")).default as unknown as string | null;
   if (!ffmpeg) return null;
   const dir = await mkdtemp(join(tmpdir(), "trim-"));
@@ -46,7 +60,7 @@ export async function trimVideoMp4(input: Uint8Array, maxSec: number): Promise<U
     await writeFile(src, input);
     await run(ffmpeg, [
       "-hide_banner", "-loglevel", "error", "-y", "-i", src, "-t", String(maxSec),
-      "-vf", "scale='min(720,iw)':-2,fps=30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-maxrate", "3M", "-bufsize", "6M", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", out,
+      "-vf", `scale='min(720,iw)':-2,fps=${fps}`, "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-maxrate", "3M", "-bufsize", "6M", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", out,
     ], { timeout: 120_000 });
     const buf = await readFile(out);
     return buf.byteLength > 1000 ? new Uint8Array(buf) : null;

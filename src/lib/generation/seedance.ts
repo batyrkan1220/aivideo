@@ -5,6 +5,8 @@ import { seedanceCostUsd, faceSwapCostUsd } from "@/lib/pricing-seedance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { ProviderError, type GenerationProvider, type ProviderJobStatus } from "./types";
 import { buildReplacePrompt, getPvr, submitPvr } from "./replicate";
+import { fitVideoForFaceSwap } from "@/lib/media/frame";
+import { supabaseAdmin } from "@/lib/supabase/server";
 
 /**
  * muapi.ai — Seedance 2.5 Omni Reference, international endpoint, 720p.
@@ -76,6 +78,27 @@ export function buildKlingPrompt(adminPrompt: string, wish: string): string {
 
 /** muapi ai-video-face-swap accepts ≤ 600 frames: 20 s at 30 fps (Kling/Wan output is 24–30 fps). */
 export const FACE_SWAP_MAX_SEC = 19.5;
+/** With the frame rate lowered to 20 fps, videos up to ~29 s still fit in 600 frames. */
+export const FACE_SWAP_LIMIT_SEC = 29.5;
+
+/** Re-encoded copy of a finished video that fits the face swap (stored privately, signed URL). */
+async function faceSwapInput(url: string, durationSec: number, jobKey: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(60_000) });
+    if (!res.ok) return null;
+    const fitted = await fitVideoForFaceSwap(new Uint8Array(await res.arrayBuffer()), durationSec);
+    if (!fitted) return null;
+    const db = supabaseAdmin();
+    const path = `faceswap-in/${jobKey.replace(/[^a-zA-Z0-9-]/g, "")}.mp4`;
+    const { error } = await db.storage.from("generated-videos").upload(path, fitted, { contentType: "video/mp4", upsert: true });
+    if (error) return null;
+    const { data } = await db.storage.from("generated-videos").createSignedUrl(path, 24 * 3600);
+    return data?.signedUrl ?? null;
+  } catch (err) {
+    console.error("[seedance] face swap input failed", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
 
 /** Kling 4.0 reference-to-video: who (photo), where (template frame), how (template video). */
 export function buildK4Prompt(withFrame: boolean, adminPrompt: string, wish: string, outfit: "photo" | "template" = "photo"): string {
@@ -161,10 +184,10 @@ export const seedanceProvider: GenerationProvider = {
       const d = await call<{ request_id?: string; id?: string }>("/api/v1/kling-4.0-reference-to-video", { method: "POST", body: JSON.stringify(body) });
       const id = d.request_id ?? d.id;
       if (!id) throw new ProviderError("provider_bad_response", false, "kling4: missing request_id");
-      // The face swap takes ≤ 600 frames (~24 s): longer videos are delivered as Kling made them.
-      const swap = durationSec <= FACE_SWAP_MAX_SEC;
+      // The face swap takes ≤ 600 frames: videos up to ~29 s get a lower-fps copy, longer ones skip it.
+      const swap = durationSec <= FACE_SWAP_LIMIT_SEC;
       const cost = seedanceCostUsd(durationSec, pricing, { mode: "k4", people: 1 });
-      return { providerJobId: id, cost, state: { stage: "wan", i: 0, faces: swap ? faceUrls.slice(0, 1) : [], swap_cost: faceSwapCostUsd(durationSec, pricing) } };
+      return { providerJobId: id, cost, state: { stage: "wan", i: 0, faces: swap ? faceUrls.slice(0, 1) : [], swap_cost: faceSwapCostUsd(durationSec, pricing), dur: durationSec } };
     }
     if (cfg.mode === "pvr") {
       // Replicate p-video-replace: all people replaced in one run (photo i → person at positions[i]).
@@ -176,13 +199,13 @@ export const seedanceProvider: GenerationProvider = {
       // Wan 2.2 Animate "replace": template background/lighting stay, the person comes from the photo;
       // the face swap pass afterwards sharpens the likeness.
       const wanCost = seedanceCostUsd(durationSec, pricing, { mode: "wan", prepare: false });
-      const wanState = { stage: "wan", i: 0, faces: faceUrls, swap_cost: faceSwapCostUsd(durationSec, pricing) };
+      const wanState = { stage: "wan", i: 0, faces: durationSec <= FACE_SWAP_LIMIT_SEC ? faceUrls : [], swap_cost: faceSwapCostUsd(durationSec, pricing), dur: durationSec };
       if (cfg.prepare) {
         // Step 0: Nano Banana Pro → a clean full-body image of the customer (face kept; outfit: own or template's).
         const frame = cfg.outfit === "template" ? input.templateFrameUrl ?? null : null;
         try {
           const id = await submitPrep(faceUrls[0], frame);
-          return { providerJobId: id, cost: pricing.prepUsd, state: { stage: "prep", i: 0, faces: faceUrls, video: input.templateVideoUrl, prompt: cfg.prompt, next_cost: wanCost, swap_cost: wanState.swap_cost } };
+          return { providerJobId: id, cost: pricing.prepUsd, state: { stage: "prep", i: 0, faces: wanState.faces, video: input.templateVideoUrl, prompt: cfg.prompt, next_cost: wanCost, swap_cost: wanState.swap_cost, dur: durationSec } };
         } catch (err) {
           console.error("[seedance] prep submit failed, Wan with the photo", err instanceof ProviderError ? `${err.code} ${err.message}` : err);
         }
@@ -249,7 +272,7 @@ export const seedanceProvider: GenerationProvider = {
       const img = status === "completed" || status === "succeeded" ? outputUrl(d) : undefined;
       if (!img) console.error("[seedance] prep failed, Wan with the photo", providerJobId, status, JSON.stringify(d.error ?? "").slice(0, 200));
       const id = await submitWan(img ?? st.faces[0], st.video, st.prompt ?? "");
-      return { state: "processing", next: { providerJobId: id, state: { stage: "wan", i: 0, faces: st.faces, swap_cost: st.swap_cost }, cost: st.next_cost ?? 0 } };
+      return { state: "processing", next: { providerJobId: id, state: { stage: "wan", i: 0, faces: st.faces, swap_cost: st.swap_cost, dur: st.dur }, cost: st.next_cost ?? 0 } };
     }
     // Kling step 1 (the customer put into the template frame) done or failed → step 2: Kling.
     if (st?.stage === "compose" && st.video && ["completed", "succeeded", "failed", "error", "cancelled"].includes(status)) {
@@ -286,7 +309,9 @@ export const seedanceProvider: GenerationProvider = {
         const i = st.stage === "seedance" || st.stage === "wan" ? 0 : st.i + 1;
         if (i < st.faces.length) {
           try {
-            const swapId = await submitFaceSwap(url, st.faces[i], i);
+            // Longer than 600 frames at 30 fps: a 20–30 fps copy (same length) goes to the face swap.
+            const input = i === 0 && (st.dur ?? 0) > FACE_SWAP_MAX_SEC ? (await faceSwapInput(url, st.dur!, providerJobId)) ?? url : url;
+            const swapId = await submitFaceSwap(input, st.faces[i], i);
             return { state: "processing", next: { providerJobId: swapId, state: { stage: "swap", i, faces: st.faces, base: url, swap_cost: st.swap_cost }, cost: i === 0 ? 0 : st.swap_cost ?? 0 } };
           } catch (err) {
             console.error("[seedance] face swap submit failed", i, err instanceof ProviderError ? `${err.code} ${err.message}` : err instanceof Error ? err.message : err);
@@ -315,7 +340,7 @@ export const seedanceProvider: GenerationProvider = {
 };
 
 
-type SeedanceState = { stage: "seedance" | "swap" | "kling" | "wan" | "compose" | "facefix" | "prep" | "pvr"; i: number; faces: string[]; base?: string; video?: string; prompt?: string; next_cost?: number; swap_cost?: number };
+type SeedanceState = { stage: "seedance" | "swap" | "kling" | "wan" | "compose" | "facefix" | "prep" | "pvr"; i: number; faces: string[]; base?: string; video?: string; prompt?: string; next_cost?: number; swap_cost?: number; dur?: number };
 function parseState(s: unknown): SeedanceState | null {
   if (!s || typeof s !== "object") return null;
   const o = s as Record<string, unknown>;
@@ -328,6 +353,7 @@ function parseState(s: unknown): SeedanceState | null {
     prompt: typeof o.prompt === "string" ? o.prompt : undefined,
     next_cost: typeof o.next_cost === "number" ? o.next_cost : undefined,
     swap_cost: typeof o.swap_cost === "number" ? o.swap_cost : undefined,
+    dur: typeof o.dur === "number" ? o.dur : undefined,
   };
 }
 

@@ -10,7 +10,7 @@ import { handlePaymentWebhook } from "@/lib/payments/process";
 import { signSandbox } from "@/lib/payments/sandbox";
 import { generationProvider } from "@/lib/generation";
 import { ru } from "@/lib/i18n/ru";
-import { trimVideoMp4 } from "@/lib/media/frame";
+import { fitVideoForFaceSwap } from "@/lib/media/frame";
 import { submitFaceSwap, FACE_SWAP_MAX_SEC } from "@/lib/generation/seedance";
 import { faceSwapCostUsd } from "@/lib/pricing-seedance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
@@ -164,7 +164,9 @@ export async function redoFaceSwap(_: AdminState, fd: FormData): Promise<AdminSt
 
   const { data: blob } = await db.storage.from("generated-videos").download(gv.private_storage_path);
   if (!blob) return { error: E.generic };
-  const trimmed = await trimVideoMp4(new Uint8Array(await blob.arrayBuffer()), FACE_SWAP_MAX_SEC - 0.1);
+  const dur = Number((o.template_snapshot_json as { video_duration_sec?: unknown; user_video_duration_sec?: unknown }).video_duration_sec
+    ?? (o.template_snapshot_json as { user_video_duration_sec?: unknown }).user_video_duration_sec) || FACE_SWAP_MAX_SEC;
+  const trimmed = await fitVideoForFaceSwap(new Uint8Array(await blob.arrayBuffer()), dur);
   if (!trimmed) return { error: E.generic };
   const tmpPath = `${o.user_id}/${o.id}-faceswap-in.mp4`;
   const { error: upErr } = await db.storage.from("generated-videos").upload(tmpPath, trimmed, { contentType: "video/mp4", upsert: true });
@@ -182,7 +184,7 @@ export async function redoFaceSwap(_: AdminState, fd: FormData): Promise<AdminSt
     console.error("[admin.redoFaceSwap]", err instanceof Error ? err.message : err);
     return { error: E.generic };
   }
-  const cost = faceSwapCostUsd(FACE_SWAP_MAX_SEC, await seedancePricingSettings());
+  const cost = faceSwapCostUsd(Math.min(dur, 29.5), await seedancePricingSettings());
   const now = new Date().toISOString();
   const { error } = await db.from("generation_jobs").insert({
     order_id: o.id, provider: "seedance", status: "processing", provider_job_id: swapId, started_at: now,
