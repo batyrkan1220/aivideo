@@ -53,7 +53,7 @@ export function emptyTemplate(): TemplateInput {
     coverAssetPath: null,
     previewVideoPath: null,
     faceSlots: autoFaceSlots(1),
-    qualities: [{ key: "720p", labelKk: "Жоғары сапа · 720p", resolution: "720p", providerQuality: "720p", surchargeKzt: 0, available: true }],
+    qualities: [{ key: "720p", labelKk: "Высокое качество · 720p", resolution: "720p", providerQuality: "720p", surchargeKzt: 0, available: true }],
     pricing: { basePriceKzt: 0, chargeExtraFaces: false, extraFacePriceKzt: 0, includedFaces: 1, platformFeeKzt: 0, minPriceKzt: 0 },
     providerKey: "seedance",
     providerConfig: { people: 1, framing: "half", aspectRatio: "adaptive", prompt: "", allowWish: true },

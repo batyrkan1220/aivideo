@@ -36,16 +36,16 @@ describe("inputToRow", () => {
   it("always lays faces out automatically left → right", () => {
     const t = { ...emptyTemplate(), providerKey: "dev" };
     t.faceSlots = [
-      { key: "l", labelKk: "1-бет — сол жақ", position: { x: 0.2, y: 0.4 }, providerInput: "f1", order: 5 },
-      { key: "c", labelKk: "2-бет — ортада", position: { x: 0.5, y: 0.4 }, providerInput: "f2", order: 9 },
-      { key: "r", labelKk: "3-бет — оң жақ", position: { x: 0.8, y: 0.4 }, providerInput: "f3", order: 1 },
+      { key: "l", labelKk: "1-е лицо — слева", position: { x: 0.2, y: 0.4 }, providerInput: "f1", order: 5 },
+      { key: "c", labelKk: "2-е лицо — в центре", position: { x: 0.5, y: 0.4 }, providerInput: "f2", order: 9 },
+      { key: "r", labelKk: "3-е лицо — справа", position: { x: 0.8, y: 0.4 }, providerInput: "f3", order: 1 },
     ];
     const row = inputToRow(t);
     expect(row.required_face_count).toBe(3);
     expect(row.face_slots_json.map((s) => [s.key, s.providerInput, s.labelKk])).toEqual([
-      ["face_1", "face_1", "1-бет — сол жақ"],
-      ["face_2", "face_2", "2-бет — ортада"],
-      ["face_3", "face_3", "3-бет — оң жақ"],
+      ["face_1", "face_1", "1-е лицо — слева"],
+      ["face_2", "face_2", "2-е лицо — в центре"],
+      ["face_3", "face_3", "3-е лицо — справа"],
     ]);
     const xs = row.face_slots_json.map((s) => s.position.x);
     expect(xs).toEqual([...xs].sort((a, b) => a - b));

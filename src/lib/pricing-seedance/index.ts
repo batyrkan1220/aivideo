@@ -24,7 +24,7 @@ export type SeedancePricing = z.infer<typeof seedancePricingSchema>;
 export const DEFAULT_SEEDANCE_PRICING: SeedancePricing = seedancePricingSchema.parse({});
 
 export const SEEDANCE_QUALITY: Quality = {
-  key: "720p", labelKk: "Жоғары сапа · 720p", resolution: "720p", providerQuality: "720p", surchargeKzt: 0, available: true,
+  key: "720p", labelKk: "Высокое качество · 720p", resolution: "720p", providerQuality: "720p", surchargeKzt: 0, available: true,
 };
 
 /** Kept for call sites; every template is Kling 4.0 now. */

@@ -61,8 +61,8 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
 
   const snap = o.template_snapshot_json as { title_kk?: string; quality?: { labelKk?: string } };
   const price = o.pricing_breakdown_json as PriceBreakdown;
-  const fmt = new Intl.DateTimeFormat("kk-KZ", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Almaty" });
-  const dateFmt = new Intl.DateTimeFormat("kk-KZ", { dateStyle: "long", timeZone: "Asia/Almaty" });
+  const fmt = new Intl.DateTimeFormat("ru-RU", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Almaty" });
+  const dateFmt = new Intl.DateTimeFormat("ru-RU", { dateStyle: "long", timeZone: "Asia/Almaty" });
   const payLabel = kk.order.payment[o.payment_status as keyof typeof kk.order.payment];
   const genLabel = kk.order.generation[o.generation_status as keyof typeof kk.order.generation];
 

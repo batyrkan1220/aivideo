@@ -44,7 +44,7 @@ export function parseSeedanceConfig(raw: unknown): SeedanceConfig {
 }
 
 export function seedanceSlotLabel(i: number, n: number) {
-  return n === 1 ? "Сіздің фотоңыз" : `${i + 1}-адам (сол жақтан)`;
+  return n === 1 ? "Ваше фото" : `${i + 1}-й человек (слева)`;
 }
 
 /** Customer upload slots. providerInput = `img_<n>` (= @image_<n> in the prompt). */

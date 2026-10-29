@@ -266,7 +266,7 @@ export function TemplateEditor({
                 <span className="text-sm font-medium">{e.seedance.labels}</span>
                 {Array.from({ length: sd.people }, (_, i) => (
                   <div key={i} className="grid gap-2 sm:grid-cols-[1fr_200px]">
-                    <input className={inputCls()} maxLength={40} placeholder={`${i + 1}-адам (сол жақтан)`}
+                    <input className={inputCls()} maxLength={40} placeholder={`${i + 1}-й человек (слева)`}
                       value={sd.labels[i] ?? ""}
                       onChange={(ev) => { const l = [...sd.labels]; while (l.length < sd.people) l.push(""); l[i] = ev.target.value; setSd({ labels: l.slice(0, sd.people) }); }} />
                     <select className={inputCls()} value={sd.positions[i] ?? ""}

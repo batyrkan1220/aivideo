@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     url: "/",
     title: `${kk.brand.name} — ${kk.brand.tagline}`,
     description: kk.brand.description,
-    locale: "kk_KZ",
+    locale: "ru_RU",
   },
 };
 
@@ -27,7 +27,7 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, view
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="kk" className="h-full antialiased">
+    <html lang="ru" className="h-full antialiased">
       <body className="flex min-h-full flex-col">
         {children}
         <Suspense fallback={null}>

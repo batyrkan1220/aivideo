@@ -45,9 +45,9 @@ describe("calculatePrice", () => {
 
 describe("face slots", () => {
   const slots: FaceSlot[] = [
-    { key: "right", labelKk: "3-бет — оң жақ", position: { x: 0.8, y: 0.4 }, providerInput: "face_3", order: 2 },
-    { key: "left", labelKk: "1-бет — сол жақ", position: { x: 0.2, y: 0.4 }, providerInput: "face_1", order: 0 },
-    { key: "center", labelKk: "2-бет — ортада", position: { x: 0.5, y: 0.4 }, providerInput: "face_2", order: 1 },
+    { key: "right", labelKk: "3-е лицо — справа", position: { x: 0.8, y: 0.4 }, providerInput: "face_3", order: 2 },
+    { key: "left", labelKk: "1-е лицо — слева", position: { x: 0.2, y: 0.4 }, providerInput: "face_1", order: 0 },
+    { key: "center", labelKk: "2-е лицо — в центре", position: { x: 0.5, y: 0.4 }, providerInput: "face_2", order: 1 },
   ];
   it("valid 3-face config", () => expect(validateFaceSlots(slots, 3)).toEqual([]));
   it("detects count mismatch and duplicates", () => {
@@ -61,9 +61,9 @@ describe("face slots", () => {
 
 describe("autoFaceSlots", () => {
   it("labels by count", () => {
-    expect(autoFaceSlots(1).map((s) => s.labelKk)).toEqual(["Бет фотосын жүктеңіз"]);
-    expect(autoFaceSlots(2).map((s) => s.labelKk)).toEqual(["1-бет — сол жақ", "2-бет — оң жақ"]);
-    expect(autoFaceSlots(5).map((s) => s.labelKk)).toEqual(["1-бет — ең сол жақ", "2-бет", "3-бет", "4-бет", "5-бет — ең оң жақ"]);
+    expect(autoFaceSlots(1).map((s) => s.labelKk)).toEqual(["Загрузите фото лица"]);
+    expect(autoFaceSlots(2).map((s) => s.labelKk)).toEqual(["1-е лицо — слева", "2-е лицо — справа"]);
+    expect(autoFaceSlots(5).map((s) => s.labelKk)).toEqual(["1-е лицо — крайнее слева", "2-е лицо", "3-е лицо", "4-е лицо", "5-е лицо — крайнее справа"]);
   });
   it("is valid, evenly spaced and clamped to 1..10", () => {
     expect(validateFaceSlots(autoFaceSlots(4), 4)).toEqual([]);

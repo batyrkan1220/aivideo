@@ -27,7 +27,7 @@ export async function OrderList({ limit = 50 }: { limit?: number }) {
       </div>
     );
   }
-  const fmt = new Intl.DateTimeFormat("kk-KZ", { dateStyle: "medium", timeZone: "Asia/Almaty" });
+  const fmt = new Intl.DateTimeFormat("ru-RU", { dateStyle: "medium", timeZone: "Asia/Almaty" });
 
   const state = (o: Row) => {
     if (o.payment_status === "refunded") return { text: kk.order.payment.refunded, cls: "bg-line text-ink", cta: kk.myVideos.open };

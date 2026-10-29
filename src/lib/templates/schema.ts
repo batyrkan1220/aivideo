@@ -57,14 +57,14 @@ export function validateFaceSlots(slots: FaceSlot[], requiredCount: number): str
   return errs;
 }
 
-/** Kazakh slot label by position: left → right. */
+/** Slot label by position: left → right. */
 export function autoFaceLabel(i: number, n: number): string {
-  if (n === 1) return "Бет фотосын жүктеңіз";
-  const num = `${i + 1}-бет`;
-  if (n === 2) return `${num} — ${i === 0 ? "сол жақ" : "оң жақ"}`;
-  if (n === 3) return `${num} — ${["сол жақ", "ортада", "оң жақ"][i]}`;
-  if (i === 0) return `${num} — ең сол жақ`;
-  if (i === n - 1) return `${num} — ең оң жақ`;
+  if (n === 1) return "Загрузите фото лица";
+  const num = `${i + 1}-е лицо`;
+  if (n === 2) return `${num} — ${i === 0 ? "слева" : "справа"}`;
+  if (n === 3) return `${num} — ${["слева", "в центре", "справа"][i]}`;
+  if (i === 0) return `${num} — крайнее слева`;
+  if (i === n - 1) return `${num} — крайнее справа`;
   return num;
 }
 

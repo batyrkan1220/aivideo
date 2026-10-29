@@ -78,7 +78,7 @@ function inPageConfirm(message: string): Promise<boolean> {
       b.onclick = () => { wrap.remove(); resolve(val); };
       return b;
     };
-    row.append(mk("Бас тарту", false, false), mk("Растау", true, true));
+    row.append(mk("Отмена", false, false), mk("Подтвердить", true, true));
     box.append(p, row);
     wrap.append(box);
     document.body.append(wrap);

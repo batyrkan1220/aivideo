@@ -1,6 +1,20 @@
 /** Server start: log (in the background) whether the Kling API key and a Kling 4.0 pack work. */
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
+  // Keep the bot's description, menu button and commands in sync with the code (idempotent).
+  setTimeout(() => {
+    void (async () => {
+      try {
+        if (!process.env.TELEGRAM_BOT_TOKEN) return;
+        const { pushBotProfile, pushBotCommands } = await import("@/lib/telegram/profile");
+        await pushBotProfile();
+        await pushBotCommands();
+        console.log("[telegram] bot profile and commands synced");
+      } catch (err) {
+        console.error("[telegram] bot sync failed", err instanceof Error ? err.message : err);
+      }
+    })();
+  }, 8_000);
   setTimeout(() => {
     void (async () => {
       try {
