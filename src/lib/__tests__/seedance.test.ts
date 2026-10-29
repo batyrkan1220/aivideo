@@ -13,8 +13,8 @@ describe("seedance pricing", () => {
     expect(seedanceBilledSec(10)).toBe(20);
     expect(seedanceBilledSec(2)).toBe(2 + 4);            // output is at least 4 s
     expect(seedanceBilledSec(8.06)).toBe(9 + 8);         // reference rounded up (real muapi bill $4.133)
-    expect(seedanceCostUsd(10, S)).toBeCloseTo(20 * 0.374 * 0.65, 4);
-    expect(seedanceCostKzt(10, S)).toBe(Math.round(20 * 0.374 * 0.65 * S.tengePerUsd));
+    expect(seedanceCostUsd(10, S)).toBeCloseTo(20 * 0.374 * 0.65 + 0.1, 4); // + one face swap pass
+    expect(seedanceCostKzt(10, S)).toBe(Math.round((20 * 0.374 * 0.65 + 0.1) * S.tengePerUsd));
   });
   it("price = cost × (1 + markup), rounded up, not below the minimum", () => {
     const raw = seedanceCostKzt(15, S) * (1 + S.markupPercent / 100);
@@ -98,6 +98,36 @@ describe("seedance provider", () => {
     expect(await seedanceProvider.getStatus("req-1", { startedAt: null, state: null })).toEqual({ state: "succeeded", outputUrl: "https://cdn.muapi/out.mp4" });
     expect(await seedanceProvider.getStatus("req-1", { startedAt: null, state: null })).toMatchObject({ state: "failed", errorCode: "provider_content_rejected" });
     expect(calls[1].url).toBe("https://api.muapi.test/api/v1/predictions/req-1/result");
+    vi.unstubAllGlobals();
+  });
+
+  it("after Seedance, swaps each face in turn; a failed swap delivers the last good video", async () => {
+    const two = [faces[0], { slotKey: "face_2", providerInput: "img_2", imageUrl: "https://s/2.jpg" }];
+    const calls: { url: string; body?: unknown }[] = [];
+    const replies = [
+      { request_id: "seed-1" },
+      { status: "completed", outputs: ["https://cdn/seed.mp4"] },
+      { request_id: "swap-1" },
+      { status: "completed", outputs: ["https://cdn/swap1.mp4"] },
+      { request_id: "swap-2" },
+      { status: "failed", error: "no face" },
+    ];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      return new Response(JSON.stringify(replies.shift()), { status: 200 });
+    }));
+    const r = await seedanceProvider.submit({ jobId: "j", ...base, faces: two, config: { people: 2, durationSec: 8 } });
+    expect(r.state).toEqual({ stage: "seedance", faces: ["https://s/1.jpg", "https://s/2.jpg"] });
+    const s1 = await seedanceProvider.getStatus("seed-1", { startedAt: null, state: r.state ?? null });
+    expect(s1).toMatchObject({ state: "processing", next: { providerJobId: "swap-1", state: { stage: "swap", i: 0, base: "https://cdn/seed.mp4" } } });
+    expect(calls[2].url).toBe("https://api.muapi.test/api/v1/ai-video-face-swap");
+    expect(calls[2].body).toMatchObject({ video_url: "https://cdn/seed.mp4", image_url: "https://s/1.jpg", target_index: 0 });
+    const n1 = (s1 as { next: { state: Record<string, unknown> } }).next.state;
+    const s2 = await seedanceProvider.getStatus("swap-1", { startedAt: null, state: n1 });
+    expect(s2).toMatchObject({ state: "processing", next: { providerJobId: "swap-2", state: { i: 1, base: "https://cdn/swap1.mp4" } } });
+    expect(calls[4].body).toMatchObject({ video_url: "https://cdn/swap1.mp4", image_url: "https://s/2.jpg", target_index: 1 });
+    const n2 = (s2 as { next: { state: Record<string, unknown> } }).next.state;
+    expect(await seedanceProvider.getStatus("swap-2", { startedAt: null, state: n2 })).toEqual({ state: "succeeded", outputUrl: "https://cdn/swap1.mp4" });
     vi.unstubAllGlobals();
   });
 

@@ -17,6 +17,8 @@ export const seedancePricingSchema = z.object({
   markupPercent: z.number().min(0).max(1000).default(150),
   minPriceKzt: z.number().int().min(0).max(1_000_000).default(1990),
   roundToKzt: z.number().int().min(1).max(10_000).default(10),
+  /** muapi ai-video-face-swap pass after Seedance (Seedance itself does not keep a real face). */
+  faceSwapUsd: z.number().min(0).max(10).default(0.1),
 });
 export type SeedancePricing = z.infer<typeof seedancePricingSchema>;
 export const DEFAULT_SEEDANCE_PRICING: SeedancePricing = seedancePricingSchema.parse({});
@@ -35,7 +37,7 @@ export function seedanceBilledSec(durationSec: number): number {
 }
 
 export function seedanceCostUsd(durationSec: number, s: SeedancePricing): number {
-  return Math.round(seedanceBilledSec(durationSec) * s.usdPerSec * s.refFactor * 10_000) / 10_000;
+  return Math.round((seedanceBilledSec(durationSec) * s.usdPerSec * s.refFactor + s.faceSwapUsd) * 10_000) / 10_000;
 }
 
 export function seedanceCostKzt(durationSec: number, s: SeedancePricing): number {

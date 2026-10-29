@@ -117,19 +117,39 @@ export const seedanceProvider: GenerationProvider = {
     const d = await call<{ request_id?: string; id?: string }>(`/api/v1/${env().MUAPI_MODEL}`, { method: "POST", body: JSON.stringify(body) });
     const id = d.request_id ?? d.id;
     if (!id) throw new ProviderError("provider_bad_response", false, "missing request_id");
-    return { providerJobId: id, cost: seedanceCostUsd(durationSec, await seedancePricingSettings()) };
+    // Seedance does not keep a real person's face (ByteDance policy) → a face swap pass follows.
+    const state = { stage: "seedance", faces: input.faces.map((f) => f.imageUrl) };
+    return { providerJobId: id, cost: seedanceCostUsd(durationSec, await seedancePricingSettings()), state };
   },
 
-  async getStatus(providerJobId): Promise<ProviderJobStatus> {
-    const d = await call<{ status?: string; outputs?: unknown[]; error?: unknown }>(`/api/v1/predictions/${encodeURIComponent(providerJobId)}/result`);
+  async getStatus(providerJobId, ctx): Promise<ProviderJobStatus> {
+    const st = parseState(ctx?.state);
+    const d = await call<{ status?: string; outputs?: unknown[]; video?: unknown; error?: unknown }>(`/api/v1/predictions/${encodeURIComponent(providerJobId)}/result`);
     const status = String(d.status ?? "").toLowerCase();
     if (status === "completed" || status === "succeeded") {
-      const url = (d.outputs ?? []).find((x): x is string => typeof x === "string" && /^https?:\/\//.test(x));
-      if (!url) return { state: "failed", errorCode: "provider_no_output", retryable: false };
+      const url = outputUrl(d);
+      if (!url) {
+        if (st?.stage === "swap" && st.base) return swapFallback(providerJobId, st.base, "no_output");
+        return { state: "failed", errorCode: "provider_no_output", retryable: false };
+      }
+      // Next face swap pass (one per person), then the finished video.
+      if (st && st.faces.length) {
+        const i = st.stage === "seedance" ? 0 : st.i + 1;
+        if (i < st.faces.length) {
+          try {
+            const swapId = await submitFaceSwap(url, st.faces[i], i);
+            return { state: "processing", next: { providerJobId: swapId, state: { stage: "swap", i, faces: st.faces, base: url }, cost: i === 0 ? 0 : (await seedancePricingSettings()).faceSwapUsd } };
+          } catch (err) {
+            console.error("[seedance] face swap submit failed", i, err instanceof Error ? err.message : err);
+            return { state: "succeeded", outputUrl: url };
+          }
+        }
+      }
       return { state: "succeeded", outputUrl: url };
     }
     if (status === "failed" || status === "error" || status === "cancelled") {
       const reason = JSON.stringify(d.error ?? "").slice(0, 300);
+      if (st?.stage === "swap" && st.base) return swapFallback(providerJobId, st.base, reason);
       console.error("[seedance] task failed", providerJobId, reason);
       const content = /sensitive|policy|moderat|safety|nsfw|real person|face|celebrit|inappropriate/i.test(reason);
       return { state: "failed", errorCode: content ? "provider_content_rejected" : "provider_failed", retryable: false };
@@ -137,6 +157,41 @@ export const seedanceProvider: GenerationProvider = {
     return { state: status === "queued" || status === "pending" || status === "created" ? "queued" : "processing" };
   },
 };
+
+
+type SeedanceState = { stage: "seedance" | "swap"; i: number; faces: string[]; base?: string };
+function parseState(s: unknown): SeedanceState | null {
+  if (!s || typeof s !== "object") return null;
+  const o = s as Record<string, unknown>;
+  if ((o.stage !== "seedance" && o.stage !== "swap") || !Array.isArray(o.faces)) return null;
+  return {
+    stage: o.stage, i: Number(o.i) || 0,
+    faces: o.faces.filter((x): x is string => typeof x === "string"),
+    base: typeof o.base === "string" ? o.base : undefined,
+  };
+}
+
+function outputUrl(d: { outputs?: unknown[]; video?: unknown }): string | undefined {
+  const isUrl = (x: unknown): x is string => typeof x === "string" && /^https?:\/\//.test(x);
+  const fromVideo = typeof d.video === "object" && d.video ? (d.video as { url?: unknown }).url : d.video;
+  return (d.outputs ?? []).find(isUrl) ?? (isUrl(fromVideo) ? fromVideo : undefined);
+}
+
+async function submitFaceSwap(videoUrl: string, faceUrl: string, targetIndex: number): Promise<string> {
+  const d = await call<{ request_id?: string; id?: string }>("/api/v1/ai-video-face-swap", {
+    method: "POST",
+    body: JSON.stringify({ video_url: videoUrl, image_url: faceUrl, target_index: targetIndex, target_gender: "All" }),
+  });
+  const id = d.request_id ?? d.id;
+  if (!id) throw new ProviderError("provider_bad_response", false, "face swap: missing request_id");
+  return id;
+}
+
+/** A failed face swap must not lose the paid Seedance video: deliver it as is (logged for the admin). */
+function swapFallback(id: string, base: string, reason: string): ProviderJobStatus {
+  console.error("[seedance] face swap failed, delivering the Seedance video", id, reason.slice(0, 200));
+  return { state: "succeeded", outputUrl: base };
+}
 
 /** Admin check: is the muapi key accepted, and what is the account balance (USD)? Never returns the key. */
 export async function muapiStatus(): Promise<{ state: "none" | "ok" | "auth" | "error"; balance?: number }> {
