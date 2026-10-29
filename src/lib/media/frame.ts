@@ -46,7 +46,7 @@ export async function trimVideoMp4(input: Uint8Array, maxSec: number): Promise<U
     await writeFile(src, input);
     await run(ffmpeg, [
       "-hide_banner", "-loglevel", "error", "-y", "-i", src, "-t", String(maxSec),
-      "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart", out,
+      "-vf", "scale='min(720,iw)':-2,fps=30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-maxrate", "3M", "-bufsize", "6M", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", out,
     ], { timeout: 120_000 });
     const buf = await readFile(out);
     return buf.byteLength > 1000 ? new Uint8Array(buf) : null;

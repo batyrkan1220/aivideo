@@ -74,8 +74,8 @@ export function buildKlingPrompt(adminPrompt: string, wish: string): string {
   return parts.join(" ");
 }
 
-/** muapi ai-video-face-swap accepts ≤ 600 frames: about 24 s at 25 fps. */
-export const FACE_SWAP_MAX_SEC = 24;
+/** muapi ai-video-face-swap accepts ≤ 600 frames: 20 s at 30 fps (Kling/Wan output is 24–30 fps). */
+export const FACE_SWAP_MAX_SEC = 19.5;
 
 /** Kling 4.0 reference-to-video: who (photo), where (template frame), how (template video). */
 export function buildK4Prompt(withFrame: boolean, adminPrompt: string, wish: string, outfit: "photo" | "template" = "photo"): string {
