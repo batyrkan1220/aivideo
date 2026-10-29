@@ -15,6 +15,7 @@ export async function saveSeedancePricing(_: SeedancePricingState, fd: FormData)
   const p = seedancePricingSchema.safeParse({
     usdPerSec: num("usdPerSec"), refFactor: num("refFactor") / 100, tengePerUsd: num("tengePerUsd"),
     markupPercent: num("markupPercent"), minPriceKzt: num("minPriceKzt"), roundToKzt: num("roundToKzt"),
+    klingUnitUsd: num("klingUnitUsd"), klingUnitsPerSec: num("klingUnitsPerSec"),
   });
   if (!p.success) return { error: "invalid" };
   const { error } = await supabaseAdmin().from("site_settings").upsert({

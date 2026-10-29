@@ -13,11 +13,13 @@ export function SeedancePricingForm({ value }: { value: SeedancePricing }) {
   const [v, setV] = useState({
     usdPerSec: String(value.usdPerSec), refFactor: String(Math.round(value.refFactor * 100)), tengePerUsd: String(value.tengePerUsd),
     markupPercent: String(value.markupPercent), minPriceKzt: String(value.minPriceKzt), roundToKzt: String(value.roundToKzt),
+    klingUnitUsd: String(value.klingUnitUsd), klingUnitsPerSec: String(value.klingUnitsPerSec),
   });
   const n = (x: string) => Number(x.replace(",", "."));
   const live = seedancePricingSchema.safeParse({
     usdPerSec: n(v.usdPerSec), refFactor: n(v.refFactor) / 100, tengePerUsd: n(v.tengePerUsd),
     markupPercent: n(v.markupPercent), minPriceKzt: n(v.minPriceKzt), roundToKzt: n(v.roundToKzt),
+    klingUnitUsd: n(v.klingUnitUsd), klingUnitsPerSec: n(v.klingUnitsPerSec),
   });
   const s = live.success ? live.data : null;
   const input = "mt-1 h-10 w-full rounded-xl border border-line px-3 text-base sm:text-sm";
@@ -40,10 +42,13 @@ export function SeedancePricingForm({ value }: { value: SeedancePricing }) {
           <summary className="cursor-pointer font-medium">{P.advanced}</summary>
           <p className="mt-2 text-xs text-muted">{P.advancedHint}</p>
           <div className="mt-3 grid gap-4 sm:grid-cols-3">
-            {field("usdPerSec", P.usdPerSec, "0.001")}
-            {field("refFactor", P.refFactor)}
+            {field("klingUnitUsd", P.klingUnitUsd, "0.001")}
+            {field("klingUnitsPerSec", P.klingUnitsPerSec, "0.01")}
             {field("roundToKzt", P.roundTo)}
           </div>
+          {/* Other modes' tariffs are kept as they are. */}
+          <input type="hidden" name="usdPerSec" value={v.usdPerSec} />
+          <input type="hidden" name="refFactor" value={v.refFactor} />
         </details>
         {s && (
           <div className="overflow-x-auto">
@@ -53,11 +58,12 @@ export function SeedancePricingForm({ value }: { value: SeedancePricing }) {
               </thead>
               <tbody className="divide-y divide-line">
                 {EXAMPLES.map((sec) => {
-                  const cost = seedanceCostKzt(sec, s), price = seedanceAutoPriceKzt(sec, s);
+                  const o = { mode: "kd" as const };
+                  const cost = seedanceCostKzt(sec, s, o), price = seedanceAutoPriceKzt(sec, s, o);
                   return (
                     <tr key={sec}>
                       <td className="py-2 pr-3">{sec} {P.sec}</td>
-                      <td className="py-2 pr-3 text-muted">{formatKzt(cost)} <span className="text-xs">(${seedanceCostUsd(sec, s).toFixed(2)})</span></td>
+                      <td className="py-2 pr-3 text-muted">{formatKzt(cost)} <span className="text-xs">(${seedanceCostUsd(sec, s, o).toFixed(2)} · {Math.round((Math.round(sec) * 2) * s.klingUnitsPerSec * 10) / 10} {P.units})</span></td>
                       <td className="py-2 pr-3"><b>{formatKzt(price)}</b></td>
                       <td className={`py-2 pr-3 font-medium ${price - cost >= 0 ? "text-success" : "text-danger"}`}>{formatKzt(price - cost)}</td>
                     </tr>
@@ -66,28 +72,6 @@ export function SeedancePricingForm({ value }: { value: SeedancePricing }) {
               </tbody>
             </table>
             <p className="mt-1 text-xs text-muted">{P.tableHint}</p>
-            {(() => {
-              const o = { mode: "swap" as const, people: 1 };
-              const cost = seedanceCostKzt(10, s, o), price = seedanceAutoPriceKzt(10, s, o);
-              return <p className="mt-2 rounded-xl bg-paper px-3 py-2 text-sm">{P.swapLine(formatKzt(cost), formatKzt(price), formatKzt(price - cost))}</p>;
-            })()}
-            <table className="mt-3 w-full min-w-[30rem] text-sm">
-              <caption className="pb-1 text-left text-xs font-medium text-muted">{P.klingTitle}</caption>
-              <tbody className="divide-y divide-line">
-                {EXAMPLES.map((sec) => {
-                  const o = { mode: "kling" as const };
-                  const cost = seedanceCostKzt(sec, s, o), price = seedanceAutoPriceKzt(sec, s, o);
-                  return (
-                    <tr key={sec}>
-                      <td className="py-2 pr-3">{sec} {P.sec}</td>
-                      <td className="py-2 pr-3 text-muted">{formatKzt(cost)} <span className="text-xs">(${seedanceCostUsd(sec, s, o).toFixed(2)})</span></td>
-                      <td className="py-2 pr-3"><b>{formatKzt(price)}</b></td>
-                      <td className={`py-2 pr-3 font-medium ${price - cost >= 0 ? "text-success" : "text-danger"}`}>{formatKzt(price - cost)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
           </div>
         )}
         <div className="flex items-center gap-3">

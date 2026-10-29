@@ -32,6 +32,10 @@ export const seedancePricingSchema = z.object({
   k4UsdPerSec: z.number().min(0).max(10).default(0.094),
   /** Kling official API, Kling 4.0 with video input, 720p: 0.6 unit per counted second × $0.14 per unit. */
   kdUsdPerSec: z.number().min(0).max(10).default(0.084),
+  /** Kling official API: price of one unit in your resource pack, $ (pack price ÷ units). */
+  klingUnitUsd: z.number().min(0).max(10).default(0.14),
+  /** Kling 4.0, 720p, with a video: units per counted second (input + output). */
+  klingUnitsPerSec: z.number().min(0).max(10).default(0.6),
   /** Kling: the customer put into the template frame first (nano-banana-pro-edit 2k $0.12 + image face swap $0.02). */
   composeUsd: z.number().min(0).max(5).default(0.14),
 });
@@ -63,7 +67,7 @@ export function seedanceCostUsd(durationSec: number, s: SeedancePricing, o: Cost
     const out = Math.min(30, Math.max(3, Math.round(durationSec)));
     const counted = Math.round(Math.min(durationSec, 30)) + out; // Kling: 6.96 s input → 7, 12.88 → 13
     const swap = o.faceSwap === true && durationSec <= 29.5 ? faceSwapCostUsd(durationSec, s) : 0;
-    return Math.round((counted * s.kdUsdPerSec + swap) * 10_000) / 10_000;
+    return Math.round((counted * s.klingUnitsPerSec * s.klingUnitUsd + swap) * 10_000) / 10_000;
   }
   if (o.mode === "k4") {
     const out = seedanceOutputSec(durationSec);
