@@ -11,6 +11,7 @@ import { parseSeedanceConfig, seedanceSlots, SEEDANCE_MAX_PEOPLE, type SeedanceC
 import { calculatePrice, formatKzt } from "@/lib/pricing";
 import { seedancePriceKzt, seedanceCostKzt, SEEDANCE_QUALITY, type SeedancePricing } from "@/lib/pricing-seedance";
 import { FaceMap } from "@/components/face-map";
+import { detectVideoPeople } from "@/lib/uploads/photo-quality";
 import { saveTemplate, changeStatus, createUploadUrl } from "./actions";
 
 const e = ru.admin.editor;
@@ -107,6 +108,26 @@ export function TemplateEditor({
   const set = <K extends keyof TemplateInput>(k: K, v: TemplateInput[K]) => { setT((p) => ({ ...p, [k]: v })); setDirty(true); };
   const setPricing = (patch: Partial<TemplateInput["pricing"]>) => set("pricing", { ...t.pricing, ...patch });
   const setSd = (patch: Partial<SeedanceConfig>) => { setSdState((p) => ({ ...p, ...patch })); setDirty(true); };
+  // Who is in the template video: faces found on a few frames, left → right.
+  const [people, setPeople] = useState<{ busy: boolean; text?: string }>({ busy: false });
+  const detectPeople = async (path: string | null = t.previewVideoPath) => {
+    if (!path) return;
+    setPeople({ busy: true });
+    const found = await detectVideoPeople(/^https?:/.test(path) ? path : `${mediaBase}/${path}`);
+    if (!found) { setPeople({ busy: false, text: e.seedance.detectFailed }); return; }
+    if (!found.length) { setPeople({ busy: false, text: e.seedance.detectNone }); return; }
+    const max = sd.mode === "kling" ? 1 : sd.mode === "pvr" ? 3 : SEEDANCE_MAX_PEOPLE;
+    const n = Math.min(found.length, max);
+    // Kept people: the biggest faces, shown left → right.
+    const kept = [...found].sort((a, b) => b.size - a.size).slice(0, n).sort((a, b) => a.x - b.x);
+    const biggest = Math.max(...kept.map((p) => p.size));
+    const where = (i: number) => (n === 1 ? "" : i === 0 ? "on the left" : i === n - 1 ? "on the right" : "in the center");
+    const patch: Partial<SeedanceConfig> = { people: n };
+    if (sd.mode === "pvr") patch.positions = kept.map((_, i) => where(i));
+    setSd(patch);
+    const desc = kept.map((p, i) => e.seedance.detectPerson(i + 1, n === 1 ? "" : e.seedance.positionOptions[where(i) as keyof typeof e.seedance.positionOptions], p.size === biggest && n > 1)).join(" · ");
+    setPeople({ busy: false, text: e.seedance.detectFound(found.length, n, desc) });
+  };
 
   // Customer photo slots = the number of people to replace, left → right (the server derives them too).
   const slots = seedanceSlots(sd.people, "face_", sd.labels);
@@ -213,7 +234,7 @@ export function TemplateEditor({
       </Section>
 
       <Section title={e.sections.media}>
-        <VideoField error={err("preview")} path={t.previewVideoPath} mediaBase={mediaBase} onUploaded={(p) => { set("previewVideoPath", p); setSd({ framePath: null }); }} onCover={(p) => set("coverAssetPath", p)} />
+        <VideoField error={err("preview")} path={t.previewVideoPath} mediaBase={mediaBase} onUploaded={(p) => { set("previewVideoPath", p); setSd({ framePath: null }); void detectPeople(p); }} onCover={(p) => set("coverAssetPath", p)} />
       </Section>
 
       <Section title={e.seedance.title}>
@@ -237,6 +258,11 @@ export function TemplateEditor({
                 {Array.from({ length: sd.mode === "pvr" ? 3 : SEEDANCE_MAX_PEOPLE }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
               <span className="mt-1 block text-xs text-muted">{sd.mode === "wan" || sd.mode === "swap" ? e.seedance.peopleHintSwap : e.seedance.peopleHint}</span>
+              <button type="button" disabled={people.busy || !t.previewVideoPath} onClick={() => void detectPeople()}
+                className="mt-2 rounded-full border border-line px-3 py-1.5 text-xs font-semibold hover:border-ink disabled:opacity-50">
+                {people.busy ? e.seedance.detecting : e.seedance.detect}
+              </button>
+              {people.text && <span className="mt-1 block text-xs font-medium">{people.text}</span>}
             </Field>
             {sd.mode === "wan" && (
               <div className="grid gap-2 rounded-xl border border-line p-3 sm:col-span-2">

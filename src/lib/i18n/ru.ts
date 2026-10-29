@@ -362,6 +362,12 @@ export const ru = {
           "Лучше всего: человек крупно, лицо видно спереди, хороший свет, видео 5–15 секунд.",
         ],
         labels: "Подписи фото для клиента (по порядку)",
+        detect: "🔍 Определить людей в видео",
+        detecting: "Ищем людей в видео…",
+        detectFailed: "Не удалось проверить видео в этом браузере. Укажите количество людей вручную.",
+        detectNone: "Лиц в видео не найдено (лица мелкие или повернуты). Укажите количество людей вручную.",
+        detectFound: (all: number, kept: number, desc: string) => `Найдено людей: ${all}${kept < all ? ` (взяли ${kept} с самыми крупными лицами)` : ""}. ${desc}. Проверьте и при необходимости поправьте.`,
+        detectPerson: (i: number, where: string, biggest: boolean) => `${i}-й${where ? ` — ${where.toLowerCase()}` : ""}${biggest ? " (самое крупное лицо)" : ""}`,
         positionAuto: (n: number) => `Где в кадре: авто (${n}-й слева)`,
         positionOptions: {
           "on the left": "Слева", "on the right": "Справа", "in the center": "В центре",

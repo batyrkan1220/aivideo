@@ -171,3 +171,37 @@ export async function checkPhoto(file: File, framing: Framing = "auto"): Promise
     return [];
   }
 }
+
+export type VideoPerson = { x: number; size: number }; // face centre (0..1 from the left), face width / frame width
+/**
+ * Template editor: who is in the video. Samples a few frames, detects faces and returns the
+ * people of the frame with the most faces, left → right. null = detector unavailable.
+ */
+export async function detectVideoPeople(videoUrl: string): Promise<VideoPerson[] | null> {
+  const fa = await loadFaceApi();
+  if (!fa) return null;
+  const v = document.createElement("video");
+  v.muted = true; v.playsInline = true; v.preload = "auto"; v.crossOrigin = "anonymous"; v.src = videoUrl;
+  try {
+    await new Promise<void>((res, rej) => { v.onloadeddata = () => res(); v.onerror = () => rej(new Error("load")); });
+    const d = v.duration || 1;
+    const c = document.createElement("canvas");
+    const W = Math.min(960, v.videoWidth || 720);
+    c.width = W; c.height = Math.round(W * ((v.videoHeight || 1280) / (v.videoWidth || 720)));
+    const ctx = c.getContext("2d");
+    if (!ctx) return null;
+    let best: VideoPerson[] = [];
+    for (const t of [0.5, d * 0.25, d * 0.5, d * 0.75]) {
+      v.currentTime = Math.min(t, Math.max(0, d - 0.1));
+      await new Promise<void>((res) => { v.onseeked = () => res(); });
+      ctx.drawImage(v, 0, 0, c.width, c.height);
+      const boxes: Box[] = (await fa.detectAllFaces(c, new fa.TinyFaceDetectorOptions({ inputSize: 608, scoreThreshold: 0.45 })))
+        .map((f) => ({ x: f.box.x, y: f.box.y, w: f.box.width, h: f.box.height }));
+      const merged = mergeBoxes([], boxes).filter((b) => b.w / W > 0.03); // ignore tiny background faces
+      if (merged.length > best.length) best = merged.map((b) => ({ x: (b.x + b.w / 2) / W, size: b.w / W }));
+    }
+    return best.sort((a, b) => a.x - b.x);
+  } catch {
+    return null;
+  }
+}
