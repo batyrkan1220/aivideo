@@ -209,7 +209,7 @@ export const seedanceProvider: GenerationProvider = {
             const swapId = await submitFaceSwap(url, st.faces[i], i);
             return { state: "processing", next: { providerJobId: swapId, state: { stage: "swap", i, faces: st.faces, base: url, swap_cost: st.swap_cost }, cost: i === 0 ? 0 : st.swap_cost ?? 0 } };
           } catch (err) {
-            console.error("[seedance] face swap submit failed", i, err instanceof Error ? err.message : err);
+            console.error("[seedance] face swap submit failed", i, err instanceof ProviderError ? `${err.code} ${err.message}` : err instanceof Error ? err.message : err);
             return { state: "succeeded", outputUrl: url };
           }
         }
