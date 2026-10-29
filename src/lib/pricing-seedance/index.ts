@@ -21,7 +21,7 @@ export const seedancePricingSchema = z.object({
   /** ai-video-face-swap, USD per second of video per person (muapi bill: 8 s → $0.75, 14.2 s → $1.33). */
   faceSwapUsdPerSec: z.number().min(0).max(10).default(0.094),
   /** Kling 3.0 Pro Motion Control (muapi), USD per output second. */
-  klingUsdPerSec: z.number().min(0).max(10).default(0.16),
+  klingUsdPerSec: z.number().min(0).max(10).default(0.194), // muapi bill: 8.06 s video → $1.744 (9 s billed)
   /** Wan 2.2 Animate replace (muapi), USD per second (muapi bill: 8 s → $1.12, 14 s → $1.96, 20 s → $2.80). */
   wanUsdPerSec: z.number().min(0).max(20).default(0.14),
   /** Wan: full-body customer image prepared first (nano-banana-pro-edit 2k). */

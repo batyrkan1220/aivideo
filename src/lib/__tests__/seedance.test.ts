@@ -161,7 +161,7 @@ describe("seedance provider", () => {
     expect(calls[0].url).toBe("https://api.muapi.test/api/v1/kling-v3.0-pro-motion-control");
     expect(calls[0].body).toMatchObject({ image_url: "https://s/1.jpg", video_url: "https://cdn/v.mp4", character_orientation: "video", keep_original_sound: true });
     expect(String((calls[0].body as { prompt: string }).prompt)).toContain("night city");
-    expect(r.cost).toBeCloseTo(9 * 0.16 + 0.14, 4);
+    expect(r.cost).toBeCloseTo(9 * 0.194 + 0.14, 4);
     expect(await seedanceProvider.getStatus("k-1", { startedAt: null, state: r.state ?? null })).toEqual({ state: "succeeded", outputUrl: "https://cdn/kling.mp4" });
     vi.unstubAllGlobals();
   });
@@ -183,7 +183,7 @@ describe("seedance provider", () => {
     expect(calls[2].body).toMatchObject({ image_url: "https://cdn/composed.jpg", swap_url: "https://s/1.jpg", target_index: 0 });
     const s1 = await seedanceProvider.getStatus("fx-1", { startedAt: null, state: (s0 as { next: { state: Record<string, unknown> } }).next.state });
     expect(s1).toMatchObject({ state: "processing", next: { providerJobId: "k-2", state: { stage: "kling" } } });
-    expect((s1 as { next: { cost: number } }).next.cost).toBeCloseTo(8 * 0.16, 4);
+    expect((s1 as { next: { cost: number } }).next.cost).toBeCloseTo(8 * 0.194, 4);
     expect(calls[4].url).toBe("https://api.muapi.test/api/v1/kling-v3.0-pro-motion-control");
     expect(calls[4].body).toMatchObject({ image_url: "https://cdn/fixed.jpg", video_url: "https://cdn/v.mp4" });
     const n = (s1 as { next: { state: Record<string, unknown> } }).next.state;
