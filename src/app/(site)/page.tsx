@@ -35,11 +35,10 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
         </div>
       </section>
 
-      {/* Phone intro: one line + three tiny steps, then straight to the videos */}
+      {/* Phone intro: one line, then straight to the videos */}
       <section className="mx-auto max-w-6xl px-4 pt-4 md:hidden">
         <div className="tg-only mb-3"><Logo className="text-lg" /></div>
         <h1 className="font-display text-xl font-extrabold leading-tight tracking-tight">{kk.home.title}</h1>
-        <HowItWorks compact />
       </section>
 
       <Suspense fallback={<div className="mx-auto mt-4 max-w-6xl px-4"><GridSkeleton /></div>}>
