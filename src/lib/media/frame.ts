@@ -35,3 +35,25 @@ export async function videoFrameJpeg(videoUrl: string, atSec = 0.5): Promise<Uin
     await rm(dir, { recursive: true, force: true });
   }
 }
+
+/** The first `maxSec` seconds of an MP4 (re-encoded, sound kept): for tools with a length limit. */
+export async function trimVideoMp4(input: Uint8Array, maxSec: number): Promise<Uint8Array | null> {
+  const ffmpeg = (await import("ffmpeg-static")).default as unknown as string | null;
+  if (!ffmpeg) return null;
+  const dir = await mkdtemp(join(tmpdir(), "trim-"));
+  const src = join(dir, "in.mp4"), out = join(dir, "out.mp4");
+  try {
+    await writeFile(src, input);
+    await run(ffmpeg, [
+      "-hide_banner", "-loglevel", "error", "-y", "-i", src, "-t", String(maxSec),
+      "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart", out,
+    ], { timeout: 120_000 });
+    const buf = await readFile(out);
+    return buf.byteLength > 1000 ? new Uint8Array(buf) : null;
+  } catch (err) {
+    console.error("[trim] ffmpeg failed", err instanceof Error ? err.message.slice(0, 200) : err);
+    return null;
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}

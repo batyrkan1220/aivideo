@@ -399,7 +399,7 @@ async function submitImageFaceSwap(imageUrl: string, faceUrl: string): Promise<s
   return id;
 }
 
-async function submitFaceSwap(videoUrl: string, faceUrl: string, targetIndex: number): Promise<string> {
+export async function submitFaceSwap(videoUrl: string, faceUrl: string, targetIndex: number): Promise<string> {
   const d = await call<{ request_id?: string; id?: string }>("/api/v1/ai-video-face-swap", {
     method: "POST",
     body: JSON.stringify({ video_url: videoUrl, image_url: faceUrl, target_index: targetIndex, target_gender: "All" }),
