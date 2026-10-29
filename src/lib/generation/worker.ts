@@ -1,5 +1,6 @@
 import "server-only";
 import { videoFrameJpeg } from "@/lib/media/frame";
+import { klingStatus } from "./kling";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/server";
@@ -30,7 +31,21 @@ function safeMessage(code: string): string {
 }
 
 /** Claims due jobs and advances each one step. Safe to run concurrently and repeatedly. */
+let providersChecked = false;
+/** Once per server start: log whether the Kling API key and a Kling 4.0 pack work (names/counts only). */
+async function logProviderStatus() {
+  if (providersChecked) return;
+  providersChecked = true;
+  try {
+    const k = await klingStatus();
+    if (k.state === "none") return;
+    const packs = (k.packs ?? []).map((p) => `${p.for40 ? "4.0" : "other"}:${p.remaining}/${p.total}`).join(",") || "none";
+    console.log(`[kling] status=${k.state} packs=${packs}`);
+  } catch { /* status only */ }
+}
+
 export async function runWorker({ limit = 5, budgetMs = 20_000 } = {}) {
+  void logProviderStatus();
   const started = Date.now();
   const worker = `w_${randomUUID().slice(0, 8)}`;
   const db = supabaseAdmin();
