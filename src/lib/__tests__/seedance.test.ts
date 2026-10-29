@@ -297,7 +297,7 @@ describe("seedance provider", () => {
       expect.objectContaining({ type: "refer_image", url: "https://s/1.jpg", id: "image_1" }),
     ]));
     expect(body.contents[0].text).toContain("Edit @video_1");
-    expect(body.settings).toMatchObject({ resolution: "720p", duration: 8 });
+    expect(body.settings).toMatchObject({ resolution: "720p", duration: 8, aspect_ratio: "9:16" });
     expect(r.cost).toBeCloseTo(8 * 0.084 + 8.1 * 0.094, 3);
     expect(await seedanceProvider.getStatus("kt-1", { startedAt: null, state: r.state ?? null })).toEqual({ state: "processing" });
     expect(calls[1].url).toBe("https://api-singapore.klingai.com/tasks?task_ids=kt-1");

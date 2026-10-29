@@ -47,13 +47,13 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   const parts = mode === "edit"
     ? [
         "Edit @video_1: replace the main person with the person from @image_1.",
-        "Preserve the person's facial features, face shape, eyes, nose, mouth, hairstyle, skin tone, age and body from @image_1 exactly.",
+        "The new person must look 100% identical to @image_1 in every frame: preserve the facial features, face shape, eyes, eyebrows, nose, mouth, teeth, ears, moles, hairstyle, hair color, skin tone, age and body proportions from @image_1 exactly. Do not beautify, stylize or change the face.",
         look,
         "Keep everything else in @video_1 unchanged: background, location, other people, objects, lighting, camera movement, framing, cuts, motion, timing and sound.",
       ]
     : [
         "Follow the motion, actions, timing, camera movement, framing and cuts of @video_1, and recreate its location, background and lighting.",
-        "The main person is the person from @image_1: preserve the facial features, face shape, hairstyle, skin tone, age and body from @image_1 exactly.",
+        "The main person is the person from @image_1 and must look 100% identical to @image_1 in every frame: preserve the facial features, face shape, eyes, nose, mouth, hairstyle, skin tone, age and body exactly. Do not beautify, stylize or change the face.",
         look,
       ];
   parts.push("Photorealistic, natural, sharp face, no text, no watermark.");
@@ -72,7 +72,8 @@ export async function submitKlingOmni(opts: { videoUrl: string; photoUrl: string
         { type: opts.mode === "edit" ? "base_video" : "feature_video", url: opts.videoUrl, id: "video_1" },
         { type: "refer_image", url: opts.photoUrl, id: "image_1" },
       ],
-      settings: { resolution: "720p", duration, aspect_ratio: ["16:9", "9:16", "1:1", "21:9"].includes(opts.aspectRatio) ? opts.aspectRatio : "adaptive" },
+      // Vertical 720p for phones unless the template asks for another format.
+      settings: { resolution: "720p", duration, aspect_ratio: ["16:9", "1:1", "21:9"].includes(opts.aspectRatio) ? opts.aspectRatio : "9:16" },
     }),
   });
   const id = d.data?.id;
