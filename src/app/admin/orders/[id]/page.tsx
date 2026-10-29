@@ -8,7 +8,7 @@ import { can } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { formatKzt, type PriceBreakdown } from "@/lib/pricing";
 import { ActionForm } from "../action-form";
-import { retryGeneration, cancelGeneration, refundPayment, redoFaceSwap } from "../actions";
+import { retryGeneration, cancelGeneration, refundPayment } from "../actions";
 
 const A = ru.admin.orders;
 
@@ -55,9 +55,6 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
       <section className={`${card} flex flex-wrap gap-3`}>
         {can(u.role, "orders.retry") && o.payment_status === "succeeded" && ["failed", "cancelled"].includes(o.generation_status) && (
           <ActionForm action={retryGeneration} fields={{ orderId: o.id }} label={A.retry} confirm={A.retryConfirm} />
-        )}
-        {can(u.role, "orders.retry") && o.generation_status === "completed" && (
-          <ActionForm action={redoFaceSwap} fields={{ orderId: o.id }} label={A.redoFaceSwap} confirm={A.redoFaceSwapConfirm} />
         )}
         {can(u.role, "orders.cancel") && activeJob && (
           <ActionForm action={cancelGeneration} fields={{ orderId: o.id }} label={A.cancel} confirm={A.cancelConfirm} />

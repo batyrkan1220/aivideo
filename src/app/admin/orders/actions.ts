@@ -10,10 +10,6 @@ import { handlePaymentWebhook } from "@/lib/payments/process";
 import { signSandbox } from "@/lib/payments/sandbox";
 import { generationProvider } from "@/lib/generation";
 import { ru } from "@/lib/i18n/ru";
-import { fitVideoForFaceSwap } from "@/lib/media/frame";
-import { submitFaceSwap, FACE_SWAP_MAX_SEC } from "@/lib/generation/seedance";
-import { faceSwapCostUsd } from "@/lib/pricing-seedance";
-import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 
 export type AdminState = { ok?: string; error?: string };
 const E = ru.admin.orders.errors;
@@ -143,56 +139,4 @@ export async function setFreeOrders(_: AdminState, fd: FormData): Promise<AdminS
   await audit(u.id, on ? "user.free_orders_on" : "user.free_orders_off", "profile", id.data);
   revalidatePath("/admin/users");
   return { ok: ru.admin.users.saved };
-}
-
-/**
- * Re-runs only the face swap on the finished video (trimmed to the face-swap limit when longer),
- * with the customer's first photo. The result replaces the delivered video when it is ready.
- */
-export async function redoFaceSwap(_: AdminState, fd: FormData): Promise<AdminState> {
-  const u = await staff("orders.retry");
-  if (!u) return { error: E.forbidden };
-  const id = uuid(fd.get("orderId"));
-  if (!id.success) return { error: E.generic };
-  const db = supabaseAdmin();
-  const { data: o } = await db.from("orders").select("id,user_id,generation_status,photos_deleted_at,template_snapshot_json").eq("id", id.data).single();
-  if (!o || o.generation_status !== "completed" || o.photos_deleted_at) return { error: E.not_eligible };
-  const { data: gv } = await db.from("generated_videos").select("private_storage_path").eq("order_id", o.id).maybeSingle();
-  const slots = ((o.template_snapshot_json as { face_slots_json?: { key: string; order: number }[] }).face_slots_json ?? []).sort((a, b) => a.order - b.order);
-  const { data: asset } = await db.from("order_assets").select("private_storage_path").eq("order_id", o.id).eq("face_slot_key", slots[0]?.key ?? "").maybeSingle();
-  if (!gv || !asset) return { error: E.not_eligible };
-
-  const { data: blob } = await db.storage.from("generated-videos").download(gv.private_storage_path);
-  if (!blob) return { error: E.generic };
-  const dur = Number((o.template_snapshot_json as { video_duration_sec?: unknown; user_video_duration_sec?: unknown }).video_duration_sec
-    ?? (o.template_snapshot_json as { user_video_duration_sec?: unknown }).user_video_duration_sec) || FACE_SWAP_MAX_SEC;
-  const trimmed = await fitVideoForFaceSwap(new Uint8Array(await blob.arrayBuffer()), dur);
-  if (!trimmed) return { error: E.generic };
-  const tmpPath = `${o.user_id}/${o.id}-faceswap-in.mp4`;
-  const { error: upErr } = await db.storage.from("generated-videos").upload(tmpPath, trimmed, { contentType: "video/mp4", upsert: true });
-  if (upErr) return { error: E.generic };
-  const [{ data: v }, { data: p }] = await Promise.all([
-    db.storage.from("generated-videos").createSignedUrl(tmpPath, 24 * 3600),
-    db.storage.from("user-uploads").createSignedUrl(asset.private_storage_path, 24 * 3600),
-  ]);
-  if (!v || !p) return { error: E.generic };
-
-  let swapId: string;
-  try {
-    swapId = await submitFaceSwap(v.signedUrl, p.signedUrl, 0);
-  } catch (err) {
-    console.error("[admin.redoFaceSwap]", err instanceof Error ? err.message : err);
-    return { error: E.generic };
-  }
-  const cost = faceSwapCostUsd(Math.min(dur, 29.5), await seedancePricingSettings());
-  const now = new Date().toISOString();
-  const { error } = await db.from("generation_jobs").insert({
-    order_id: o.id, provider: "seedance", status: "processing", provider_job_id: swapId, started_at: now,
-    provider_cost: cost, provider_state: { stage: "swap", i: 0, faces: [p.signedUrl], base: v.signedUrl },
-  });
-  if (error) return { error: E.generic };
-  await db.from("orders").update({ generation_status: "processing", completed_at: null }).eq("id", o.id);
-  await audit(u.id, "order.redo_face_swap", "order", o.id);
-  revalidatePath(`/admin/orders/${o.id}`);
-  return { ok: ru.admin.orders.done };
 }

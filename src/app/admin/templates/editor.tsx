@@ -116,14 +116,14 @@ export function TemplateEditor({
     const found = await detectVideoPeople(/^https?:/.test(path) ? path : `${mediaBase}/${path}`);
     if (!found) { setPeople({ busy: false, text: e.seedance.detectFailed }); return; }
     if (!found.length) { setPeople({ busy: false, text: e.seedance.detectNone }); return; }
-    const max = sd.mode === "kling" ? 1 : sd.mode === "pvr" ? 3 : SEEDANCE_MAX_PEOPLE;
+    const max = SEEDANCE_MAX_PEOPLE;
     const n = Math.min(found.length, max);
     // Kept people: the biggest faces, shown left → right.
     const kept = [...found].sort((a, b) => b.size - a.size).slice(0, n).sort((a, b) => a.x - b.x);
     const biggest = Math.max(...kept.map((p) => p.size));
     const where = (i: number) => (n === 1 ? "" : i === 0 ? "on the left" : i === n - 1 ? "on the right" : "in the center");
     const patch: Partial<SeedanceConfig> = { people: n };
-    if (sd.mode === "pvr" || sd.mode === "kd") patch.positions = kept.map((_, i) => where(i));
+    patch.positions = kept.map((_, i) => where(i));
     setSd(patch);
     const desc = kept.map((p, i) => e.seedance.detectPerson(i + 1, n === 1 ? "" : e.seedance.positionOptions[where(i) as keyof typeof e.seedance.positionOptions], p.size === biggest && n > 1)).join(" · ");
     setPeople({ busy: false, text: e.seedance.detectFound(found.length, n, desc) });
@@ -149,14 +149,7 @@ export function TemplateEditor({
       cover = blob ? await uploadCover(blob) : null;
       if (cover) set("coverAssetPath", cover);
     }
-    // Kling: a full-size frame of the video = the scene the customer is put into.
-    let cfg = sd;
-    if (sd.mode === "kling" && !sd.framePath && t.previewVideoPath) {
-      const blob = await captureCover(`${mediaBase}/${t.previewVideoPath}`, 1280);
-      const framePath = blob ? await uploadCover(blob) : null;
-      if (framePath) { cfg = { ...sd, framePath }; setSdState(cfg); }
-    }
-    const payload = { ...t, coverAssetPath: cover, providerKey: "seedance", providerConfig: cfg, faceSlots: sent };
+    const payload = { ...t, coverAssetPath: cover, providerKey: "seedance", providerConfig: sd, faceSlots: sent };
     const r = await saveTemplate(payload, id);
     if (!r.ok) {
       setMsg({ kind: "err", text: r.error === "forbidden" ? ru.admin.forbidden : r.error === "invalid" ? e.invalid : ru.errors.generic });
@@ -198,7 +191,7 @@ export function TemplateEditor({
     else router.refresh();
   });
 
-  const costOpts = { mode: sd.mode, people: sd.people, prepare: sd.prepare, faceSwap: sd.faceSwap };
+  const costOpts = { people: sd.people };
   const autoPrice = seedancePriceKzt(duration, Number(t.pricing.basePriceKzt) || 0, seedancePricing, costOpts);
   const costKzt = duration ? seedanceCostKzt(duration, seedancePricing, costOpts) : null;
 
@@ -234,81 +227,40 @@ export function TemplateEditor({
       </Section>
 
       <Section title={e.sections.media}>
-        <VideoField error={err("preview")} path={t.previewVideoPath} mediaBase={mediaBase} onUploaded={(p) => { set("previewVideoPath", p); setSd({ framePath: null }); void detectPeople(p); }} onCover={(p) => set("coverAssetPath", p)} />
+        <VideoField error={err("preview")} path={t.previewVideoPath} mediaBase={mediaBase} onUploaded={(p) => { set("previewVideoPath", p); void detectPeople(p); }} onCover={(p) => set("coverAssetPath", p)} />
       </Section>
 
       <Section title={e.seedance.title}>
         <p className="text-sm text-muted">{e.seedance.intro}</p>
         <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_minmax(0,320px)]">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={e.seedance.mode} className="sm:col-span-2">
-              <select className={inputCls()} value={sd.mode} onChange={(ev) => { const m = ev.target.value as SeedanceConfig["mode"]; setSd(m === "kling" || m === "k4" ? { mode: m, people: 1 } : m === "pvr" ? { mode: m, people: Math.min(sd.people, 3) } : { mode: m }); }}>
-                {(["kd", "wan", "k4", "pvr", "kling", "swap", "scene"] as const).map((k) => <option key={k} value={k}>{e.seedance.modeOptions[k]}</option>)}
+            <Field label={e.seedance.klingMode}>
+              <select className={inputCls()} value={sd.klingMode} onChange={(ev) => setSd({ klingMode: ev.target.value as SeedanceConfig["klingMode"] })}>
+                <option value="edit">{e.seedance.klingModeOptions.edit}</option>
+                <option value="reference">{e.seedance.klingModeOptions.reference}</option>
               </select>
-              <span className="mt-1 block text-xs text-muted">{e.seedance.modeHint[sd.mode]}</span>
-              <details className="mt-2 rounded-xl bg-paper px-3 py-2 text-xs">
-                <summary className="cursor-pointer font-semibold">{e.seedance.guideTitle}</summary>
-                <ul className="mt-2 list-disc space-y-1 pl-4 text-muted">
-                  {e.seedance.guide.map((g) => <li key={g}>{g}</li>)}
-                </ul>
-              </details>
+            </Field>
+            <Field label={e.seedance.outfit}>
+              <select className={inputCls()} value={sd.outfit} onChange={(ev) => setSd({ outfit: ev.target.value as SeedanceConfig["outfit"] })}>
+                <option value="photo">{e.seedance.outfitOptions.photo}</option>
+                <option value="template">{e.seedance.outfitOptions.template}</option>
+              </select>
             </Field>
             <Field label={e.seedance.people}>
-              <select className={inputCls()} value={sd.people} disabled={sd.mode === "kling" || sd.mode === "k4"} onChange={(ev) => setSd({ people: Number(ev.target.value) })}>
-                {Array.from({ length: sd.mode === "pvr" ? 3 : SEEDANCE_MAX_PEOPLE }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
+              <select className={inputCls()} value={sd.people} onChange={(ev) => setSd({ people: Number(ev.target.value) })}>
+                {Array.from({ length: SEEDANCE_MAX_PEOPLE }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
-              <span className="mt-1 block text-xs text-muted">{sd.mode === "wan" || sd.mode === "swap" ? e.seedance.peopleHintSwap : e.seedance.peopleHint}</span>
               <button type="button" disabled={people.busy || !t.previewVideoPath} onClick={() => void detectPeople()}
                 className="mt-2 rounded-full border border-line px-3 py-1.5 text-xs font-semibold hover:border-ink disabled:opacity-50">
                 {people.busy ? e.seedance.detecting : e.seedance.detect}
               </button>
               {people.text && <span className="mt-1 block text-xs font-medium">{people.text}</span>}
             </Field>
-            {sd.mode === "kd" && (
-              <div className="grid gap-3 rounded-xl border border-line p-3 sm:col-span-2 sm:grid-cols-2">
-                <Field label={e.seedance.klingMode}>
-                  <select className={inputCls()} value={sd.klingMode} onChange={(ev) => setSd({ klingMode: ev.target.value as SeedanceConfig["klingMode"] })}>
-                    <option value="edit">{e.seedance.klingModeOptions.edit}</option>
-                    <option value="reference">{e.seedance.klingModeOptions.reference}</option>
-                  </select>
-                </Field>
-                <Field label={e.seedance.outfit}>
-                  <select className={inputCls()} value={sd.outfit} onChange={(ev) => setSd({ outfit: ev.target.value as SeedanceConfig["outfit"] })}>
-                    <option value="photo">{e.seedance.outfitOptions.photo}</option>
-                    <option value="template">{e.seedance.outfitOptions.template}</option>
-                  </select>
-                </Field>
-                <label className="flex items-center gap-2 text-sm sm:col-span-2">
-                  <input type="checkbox" className="h-4 w-4 accent-brand" checked={sd.faceSwap} onChange={(ev) => setSd({ faceSwap: ev.target.checked })} />
-                  {e.seedance.faceSwap}
-                </label>
-              </div>
-            )}
-            {sd.mode === "k4" && (
-              <Field label={e.seedance.outfit} className="sm:col-span-2">
-                <select className={inputCls()} value={sd.outfit} onChange={(ev) => setSd({ outfit: ev.target.value as SeedanceConfig["outfit"] })}>
-                  <option value="photo">{e.seedance.outfitOptions.photo}</option>
-                  <option value="template">{e.seedance.outfitOptions.template}</option>
-                </select>
-              </Field>
-            )}
-            {sd.mode === "wan" && (
-              <div className="grid gap-2 rounded-xl border border-line p-3 sm:col-span-2">
-                <label className="flex items-center gap-2 text-sm font-medium">
-                  <input type="checkbox" className="h-4 w-4 accent-brand" checked={sd.prepare} onChange={(ev) => setSd({ prepare: ev.target.checked })} />
-                  {e.seedance.prepare}
-                </label>
-                <span className="text-xs text-muted">{e.seedance.prepareHint}</span>
-                {sd.prepare && (
-                  <Field label={e.seedance.outfit}>
-                    <select className={inputCls()} value={sd.outfit} onChange={(ev) => setSd({ outfit: ev.target.value as SeedanceConfig["outfit"] })}>
-                      <option value="photo">{e.seedance.outfitOptions.photo}</option>
-                      <option value="template">{e.seedance.outfitOptions.template}</option>
-                    </select>
-                  </Field>
-                )}
-              </div>
-            )}
+            <Field label={e.seedance.aspect}>
+              <select className={inputCls()} value={sd.aspectRatio} onChange={(ev) => setSd({ aspectRatio: ev.target.value as SeedanceConfig["aspectRatio"] })}>
+                {(["9:16", "16:9", "1:1", "adaptive"] as const).map((k) => <option key={k} value={k}>{e.seedance.aspectOptions[k]}</option>)}
+              </select>
+            </Field>
             {sd.people > 1 && (
               <div className="grid gap-2 sm:col-span-2">
                 <span className="text-sm font-medium">{e.seedance.labels}</span>
@@ -317,29 +269,20 @@ export function TemplateEditor({
                     <input className={inputCls()} maxLength={40} placeholder={`${i + 1}-адам (сол жақтан)`}
                       value={sd.labels[i] ?? ""}
                       onChange={(ev) => { const l = [...sd.labels]; while (l.length < sd.people) l.push(""); l[i] = ev.target.value; setSd({ labels: l.slice(0, sd.people) }); }} />
-                    {(sd.mode === "pvr" || sd.mode === "kd") && (
-                      <select className={inputCls()} value={sd.positions[i] ?? ""}
-                        onChange={(ev) => { const p = [...sd.positions]; while (p.length < sd.people) p.push(""); p[i] = ev.target.value; setSd({ positions: p.slice(0, sd.people) }); }}>
-                        <option value="">{e.seedance.positionAuto(i + 1)}</option>
-                        {Object.entries(e.seedance.positionOptions).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                      </select>
-                    )}
+                    <select className={inputCls()} value={sd.positions[i] ?? ""}
+                      onChange={(ev) => { const p = [...sd.positions]; while (p.length < sd.people) p.push(""); p[i] = ev.target.value; setSd({ positions: p.slice(0, sd.people) }); }}>
+                      <option value="">{e.seedance.positionAuto(i + 1)}</option>
+                      {Object.entries(e.seedance.positionOptions).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
                   </div>
                 ))}
               </div>
             )}
-            {sd.mode === "scene" && <Field label={e.seedance.aspect}>
-              <select className={inputCls()} value={sd.aspectRatio} onChange={(ev) => setSd({ aspectRatio: ev.target.value as SeedanceConfig["aspectRatio"] })}>
-                {(Object.keys(e.seedance.aspectOptions) as SeedanceConfig["aspectRatio"][]).map((k) => <option key={k} value={k}>{e.seedance.aspectOptions[k]}</option>)}
-              </select>
-            </Field>}
             <Field label={e.seedance.framing} className="sm:col-span-2">
               <select className={inputCls()} value={sd.framing} onChange={(ev) => setSd({ framing: ev.target.value as SeedanceConfig["framing"] })}>
                 {(["face", "half", "full"] as const).map((k) => <option key={k} value={k}>{e.seedance.framingOptions[k]}</option>)}
               </select>
-              <span className="mt-1 block text-xs text-muted">{e.seedance.framingHint}</span>
             </Field>
-            {(sd.mode === "scene" || sd.mode === "kling" || sd.mode === "k4" || sd.mode === "kd") && <>
             <Field label={e.seedance.prompt} field="seedance.prompt" error={err("seedance.prompt")} className="sm:col-span-2">
               <textarea className={`${inputCls(err("seedance.prompt"))} min-h-24`} value={sd.prompt} maxLength={1500} onChange={(ev) => setSd({ prompt: ev.target.value })} />
               <span className="mt-1 block text-xs text-muted">{e.seedance.promptHint}</span>
@@ -348,9 +291,8 @@ export function TemplateEditor({
               <input type="checkbox" className="h-4 w-4 accent-brand" checked={sd.allowWish} onChange={(ev) => setSd({ allowWish: ev.target.checked })} />
               {e.seedance.allowWish}
             </label>
-            </>}
-            <p className={`text-xs sm:col-span-2 ${duration !== null && (duration < 3.5 || duration > 30.5) ? "font-semibold text-danger" : "text-muted"}`}>
-              {sd.mode === "wan" ? e.seedance.durationHintWan : sd.mode === "swap" ? e.seedance.durationHintSwap : sd.mode === "kling" ? e.seedance.durationHintKling : e.seedance.durationHint}{duration !== null ? ` · ${Math.round(duration * 10) / 10} сек` : ""}
+            <p className={`text-xs sm:col-span-2 ${duration !== null && (duration < 2.5 || duration > 30.5) ? "font-semibold text-danger" : "text-muted"}`}>
+              {e.seedance.durationHint}{duration !== null ? ` · ${Math.round(duration * 10) / 10} сек` : ""}
             </p>
           </div>
           {slots.length > 0 && <FaceMap slots={slots} mediaBase={mediaBase} />}

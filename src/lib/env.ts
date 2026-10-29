@@ -26,10 +26,6 @@ const schema = z.object({
   // Teliks partner cabinet (separate server + Supabase): shared secret for its API calls only.
   TELIKS_API_SECRET: z.string().trim().min(32).optional(),
   AI_PROVIDER: z.string().default("dev"),
-  // muapi.ai — Seedance 2.5 Omni Reference (Intl, 720p): the AI video provider.
-  MUAPI_API_KEY: z.string().transform((v) => v.trim().replace(/^["']|["']$/g, "").trim()).pipe(z.string().min(10)).optional(),
-  MUAPI_API_BASE_URL: z.string().url().default("https://api.muapi.ai"),
-  MUAPI_MODEL: z.string().regex(/^[a-z0-9.-]+$/).default("seedance-2.5-intl-omni-reference"),
   // Replicate — prunaai/p-video-replace (several people in one video).
   // Kling AI official API (api-singapore.klingai.com) — API key from the Kling console.
   KLING_API_KEY: z.string().transform((v) => v.trim().replace(/^["']|["']$/g, "").trim()).pipe(z.string().min(10)).optional(),
@@ -47,7 +43,7 @@ const schema = z.object({
 
 const OPTIONAL_INTEGRATION_KEYS = new Set([
   "TOLE_API_KEY", "TOLE_CONNECTION_ID", "TOLE_WEBHOOK_SECRET", "TOLE_API_BASE_URL",
-  "MUAPI_API_KEY", "MUAPI_API_BASE_URL", "MUAPI_MODEL", "REPLICATE_API_TOKEN", "KLING_API_KEY", "TELEGRAM_BOT_TOKEN",
+  "KLING_API_KEY", "TELEGRAM_BOT_TOKEN",
   "TELIKS_API_SECRET",
   "KASPI_MERCHANT_ID", "KASPI_API_KEY", "KASPI_WEBHOOK_SECRET", "KASPI_API_BASE_URL",
 ]);
@@ -73,7 +69,7 @@ export function env() {
       throw new Error("Invalid environment: " + parsed.error.issues.map((i) => i.path.join(".")).join(", "));
     }
     cached = parsed.data;
-    console.log(`[env] payment=${cached.PAYMENT_PROVIDER} tole_key=${cached.TOLE_API_KEY ? (cached.TOLE_API_KEY.startsWith("tole_sk_test_") ? "test" : cached.TOLE_API_KEY.startsWith("tole_sk_live_") ? "live" : "unknown_format") : "none"} tole_connection=${cached.TOLE_CONNECTION_ID ? "set" : "none"} tole_webhook_secret=${cached.TOLE_WEBHOOK_SECRET ? "set" : "none"} ai=${cached.AI_PROVIDER} muapi=${cached.MUAPI_API_KEY ? "set" : "none"} replicate=${cached.REPLICATE_API_TOKEN ? "set" : "none"} kling=${cached.KLING_API_KEY ? "set" : "none"} telegram=${cached.TELEGRAM_BOT_TOKEN ? "on" : "off"} teliks_api=${cached.TELIKS_API_SECRET ? "on" : "off"}`);
+    console.log(`[env] payment=${cached.PAYMENT_PROVIDER} tole_key=${cached.TOLE_API_KEY ? (cached.TOLE_API_KEY.startsWith("tole_sk_test_") ? "test" : cached.TOLE_API_KEY.startsWith("tole_sk_live_") ? "live" : "unknown_format") : "none"} tole_connection=${cached.TOLE_CONNECTION_ID ? "set" : "none"} tole_webhook_secret=${cached.TOLE_WEBHOOK_SECRET ? "set" : "none"} ai=${cached.AI_PROVIDER} kling=${cached.KLING_API_KEY ? "set" : "none"} telegram=${cached.TELEGRAM_BOT_TOKEN ? "on" : "off"} teliks_api=${cached.TELIKS_API_SECRET ? "on" : "off"}`);
     if (cached.APP_ENV === "production" && (cached.PAYMENT_PROVIDER === "sandbox" || cached.PAYMENT_PROVIDER === "tole_sandbox" || cached.AI_PROVIDER === "dev")) {
       throw new Error("Sandbox payment / dev AI provider are not allowed in production");
     }

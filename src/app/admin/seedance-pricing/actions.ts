@@ -13,7 +13,7 @@ export async function saveSeedancePricing(_: SeedancePricingState, fd: FormData)
   if (!u || !can(u.role, "templates.manage")) return { error: "forbidden" };
   const num = (k: string) => Number(String(fd.get(k) ?? "").replace(",", "."));
   const p = seedancePricingSchema.safeParse({
-    usdPerSec: num("usdPerSec"), refFactor: num("refFactor") / 100, tengePerUsd: num("tengePerUsd"),
+    tengePerUsd: num("tengePerUsd"),
     markupPercent: num("markupPercent"), minPriceKzt: num("minPriceKzt"), roundToKzt: num("roundToKzt"),
     klingUnitUsd: num("klingUnitUsd"), klingUnitsPerSec: num("klingUnitsPerSec"),
   });

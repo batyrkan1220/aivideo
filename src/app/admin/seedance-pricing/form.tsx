@@ -11,13 +11,13 @@ export function SeedancePricingForm({ value }: { value: SeedancePricing }) {
   const P = ru.admin.seedancePricing;
   const [state, action, pending] = useActionState<SeedancePricingState, FormData>(saveSeedancePricing, {});
   const [v, setV] = useState({
-    usdPerSec: String(value.usdPerSec), refFactor: String(Math.round(value.refFactor * 100)), tengePerUsd: String(value.tengePerUsd),
+    tengePerUsd: String(value.tengePerUsd),
     markupPercent: String(value.markupPercent), minPriceKzt: String(value.minPriceKzt), roundToKzt: String(value.roundToKzt),
     klingUnitUsd: String(value.klingUnitUsd), klingUnitsPerSec: String(value.klingUnitsPerSec),
   });
   const n = (x: string) => Number(x.replace(",", "."));
   const live = seedancePricingSchema.safeParse({
-    usdPerSec: n(v.usdPerSec), refFactor: n(v.refFactor) / 100, tengePerUsd: n(v.tengePerUsd),
+    tengePerUsd: n(v.tengePerUsd),
     markupPercent: n(v.markupPercent), minPriceKzt: n(v.minPriceKzt), roundToKzt: n(v.roundToKzt),
     klingUnitUsd: n(v.klingUnitUsd), klingUnitsPerSec: n(v.klingUnitsPerSec),
   });
@@ -46,9 +46,6 @@ export function SeedancePricingForm({ value }: { value: SeedancePricing }) {
             {field("klingUnitsPerSec", P.klingUnitsPerSec, "0.01")}
             {field("roundToKzt", P.roundTo)}
           </div>
-          {/* Other modes' tariffs are kept as they are. */}
-          <input type="hidden" name="usdPerSec" value={v.usdPerSec} />
-          <input type="hidden" name="refFactor" value={v.refFactor} />
         </details>
         {s && (
           <div className="overflow-x-auto">

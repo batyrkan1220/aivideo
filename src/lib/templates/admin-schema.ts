@@ -41,7 +41,7 @@ export function publishProblems(t: TemplateInput, durationSec?: number | null): 
   return p;
 }
 
-/** Default config for a new template: Seedance (muapi), one quality (720p). */
+/** Default config for a new template: Kling 4.0 (official API), one quality (720p). */
 export function emptyTemplate(): TemplateInput {
   return {
     titleKk: "",

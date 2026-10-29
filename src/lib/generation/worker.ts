@@ -1,5 +1,4 @@
 import "server-only";
-import { videoFrameJpeg } from "@/lib/media/frame";
 import { klingStatus } from "./kling";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -142,15 +141,6 @@ async function submitJob(job: Job) {
     faces.push({ slotKey: s.key, providerInput: s.providerInput, imageUrl: signed.signedUrl });
   }
   let templateVideoUrl = mediaUrl((snap.preview_video_path as string) ?? null) ?? "";
-  // The template's cover = a frame of its video (Kling: the customer is put into this scene first).
-  let templateFrameUrl: string | null = null;
-  let coverUrl: string | null = null; // 540 px catalog cover: only if a full-size frame cannot be made
-  if (!snap.user_video_path && order.template_id) {
-    const { data: tpl } = await db.from("templates").select("cover_asset_path,frame:provider_config_json->>framePath").eq("id", order.template_id).maybeSingle();
-    const t = tpl as { cover_asset_path: string | null; frame: string | null } | null;
-    templateFrameUrl = mediaUrl(t?.frame ?? null);
-    coverUrl = mediaUrl(t?.cover_asset_path ?? null);
-  }
   if (typeof snap.user_video_path === "string" && snap.user_video_path) {
     // "Өз видеом": the customer's own private video, shared with the provider via a signed URL.
     const { data: signedVideo } = await db.storage.from("user-videos").createSignedUrl(snap.user_video_path, 24 * 3600);
@@ -164,12 +154,7 @@ async function submitJob(job: Job) {
     durationSec: Number(snap.video_duration_sec ?? snap.user_video_duration_sec) || null,
     ...(typeof snap.customer_wish === "string" ? { wish: snap.customer_wish } : {}),
   };
-  // Kling builds the scene from its image: make sure there is a frame of the video to put the customer into.
-  const wantsFrame = ["kling", "k4"].includes(String((config as { mode?: unknown }).mode)) || (config as { outfit?: unknown }).outfit === "template";
-  if (!templateFrameUrl && wantsFrame && templateVideoUrl) {
-    templateFrameUrl = (await ensureSceneFrame(order, templateVideoUrl, typeof snap.user_video_path === "string" && !!snap.user_video_path)) ?? coverUrl;
-  }
-  const input = { templateVideoUrl, templateFrameUrl, faces, quality, config };
+  const input = { templateVideoUrl, faces, quality, config };
 
   const problems = provider.validateInputs(input);
   if (problems.length) return failJob(job, "invalid_inputs", { safe_error_message: safeMessage("invalid_inputs") });
@@ -281,28 +266,4 @@ async function finalize(job: Job, outputUrl: string, cost?: number) {
   await notifyOrderOwner(job.order_id, "ready");
   await notifyAdmins(job.order_id, "ready");
   await track("generation_succeeded", { userId: order.user_id, orderId: job.order_id });
-}
-
-/**
- * A full-size frame of the template video (stored once on the template), or of the customer's own
- * video (private, per order). Best effort: null when ffmpeg or storage fails.
- */
-async function ensureSceneFrame(order: { id: string; user_id: string; template_id: string | null }, videoUrl: string, own: boolean): Promise<string | null> {
-  const db = supabaseAdmin();
-  const jpg = await videoFrameJpeg(videoUrl);
-  if (!jpg) return null;
-  if (own) {
-    const path = `${order.user_id}/${order.id}-frame.jpg`;
-    const { error } = await db.storage.from("user-uploads").upload(path, jpg, { contentType: "image/jpeg", upsert: true });
-    if (error) return null;
-    const { data } = await db.storage.from("user-uploads").createSignedUrl(path, 24 * 3600);
-    return data?.signedUrl ?? null;
-  }
-  if (!order.template_id) return null;
-  const path = `frames/${order.template_id}-${Date.now()}.jpg`;
-  const { error } = await db.storage.from("template-media").upload(path, jpg, { contentType: "image/jpeg", upsert: true });
-  if (error) { console.error("[worker] frame upload failed", error.message); return null; }
-  const { data: t } = await db.from("templates").select("provider_config_json").eq("id", order.template_id).single();
-  await db.from("templates").update({ provider_config_json: { ...((t?.provider_config_json as Record<string, unknown>) ?? {}), framePath: path } }).eq("id", order.template_id);
-  return mediaUrl(path);
 }

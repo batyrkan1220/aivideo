@@ -29,8 +29,6 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  // ffmpeg binary (template scene frames for Kling) is loaded from node_modules at runtime.
-  serverExternalPackages: ["ffmpeg-static"],
   // The separate catalog page was merged into the home feed.
   async redirects() {
     return [{ source: "/templates", destination: "/", permanent: false }];
