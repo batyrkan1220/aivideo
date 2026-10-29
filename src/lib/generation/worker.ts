@@ -129,10 +129,12 @@ async function submitJob(job: Job) {
   let templateVideoUrl = mediaUrl((snap.preview_video_path as string) ?? null) ?? "";
   // The template's cover = a frame of its video (Kling: the customer is put into this scene first).
   let templateFrameUrl: string | null = null;
+  let coverUrl: string | null = null; // 540 px catalog cover: only if a full-size frame cannot be made
   if (!snap.user_video_path && order.template_id) {
     const { data: tpl } = await db.from("templates").select("cover_asset_path,frame:provider_config_json->>framePath").eq("id", order.template_id).maybeSingle();
     const t = tpl as { cover_asset_path: string | null; frame: string | null } | null;
-    templateFrameUrl = mediaUrl(t?.frame ?? t?.cover_asset_path ?? null);
+    templateFrameUrl = mediaUrl(t?.frame ?? null);
+    coverUrl = mediaUrl(t?.cover_asset_path ?? null);
   }
   if (typeof snap.user_video_path === "string" && snap.user_video_path) {
     // "Өз видеом": the customer's own private video, shared with the provider via a signed URL.
@@ -150,7 +152,7 @@ async function submitJob(job: Job) {
   // Kling builds the scene from its image: make sure there is a frame of the video to put the customer into.
   const wantsFrame = (config as { mode?: unknown }).mode === "kling" || (config as { outfit?: unknown }).outfit === "template";
   if (!templateFrameUrl && wantsFrame && templateVideoUrl) {
-    templateFrameUrl = await ensureSceneFrame(order, templateVideoUrl, typeof snap.user_video_path === "string" && !!snap.user_video_path);
+    templateFrameUrl = (await ensureSceneFrame(order, templateVideoUrl, typeof snap.user_video_path === "string" && !!snap.user_video_path)) ?? coverUrl;
   }
   const input = { templateVideoUrl, templateFrameUrl, faces, quality, config };
 
