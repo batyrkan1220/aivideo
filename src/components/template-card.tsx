@@ -20,7 +20,7 @@ export type CardData = {
  * Keeps at most MAX_PLAYING previews running at once across the whole page: starting a new
  * one pauses the oldest. Many cards on screen then never decode/stream videos in parallel.
  */
-const MAX_PLAYING = 6;
+const MAX_PLAYING = 9; // 3 columns × 3 rows on a phone screen
 const playingNow: HTMLVideoElement[] = [];
 function claimPlayback(v: HTMLVideoElement) {
   const i = playingNow.indexOf(v);

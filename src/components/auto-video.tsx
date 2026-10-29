@@ -22,6 +22,7 @@ export function AutoVideo(props: { src: string; poster?: string; controls?: bool
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
+    let alive = true;
     const wantSound = !!props.preferSound && !soundOff();
     const playMuted = () => {
       v.muted = true;
@@ -31,6 +32,7 @@ export function AutoVideo(props: { src: string; poster?: string; controls?: bool
       v.play().catch(() => {});
     };
     const playWithSound = () => {
+      if (!alive) return Promise.resolve(true);
       v.muted = false;
       v.removeAttribute("muted");
       return v.play().then(() => { setMuted(false); return true; }).catch(() => false);
@@ -44,7 +46,7 @@ export function AutoVideo(props: { src: string; poster?: string; controls?: bool
     };
     if (wantSound) {
       void playWithSound().then((ok) => {
-        if (ok) return;
+        if (ok || !alive) return;
         playMuted();
         document.addEventListener("pointerdown", unmuteOnTouch, { passive: true });
       });
@@ -56,9 +58,18 @@ export function AutoVideo(props: { src: string; poster?: string; controls?: bool
     v.addEventListener("loadeddata", tryPlay);
     // Some WebViews only allow playback after the first touch.
     document.addEventListener("touchstart", tryPlay, { once: true, passive: true });
+    // Mini App minimised / tab hidden: stop the sound; resume when it comes back.
+    const onVisibility = () => { if (document.hidden) v.pause(); else if (v.isConnected) tryPlay(); };
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       io.disconnect(); v.removeEventListener("loadeddata", tryPlay);
       document.removeEventListener("touchstart", tryPlay); document.removeEventListener("pointerdown", unmuteOnTouch);
+      document.removeEventListener("visibilitychange", onVisibility);
+      // Leaving the page (Back in Telegram): the router may keep this page alive in the
+      // background, so silence and stop the video explicitly.
+      alive = false;
+      v.muted = true;
+      v.pause();
     };
   }, [props.src, props.preferSound]);
 
