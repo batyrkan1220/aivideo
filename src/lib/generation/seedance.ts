@@ -144,8 +144,12 @@ export const seedanceProvider: GenerationProvider = {
       const images = [faceUrls[0], ...(input.templateFrameUrl ? [input.templateFrameUrl] : [])];
       const body = {
         prompt: buildK4Prompt(!!input.templateFrameUrl, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : "", cfg.outfit),
+        // muapi field names for this model are not documented: send the known spellings (extra keys are ignored).
         images_list: images,
+        image_urls: images,
+        video_url: input.templateVideoUrl,
         videos_list: [input.templateVideoUrl],
+        video_urls: [input.templateVideoUrl],
         duration: seedanceOutputSec(durationSec),
         resolution: "720p",
         aspect_ratio: cfg.aspectRatio === "adaptive" ? "auto" : cfg.aspectRatio,
@@ -221,7 +225,18 @@ export const seedanceProvider: GenerationProvider = {
   async getStatus(providerJobId, ctx): Promise<ProviderJobStatus> {
     const st = parseState(ctx?.state);
     if (st?.stage === "pvr") return getPvr(providerJobId);
-    const d = await call<{ status?: string; outputs?: unknown[]; video?: unknown; error?: unknown }>(`/api/v1/predictions/${encodeURIComponent(providerJobId)}/result`);
+    let d: { status?: string; outputs?: unknown[]; video?: unknown; error?: unknown };
+    try {
+      d = await call<typeof d>(`/api/v1/predictions/${encodeURIComponent(providerJobId)}/result`);
+    } catch (err) {
+      // muapi answers a failed task with HTTP 400 + its error: that is a final failure, not "retry polling".
+      if (err instanceof ProviderError && err.code === "provider_bad_params") {
+        console.error("[seedance] task failed (400)", providerJobId, err.message.slice(0, 300));
+        if (st?.stage === "swap" && st.base) return swapFallback(providerJobId, st.base, err.message);
+        return { state: "failed", errorCode: "provider_failed", retryable: false };
+      }
+      throw err;
+    }
     const status = String(d.status ?? "").toLowerCase();
     // Wan step 0 (full-body image) done or failed → Wan with that image (or the photo itself).
     if (st?.stage === "prep" && st.video && ["completed", "succeeded", "failed", "error", "cancelled"].includes(status)) {
