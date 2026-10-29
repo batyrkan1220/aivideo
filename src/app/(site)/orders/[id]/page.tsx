@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { DownloadVideo } from "@/components/download-video";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
@@ -158,9 +159,7 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
               />
               <p className="mt-3 text-sm text-muted">{kk.result.keptUntil(dateFmt.format(new Date(video.expires_at)))}</p>
               <div className="mt-4 flex flex-wrap items-center gap-3">
-                <a href={`/api/orders/${o.id}/video?download=1`} className="inline-flex h-12 items-center rounded-full bg-brand px-6 font-semibold text-white hover:bg-brand-dark">
-                  {kk.result.download}
-                </a>
+                <DownloadVideo orderId={o.id} />
                 <form action={deleteVideo}>
                   <input type="hidden" name="orderId" value={o.id} />
                   <ConfirmSubmit message={kk.result.deleteVideoConfirm} className="h-12 rounded-full px-4 text-sm font-medium text-muted hover:text-danger">

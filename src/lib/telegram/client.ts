@@ -12,6 +12,9 @@ export type TelegramWebApp = {
   showConfirm?(message: string, cb: (ok: boolean) => void): void;
   close?(): void;
   BackButton: { show(): void; hide(): void; onClick(cb: () => void): void; offClick(cb: () => void): void };
+  /** Bot API 8.0+: native "save file" dialog. */
+  downloadFile?(params: { url: string; file_name: string }, cb?: (accepted: boolean) => void): void;
+  isVersionAtLeast?(version: string): boolean;
   HapticFeedback?: { impactOccurred(style: "light" | "medium" | "heavy" | "rigid" | "soft"): void; notificationOccurred(type: "error" | "success" | "warning"): void; selectionChanged(): void };
 };
 

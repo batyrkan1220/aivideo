@@ -21,5 +21,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     download ? { download: `${o.public_order_number}.mp4` } : undefined);
   if (!signed) return new NextResponse(null, { status: 500 });
   if (download) await track("video_downloaded", { userId: user.id, orderId: id });
+  // The Telegram Mini App downloads through Telegram's own downloadFile(), which needs the direct URL.
+  if (new URL(req.url).searchParams.has("json")) return NextResponse.json({ url: signed.signedUrl, fileName: `${o.public_order_number}.mp4` }, { headers: { "cache-control": "no-store" } });
   return NextResponse.redirect(signed.signedUrl, { headers: { "cache-control": "no-store" } });
 }
