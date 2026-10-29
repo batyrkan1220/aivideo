@@ -156,13 +156,32 @@ describe("seedance provider", () => {
       return new Response(JSON.stringify(replies.shift()), { status: 200 });
     }));
     const two = [faces[0], { slotKey: "face_2", providerInput: "img_2", imageUrl: "https://s/2.jpg" }];
-    expect(seedanceProvider.validateInputs({ ...base, faces: two, config: { durationSec: 8 } })).toContain("too_many_faces");
-    const r = await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { durationSec: 8.06, wish: "night city", allowWish: true } });
+    expect(seedanceProvider.validateInputs({ ...base, faces: two, config: { mode: "kling", durationSec: 8 } })).toContain("too_many_faces");
+    const r = await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { mode: "kling", durationSec: 8.06, wish: "night city", allowWish: true } });
     expect(calls[0].url).toBe("https://api.muapi.test/api/v1/kling-v3.0-pro-motion-control");
     expect(calls[0].body).toMatchObject({ image_url: "https://s/1.jpg", video_url: "https://cdn/v.mp4", character_orientation: "video", keep_original_sound: true });
     expect(String((calls[0].body as { prompt: string }).prompt)).toContain("night city");
     expect(r.cost).toBeCloseTo(9 * 0.16, 4);
     expect(await seedanceProvider.getStatus("k-1", { startedAt: null, state: r.state ?? null })).toEqual({ state: "succeeded", outputUrl: "https://cdn/kling.mp4" });
+    vi.unstubAllGlobals();
+  });
+
+  it("wan mode (default): Wan 2.2 Animate replace, then a face swap pass", async () => {
+    const calls: { url: string; body?: unknown }[] = [];
+    const replies = [{ request_id: "w-1" }, { status: "completed", outputs: ["https://cdn/wan.mp4"] }, { request_id: "fs-1" }, { status: "completed", outputs: ["https://cdn/final.mp4"] }];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      return new Response(JSON.stringify(replies.shift()), { status: 200 });
+    }));
+    const r = await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { durationSec: 8 } });
+    expect(calls[0].url).toBe("https://api.muapi.test/api/v1/wan2.2-animate");
+    expect(calls[0].body).toMatchObject({ image_url: "https://s/1.jpg", video_url: "https://cdn/v.mp4", mode: "replace", resolution: "720p" });
+    expect(r.cost).toBeCloseTo(0.45, 4);
+    const s1 = await seedanceProvider.getStatus("w-1", { startedAt: null, state: r.state ?? null });
+    expect(s1).toMatchObject({ state: "processing", next: { providerJobId: "fs-1" } });
+    expect(calls[2].body).toMatchObject({ video_url: "https://cdn/wan.mp4", image_url: "https://s/1.jpg", target_index: 0 });
+    const n = (s1 as { next: { state: Record<string, unknown> } }).next.state;
+    expect(await seedanceProvider.getStatus("fs-1", { startedAt: null, state: n })).toEqual({ state: "succeeded", outputUrl: "https://cdn/final.mp4" });
     vi.unstubAllGlobals();
   });
 

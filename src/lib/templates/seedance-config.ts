@@ -19,8 +19,10 @@ export const seedanceConfigSchema = z.object({
    * scene = Seedance re-creates the video (background, outfit, customer wish), then the face swap.
    * kling = Kling 3.0 Pro Motion Control: the customer's photo performs the template's motion
    *         (one person; face, hair, outfit and background come from the photo).
+   * wan   = Wan 2.2 Animate "replace": the person in the template video is replaced by the person
+   *         from the photo, the template's background/lighting stay; then a face swap pass.
    */
-  mode: z.enum(["swap", "scene", "kling"]).default("kling"),
+  mode: z.enum(["wan", "swap", "scene", "kling"]).default("wan"),
   /** How many people in the video are replaced (one customer photo each, left → right). */
   people: z.number().int().min(1).max(SEEDANCE_MAX_PEOPLE).default(1),
   /** What photo the customer needs (shown on the order page). */
@@ -33,7 +35,7 @@ export const seedanceConfigSchema = z.object({
 });
 export type SeedanceConfig = z.infer<typeof seedanceConfigSchema>;
 export type SeedanceMode = SeedanceConfig["mode"];
-export const parseSeedanceMode = (v: unknown): SeedanceMode => (v === "scene" || v === "swap" ? v : "kling");
+export const parseSeedanceMode = (v: unknown): SeedanceMode => (v === "scene" || v === "swap" || v === "kling" ? v : "wan");
 export type PhotoFraming = SeedanceConfig["framing"];
 
 export function parseSeedanceConfig(raw: unknown): SeedanceConfig {

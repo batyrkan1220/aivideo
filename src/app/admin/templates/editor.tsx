@@ -214,13 +214,13 @@ export function TemplateEditor({
         <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_minmax(0,320px)]">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={e.seedance.mode} className="sm:col-span-2">
-              <select className={inputCls()} value={sd.mode} onChange={(ev) => { const m = ev.target.value as SeedanceConfig["mode"]; setSd(m === "kling" ? { mode: m, people: 1 } : { mode: m }); }}>
-                {(["kling", "swap", "scene"] as const).map((k) => <option key={k} value={k}>{e.seedance.modeOptions[k]}</option>)}
+              <select className={inputCls()} value={sd.mode} onChange={(ev) => { const m = ev.target.value as SeedanceConfig["mode"]; setSd(m === "kling" || m === "wan" ? { mode: m, people: 1 } : { mode: m }); }}>
+                {(["wan", "kling", "swap", "scene"] as const).map((k) => <option key={k} value={k}>{e.seedance.modeOptions[k]}</option>)}
               </select>
               <span className="mt-1 block text-xs text-muted">{e.seedance.modeHint[sd.mode]}</span>
             </Field>
             <Field label={e.seedance.people}>
-              <select className={inputCls()} value={sd.people} disabled={sd.mode === "kling"} onChange={(ev) => setSd({ people: Number(ev.target.value) })}>
+              <select className={inputCls()} value={sd.people} disabled={sd.mode === "kling" || sd.mode === "wan"} onChange={(ev) => setSd({ people: Number(ev.target.value) })}>
                 {Array.from({ length: SEEDANCE_MAX_PEOPLE }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
               <span className="mt-1 block text-xs text-muted">{e.seedance.peopleHint}</span>
@@ -236,7 +236,7 @@ export function TemplateEditor({
               </select>
               <span className="mt-1 block text-xs text-muted">{e.seedance.framingHint}</span>
             </Field>
-            {sd.mode !== "swap" && <>
+            {(sd.mode === "scene" || sd.mode === "kling") && <>
             <Field label={e.seedance.prompt} field="seedance.prompt" error={err("seedance.prompt")} className="sm:col-span-2">
               <textarea className={`${inputCls(err("seedance.prompt"))} min-h-24`} value={sd.prompt} maxLength={1500} onChange={(ev) => setSd({ prompt: ev.target.value })} />
               <span className="mt-1 block text-xs text-muted">{e.seedance.promptHint}</span>
@@ -247,7 +247,7 @@ export function TemplateEditor({
             </label>
             </>}
             <p className={`text-xs sm:col-span-2 ${duration !== null && (duration < 3.5 || duration > 30.5) ? "font-semibold text-danger" : "text-muted"}`}>
-              {sd.mode === "swap" ? e.seedance.durationHintSwap : sd.mode === "kling" ? e.seedance.durationHintKling : e.seedance.durationHint}{duration !== null ? ` · ${Math.round(duration * 10) / 10} сек` : ""}
+              {sd.mode === "wan" ? e.seedance.durationHintWan : sd.mode === "swap" ? e.seedance.durationHintSwap : sd.mode === "kling" ? e.seedance.durationHintKling : e.seedance.durationHint}{duration !== null ? ` · ${Math.round(duration * 10) / 10} сек` : ""}
             </p>
           </div>
           {slots.length > 0 && <FaceMap slots={slots} mediaBase={mediaBase} />}

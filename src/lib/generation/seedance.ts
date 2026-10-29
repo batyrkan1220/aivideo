@@ -108,7 +108,7 @@ export const seedanceProvider: GenerationProvider = {
     if (idx.some((x, i) => x !== i + 1)) problems.push("unmapped_slot");
     const d = Number((input.config as { durationSec?: unknown }).durationSec);
     if (cfg.data.mode === "swap") return problems; // face swap only: no Seedance length limits
-    if (cfg.data.mode === "kling" && input.faces.length > 1) problems.push("too_many_faces"); // one photo
+    if ((cfg.data.mode === "kling" || cfg.data.mode === "wan") && input.faces.length > 1) problems.push("too_many_faces"); // one photo
     if (!(d > 0)) problems.push("unknown_duration");
     else if (d < SEEDANCE_MIN_SEC - 0.5 || d > SEEDANCE_MAX_SEC + 0.5) problems.push("bad_duration");
     return problems;
@@ -120,6 +120,15 @@ export const seedanceProvider: GenerationProvider = {
     const durationSec = Number(extra.durationSec);
     const pricing = await seedancePricingSettings();
     const faceUrls = input.faces.map((f) => f.imageUrl);
+    if (cfg.mode === "wan") {
+      // Wan 2.2 Animate "replace": template background/lighting stay, the person comes from the photo;
+      // the face swap pass afterwards sharpens the likeness.
+      const body = { image_url: faceUrls[0], video_url: input.templateVideoUrl, mode: "replace", resolution: "720p", prompt: cfg.prompt || "" };
+      const d = await call<{ request_id?: string; id?: string }>("/api/v1/wan2.2-animate", { method: "POST", body: JSON.stringify(body) });
+      const id = d.request_id ?? d.id;
+      if (!id) throw new ProviderError("provider_bad_response", false, "wan: missing request_id");
+      return { providerJobId: id, cost: seedanceCostUsd(durationSec, pricing, { mode: "wan" }), state: { stage: "wan", i: 0, faces: faceUrls } };
+    }
     if (cfg.mode === "kling") {
       // Kling 3.0 Pro Motion Control: the customer's photo performs the template video's motion.
       const wish = cfg.allowWish ? cleanWish(extra.wish) : "";
@@ -169,7 +178,7 @@ export const seedanceProvider: GenerationProvider = {
       }
       // Next face swap pass (one per person), then the finished video.
       if (st && st.faces.length) {
-        const i = st.stage === "seedance" ? 0 : st.i + 1;
+        const i = st.stage === "seedance" || st.stage === "wan" ? 0 : st.i + 1;
         if (i < st.faces.length) {
           try {
             const swapId = await submitFaceSwap(url, st.faces[i], i);
@@ -196,11 +205,11 @@ export const seedanceProvider: GenerationProvider = {
 };
 
 
-type SeedanceState = { stage: "seedance" | "swap" | "kling"; i: number; faces: string[]; base?: string };
+type SeedanceState = { stage: "seedance" | "swap" | "kling" | "wan"; i: number; faces: string[]; base?: string };
 function parseState(s: unknown): SeedanceState | null {
   if (!s || typeof s !== "object") return null;
   const o = s as Record<string, unknown>;
-  if ((o.stage !== "seedance" && o.stage !== "swap" && o.stage !== "kling") || !Array.isArray(o.faces)) return null;
+  if ((o.stage !== "seedance" && o.stage !== "swap" && o.stage !== "kling" && o.stage !== "wan") || !Array.isArray(o.faces)) return null;
   return {
     stage: o.stage, i: Number(o.i) || 0,
     faces: o.faces.filter((x): x is string => typeof x === "string"),
