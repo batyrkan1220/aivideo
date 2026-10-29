@@ -1,7 +1,7 @@
 import "server-only";
 import { env } from "@/lib/env";
 import { seedanceConfigSchema, seedanceOutputSec, SEEDANCE_MAX_PEOPLE, SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC, maxSecFor } from "@/lib/templates/seedance-config";
-import { seedanceCostUsd } from "@/lib/pricing-seedance";
+import { seedanceCostUsd, faceSwapCostUsd } from "@/lib/pricing-seedance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { ProviderError, type GenerationProvider, type ProviderJobStatus } from "./types";
 
@@ -127,7 +127,7 @@ export const seedanceProvider: GenerationProvider = {
       const d = await call<{ request_id?: string; id?: string }>("/api/v1/wan2.2-animate", { method: "POST", body: JSON.stringify(body) });
       const id = d.request_id ?? d.id;
       if (!id) throw new ProviderError("provider_bad_response", false, "wan: missing request_id");
-      return { providerJobId: id, cost: seedanceCostUsd(durationSec, pricing, { mode: "wan" }), state: { stage: "wan", i: 0, faces: faceUrls } };
+      return { providerJobId: id, cost: seedanceCostUsd(durationSec, pricing, { mode: "wan" }), state: { stage: "wan", i: 0, faces: faceUrls, swap_cost: faceSwapCostUsd(durationSec, pricing) } };
     }
     if (cfg.mode === "kling") {
       // Kling 3.0 Pro Motion Control builds the whole scene from its image. So first the customer is
@@ -148,7 +148,7 @@ export const seedanceProvider: GenerationProvider = {
     if (cfg.mode === "swap") {
       // Face swap only: the customer's face goes straight onto the template video.
       const id = await submitFaceSwap(input.templateVideoUrl, faceUrls[0], 0);
-      return { providerJobId: id, cost: seedanceCostUsd(durationSec, pricing, { mode: "swap", people: 1 }), state: { stage: "swap", i: 0, faces: faceUrls } };
+      return { providerJobId: id, cost: seedanceCostUsd(durationSec, pricing, { mode: "swap", people: 1 }), state: { stage: "swap", i: 0, faces: faceUrls, swap_cost: faceSwapCostUsd(durationSec, pricing) } };
     }
     const body = {
       prompt: buildPrompt(input.faces.length, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : ""),
@@ -163,7 +163,7 @@ export const seedanceProvider: GenerationProvider = {
     const id = d.request_id ?? d.id;
     if (!id) throw new ProviderError("provider_bad_response", false, "missing request_id");
     // Seedance does not keep a real person's face (ByteDance policy) → a face swap pass follows.
-    const state = { stage: "seedance", faces: faceUrls };
+    const state = { stage: "seedance", faces: faceUrls, swap_cost: faceSwapCostUsd(durationSec, pricing) };
     return { providerJobId: id, cost: seedanceCostUsd(durationSec, pricing, { mode: "scene", people: 1 }), state };
   },
 
@@ -207,7 +207,7 @@ export const seedanceProvider: GenerationProvider = {
         if (i < st.faces.length) {
           try {
             const swapId = await submitFaceSwap(url, st.faces[i], i);
-            return { state: "processing", next: { providerJobId: swapId, state: { stage: "swap", i, faces: st.faces, base: url }, cost: i === 0 ? 0 : (await seedancePricingSettings()).faceSwapUsd } };
+            return { state: "processing", next: { providerJobId: swapId, state: { stage: "swap", i, faces: st.faces, base: url, swap_cost: st.swap_cost }, cost: i === 0 ? 0 : st.swap_cost ?? 0 } };
           } catch (err) {
             console.error("[seedance] face swap submit failed", i, err instanceof Error ? err.message : err);
             return { state: "succeeded", outputUrl: url };
@@ -230,7 +230,7 @@ export const seedanceProvider: GenerationProvider = {
 };
 
 
-type SeedanceState = { stage: "seedance" | "swap" | "kling" | "wan" | "compose" | "facefix"; i: number; faces: string[]; base?: string; video?: string; prompt?: string; next_cost?: number };
+type SeedanceState = { stage: "seedance" | "swap" | "kling" | "wan" | "compose" | "facefix"; i: number; faces: string[]; base?: string; video?: string; prompt?: string; next_cost?: number; swap_cost?: number };
 function parseState(s: unknown): SeedanceState | null {
   if (!s || typeof s !== "object") return null;
   const o = s as Record<string, unknown>;
@@ -242,6 +242,7 @@ function parseState(s: unknown): SeedanceState | null {
     video: typeof o.video === "string" ? o.video : undefined,
     prompt: typeof o.prompt === "string" ? o.prompt : undefined,
     next_cost: typeof o.next_cost === "number" ? o.next_cost : undefined,
+    swap_cost: typeof o.swap_cost === "number" ? o.swap_cost : undefined,
   };
 }
 

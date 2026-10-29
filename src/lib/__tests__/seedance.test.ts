@@ -13,8 +13,8 @@ describe("seedance pricing", () => {
     expect(seedanceBilledSec(10)).toBe(20);
     expect(seedanceBilledSec(2)).toBe(2 + 4);            // output is at least 4 s
     expect(seedanceBilledSec(8.06)).toBe(9 + 8);         // reference rounded up (real muapi bill $4.133)
-    expect(seedanceCostUsd(10, S)).toBeCloseTo(20 * 0.374 * 0.65 + 0.1, 4); // + one face swap pass
-    expect(seedanceCostKzt(10, S)).toBe(Math.round((20 * 0.374 * 0.65 + 0.1) * S.tengePerUsd));
+    expect(seedanceCostUsd(10, S)).toBeCloseTo(20 * 0.374 * 0.65 + 10 * 0.094, 4); // + one face swap pass (per second)
+    expect(seedanceCostKzt(10, S)).toBe(Math.round((20 * 0.374 * 0.65 + 10 * 0.094) * S.tengePerUsd));
   });
   it("price = cost × (1 + markup), rounded up, not below the minimum", () => {
     const raw = seedanceCostKzt(15, S) * (1 + S.markupPercent / 100);
@@ -117,7 +117,7 @@ describe("seedance provider", () => {
       return new Response(JSON.stringify(replies.shift()), { status: 200 });
     }));
     const r = await seedanceProvider.submit({ jobId: "j", ...base, faces: two, config: { mode: "scene", people: 2, durationSec: 8 } });
-    expect(r.state).toEqual({ stage: "seedance", faces: ["https://s/1.jpg", "https://s/2.jpg"] });
+    expect(r.state).toEqual({ stage: "seedance", faces: ["https://s/1.jpg", "https://s/2.jpg"], swap_cost: 8 * 0.094 });
     const s1 = await seedanceProvider.getStatus("seed-1", { startedAt: null, state: r.state ?? null });
     expect(s1).toMatchObject({ state: "processing", next: { providerJobId: "swap-1", state: { stage: "swap", i: 0, base: "https://cdn/seed.mp4" } } });
     expect(calls[2].url).toBe("https://api.muapi.test/api/v1/ai-video-face-swap");
@@ -142,9 +142,9 @@ describe("seedance provider", () => {
     const r = await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { mode: "swap", durationSec: 8 } });
     expect(calls[0].url).toBe("https://api.muapi.test/api/v1/ai-video-face-swap");
     expect(calls[0].body).toMatchObject({ video_url: "https://cdn/v.mp4", image_url: "https://s/1.jpg", target_index: 0 });
-    expect(r.cost).toBeCloseTo(0.1, 4);
+    expect(r.cost).toBeCloseTo(8 * 0.094, 4);
     expect(await seedanceProvider.getStatus("swap-0", { startedAt: null, state: r.state ?? null })).toEqual({ state: "succeeded", outputUrl: "https://cdn/swapped.mp4" });
-    expect(seedanceCostUsd(8, S, { mode: "swap", people: 2 })).toBeCloseTo(0.2, 4);
+    expect(seedanceCostUsd(8, S, { mode: "swap", people: 2 })).toBeCloseTo(2 * 8 * 0.094, 4);
     vi.unstubAllGlobals();
   });
 
@@ -209,7 +209,7 @@ describe("seedance provider", () => {
     const r = await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { durationSec: 8 } });
     expect(calls[0].url).toBe("https://api.muapi.test/api/v1/wan2.2-animate");
     expect(calls[0].body).toMatchObject({ image_url: "https://s/1.jpg", video_url: "https://cdn/v.mp4", mode: "replace", resolution: "720p" });
-    expect(r.cost).toBeCloseTo(0.45, 4);
+    expect(r.cost).toBeCloseTo(8 * 0.14 + 8 * 0.094, 4); // muapi: Wan 8 s = $1.12, face swap $0.75
     const s1 = await seedanceProvider.getStatus("w-1", { startedAt: null, state: r.state ?? null });
     expect(s1).toMatchObject({ state: "processing", next: { providerJobId: "fs-1" } });
     expect(calls[2].body).toMatchObject({ video_url: "https://cdn/wan.mp4", image_url: "https://s/1.jpg", target_index: 0 });

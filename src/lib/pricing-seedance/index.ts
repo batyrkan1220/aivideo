@@ -18,11 +18,12 @@ export const seedancePricingSchema = z.object({
   minPriceKzt: z.number().int().min(0).max(1_000_000).default(1990),
   roundToKzt: z.number().int().min(1).max(10_000).default(10),
   /** muapi ai-video-face-swap pass after Seedance (Seedance itself does not keep a real face). */
-  faceSwapUsd: z.number().min(0).max(10).default(0.1),
+  /** ai-video-face-swap, USD per second of video per person (muapi bill: 8 s → $0.75, 14.2 s → $1.33). */
+  faceSwapUsdPerSec: z.number().min(0).max(10).default(0.094),
   /** Kling 3.0 Pro Motion Control (muapi), USD per output second. */
   klingUsdPerSec: z.number().min(0).max(10).default(0.16),
-  /** Wan 2.2 Animate replace (muapi), USD per generation (+ one face swap pass). */
-  wanUsd: z.number().min(0).max(20).default(0.35),
+  /** Wan 2.2 Animate replace (muapi), USD per second (muapi bill: 8 s → $1.12, 14 s → $1.96, 20 s → $2.80). */
+  wanUsdPerSec: z.number().min(0).max(20).default(0.14),
   /** Kling: the customer put into the template frame first (nano-banana-pro-edit 2k $0.12 + image face swap $0.02). */
   composeUsd: z.number().min(0).max(5).default(0.14),
 });
@@ -48,10 +49,16 @@ export type CostOpts = { mode?: "swap" | "scene" | "kling" | "wan"; people?: num
 export function seedanceCostUsd(durationSec: number, s: SeedancePricing, o: CostOpts = {}): number {
   // Kling: per output second + putting the customer into the template frame first.
   if (o.mode === "kling") return Math.round((Math.ceil(Math.min(durationSec, 30) - 1e-6) * s.klingUsdPerSec + s.composeUsd) * 10_000) / 10_000;
-  if (o.mode === "wan") return Math.round((s.wanUsd + Math.max(1, o.people ?? 1) * s.faceSwapUsd) * 10_000) / 10_000;
-  const swaps = Math.max(1, o.people ?? 1) * s.faceSwapUsd;
+  const sec = Math.min(durationSec, 120);
+  const swaps = Math.max(1, o.people ?? 1) * faceSwapCostUsd(durationSec, s);
+  if (o.mode === "wan") return Math.round((Math.round(sec) * s.wanUsdPerSec + swaps) * 10_000) / 10_000;
   const scene = o.mode === "swap" ? 0 : seedanceBilledSec(durationSec) * s.usdPerSec * s.refFactor;
   return Math.round((scene + swaps) * 10_000) / 10_000;
+}
+
+/** One face swap pass over a video of this length. */
+export function faceSwapCostUsd(durationSec: number, s: SeedancePricing): number {
+  return Math.round(Math.min(durationSec, 120) * s.faceSwapUsdPerSec * 10_000) / 10_000;
 }
 
 export function seedanceCostKzt(durationSec: number, s: SeedancePricing, o: CostOpts = {}): number {
