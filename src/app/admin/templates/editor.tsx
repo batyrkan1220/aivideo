@@ -225,6 +225,12 @@ export function TemplateEditor({
                 {(["wan", "kling", "swap", "scene"] as const).map((k) => <option key={k} value={k}>{e.seedance.modeOptions[k]}</option>)}
               </select>
               <span className="mt-1 block text-xs text-muted">{e.seedance.modeHint[sd.mode]}</span>
+              <details className="mt-2 rounded-xl bg-paper px-3 py-2 text-xs">
+                <summary className="cursor-pointer font-semibold">{e.seedance.guideTitle}</summary>
+                <ul className="mt-2 list-disc space-y-1 pl-4 text-muted">
+                  {e.seedance.guide.map((g) => <li key={g}>{g}</li>)}
+                </ul>
+              </details>
             </Field>
             <Field label={e.seedance.people}>
               <select className={inputCls()} value={sd.people} disabled={sd.mode === "kling" || sd.mode === "wan"} onChange={(ev) => setSd({ people: Number(ev.target.value) })}>
