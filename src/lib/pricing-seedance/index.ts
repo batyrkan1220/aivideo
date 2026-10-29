@@ -25,10 +25,13 @@ export const SEEDANCE_QUALITY: Quality = {
   key: "720p", labelKk: "Жоғары сапа · 720p", resolution: "720p", providerQuality: "720p", surchargeKzt: 0, available: true,
 };
 
-/** Seconds muapi bills: reference video + output video. */
+/**
+ * Seconds muapi bills: reference video rounded UP to whole seconds + output video.
+ * Checked on a real job: 8.06 s reference → 9 + 8 = 17 s × $0.374 × 65 % = $4.133.
+ */
 export function seedanceBilledSec(durationSec: number): number {
   const out = seedanceOutputSec(durationSec);
-  return Math.min(durationSec, 30) + out;
+  return Math.ceil(Math.min(durationSec, 30) - 1e-6) + out;
 }
 
 export function seedanceCostUsd(durationSec: number, s: SeedancePricing): number {

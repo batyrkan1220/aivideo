@@ -12,6 +12,7 @@ describe("seedance pricing", () => {
   it("bills reference + output seconds at 65 % of the 720p rate", () => {
     expect(seedanceBilledSec(10)).toBe(20);
     expect(seedanceBilledSec(2)).toBe(2 + 4);            // output is at least 4 s
+    expect(seedanceBilledSec(8.06)).toBe(9 + 8);         // reference rounded up (real muapi bill $4.133)
     expect(seedanceCostUsd(10, S)).toBeCloseTo(20 * 0.374 * 0.65, 4);
     expect(seedanceCostKzt(10, S)).toBe(Math.round(20 * 0.374 * 0.65 * S.tengePerUsd));
   });
