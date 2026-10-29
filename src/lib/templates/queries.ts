@@ -1,5 +1,5 @@
 import "server-only";
-import { SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC, type PhotoFraming } from "./seedance-config";
+import { SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC, parseSeedanceMode, type PhotoFraming, type SeedanceMode } from "./seedance-config";
 import { after, connection } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -48,7 +48,7 @@ export type TemplateDetail = TemplateCard & {
   /** The customer may write a wish for the AI (background, outfit, style). */
   allowWish: boolean;
   /** swap = face swap only (no wish), scene = Seedance + face swap. */
-  seedanceMode: "swap" | "scene";
+  seedanceMode: SeedanceMode;
 };
 
 const CARD_COLUMNS =
@@ -86,7 +86,7 @@ export function parseRow(r: Row, seedancePricing: SeedancePricing = DEFAULT_SEED
     const duration = r.video_duration_sec == null ? null : Number(r.video_duration_sec);
     // A video outside Seedance's 4–30 s cannot be generated: no price, so it cannot be ordered.
     const usable = duration === null || (duration >= SEEDANCE_MIN_SEC - 0.5 && duration <= SEEDANCE_MAX_SEC + 0.5);
-    const price = usable ? seedancePriceKzt(duration, parsedP.data.basePriceKzt, seedancePricing, { mode: r.seedance_mode === "scene" ? "scene" : "swap", people: r.required_face_count }) : null;
+    const price = usable ? seedancePriceKzt(duration, parsedP.data.basePriceKzt, seedancePricing, { mode: parseSeedanceMode(r.seedance_mode), people: r.required_face_count }) : null;
     const eff = applySeedancePricing(parsedP.data, price ?? 0);
     qualities = { success: true, data: eff.qualities } as typeof parsedQ;
     pricing = { success: true, data: eff.pricing } as typeof parsedP;
@@ -115,8 +115,8 @@ export function parseRow(r: Row, seedancePricing: SeedancePricing = DEFAULT_SEED
     durationSec: r.video_duration_sec == null ? null : Number(r.video_duration_sec),
     priced,
     photoFraming: r.photo_framing === "face" || r.photo_framing === "full" ? r.photo_framing : "half",
-    allowWish: r.seedance_mode === "scene" && r.allow_wish !== "false",
-    seedanceMode: r.seedance_mode === "scene" ? "scene" : "swap",
+    allowWish: parseSeedanceMode(r.seedance_mode) !== "swap" && r.allow_wish !== "false",
+    seedanceMode: parseSeedanceMode(r.seedance_mode),
   };
 }
 

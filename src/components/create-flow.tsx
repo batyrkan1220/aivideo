@@ -85,7 +85,7 @@ function readVideoDuration(url: string): Promise<number | null> {
 }
 
 export function CreateFlow({
-  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, freeOrders = false, customVideo, seedancePricing, framing = "auto", allowWish = false, seedanceMode = "swap",
+  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, freeOrders = false, customVideo, seedancePricing, framing = "auto", allowWish = false, seedanceMode = "kling",
 }: {
   templateId: string;
   slots: FaceSlot[];
@@ -107,7 +107,7 @@ export function CreateFlow({
   /** The customer may write a wish for the AI (background, outfit, style). */
   allowWish?: boolean;
   /** Template mode: face swap only or Seedance scene + face swap (custom-video price). */
-  seedanceMode?: "swap" | "scene";
+  seedanceMode?: "swap" | "scene" | "kling";
   /** What photo the template needs (face / waist-up / full body); "auto" = like the person in the video. */
   framing?: Framing;
 }) {
@@ -337,7 +337,7 @@ export function CreateFlow({
       <section ref={photosRef} className={`rounded-card border bg-white p-4 transition-shadow sm:p-5 ${nudge === "photo" ? "border-brand ring-4 ring-brand/20" : "border-line"}`}>
         <StepTitle n={++step} done={missing === 0}>{slots.length > 1 ? c.stepPhotos(slots.length) : c.stepPhoto}</StepTitle>
         {slots.length > 1 && <p className="mt-1 text-sm text-muted">{c.photosHint}</p>}
-        {customVideo && readyVideoId && (
+        {customVideo && readyVideoId && seedanceMode !== "kling" && (
           <div className="mt-3">
             <p className="text-sm font-medium">{cv.howMany}</p>
             <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label={cv.howMany}>

@@ -71,6 +71,23 @@ export function SeedancePricingForm({ value }: { value: SeedancePricing }) {
               const cost = seedanceCostKzt(10, s, o), price = seedanceAutoPriceKzt(10, s, o);
               return <p className="mt-2 rounded-xl bg-paper px-3 py-2 text-sm">{P.swapLine(formatKzt(cost), formatKzt(price), formatKzt(price - cost))}</p>;
             })()}
+            <table className="mt-3 w-full min-w-[30rem] text-sm">
+              <caption className="pb-1 text-left text-xs font-medium text-muted">{P.klingTitle}</caption>
+              <tbody className="divide-y divide-line">
+                {EXAMPLES.map((sec) => {
+                  const o = { mode: "kling" as const };
+                  const cost = seedanceCostKzt(sec, s, o), price = seedanceAutoPriceKzt(sec, s, o);
+                  return (
+                    <tr key={sec}>
+                      <td className="py-2 pr-3">{sec} {P.sec}</td>
+                      <td className="py-2 pr-3 text-muted">{formatKzt(cost)} <span className="text-xs">(${seedanceCostUsd(sec, s, o).toFixed(2)})</span></td>
+                      <td className="py-2 pr-3"><b>{formatKzt(price)}</b></td>
+                      <td className={`py-2 pr-3 font-medium ${price - cost >= 0 ? "text-success" : "text-danger"}`}>{formatKzt(price - cost)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
         <div className="flex items-center gap-3">

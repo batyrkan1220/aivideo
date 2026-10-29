@@ -62,6 +62,17 @@ export function buildPrompt(people: number, adminPrompt: string, wish: string): 
   return parts.join(" ");
 }
 
+/** Kling Motion Control: the person (face, hair, outfit) comes from the photo, the motion from the video. */
+export function buildKlingPrompt(adminPrompt: string, wish: string): string {
+  const parts = [
+    "The person from the image performs exactly the same movements, dance, gestures and timing as in the reference video.",
+    "Keep the person's face, facial features, hairstyle, skin tone and body exactly as in the image. Photorealistic, natural lighting, sharp face, no text, no watermark.",
+  ];
+  if (adminPrompt) parts.push(`Scene and style: ${adminPrompt}`);
+  if (wish) parts.push(`Customer's wish: ${wish}`);
+  return parts.join(" ");
+}
+
 /** Customer text is free input: no media tags, no control characters, limited length. */
 export const cleanWish = (s: unknown) =>
   typeof s === "string" ? s.replace(/[@<>{}\[\]\\]/g, " ").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 300) : "";
@@ -97,6 +108,7 @@ export const seedanceProvider: GenerationProvider = {
     if (idx.some((x, i) => x !== i + 1)) problems.push("unmapped_slot");
     const d = Number((input.config as { durationSec?: unknown }).durationSec);
     if (cfg.data.mode === "swap") return problems; // face swap only: no Seedance length limits
+    if (cfg.data.mode === "kling" && input.faces.length > 1) problems.push("too_many_faces"); // one photo
     if (!(d > 0)) problems.push("unknown_duration");
     else if (d < SEEDANCE_MIN_SEC - 0.5 || d > SEEDANCE_MAX_SEC + 0.5) problems.push("bad_duration");
     return problems;
@@ -108,6 +120,21 @@ export const seedanceProvider: GenerationProvider = {
     const durationSec = Number(extra.durationSec);
     const pricing = await seedancePricingSettings();
     const faceUrls = input.faces.map((f) => f.imageUrl);
+    if (cfg.mode === "kling") {
+      // Kling 3.0 Pro Motion Control: the customer's photo performs the template video's motion.
+      const wish = cfg.allowWish ? cleanWish(extra.wish) : "";
+      const body = {
+        prompt: buildKlingPrompt(cfg.prompt, wish),
+        image_url: faceUrls[0],
+        video_url: input.templateVideoUrl,
+        character_orientation: "video", // follow the template's body orientation; up to 30 s
+        keep_original_sound: true,
+      };
+      const d = await call<{ request_id?: string; id?: string }>("/api/v1/kling-v3.0-pro-motion-control", { method: "POST", body: JSON.stringify(body) });
+      const id = d.request_id ?? d.id;
+      if (!id) throw new ProviderError("provider_bad_response", false, "kling: missing request_id");
+      return { providerJobId: id, cost: seedanceCostUsd(durationSec, pricing, { mode: "kling" }), state: { stage: "kling", i: 0, faces: [] } };
+    }
     if (cfg.mode === "swap") {
       // Face swap only: the customer's face goes straight onto the template video.
       const id = await submitFaceSwap(input.templateVideoUrl, faceUrls[0], 0);
@@ -169,11 +196,11 @@ export const seedanceProvider: GenerationProvider = {
 };
 
 
-type SeedanceState = { stage: "seedance" | "swap"; i: number; faces: string[]; base?: string };
+type SeedanceState = { stage: "seedance" | "swap" | "kling"; i: number; faces: string[]; base?: string };
 function parseState(s: unknown): SeedanceState | null {
   if (!s || typeof s !== "object") return null;
   const o = s as Record<string, unknown>;
-  if ((o.stage !== "seedance" && o.stage !== "swap") || !Array.isArray(o.faces)) return null;
+  if ((o.stage !== "seedance" && o.stage !== "swap" && o.stage !== "kling") || !Array.isArray(o.faces)) return null;
   return {
     stage: o.stage, i: Number(o.i) || 0,
     faces: o.faces.filter((x): x is string => typeof x === "string"),
