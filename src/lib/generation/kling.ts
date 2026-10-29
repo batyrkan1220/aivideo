@@ -28,6 +28,8 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   const body = (await res.json().catch(() => ({}))) as T & { code?: number; message?: string };
   const msg = String(body?.message ?? "").slice(0, 300);
   if (res.status === 401 || res.status === 403) throw new ProviderError("provider_auth", false, msg);
+  // Kling answers "Account balance not enough" with 429 too: that is not "busy, retry".
+  if (/balance|insufficient|package|quota|arrear/i.test(msg)) throw new ProviderError("provider_no_balance", false, `${res.status} ${msg}`);
   if (res.status === 429) throw new ProviderError("provider_http_429", true, msg);
   if (res.status >= 500) throw new ProviderError(`provider_http_${res.status}`, true, msg);
   if (!res.ok || (body.code !== undefined && body.code !== 0)) {
