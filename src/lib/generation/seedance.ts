@@ -74,6 +74,9 @@ export function buildKlingPrompt(adminPrompt: string, wish: string): string {
   return parts.join(" ");
 }
 
+/** muapi ai-video-face-swap accepts ≤ 600 frames: about 24 s at 25 fps. */
+export const FACE_SWAP_MAX_SEC = 24;
+
 /** Kling 4.0 reference-to-video: who (photo), where (template frame), how (template video). */
 export function buildK4Prompt(withFrame: boolean, adminPrompt: string, wish: string, outfit: "photo" | "template" = "photo"): string {
   const parts = [
@@ -158,7 +161,10 @@ export const seedanceProvider: GenerationProvider = {
       const d = await call<{ request_id?: string; id?: string }>("/api/v1/kling-4.0-reference-to-video", { method: "POST", body: JSON.stringify(body) });
       const id = d.request_id ?? d.id;
       if (!id) throw new ProviderError("provider_bad_response", false, "kling4: missing request_id");
-      return { providerJobId: id, cost: seedanceCostUsd(durationSec, pricing, { mode: "k4", people: 1 }), state: { stage: "wan", i: 0, faces: faceUrls.slice(0, 1), swap_cost: faceSwapCostUsd(durationSec, pricing) } };
+      // The face swap takes ≤ 600 frames (~24 s): longer videos are delivered as Kling made them.
+      const swap = durationSec <= FACE_SWAP_MAX_SEC;
+      const cost = seedanceCostUsd(durationSec, pricing, { mode: "k4", people: 1 });
+      return { providerJobId: id, cost, state: { stage: "wan", i: 0, faces: swap ? faceUrls.slice(0, 1) : [], swap_cost: faceSwapCostUsd(durationSec, pricing) } };
     }
     if (cfg.mode === "pvr") {
       // Replicate p-video-replace: all people replaced in one run (photo i → person at positions[i]).
@@ -285,8 +291,10 @@ export const seedanceProvider: GenerationProvider = {
           } catch (err) {
             console.error("[seedance] face swap submit failed", i, err instanceof ProviderError ? `${err.code} ${err.message}` : err instanceof Error ? err.message : err);
             // Busy / rate limit / server error: the worker polls again in 30 s and resubmits this pass.
-            const fresh = !ctx?.startedAt || Date.now() - ctx.startedAt.getTime() < 60 * 60_000;
-            if (err instanceof ProviderError && err.retryable && fresh) throw err;
+            // Only "busy" (429) is worth waiting for; a 5xx on a finished video means the face swap
+            // cannot take it (too long / too big) — deliver the video without it.
+            const fresh = !ctx?.startedAt || Date.now() - ctx.startedAt.getTime() < 30 * 60_000;
+            if (err instanceof ProviderError && err.code === "provider_http_429" && fresh) throw err;
             return { state: "succeeded", outputUrl: url };
           }
         }

@@ -58,7 +58,8 @@ export function seedanceCostUsd(durationSec: number, s: SeedancePricing, o: Cost
   const sec = Math.min(durationSec, 120);
   if (o.mode === "k4") {
     const out = seedanceOutputSec(durationSec);
-    return Math.round((Math.max(2 * out, Math.ceil(Math.min(durationSec, 30) - 1e-6) + out) * s.k4UsdPerSec + faceSwapCostUsd(durationSec, s)) * 10_000) / 10_000;
+    const swap = durationSec <= 24 ? faceSwapCostUsd(durationSec, s) : 0; // face swap only up to ~600 frames
+    return Math.round((Math.max(2 * out, Math.ceil(Math.min(durationSec, 30) - 1e-6) + out) * s.k4UsdPerSec + swap) * 10_000) / 10_000;
   }
   if (o.mode === "pvr") return Math.round(Math.ceil(sec - 1e-6) * s.pvrUsdPerSec * 10_000) / 10_000;
   const swaps = Math.max(1, o.people ?? 1) * faceSwapCostUsd(durationSec, s);
