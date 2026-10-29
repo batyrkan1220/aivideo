@@ -161,27 +161,31 @@ describe("seedance provider", () => {
     expect(calls[0].url).toBe("https://api.muapi.test/api/v1/kling-v3.0-pro-motion-control");
     expect(calls[0].body).toMatchObject({ image_url: "https://s/1.jpg", video_url: "https://cdn/v.mp4", character_orientation: "video", keep_original_sound: true });
     expect(String((calls[0].body as { prompt: string }).prompt)).toContain("night city");
-    expect(r.cost).toBeCloseTo(9 * 0.16 + 0.06, 4);
+    expect(r.cost).toBeCloseTo(9 * 0.16 + 0.14, 4);
     expect(await seedanceProvider.getStatus("k-1", { startedAt: null, state: r.state ?? null })).toEqual({ state: "succeeded", outputUrl: "https://cdn/kling.mp4" });
     vi.unstubAllGlobals();
   });
 
   it("kling with a template frame: customer put into the frame first, then Kling animates it", async () => {
     const calls: { url: string; body?: unknown }[] = [];
-    const replies = [{ request_id: "c-1" }, { status: "completed", outputs: ["https://cdn/composed.jpg"] }, { request_id: "k-2" }, { status: "completed", outputs: ["https://cdn/k.mp4"] }];
+    const replies = [{ request_id: "c-1" }, { status: "completed", outputs: ["https://cdn/composed.jpg"] }, { request_id: "fx-1" }, { status: "completed", outputs: ["https://cdn/fixed.jpg"] }, { request_id: "k-2" }, { status: "completed", outputs: ["https://cdn/k.mp4"] }];
     vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
       calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
       return new Response(JSON.stringify(replies.shift()), { status: 200 });
     }));
     const r = await seedanceProvider.submit({ jobId: "j", ...base, templateFrameUrl: "https://cdn/cover.jpg", faces, config: { mode: "kling", durationSec: 8 } });
-    expect(calls[0].url).toBe("https://api.muapi.test/api/v1/nano-banana-2-edit");
+    expect(calls[0].url).toBe("https://api.muapi.test/api/v1/nano-banana-pro-edit");
     expect(calls[0].body).toMatchObject({ images_list: ["https://cdn/cover.jpg", "https://s/1.jpg"] });
-    expect(r.cost).toBeCloseTo(0.06, 4);
-    const s1 = await seedanceProvider.getStatus("c-1", { startedAt: null, state: r.state ?? null });
+    expect(r.cost).toBeCloseTo(0.14, 4);
+    const s0 = await seedanceProvider.getStatus("c-1", { startedAt: null, state: r.state ?? null });
+    expect(s0).toMatchObject({ state: "processing", next: { providerJobId: "fx-1", state: { stage: "facefix", base: "https://cdn/composed.jpg" } } });
+    expect(calls[2].url).toBe("https://api.muapi.test/api/v1/ai-image-face-swap");
+    expect(calls[2].body).toMatchObject({ image_url: "https://cdn/composed.jpg", swap_url: "https://s/1.jpg", target_index: 0 });
+    const s1 = await seedanceProvider.getStatus("fx-1", { startedAt: null, state: (s0 as { next: { state: Record<string, unknown> } }).next.state });
     expect(s1).toMatchObject({ state: "processing", next: { providerJobId: "k-2", state: { stage: "kling" } } });
     expect((s1 as { next: { cost: number } }).next.cost).toBeCloseTo(8 * 0.16, 4);
-    expect(calls[2].url).toBe("https://api.muapi.test/api/v1/kling-v3.0-pro-motion-control");
-    expect(calls[2].body).toMatchObject({ image_url: "https://cdn/composed.jpg", video_url: "https://cdn/v.mp4" });
+    expect(calls[4].url).toBe("https://api.muapi.test/api/v1/kling-v3.0-pro-motion-control");
+    expect(calls[4].body).toMatchObject({ image_url: "https://cdn/fixed.jpg", video_url: "https://cdn/v.mp4" });
     const n = (s1 as { next: { state: Record<string, unknown> } }).next.state;
     expect(await seedanceProvider.getStatus("k-2", { startedAt: null, state: n })).toEqual({ state: "succeeded", outputUrl: "https://cdn/k.mp4" });
     vi.unstubAllGlobals();

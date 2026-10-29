@@ -23,8 +23,8 @@ export const seedancePricingSchema = z.object({
   klingUsdPerSec: z.number().min(0).max(10).default(0.16),
   /** Wan 2.2 Animate replace (muapi), USD per generation (+ one face swap pass). */
   wanUsd: z.number().min(0).max(20).default(0.35),
-  /** Kling: the customer put into the template frame first (nano-banana-2-edit, 1k). */
-  composeUsd: z.number().min(0).max(5).default(0.06),
+  /** Kling: the customer put into the template frame first (nano-banana-pro-edit 2k $0.12 + image face swap $0.02). */
+  composeUsd: z.number().min(0).max(5).default(0.14),
 });
 export type SeedancePricing = z.infer<typeof seedancePricingSchema>;
 export const DEFAULT_SEEDANCE_PRICING: SeedancePricing = seedancePricingSchema.parse({});

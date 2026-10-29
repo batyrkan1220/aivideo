@@ -138,7 +138,7 @@ export const seedanceProvider: GenerationProvider = {
       const cost = seedanceCostUsd(durationSec, pricing, { mode: "kling" });
       if (input.templateFrameUrl) {
         // No silent fallback: Kling with the customer's own photo gives their room as the scene,
-        // so a failed compose stops the job before the expensive Kling step (only ~$0.06 spent).
+        // so a failed compose stops the job before the expensive Kling step (only the cheap image step is spent).
         const id = await submitCompose(input.templateFrameUrl, faceUrls[0]);
         return { providerJobId: id, cost: pricing.composeUsd, state: { stage: "compose", i: 0, faces: [faceUrls[0]], video: input.templateVideoUrl, prompt, next_cost: cost - pricing.composeUsd } };
       }
@@ -178,7 +178,21 @@ export const seedanceProvider: GenerationProvider = {
         console.error("[seedance] compose failed — Kling not started", providerJobId, status, JSON.stringify(d.error ?? d.outputs ?? "").slice(0, 300));
         return { state: "failed", errorCode: "provider_failed", retryable: false };
       }
+      // Step 2: the exact face from the customer's photo onto the composed frame (image face swap).
+      try {
+        const fixId = await submitImageFaceSwap(img, st.faces[0]);
+        return { state: "processing", next: { providerJobId: fixId, state: { ...st, stage: "facefix", base: img }, cost: 0 } };
+      } catch (err) {
+        console.error("[seedance] image face swap submit failed, Kling with the composed frame", err instanceof Error ? err.message : err);
+      }
       const id = await submitKling(img, st.video, st.prompt ?? buildKlingPrompt("", ""));
+      return { state: "processing", next: { providerJobId: id, state: { stage: "kling", i: 0, faces: [] }, cost: st.next_cost ?? 0 } };
+    }
+    // Step 3: Kling animates the frame (face fixed; if the fix failed, the composed frame as is).
+    if (st?.stage === "facefix" && st.video && st.base && ["completed", "succeeded", "failed", "error", "cancelled"].includes(status)) {
+      const fixed = status === "completed" || status === "succeeded" ? outputUrl(d) : undefined;
+      if (!fixed) console.error("[seedance] image face swap failed, Kling with the composed frame", providerJobId, JSON.stringify(d.error ?? "").slice(0, 200));
+      const id = await submitKling(fixed ?? st.base, st.video, st.prompt ?? buildKlingPrompt("", ""));
       return { state: "processing", next: { providerJobId: id, state: { stage: "kling", i: 0, faces: [] }, cost: st.next_cost ?? 0 } };
     }
     if (status === "completed" || status === "succeeded") {
@@ -216,11 +230,11 @@ export const seedanceProvider: GenerationProvider = {
 };
 
 
-type SeedanceState = { stage: "seedance" | "swap" | "kling" | "wan" | "compose"; i: number; faces: string[]; base?: string; video?: string; prompt?: string; next_cost?: number };
+type SeedanceState = { stage: "seedance" | "swap" | "kling" | "wan" | "compose" | "facefix"; i: number; faces: string[]; base?: string; video?: string; prompt?: string; next_cost?: number };
 function parseState(s: unknown): SeedanceState | null {
   if (!s || typeof s !== "object") return null;
   const o = s as Record<string, unknown>;
-  if ((o.stage !== "seedance" && o.stage !== "swap" && o.stage !== "kling" && o.stage !== "wan" && o.stage !== "compose") || !Array.isArray(o.faces)) return null;
+  if ((o.stage !== "seedance" && o.stage !== "swap" && o.stage !== "kling" && o.stage !== "wan" && o.stage !== "compose" && o.stage !== "facefix") || !Array.isArray(o.faces)) return null;
   return {
     stage: o.stage, i: Number(o.i) || 0,
     faces: o.faces.filter((x): x is string => typeof x === "string"),
@@ -252,12 +266,24 @@ async function submitCompose(frameUrl: string, photoUrl: string): Promise<string
   const prompt = "Image 1 is a frame from a video, image 2 is a photo of a person. Replace the main person in image 1 with the person from image 2: " +
     "same face, facial features, hairstyle, skin tone and body as in image 2. Keep everything else from image 1 exactly: the pose, " +
     "position, size in the frame, clothing style of the scene, background, cars and objects, lighting, colors and camera angle. Photorealistic, sharp face.";
-  const d = await call<{ request_id?: string; id?: string }>("/api/v1/nano-banana-2-edit", {
+  // Nano Banana Pro keeps a person's identity best among the editors; 2k for a sharp face.
+  const d = await call<{ request_id?: string; id?: string }>("/api/v1/nano-banana-pro-edit", {
     method: "POST",
-    body: JSON.stringify({ prompt, images_list: [frameUrl, photoUrl], resolution: "1k", output_format: "jpg" }),
+    body: JSON.stringify({ prompt, images_list: [frameUrl, photoUrl], resolution: "2k", output_format: "jpg" }),
   });
   const id = d.request_id ?? d.id;
   if (!id) throw new ProviderError("provider_bad_response", false, "compose: missing request_id");
+  return id;
+}
+
+/** ai-image-face-swap: the face from the customer's photo onto the largest face of the image. */
+async function submitImageFaceSwap(imageUrl: string, faceUrl: string): Promise<string> {
+  const d = await call<{ request_id?: string; id?: string }>("/api/v1/ai-image-face-swap", {
+    method: "POST",
+    body: JSON.stringify({ image_url: imageUrl, swap_url: faceUrl, target_index: 0 }),
+  });
+  const id = d.request_id ?? d.id;
+  if (!id) throw new ProviderError("provider_bad_response", false, "image face swap: missing request_id");
   return id;
 }
 
