@@ -82,7 +82,7 @@ async function submitJob(job: Job) {
   const e = env();
 
   const { data: order } = await db.from("orders")
-    .select("id,user_id,payment_status,template_snapshot_json").eq("id", job.order_id).single();
+    .select("id,user_id,template_id,payment_status,template_snapshot_json").eq("id", job.order_id).single();
   if (!order) return failJob(job, "order_missing");
   if (order.payment_status !== "succeeded") return failJob(job, "unpaid"); // never generate unpaid orders
 
@@ -126,6 +126,12 @@ async function submitJob(job: Job) {
     faces.push({ slotKey: s.key, providerInput: s.providerInput, imageUrl: signed.signedUrl });
   }
   let templateVideoUrl = mediaUrl((snap.preview_video_path as string) ?? null) ?? "";
+  // The template's cover = a frame of its video (Kling: the customer is put into this scene first).
+  let templateFrameUrl: string | null = null;
+  if (!snap.user_video_path && order.template_id) {
+    const { data: tpl } = await db.from("templates").select("cover_asset_path").eq("id", order.template_id).maybeSingle();
+    templateFrameUrl = mediaUrl(tpl?.cover_asset_path ?? null);
+  }
   if (typeof snap.user_video_path === "string" && snap.user_video_path) {
     // "Өз видеом": the customer's own private video, shared with the provider via a signed URL.
     const { data: signedVideo } = await db.storage.from("user-videos").createSignedUrl(snap.user_video_path, 24 * 3600);
@@ -139,7 +145,7 @@ async function submitJob(job: Job) {
     durationSec: Number(snap.video_duration_sec ?? snap.user_video_duration_sec) || null,
     ...(typeof snap.customer_wish === "string" ? { wish: snap.customer_wish } : {}),
   };
-  const input = { templateVideoUrl, faces, quality, config };
+  const input = { templateVideoUrl, templateFrameUrl, faces, quality, config };
 
   const problems = provider.validateInputs(input);
   if (problems.length) return failJob(job, "invalid_inputs", { safe_error_message: safeMessage("invalid_inputs") });

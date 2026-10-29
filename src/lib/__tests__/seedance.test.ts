@@ -161,8 +161,27 @@ describe("seedance provider", () => {
     expect(calls[0].url).toBe("https://api.muapi.test/api/v1/kling-v3.0-pro-motion-control");
     expect(calls[0].body).toMatchObject({ image_url: "https://s/1.jpg", video_url: "https://cdn/v.mp4", character_orientation: "video", keep_original_sound: true });
     expect(String((calls[0].body as { prompt: string }).prompt)).toContain("night city");
-    expect(r.cost).toBeCloseTo(9 * 0.16, 4);
+    expect(r.cost).toBeCloseTo(9 * 0.16 + 0.06, 4);
     expect(await seedanceProvider.getStatus("k-1", { startedAt: null, state: r.state ?? null })).toEqual({ state: "succeeded", outputUrl: "https://cdn/kling.mp4" });
+    vi.unstubAllGlobals();
+  });
+
+  it("kling with a template frame: customer put into the frame first, then Kling animates it", async () => {
+    const calls: { url: string; body?: unknown }[] = [];
+    const replies = [{ request_id: "c-1" }, { status: "completed", outputs: ["https://cdn/composed.jpg"] }, { request_id: "k-2" }, { status: "completed", outputs: ["https://cdn/k.mp4"] }];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      return new Response(JSON.stringify(replies.shift()), { status: 200 });
+    }));
+    const r = await seedanceProvider.submit({ jobId: "j", ...base, templateFrameUrl: "https://cdn/cover.jpg", faces, config: { mode: "kling", durationSec: 8 } });
+    expect(calls[0].url).toBe("https://api.muapi.test/api/v1/nano-banana-2-edit");
+    expect(calls[0].body).toMatchObject({ image_urls: ["https://cdn/cover.jpg", "https://s/1.jpg"] });
+    const s1 = await seedanceProvider.getStatus("c-1", { startedAt: null, state: r.state ?? null });
+    expect(s1).toMatchObject({ state: "processing", next: { providerJobId: "k-2", state: { stage: "kling" } } });
+    expect(calls[2].url).toBe("https://api.muapi.test/api/v1/kling-v3.0-pro-motion-control");
+    expect(calls[2].body).toMatchObject({ image_url: "https://cdn/composed.jpg", video_url: "https://cdn/v.mp4" });
+    const n = (s1 as { next: { state: Record<string, unknown> } }).next.state;
+    expect(await seedanceProvider.getStatus("k-2", { startedAt: null, state: n })).toEqual({ state: "succeeded", outputUrl: "https://cdn/k.mp4" });
     vi.unstubAllGlobals();
   });
 

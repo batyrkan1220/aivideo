@@ -130,19 +130,22 @@ export const seedanceProvider: GenerationProvider = {
       return { providerJobId: id, cost: seedanceCostUsd(durationSec, pricing, { mode: "wan" }), state: { stage: "wan", i: 0, faces: faceUrls } };
     }
     if (cfg.mode === "kling") {
-      // Kling 3.0 Pro Motion Control: the customer's photo performs the template video's motion.
+      // Kling 3.0 Pro Motion Control builds the whole scene from its image. So first the customer is
+      // put into the template's own frame (nano-banana-2-edit: frame + photo), then Kling animates
+      // THAT image with the template's motion → template background, car, light; customer's look.
       const wish = cfg.allowWish ? cleanWish(extra.wish) : "";
-      const body = {
-        prompt: buildKlingPrompt(cfg.prompt, wish),
-        image_url: faceUrls[0],
-        video_url: input.templateVideoUrl,
-        character_orientation: "video", // follow the template's body orientation; up to 30 s
-        keep_original_sound: true,
-      };
-      const d = await call<{ request_id?: string; id?: string }>("/api/v1/kling-v3.0-pro-motion-control", { method: "POST", body: JSON.stringify(body) });
-      const id = d.request_id ?? d.id;
-      if (!id) throw new ProviderError("provider_bad_response", false, "kling: missing request_id");
-      return { providerJobId: id, cost: seedanceCostUsd(durationSec, pricing, { mode: "kling" }), state: { stage: "kling", i: 0, faces: [] } };
+      const prompt = buildKlingPrompt(cfg.prompt, wish);
+      const cost = seedanceCostUsd(durationSec, pricing, { mode: "kling" });
+      if (input.templateFrameUrl) {
+        try {
+          const id = await submitCompose(input.templateFrameUrl, faceUrls[0]);
+          return { providerJobId: id, cost, state: { stage: "compose", i: 0, faces: [faceUrls[0]], video: input.templateVideoUrl, prompt } };
+        } catch (err) {
+          console.error("[seedance] compose submit failed, Kling with the photo", err instanceof Error ? err.message : err);
+        }
+      }
+      const id = await submitKling(faceUrls[0], input.templateVideoUrl, prompt);
+      return { providerJobId: id, cost, state: { stage: "kling", i: 0, faces: [] } };
     }
     if (cfg.mode === "swap") {
       // Face swap only: the customer's face goes straight onto the template video.
@@ -170,6 +173,13 @@ export const seedanceProvider: GenerationProvider = {
     const st = parseState(ctx?.state);
     const d = await call<{ status?: string; outputs?: unknown[]; video?: unknown; error?: unknown }>(`/api/v1/predictions/${encodeURIComponent(providerJobId)}/result`);
     const status = String(d.status ?? "").toLowerCase();
+    // Kling step 1 (the customer put into the template frame) done or failed → step 2: Kling.
+    if (st?.stage === "compose" && st.video && ["completed", "succeeded", "failed", "error", "cancelled"].includes(status)) {
+      const img = status === "completed" || status === "succeeded" ? outputUrl(d) : undefined;
+      if (!img) console.error("[seedance] compose failed, Kling with the photo", providerJobId, JSON.stringify(d.error ?? "").slice(0, 200));
+      const id = await submitKling(img ?? st.faces[0], st.video, st.prompt ?? buildKlingPrompt("", ""));
+      return { state: "processing", next: { providerJobId: id, state: { stage: "kling", i: 0, faces: [] } } };
+    }
     if (status === "completed" || status === "succeeded") {
       const url = outputUrl(d);
       if (!url) {
@@ -205,15 +215,17 @@ export const seedanceProvider: GenerationProvider = {
 };
 
 
-type SeedanceState = { stage: "seedance" | "swap" | "kling" | "wan"; i: number; faces: string[]; base?: string };
+type SeedanceState = { stage: "seedance" | "swap" | "kling" | "wan" | "compose"; i: number; faces: string[]; base?: string; video?: string; prompt?: string };
 function parseState(s: unknown): SeedanceState | null {
   if (!s || typeof s !== "object") return null;
   const o = s as Record<string, unknown>;
-  if ((o.stage !== "seedance" && o.stage !== "swap" && o.stage !== "kling" && o.stage !== "wan") || !Array.isArray(o.faces)) return null;
+  if ((o.stage !== "seedance" && o.stage !== "swap" && o.stage !== "kling" && o.stage !== "wan" && o.stage !== "compose") || !Array.isArray(o.faces)) return null;
   return {
     stage: o.stage, i: Number(o.i) || 0,
     faces: o.faces.filter((x): x is string => typeof x === "string"),
     base: typeof o.base === "string" ? o.base : undefined,
+    video: typeof o.video === "string" ? o.video : undefined,
+    prompt: typeof o.prompt === "string" ? o.prompt : undefined,
   };
 }
 
@@ -221,6 +233,30 @@ function outputUrl(d: { outputs?: unknown[]; video?: unknown }): string | undefi
   const isUrl = (x: unknown): x is string => typeof x === "string" && /^https?:\/\//.test(x);
   const fromVideo = typeof d.video === "object" && d.video ? (d.video as { url?: unknown }).url : d.video;
   return (d.outputs ?? []).find(isUrl) ?? (isUrl(fromVideo) ? fromVideo : undefined);
+}
+
+async function submitKling(imageUrl: string, videoUrl: string, prompt: string): Promise<string> {
+  const d = await call<{ request_id?: string; id?: string }>("/api/v1/kling-v3.0-pro-motion-control", {
+    method: "POST",
+    body: JSON.stringify({ prompt, image_url: imageUrl, video_url: videoUrl, character_orientation: "video", keep_original_sound: true }),
+  });
+  const id = d.request_id ?? d.id;
+  if (!id) throw new ProviderError("provider_bad_response", false, "kling: missing request_id");
+  return id;
+}
+
+/** nano-banana-2-edit: the person from the customer's photo put into the template frame (same pose, scene, light). */
+async function submitCompose(frameUrl: string, photoUrl: string): Promise<string> {
+  const prompt = "Image 1 is a frame from a video, image 2 is a photo of a person. Replace the main person in image 1 with the person from image 2: " +
+    "same face, facial features, hairstyle, skin tone and body as in image 2. Keep everything else from image 1 exactly: the pose, " +
+    "position, size in the frame, clothing style of the scene, background, cars and objects, lighting, colors and camera angle. Photorealistic, sharp face.";
+  const d = await call<{ request_id?: string; id?: string }>("/api/v1/nano-banana-2-edit", {
+    method: "POST",
+    body: JSON.stringify({ prompt, image_urls: [frameUrl, photoUrl], resolution: "1k", output_format: "jpg" }),
+  });
+  const id = d.request_id ?? d.id;
+  if (!id) throw new ProviderError("provider_bad_response", false, "compose: missing request_id");
+  return id;
 }
 
 async function submitFaceSwap(videoUrl: string, faceUrl: string, targetIndex: number): Promise<string> {

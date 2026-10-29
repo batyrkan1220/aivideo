@@ -16,6 +16,8 @@ export type FaceInput = { slotKey: string; providerInput: string; imageUrl: stri
 export type SubmitInput = {
   jobId: string;
   templateVideoUrl: string;
+  /** A still frame of the template video (its cover), when the template has one. */
+  templateFrameUrl?: string | null;
   faces: FaceInput[];           // already in deterministic slot order
   quality: string;
   config: Record<string, unknown>;

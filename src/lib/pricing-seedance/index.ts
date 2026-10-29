@@ -23,6 +23,8 @@ export const seedancePricingSchema = z.object({
   klingUsdPerSec: z.number().min(0).max(10).default(0.16),
   /** Wan 2.2 Animate replace (muapi), USD per generation (+ one face swap pass). */
   wanUsd: z.number().min(0).max(20).default(0.35),
+  /** Kling: the customer put into the template frame first (nano-banana-2-edit, 1k). */
+  composeUsd: z.number().min(0).max(5).default(0.06),
 });
 export type SeedancePricing = z.infer<typeof seedancePricingSchema>;
 export const DEFAULT_SEEDANCE_PRICING: SeedancePricing = seedancePricingSchema.parse({});
@@ -44,7 +46,8 @@ export function seedanceBilledSec(durationSec: number): number {
 export type CostOpts = { mode?: "swap" | "scene" | "kling" | "wan"; people?: number };
 
 export function seedanceCostUsd(durationSec: number, s: SeedancePricing, o: CostOpts = {}): number {
-  if (o.mode === "kling") return Math.round(Math.ceil(Math.min(durationSec, 30) - 1e-6) * s.klingUsdPerSec * 10_000) / 10_000;
+  // Kling: per output second + putting the customer into the template frame first.
+  if (o.mode === "kling") return Math.round((Math.ceil(Math.min(durationSec, 30) - 1e-6) * s.klingUsdPerSec + s.composeUsd) * 10_000) / 10_000;
   if (o.mode === "wan") return Math.round((s.wanUsd + s.faceSwapUsd) * 10_000) / 10_000;
   const swaps = Math.max(1, o.people ?? 1) * s.faceSwapUsd;
   const scene = o.mode === "swap" ? 0 : seedanceBilledSec(durationSec) * s.usdPerSec * s.refFactor;
