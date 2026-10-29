@@ -90,9 +90,10 @@ export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: strin
 }
 
 export async function getKlingTask(id: string): Promise<ProviderJobStatus & { videoUrl?: string }> {
-  const d = await call<{ data?: { status?: string; message?: string; outputs?: { type?: string; url?: string }[] }[] }>(`/tasks?task_ids=${encodeURIComponent(id)}`);
+  const d = await call<{ data?: { status?: string; message?: string; outputs?: { type?: string; url?: string }[]; billing?: KlingBilling[]; usage?: unknown }[] }>(`/tasks?task_ids=${encodeURIComponent(id)}`);
   const t = d.data?.[0];
   const status = String(t?.status ?? "");
+  if (status === "succeeded" || status === "failed") console.log(`[kling] task ${id} ${status} billing=${billingText(t?.billing)} usage=${JSON.stringify(t?.usage ?? null)}`);
   if (status === "succeeded") {
     const url = t?.outputs?.find((o) => o.type === "video" && typeof o.url === "string")?.url;
     if (!url) return { state: "failed", errorCode: "provider_no_output", retryable: false };
@@ -105,6 +106,18 @@ export async function getKlingTask(id: string): Promise<ProviderJobStatus & { vi
     return { state: "failed", errorCode: content ? "provider_content_rejected" : "provider_failed", retryable: false };
   }
   return { state: status === "submitted" ? "queued" : "processing" };
+}
+
+type KlingBilling = { charge_type?: string; amount?: string; currency?: string; package_type?: string; list_price?: string };
+const billingText = (b?: KlingBilling[]) =>
+  (b ?? []).map((x) => (x.charge_type === "unit" ? `${x.amount} units` : `${x.amount} ${x.currency ?? ""}`.trim())).join("+") || "n/a";
+
+/** Recent Kling tasks with what was charged (for checking the real cost). */
+export async function klingRecentBilling(limit = 5): Promise<string[]> {
+  const d = await call<{ data?: { result?: { id?: string; status?: string; billing?: KlingBilling[]; usage?: unknown; create_time?: number }[] } }>("/tasks", {
+    method: "POST", body: JSON.stringify({ limit }),
+  });
+  return (d.data?.result ?? []).map((t) => `${t.id} ${t.status} billing=${billingText(t.billing)} usage=${JSON.stringify(t.usage ?? null)}`);
 }
 
 export type KlingStatus = { state: "none" | "ok" | "auth" | "error"; packs?: { name: string; remaining: number; total: number; for40: boolean }[] };
