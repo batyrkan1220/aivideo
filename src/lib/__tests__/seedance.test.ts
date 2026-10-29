@@ -258,6 +258,24 @@ describe("seedance provider", () => {
     vi.unstubAllGlobals();
   });
 
+  it("k4 mode: Kling 4.0 reference-to-video (photo + template frame + template video), then a face swap", async () => {
+    const calls: { url: string; body?: unknown }[] = [];
+    const replies = [{ request_id: "k4-1" }, { status: "completed", outputs: ["https://cdn/k4.mp4"] }, { request_id: "fs-4" }];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      return new Response(JSON.stringify(replies.shift()), { status: 200 });
+    }));
+    const r = await seedanceProvider.submit({ jobId: "j", ...base, templateFrameUrl: "https://cdn/frame.jpg", faces, config: { mode: "k4", durationSec: 8.1 } });
+    expect(calls[0].url).toBe("https://api.muapi.test/api/v1/kling-4.0-reference-to-video");
+    expect(calls[0].body).toMatchObject({ images_list: ["https://s/1.jpg", "https://cdn/frame.jpg"], videos_list: ["https://cdn/v.mp4"], duration: 8, resolution: "720p" });
+    expect(String((calls[0].body as { prompt: string }).prompt)).toContain("@image_1");
+    expect(r.cost).toBeCloseTo(17 * 0.094 + 8.1 * 0.094, 3);
+    const s1 = await seedanceProvider.getStatus("k4-1", { startedAt: null, state: r.state ?? null });
+    expect(s1).toMatchObject({ state: "processing", next: { providerJobId: "fs-4" } });
+    expect(calls[2].body).toMatchObject({ video_url: "https://cdn/k4.mp4", image_url: "https://s/1.jpg", target_index: 0 });
+    vi.unstubAllGlobals();
+  });
+
   it("maps HTTP errors (auth / balance / retryable)", async () => {
     for (const [status, code, retry] of [[401, "provider_auth", false], [402, "provider_no_balance", false], [503, "provider_http_503", true]] as const) {
       vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status })));

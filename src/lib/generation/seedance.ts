@@ -74,6 +74,19 @@ export function buildKlingPrompt(adminPrompt: string, wish: string): string {
   return parts.join(" ");
 }
 
+/** Kling 4.0 reference-to-video: who (photo), where (template frame), how (template video). */
+export function buildK4Prompt(withFrame: boolean, adminPrompt: string, wish: string): string {
+  const parts = [
+    "Recreate @video_1 shot by shot: exactly the same motion, actions, timing, camera movement, framing and cuts.",
+    "The main person is the person from @image_1: keep exactly the same face, facial features, hairstyle, skin tone, age and body as in @image_1.",
+    withFrame ? "Use the same location, background, objects and lighting as in @video_1 and @image_2." : "Use the same location, background, objects and lighting as in @video_1.",
+    "Photorealistic, natural, sharp face, no text, no watermark.",
+  ];
+  if (adminPrompt) parts.push(`Scene and style: ${adminPrompt}`);
+  if (wish) parts.push(`Customer's wish: ${wish}`);
+  return parts.join(" ");
+}
+
 /** Customer text is free input: no media tags, no control characters, limited length. */
 export const cleanWish = (s: unknown) =>
   typeof s === "string" ? s.replace(/[@<>{}\[\]\\]/g, " ").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 300) : "";
@@ -110,7 +123,7 @@ export const seedanceProvider: GenerationProvider = {
     const d = Number((input.config as { durationSec?: unknown }).durationSec);
     if (cfg.data.mode === "swap") return problems; // face swap only: no Seedance length limits
     if (cfg.data.mode === "pvr" && input.faces.length > 3) problems.push("too_many_faces");
-    if (cfg.data.mode === "kling" && input.faces.length > 1) problems.push("too_many_faces"); // one photo
+    if ((cfg.data.mode === "kling" || cfg.data.mode === "k4") && input.faces.length > 1) problems.push("too_many_faces"); // one photo
     if (!(d > 0)) problems.push("unknown_duration");
     else if (d < SEEDANCE_MIN_SEC - 0.5 || d > maxSecFor(cfg.data.mode) + 0.5) problems.push("bad_duration");
     return problems;
@@ -122,6 +135,24 @@ export const seedanceProvider: GenerationProvider = {
     const durationSec = Number(extra.durationSec);
     const pricing = await seedancePricingSettings();
     const faceUrls = input.faces.map((f) => f.imageUrl);
+    if (cfg.mode === "k4") {
+      // Kling 4.0 reference-to-video: template video = motion, camera and cuts (@video_1); customer
+      // photo = the person (@image_1); template frame = location (@image_2). Then a face swap pass.
+      const images = [faceUrls[0], ...(input.templateFrameUrl ? [input.templateFrameUrl] : [])];
+      const body = {
+        prompt: buildK4Prompt(!!input.templateFrameUrl, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : ""),
+        images_list: images,
+        videos_list: [input.templateVideoUrl],
+        duration: seedanceOutputSec(durationSec),
+        resolution: "720p",
+        aspect_ratio: cfg.aspectRatio === "adaptive" ? "auto" : cfg.aspectRatio,
+        keep_original_sound: true,
+      };
+      const d = await call<{ request_id?: string; id?: string }>("/api/v1/kling-4.0-reference-to-video", { method: "POST", body: JSON.stringify(body) });
+      const id = d.request_id ?? d.id;
+      if (!id) throw new ProviderError("provider_bad_response", false, "kling4: missing request_id");
+      return { providerJobId: id, cost: seedanceCostUsd(durationSec, pricing, { mode: "k4", people: 1 }), state: { stage: "wan", i: 0, faces: faceUrls.slice(0, 1), swap_cost: faceSwapCostUsd(durationSec, pricing) } };
+    }
     if (cfg.mode === "pvr") {
       // Replicate p-video-replace: all people replaced in one run (photo i → person at positions[i]).
       const n = Math.min(3, faceUrls.length);

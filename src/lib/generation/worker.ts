@@ -150,7 +150,7 @@ async function submitJob(job: Job) {
     ...(typeof snap.customer_wish === "string" ? { wish: snap.customer_wish } : {}),
   };
   // Kling builds the scene from its image: make sure there is a frame of the video to put the customer into.
-  const wantsFrame = (config as { mode?: unknown }).mode === "kling" || (config as { outfit?: unknown }).outfit === "template";
+  const wantsFrame = ["kling", "k4"].includes(String((config as { mode?: unknown }).mode)) || (config as { outfit?: unknown }).outfit === "template";
   if (!templateFrameUrl && wantsFrame && templateVideoUrl) {
     templateFrameUrl = (await ensureSceneFrame(order, templateVideoUrl, typeof snap.user_video_path === "string" && !!snap.user_video_path)) ?? coverUrl;
   }
