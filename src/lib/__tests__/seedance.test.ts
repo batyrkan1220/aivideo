@@ -176,12 +176,22 @@ describe("seedance provider", () => {
     const r = await seedanceProvider.submit({ jobId: "j", ...base, templateFrameUrl: "https://cdn/cover.jpg", faces, config: { mode: "kling", durationSec: 8 } });
     expect(calls[0].url).toBe("https://api.muapi.test/api/v1/nano-banana-2-edit");
     expect(calls[0].body).toMatchObject({ images_list: ["https://cdn/cover.jpg", "https://s/1.jpg"] });
+    expect(r.cost).toBeCloseTo(0.06, 4);
     const s1 = await seedanceProvider.getStatus("c-1", { startedAt: null, state: r.state ?? null });
     expect(s1).toMatchObject({ state: "processing", next: { providerJobId: "k-2", state: { stage: "kling" } } });
+    expect((s1 as { next: { cost: number } }).next.cost).toBeCloseTo(8 * 0.16, 4);
     expect(calls[2].url).toBe("https://api.muapi.test/api/v1/kling-v3.0-pro-motion-control");
     expect(calls[2].body).toMatchObject({ image_url: "https://cdn/composed.jpg", video_url: "https://cdn/v.mp4" });
     const n = (s1 as { next: { state: Record<string, unknown> } }).next.state;
     expect(await seedanceProvider.getStatus("k-2", { startedAt: null, state: n })).toEqual({ state: "succeeded", outputUrl: "https://cdn/k.mp4" });
+    vi.unstubAllGlobals();
+  });
+
+  it("kling: a failed compose stops before Kling (no expensive run with the customer's room)", async () => {
+    const replies = [{ status: "failed", error: "bad image" }];
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(replies.shift()), { status: 200 })));
+    const st = { stage: "compose", i: 0, faces: ["https://s/1.jpg"], video: "https://cdn/v.mp4", prompt: "p", next_cost: 1.28 };
+    expect(await seedanceProvider.getStatus("c-9", { startedAt: null, state: st })).toMatchObject({ state: "failed", errorCode: "provider_failed" });
     vi.unstubAllGlobals();
   });
 

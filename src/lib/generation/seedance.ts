@@ -137,12 +137,10 @@ export const seedanceProvider: GenerationProvider = {
       const prompt = buildKlingPrompt(cfg.prompt, wish);
       const cost = seedanceCostUsd(durationSec, pricing, { mode: "kling" });
       if (input.templateFrameUrl) {
-        try {
-          const id = await submitCompose(input.templateFrameUrl, faceUrls[0]);
-          return { providerJobId: id, cost, state: { stage: "compose", i: 0, faces: [faceUrls[0]], video: input.templateVideoUrl, prompt } };
-        } catch (err) {
-          console.error("[seedance] compose submit failed, Kling with the photo", err instanceof Error ? err.message : err);
-        }
+        // No silent fallback: Kling with the customer's own photo gives their room as the scene,
+        // so a failed compose stops the job before the expensive Kling step (only ~$0.06 spent).
+        const id = await submitCompose(input.templateFrameUrl, faceUrls[0]);
+        return { providerJobId: id, cost: pricing.composeUsd, state: { stage: "compose", i: 0, faces: [faceUrls[0]], video: input.templateVideoUrl, prompt, next_cost: cost - pricing.composeUsd } };
       }
       const id = await submitKling(faceUrls[0], input.templateVideoUrl, prompt);
       return { providerJobId: id, cost, state: { stage: "kling", i: 0, faces: [] } };
@@ -176,9 +174,12 @@ export const seedanceProvider: GenerationProvider = {
     // Kling step 1 (the customer put into the template frame) done or failed → step 2: Kling.
     if (st?.stage === "compose" && st.video && ["completed", "succeeded", "failed", "error", "cancelled"].includes(status)) {
       const img = status === "completed" || status === "succeeded" ? outputUrl(d) : undefined;
-      if (!img) console.error("[seedance] compose failed, Kling with the photo", providerJobId, JSON.stringify(d.error ?? "").slice(0, 200));
-      const id = await submitKling(img ?? st.faces[0], st.video, st.prompt ?? buildKlingPrompt("", ""));
-      return { state: "processing", next: { providerJobId: id, state: { stage: "kling", i: 0, faces: [] } } };
+      if (!img) {
+        console.error("[seedance] compose failed — Kling not started", providerJobId, status, JSON.stringify(d.error ?? d.outputs ?? "").slice(0, 300));
+        return { state: "failed", errorCode: "provider_failed", retryable: false };
+      }
+      const id = await submitKling(img, st.video, st.prompt ?? buildKlingPrompt("", ""));
+      return { state: "processing", next: { providerJobId: id, state: { stage: "kling", i: 0, faces: [] }, cost: st.next_cost ?? 0 } };
     }
     if (status === "completed" || status === "succeeded") {
       const url = outputUrl(d);
@@ -215,7 +216,7 @@ export const seedanceProvider: GenerationProvider = {
 };
 
 
-type SeedanceState = { stage: "seedance" | "swap" | "kling" | "wan" | "compose"; i: number; faces: string[]; base?: string; video?: string; prompt?: string };
+type SeedanceState = { stage: "seedance" | "swap" | "kling" | "wan" | "compose"; i: number; faces: string[]; base?: string; video?: string; prompt?: string; next_cost?: number };
 function parseState(s: unknown): SeedanceState | null {
   if (!s || typeof s !== "object") return null;
   const o = s as Record<string, unknown>;
@@ -226,6 +227,7 @@ function parseState(s: unknown): SeedanceState | null {
     base: typeof o.base === "string" ? o.base : undefined,
     video: typeof o.video === "string" ? o.video : undefined,
     prompt: typeof o.prompt === "string" ? o.prompt : undefined,
+    next_cost: typeof o.next_cost === "number" ? o.next_cost : undefined,
   };
 }
 
