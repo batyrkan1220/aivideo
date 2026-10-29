@@ -37,6 +37,8 @@ export const seedanceConfigSchema = z.object({
 });
 export type SeedanceConfig = z.infer<typeof seedanceConfigSchema>;
 export type SeedanceMode = SeedanceConfig["mode"];
+/** Longest template video a mode accepts (Wan 2.2 Animate: up to 120 s; the others: 30 s). */
+export const maxSecFor = (mode: unknown) => (mode === "wan" || mode === undefined || mode === null ? 120 : SEEDANCE_MAX_SEC);
 export const parseSeedanceMode = (v: unknown): SeedanceMode => (v === "scene" || v === "swap" || v === "kling" ? v : "wan");
 export type PhotoFraming = SeedanceConfig["framing"];
 

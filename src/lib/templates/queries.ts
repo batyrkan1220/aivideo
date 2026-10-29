@@ -1,5 +1,5 @@
 import "server-only";
-import { SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC, parseSeedanceMode, type PhotoFraming, type SeedanceMode } from "./seedance-config";
+import { SEEDANCE_MIN_SEC, maxSecFor, parseSeedanceMode, type PhotoFraming, type SeedanceMode } from "./seedance-config";
 import { after, connection } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -85,7 +85,7 @@ export function parseRow(r: Row, seedancePricing: SeedancePricing = DEFAULT_SEED
     // Seedance: one quality (720p); price from the video length (or a manual price).
     const duration = r.video_duration_sec == null ? null : Number(r.video_duration_sec);
     // A video outside Seedance's 4–30 s cannot be generated: no price, so it cannot be ordered.
-    const usable = duration === null || (duration >= SEEDANCE_MIN_SEC - 0.5 && duration <= SEEDANCE_MAX_SEC + 0.5);
+    const usable = duration === null || (duration >= SEEDANCE_MIN_SEC - 0.5 && duration <= maxSecFor(parseSeedanceMode(r.seedance_mode)) + 0.5);
     const price = usable ? seedancePriceKzt(duration, parsedP.data.basePriceKzt, seedancePricing, { mode: parseSeedanceMode(r.seedance_mode), people: r.required_face_count }) : null;
     const eff = applySeedancePricing(parsedP.data, price ?? 0);
     qualities = { success: true, data: eff.qualities } as typeof parsedQ;

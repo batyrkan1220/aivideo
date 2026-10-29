@@ -1,6 +1,6 @@
 import "server-only";
 import { env } from "@/lib/env";
-import { seedanceConfigSchema, seedanceOutputSec, SEEDANCE_MAX_PEOPLE, SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC } from "@/lib/templates/seedance-config";
+import { seedanceConfigSchema, seedanceOutputSec, SEEDANCE_MAX_PEOPLE, SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC, maxSecFor } from "@/lib/templates/seedance-config";
 import { seedanceCostUsd } from "@/lib/pricing-seedance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { ProviderError, type GenerationProvider, type ProviderJobStatus } from "./types";
@@ -110,7 +110,7 @@ export const seedanceProvider: GenerationProvider = {
     if (cfg.data.mode === "swap") return problems; // face swap only: no Seedance length limits
     if ((cfg.data.mode === "kling" || cfg.data.mode === "wan") && input.faces.length > 1) problems.push("too_many_faces"); // one photo
     if (!(d > 0)) problems.push("unknown_duration");
-    else if (d < SEEDANCE_MIN_SEC - 0.5 || d > SEEDANCE_MAX_SEC + 0.5) problems.push("bad_duration");
+    else if (d < SEEDANCE_MIN_SEC - 0.5 || d > maxSecFor(cfg.data.mode) + 0.5) problems.push("bad_duration");
     return problems;
   },
 

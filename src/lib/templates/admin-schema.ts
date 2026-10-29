@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { faceSlotSchema, qualitySchema, pricingConfigSchema, validateFaceSlots, autoFaceSlots } from "./schema";
-import { parseSeedanceConfig, seedanceSlots, SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC } from "./seedance-config";
+import { parseSeedanceConfig, seedanceSlots, SEEDANCE_MIN_SEC, maxSecFor } from "./seedance-config";
 
 /** Everything an admin can edit on a template. Validated on the server on every save. */
 export const templateInputSchema = z.object({
@@ -37,7 +37,7 @@ export function publishProblems(t: TemplateInput, durationSec?: number | null): 
   const { minPriceKzt, maxPriceKzt } = t.pricing;
   if (maxPriceKzt !== undefined && maxPriceKzt < minPriceKzt) p.push("price_out_of_range");
   // Seedance: the template video is the motion reference, 4–30 s.
-  if (t.providerKey === "seedance" && durationSec != null && (durationSec < SEEDANCE_MIN_SEC - 0.5 || durationSec > SEEDANCE_MAX_SEC + 0.5)) p.push("bad_duration");
+  if (t.providerKey === "seedance" && durationSec != null && (durationSec < SEEDANCE_MIN_SEC - 0.5 || durationSec > maxSecFor(parseSeedanceConfig(t.providerConfig).mode) + 0.5)) p.push("bad_duration");
   return p;
 }
 

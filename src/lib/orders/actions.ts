@@ -14,7 +14,7 @@ import { allow } from "@/lib/security/rate-limit";
 import { customVideoSettings } from "@/lib/custom-video/settings";
 import { attributeFromCookie } from "@/lib/partners";
 import { seedancePriceKzt, applySeedancePricing } from "@/lib/pricing-seedance";
-import { parseSeedanceConfig, seedanceSlots, SEEDANCE_MAX_PEOPLE, SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC } from "@/lib/templates/seedance-config";
+import { parseSeedanceConfig, seedanceSlots, SEEDANCE_MAX_PEOPLE, SEEDANCE_MIN_SEC, maxSecFor } from "@/lib/templates/seedance-config";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { ensureTemplateDuration } from "@/lib/templates/duration";
 import { cleanWish } from "@/lib/generation/seedance";
@@ -236,8 +236,8 @@ export async function createOrder(raw: unknown): Promise<
       durationSec = tv.template.video_duration_sec == null ? null : Number(tv.template.video_duration_sec);
       if (durationSec === null) durationSec = await ensureTemplateDuration(tv.template.id, mediaUrl((tv.snapshot.preview_video_path as string) ?? null));
     }
-    if (durationSec === null || durationSec < SEEDANCE_MIN_SEC - 0.5 || durationSec > SEEDANCE_MAX_SEC + 0.5) return { ok: false, error: custom ? "video_missing" : "template_unavailable" };
     const cfg = parseSeedanceConfig((snapshotExtra.provider_config_json as unknown) ?? tv.snapshot.provider_config_json);
+    if (durationSec === null || durationSec < SEEDANCE_MIN_SEC - 0.5 || durationSec > maxSecFor(cfg.mode) + 0.5) return { ok: false, error: custom ? "video_missing" : "template_unavailable" };
     if ((cfg.mode === "kling" || cfg.mode === "wan") && slots.length > 1) return { ok: false, error: "photos_missing" }; // Kling: one photo
     const price = seedancePriceKzt(durationSec, custom ? 0 : tv.pricing.basePriceKzt, await seedancePricingSettings(), { mode: cfg.mode, people: slots.length });
     if (price === null) return { ok: false, error: "template_unavailable" };
