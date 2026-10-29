@@ -48,7 +48,7 @@ export type CostOpts = { mode?: "swap" | "scene" | "kling" | "wan"; people?: num
 export function seedanceCostUsd(durationSec: number, s: SeedancePricing, o: CostOpts = {}): number {
   // Kling: per output second + putting the customer into the template frame first.
   if (o.mode === "kling") return Math.round((Math.ceil(Math.min(durationSec, 30) - 1e-6) * s.klingUsdPerSec + s.composeUsd) * 10_000) / 10_000;
-  if (o.mode === "wan") return Math.round((s.wanUsd + s.faceSwapUsd) * 10_000) / 10_000;
+  if (o.mode === "wan") return Math.round((s.wanUsd + Math.max(1, o.people ?? 1) * s.faceSwapUsd) * 10_000) / 10_000;
   const swaps = Math.max(1, o.people ?? 1) * s.faceSwapUsd;
   const scene = o.mode === "swap" ? 0 : seedanceBilledSec(durationSec) * s.usdPerSec * s.refFactor;
   return Math.round((scene + swaps) * 10_000) / 10_000;

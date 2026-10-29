@@ -100,7 +100,7 @@ export function inputToRow(t: TemplateInput) {
   if (t.providerKey === "seedance") {
     const cfg = parseSeedanceConfig(t.providerConfig);
     config = cfg;
-    slots = seedanceSlots(cfg.people);
+    slots = seedanceSlots(cfg.people, "face_", cfg.labels);
   }
   return {
     title_kk: t.titleKk,

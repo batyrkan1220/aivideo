@@ -108,7 +108,7 @@ export const seedanceProvider: GenerationProvider = {
     if (idx.some((x, i) => x !== i + 1)) problems.push("unmapped_slot");
     const d = Number((input.config as { durationSec?: unknown }).durationSec);
     if (cfg.data.mode === "swap") return problems; // face swap only: no Seedance length limits
-    if ((cfg.data.mode === "kling" || cfg.data.mode === "wan") && input.faces.length > 1) problems.push("too_many_faces"); // one photo
+    if (cfg.data.mode === "kling" && input.faces.length > 1) problems.push("too_many_faces"); // one photo
     if (!(d > 0)) problems.push("unknown_duration");
     else if (d < SEEDANCE_MIN_SEC - 0.5 || d > maxSecFor(cfg.data.mode) + 0.5) problems.push("bad_duration");
     return problems;

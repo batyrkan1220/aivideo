@@ -34,6 +34,8 @@ export const seedanceConfigSchema = z.object({
   allowWish: z.boolean().default(true),
   /** Kling: a full-size frame of the template video (storage path), the scene the customer is put into. */
   framePath: z.string().max(300).nullable().default(null),
+  /** Photo labels for the customer, one per person (e.g. "Баланың фотосы", "Мамасының фотосы"). */
+  labels: z.array(z.string().trim().max(40)).max(5).default([]),
 });
 export type SeedanceConfig = z.infer<typeof seedanceConfigSchema>;
 export type SeedanceMode = SeedanceConfig["mode"];
@@ -52,10 +54,10 @@ export function seedanceSlotLabel(i: number, n: number) {
 }
 
 /** Customer upload slots, left → right. providerInput = `img_<n>` (= @Image<n> in the prompt). */
-export function seedanceSlots(n: number, keyPrefix = "face_"): FaceSlot[] {
+export function seedanceSlots(n: number, keyPrefix = "face_", labels: string[] = []): FaceSlot[] {
   return Array.from({ length: n }, (_, i) => ({
     key: `${keyPrefix}${i + 1}`,
-    labelKk: seedanceSlotLabel(i, n),
+    labelKk: labels[i]?.trim() || seedanceSlotLabel(i, n),
     position: { x: (i + 1) / (n + 1), y: 0.42 },
     providerInput: `img_${i + 1}`,
     order: i,
