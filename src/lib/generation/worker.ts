@@ -1,4 +1,5 @@
 import "server-only";
+import { videoFrameJpeg } from "@/lib/media/frame";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/server";
@@ -146,6 +147,10 @@ async function submitJob(job: Job) {
     durationSec: Number(snap.video_duration_sec ?? snap.user_video_duration_sec) || null,
     ...(typeof snap.customer_wish === "string" ? { wish: snap.customer_wish } : {}),
   };
+  // Kling builds the scene from its image: make sure there is a frame of the video to put the customer into.
+  if (!templateFrameUrl && (config as { mode?: unknown }).mode === "kling" && templateVideoUrl) {
+    templateFrameUrl = await ensureSceneFrame(order, templateVideoUrl, typeof snap.user_video_path === "string" && !!snap.user_video_path);
+  }
   const input = { templateVideoUrl, templateFrameUrl, faces, quality, config };
 
   const problems = provider.validateInputs(input);
@@ -258,4 +263,28 @@ async function finalize(job: Job, outputUrl: string, cost?: number) {
   await notifyOrderOwner(job.order_id, "ready");
   await notifyAdmins(job.order_id, "ready");
   await track("generation_succeeded", { userId: order.user_id, orderId: job.order_id });
+}
+
+/**
+ * A full-size frame of the template video (stored once on the template), or of the customer's own
+ * video (private, per order). Best effort: null when ffmpeg or storage fails.
+ */
+async function ensureSceneFrame(order: { id: string; user_id: string; template_id: string | null }, videoUrl: string, own: boolean): Promise<string | null> {
+  const db = supabaseAdmin();
+  const jpg = await videoFrameJpeg(videoUrl);
+  if (!jpg) return null;
+  if (own) {
+    const path = `${order.user_id}/${order.id}-frame.jpg`;
+    const { error } = await db.storage.from("user-uploads").upload(path, jpg, { contentType: "image/jpeg", upsert: true });
+    if (error) return null;
+    const { data } = await db.storage.from("user-uploads").createSignedUrl(path, 24 * 3600);
+    return data?.signedUrl ?? null;
+  }
+  if (!order.template_id) return null;
+  const path = `frames/${order.template_id}-${Date.now()}.jpg`;
+  const { error } = await db.storage.from("template-media").upload(path, jpg, { contentType: "image/jpeg", upsert: true });
+  if (error) { console.error("[worker] frame upload failed", error.message); return null; }
+  const { data: t } = await db.from("templates").select("provider_config_json").eq("id", order.template_id).single();
+  await db.from("templates").update({ provider_config_json: { ...((t?.provider_config_json as Record<string, unknown>) ?? {}), framePath: path } }).eq("id", order.template_id);
+  return mediaUrl(path);
 }

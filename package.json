@@ -16,6 +16,7 @@
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
     "@vladmandic/face-api": "^1.7.15",
+    "ffmpeg-static": "5.2.0",
     "image-size": "^2.0.4",
     "next": "16.4.2",
     "react": "19.3.0",
