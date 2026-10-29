@@ -61,7 +61,7 @@ export function seedanceCostUsd(durationSec: number, s: SeedancePricing, o: Cost
   if (o.mode === "kd") {
     // Real Kling bill: 0.6 unit × (input video s rounded up + output s); 12.88 s → 15.6 units.
     const out = Math.min(30, Math.max(3, Math.round(durationSec)));
-    const counted = Math.ceil(Math.min(durationSec, 30) - 1e-6) + out;
+    const counted = Math.round(Math.min(durationSec, 30)) + out; // Kling: 6.96 s input → 7, 12.88 → 13
     const swap = o.faceSwap === true && durationSec <= 29.5 ? faceSwapCostUsd(durationSec, s) : 0;
     return Math.round((counted * s.kdUsdPerSec + swap) * 10_000) / 10_000;
   }
