@@ -221,8 +221,8 @@ export function TemplateEditor({
         <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_minmax(0,320px)]">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={e.seedance.mode} className="sm:col-span-2">
-              <select className={inputCls()} value={sd.mode} onChange={(ev) => { const m = ev.target.value as SeedanceConfig["mode"]; setSd(m === "kling" ? { mode: m, people: 1 } : { mode: m }); }}>
-                {(["wan", "kling", "swap", "scene"] as const).map((k) => <option key={k} value={k}>{e.seedance.modeOptions[k]}</option>)}
+              <select className={inputCls()} value={sd.mode} onChange={(ev) => { const m = ev.target.value as SeedanceConfig["mode"]; setSd(m === "kling" ? { mode: m, people: 1 } : m === "pvr" ? { mode: m, people: Math.min(sd.people, 3) } : { mode: m }); }}>
+                {(["wan", "pvr", "kling", "swap", "scene"] as const).map((k) => <option key={k} value={k}>{e.seedance.modeOptions[k]}</option>)}
               </select>
               <span className="mt-1 block text-xs text-muted">{e.seedance.modeHint[sd.mode]}</span>
               <details className="mt-2 rounded-xl bg-paper px-3 py-2 text-xs">
@@ -234,7 +234,7 @@ export function TemplateEditor({
             </Field>
             <Field label={e.seedance.people}>
               <select className={inputCls()} value={sd.people} disabled={sd.mode === "kling"} onChange={(ev) => setSd({ people: Number(ev.target.value) })}>
-                {Array.from({ length: SEEDANCE_MAX_PEOPLE }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
+                {Array.from({ length: sd.mode === "pvr" ? 3 : SEEDANCE_MAX_PEOPLE }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
               <span className="mt-1 block text-xs text-muted">{sd.mode === "wan" || sd.mode === "swap" ? e.seedance.peopleHintSwap : e.seedance.peopleHint}</span>
             </Field>
@@ -259,9 +259,18 @@ export function TemplateEditor({
               <div className="grid gap-2 sm:col-span-2">
                 <span className="text-sm font-medium">{e.seedance.labels}</span>
                 {Array.from({ length: sd.people }, (_, i) => (
-                  <input key={i} className={inputCls()} maxLength={40} placeholder={`${i + 1}-адам (сол жақтан)`}
-                    value={sd.labels[i] ?? ""}
-                    onChange={(ev) => { const l = [...sd.labels]; while (l.length < sd.people) l.push(""); l[i] = ev.target.value; setSd({ labels: l.slice(0, sd.people) }); }} />
+                  <div key={i} className="grid gap-2 sm:grid-cols-[1fr_200px]">
+                    <input className={inputCls()} maxLength={40} placeholder={`${i + 1}-адам (сол жақтан)`}
+                      value={sd.labels[i] ?? ""}
+                      onChange={(ev) => { const l = [...sd.labels]; while (l.length < sd.people) l.push(""); l[i] = ev.target.value; setSd({ labels: l.slice(0, sd.people) }); }} />
+                    {sd.mode === "pvr" && (
+                      <select className={inputCls()} value={sd.positions[i] ?? ""}
+                        onChange={(ev) => { const p = [...sd.positions]; while (p.length < sd.people) p.push(""); p[i] = ev.target.value; setSd({ positions: p.slice(0, sd.people) }); }}>
+                        <option value="">{e.seedance.positionAuto(i + 1)}</option>
+                        {Object.entries(e.seedance.positionOptions).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                      </select>
+                    )}
+                  </div>
                 ))}
               </div>
             )}

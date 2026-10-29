@@ -4,6 +4,7 @@ import { seedanceConfigSchema, seedanceOutputSec, SEEDANCE_MAX_PEOPLE, SEEDANCE_
 import { seedanceCostUsd, faceSwapCostUsd } from "@/lib/pricing-seedance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { ProviderError, type GenerationProvider, type ProviderJobStatus } from "./types";
+import { buildReplacePrompt, getPvr, submitPvr } from "./replicate";
 
 /**
  * muapi.ai — Seedance 2.5 Omni Reference, international endpoint, 720p.
@@ -108,6 +109,7 @@ export const seedanceProvider: GenerationProvider = {
     if (idx.some((x, i) => x !== i + 1)) problems.push("unmapped_slot");
     const d = Number((input.config as { durationSec?: unknown }).durationSec);
     if (cfg.data.mode === "swap") return problems; // face swap only: no Seedance length limits
+    if (cfg.data.mode === "pvr" && input.faces.length > 3) problems.push("too_many_faces");
     if (cfg.data.mode === "kling" && input.faces.length > 1) problems.push("too_many_faces"); // one photo
     if (!(d > 0)) problems.push("unknown_duration");
     else if (d < SEEDANCE_MIN_SEC - 0.5 || d > maxSecFor(cfg.data.mode) + 0.5) problems.push("bad_duration");
@@ -120,6 +122,12 @@ export const seedanceProvider: GenerationProvider = {
     const durationSec = Number(extra.durationSec);
     const pricing = await seedancePricingSettings();
     const faceUrls = input.faces.map((f) => f.imageUrl);
+    if (cfg.mode === "pvr") {
+      // Replicate p-video-replace: all people replaced in one run (photo i → person at positions[i]).
+      const n = Math.min(3, faceUrls.length);
+      const id = await submitPvr(input.templateVideoUrl, faceUrls.slice(0, n), buildReplacePrompt(cfg.positions, n));
+      return { providerJobId: id, cost: seedanceCostUsd(durationSec, pricing, { mode: "pvr" }), state: { stage: "pvr", i: 0, faces: [] } };
+    }
     if (cfg.mode === "wan") {
       // Wan 2.2 Animate "replace": template background/lighting stay, the person comes from the photo;
       // the face swap pass afterwards sharpens the likeness.
@@ -178,6 +186,7 @@ export const seedanceProvider: GenerationProvider = {
 
   async getStatus(providerJobId, ctx): Promise<ProviderJobStatus> {
     const st = parseState(ctx?.state);
+    if (st?.stage === "pvr") return getPvr(providerJobId);
     const d = await call<{ status?: string; outputs?: unknown[]; video?: unknown; error?: unknown }>(`/api/v1/predictions/${encodeURIComponent(providerJobId)}/result`);
     const status = String(d.status ?? "").toLowerCase();
     // Wan step 0 (full-body image) done or failed → Wan with that image (or the photo itself).
@@ -249,11 +258,11 @@ export const seedanceProvider: GenerationProvider = {
 };
 
 
-type SeedanceState = { stage: "seedance" | "swap" | "kling" | "wan" | "compose" | "facefix" | "prep"; i: number; faces: string[]; base?: string; video?: string; prompt?: string; next_cost?: number; swap_cost?: number };
+type SeedanceState = { stage: "seedance" | "swap" | "kling" | "wan" | "compose" | "facefix" | "prep" | "pvr"; i: number; faces: string[]; base?: string; video?: string; prompt?: string; next_cost?: number; swap_cost?: number };
 function parseState(s: unknown): SeedanceState | null {
   if (!s || typeof s !== "object") return null;
   const o = s as Record<string, unknown>;
-  if ((o.stage !== "seedance" && o.stage !== "swap" && o.stage !== "kling" && o.stage !== "wan" && o.stage !== "compose" && o.stage !== "facefix" && o.stage !== "prep") || !Array.isArray(o.faces)) return null;
+  if ((o.stage !== "seedance" && o.stage !== "swap" && o.stage !== "kling" && o.stage !== "wan" && o.stage !== "compose" && o.stage !== "facefix" && o.stage !== "prep" && o.stage !== "pvr") || !Array.isArray(o.faces)) return null;
   return {
     stage: o.stage, i: Number(o.i) || 0,
     faces: o.faces.filter((x): x is string => typeof x === "string"),

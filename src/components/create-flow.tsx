@@ -107,7 +107,7 @@ export function CreateFlow({
   /** The customer may write a wish for the AI (background, outfit, style). */
   allowWish?: boolean;
   /** Template mode: face swap only or Seedance scene + face swap (custom-video price). */
-  seedanceMode?: "swap" | "scene" | "kling" | "wan";
+  seedanceMode?: "swap" | "scene" | "kling" | "wan" | "pvr";
   /** What photo the template needs (face / waist-up / full body); "auto" = like the person in the video. */
   framing?: Framing;
 }) {

@@ -22,7 +22,7 @@ export const seedanceConfigSchema = z.object({
    * wan   = Wan 2.2 Animate "replace": the person in the template video is replaced by the person
    *         from the photo, the template's background/lighting stay; then a face swap pass.
    */
-  mode: z.enum(["wan", "swap", "scene", "kling"]).default("wan"),
+  mode: z.enum(["wan", "pvr", "swap", "scene", "kling"]).default("wan"),
   /** How many people in the video are replaced (one customer photo each, left → right). */
   people: z.number().int().min(1).max(SEEDANCE_MAX_PEOPLE).default(1),
   /** What photo the customer needs (shown on the order page). */
@@ -40,12 +40,14 @@ export const seedanceConfigSchema = z.object({
   prepare: z.boolean().default(true),
   /** Wan + prepare: the outfit — the customer's own (photo) or the main person's in the template. */
   outfit: z.enum(["photo", "template"]).default("photo"),
+  /** P-Video-Replace: where each person is in the frame (English for the model), e.g. "on the left". */
+  positions: z.array(z.string().trim().max(60)).max(5).default([]),
 });
 export type SeedanceConfig = z.infer<typeof seedanceConfigSchema>;
 export type SeedanceMode = SeedanceConfig["mode"];
 /** Longest template video a mode accepts (Wan 2.2 Animate: up to 120 s; the others: 30 s). */
 export const maxSecFor = (mode: unknown) => (mode === "wan" || mode === undefined || mode === null ? 120 : SEEDANCE_MAX_SEC);
-export const parseSeedanceMode = (v: unknown): SeedanceMode => (v === "scene" || v === "swap" || v === "kling" ? v : "wan");
+export const parseSeedanceMode = (v: unknown): SeedanceMode => (v === "scene" || v === "swap" || v === "kling" || v === "pvr" ? v : "wan");
 export type PhotoFraming = SeedanceConfig["framing"];
 
 export function parseSeedanceConfig(raw: unknown): SeedanceConfig {

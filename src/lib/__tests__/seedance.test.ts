@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/env", () => ({ env: () => ({ MUAPI_API_KEY: "k".repeat(20), MUAPI_API_BASE_URL: "https://api.muapi.test", MUAPI_MODEL: "seedance-2.5-intl-omni-reference" }) }));
+vi.mock("@/lib/env", () => ({ env: () => ({ REPLICATE_API_TOKEN: "r".repeat(20), MUAPI_API_KEY: "k".repeat(20), MUAPI_API_BASE_URL: "https://api.muapi.test", MUAPI_MODEL: "seedance-2.5-intl-omni-reference" }) }));
 vi.mock("@/lib/pricing-seedance/settings", async () => ({ seedancePricingSettings: async () => (await import("@/lib/pricing-seedance")).DEFAULT_SEEDANCE_PRICING }));
 
 import { seedanceProvider, buildPrompt, cleanWish } from "@/lib/generation/seedance";
@@ -236,6 +236,25 @@ describe("seedance provider", () => {
     const s2 = await seedanceProvider.getStatus("w-2", { startedAt: null, state: (s1 as { next: { state: Record<string, unknown> } }).next.state });
     expect(s2).toMatchObject({ state: "processing", next: { providerJobId: "fs-2" } });
     expect(calls[4].body).toMatchObject({ video_url: "https://cdn/wan.mp4", image_url: "https://s/1.jpg" }); // exact face from the photo
+    vi.unstubAllGlobals();
+  });
+
+  it("pvr mode: Replicate p-video-replace, all people in one run with position mapping", async () => {
+    const calls: { url: string; body?: unknown }[] = [];
+    const replies = [{ id: "rp-1", status: "starting" }, { status: "processing" }, { status: "succeeded", output: "https://replicate.delivery/out.mp4" }];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      return new Response(JSON.stringify(replies.shift()), { status: 200 });
+    }));
+    const two = [faces[0], { slotKey: "face_2", providerInput: "img_2", imageUrl: "https://s/2.jpg" }];
+    const r = await seedanceProvider.submit({ jobId: "j", ...base, faces: two, config: { mode: "pvr", people: 2, positions: ["the biggest one in the frame", "in the background"], durationSec: 19.9 } });
+    expect(calls[0].url).toBe("https://api.replicate.com/v1/models/prunaai/p-video-replace/predictions");
+    const input = (calls[0].body as { input: { images: string[]; instruction_prompt: string; resolution: string } }).input;
+    expect(input).toMatchObject({ images: ["https://s/1.jpg", "https://s/2.jpg"], resolution: "720p" });
+    expect(input.instruction_prompt).toContain("the person the biggest one in the frame with the person from reference image 1");
+    expect(r.cost).toBeCloseTo(20 * 0.03, 4);
+    expect(await seedanceProvider.getStatus("rp-1", { startedAt: null, state: r.state ?? null })).toEqual({ state: "processing" });
+    expect(await seedanceProvider.getStatus("rp-1", { startedAt: null, state: r.state ?? null })).toEqual({ state: "succeeded", outputUrl: "https://replicate.delivery/out.mp4" });
     vi.unstubAllGlobals();
   });
 
