@@ -13,6 +13,7 @@ import { seedancePriceKzt, seedanceCostKzt, SEEDANCE_QUALITY, type SeedancePrici
 import { FaceMap } from "@/components/face-map";
 import { detectVideoPeople } from "@/lib/uploads/photo-quality";
 import { saveTemplate, changeStatus, createUploadUrl } from "./actions";
+import { DeleteTemplateButton } from "./delete-button";
 
 const e = ru.admin.editor;
 type Status = "draft" | "published" | "disabled" | "archived";
@@ -70,9 +71,10 @@ function goTo(key: string | null) {
 }
 
 export function TemplateEditor({
-  id, initial, status, categories, mediaBase, seedancePricing,
+  id, initial, status, categories, mediaBase, seedancePricing, canDelete = false,
 }: {
   id: string | null;
+  canDelete?: boolean;
   initial: TemplateInput;
   status: Status;
   categories: { id: string; title: string }[];
@@ -387,6 +389,7 @@ export function TemplateEditor({
           {id && status !== "archived" && status !== "published" && (
             <button type="button" disabled={pending} onClick={() => status_("archive")} className="rounded-full px-4 py-2 text-sm font-medium text-muted hover:text-ink">{e.archive}</button>
           )}
+          {id && canDelete && <DeleteTemplateButton id={id} title={t.titleKk || ru.admin.editor.editTitle} full />}
           {id && status === "archived" && (
             <button type="button" disabled={pending} onClick={() => status_("restore")} className="rounded-full border border-line px-4 py-2 text-sm font-medium hover:border-ink">{e.restore}</button>
           )}

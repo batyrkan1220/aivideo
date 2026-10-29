@@ -126,6 +126,46 @@ export async function changeStatus(
   return { ok: true };
 }
 
+export type DeleteResult = { ok: true; mode: "deleted" | "hidden" } | { ok: false; error: "forbidden" | "generic" };
+
+/**
+ * Deletes a template. Without any orders it is removed for good (versions cascade, media files
+ * are removed from storage). With order history it is hidden instead: archived + deleted_at, so it
+ * disappears from the catalog and the admin list while customers' orders stay intact.
+ */
+export async function deleteTemplate(id: string): Promise<DeleteResult> {
+  const user = await guard("templates.publish");
+  if (!user) return { ok: false, error: "forbidden" };
+  if (!z.string().uuid().safeParse(id).success) return { ok: false, error: "generic" };
+  const db = supabaseAdmin();
+  const { data: t } = await db.from("templates").select("id,kind,cover_asset_path,preview_video_path").eq("id", id).maybeSingle();
+  if (!t || t.kind !== "catalog") return { ok: false, error: "generic" };
+
+  const [{ count: orders }, { count: assets }] = await Promise.all([
+    db.from("orders").select("id", { count: "exact", head: true }).eq("template_id", id),
+    db.from("order_assets").select("id", { count: "exact", head: true }).eq("template_id", id),
+  ]);
+  let mode: "deleted" | "hidden";
+  if ((orders ?? 0) + (assets ?? 0) > 0) {
+    const { error } = await db.from("templates")
+      .update({ status: "archived", is_trending: false, deleted_at: new Date().toISOString() }).eq("id", id);
+    if (error) return { ok: false, error: "generic" };
+    mode = "hidden";
+  } else {
+    const { error: e1 } = await db.from("templates").update({ current_version_id: null }).eq("id", id);
+    const { error: e2 } = e1 ? { error: e1 } : await db.from("templates").delete().eq("id", id);
+    if (e2) return { ok: false, error: "generic" };
+    const files = [t.cover_asset_path, t.preview_video_path].filter((p): p is string => !!p && !/^https?:/.test(p));
+    if (files.length) await db.storage.from("template-media").remove(files);
+    mode = "deleted";
+  }
+
+  await audit(user.id, "template.delete", "template", id, { mode });
+  revalidatePath("/admin/templates");
+  revalidatePath("/");
+  return { ok: true, mode };
+}
+
 const uploadSchema = z.object({
   kind: z.enum(["cover", "preview"]),
   contentType: z.enum(["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm"]),

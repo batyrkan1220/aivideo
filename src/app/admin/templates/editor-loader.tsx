@@ -32,7 +32,7 @@ export async function EditorLoader({ id }: { id: string | null }) {
 
   if (!z.string().uuid().safeParse(id).success) notFound();
   const { data: row } = await db.from("templates").select("*").eq("id", id).maybeSingle();
-  if (!row) notFound();
+  if (!row || row.deleted_at) notFound();
 
   return (
     <>
@@ -42,7 +42,7 @@ export async function EditorLoader({ id }: { id: string | null }) {
           {ru.admin.status[row.status as keyof typeof ru.admin.status]}
         </span>
       </div>
-      <TemplateEditor key={row.updated_at} id={id} initial={rowToInput(row)} status={row.status} categories={categories} mediaBase={mediaBase} seedancePricing={seedancePricing} />
+      <TemplateEditor key={row.updated_at} id={id} canDelete={can(u.role, "templates.publish") && row.kind === "catalog" && !row.deleted_at} initial={rowToInput(row)} status={row.status} categories={categories} mediaBase={mediaBase} seedancePricing={seedancePricing} />
     </>
   );
 }

@@ -6,6 +6,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { ButtonLink } from "@/components/ui/button";
+import { DeleteTemplateButton } from "./delete-button";
 
 const STATUS_STYLE: Record<string, string> = {
   draft: "bg-line text-ink",
@@ -36,6 +37,7 @@ async function List() {
   const { data } = await supabaseAdmin().from("templates")
     .select("id,title_kk,status,required_face_count,updated_at,is_trending")
     .eq("kind", "catalog")
+    .is("deleted_at", null)
     .order("updated_at", { ascending: false });
 
   if (!data?.length) {
@@ -70,7 +72,10 @@ async function List() {
               <td className="px-4 py-3">{t.required_face_count}</td>
               <td className="px-4 py-3 text-muted">{fmt.format(new Date(t.updated_at))}</td>
               <td className="px-4 py-3 text-right">
-                <Link href={`/admin/templates/${t.id}`} className="font-semibold text-brand hover:underline">{ru.admin.list.edit}</Link>
+                <div className="flex items-center justify-end gap-4">
+                  <Link href={`/admin/templates/${t.id}`} className="font-semibold text-brand hover:underline">{ru.admin.list.edit}</Link>
+                  {can(u.role, "templates.publish") && <DeleteTemplateButton id={t.id} title={t.title_kk} />}
+                </div>
               </td>
             </tr>
           ))}

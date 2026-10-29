@@ -296,6 +296,12 @@ export const ru = {
       colFaces: "Людей",
       colUpdated: "Изменён",
       edit: "Редактировать",
+      delete: "Удалить",
+      deleteTemplate: "Удалить шаблон",
+      deleting: "Удаляем…",
+      deleteConfirm: (title: string) => `Удалить шаблон «${title}»? Если по нему уже были заказы, он скроется из каталога и админки, а заказы клиентов сохранятся. Отменить нельзя.`,
+      deleted: "Шаблон удалён.",
+      deleteFailed: "Не удалось удалить шаблон.",
     },
     editor: {
       createTitle: "Новый шаблон",
