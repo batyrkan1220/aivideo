@@ -53,8 +53,8 @@ export function CategoryChips({
     return `/${s ? `?${s}` : ""}`;
   };
   const chip = (isActive: boolean) =>
-    `shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
-      isActive ? "border-ink bg-ink text-white" : "border-line bg-white hover:border-ink"
+    `shrink-0 rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition-colors active:scale-95 sm:px-4 sm:py-2 sm:text-sm sm:font-medium ${
+      isActive ? "border-brand bg-brand text-white shadow-sm shadow-brand/30" : "border-line bg-white text-ink hover:border-ink"
     }`;
   return (
     <nav aria-label={kk.nav.categories} className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">

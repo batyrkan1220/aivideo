@@ -36,9 +36,11 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
       </section>
 
       {/* Phone intro: one line, then straight to the videos */}
-      <section className="mx-auto max-w-6xl px-4 pt-4 md:hidden">
-        <div className="tg-only mb-3"><Logo className="text-lg" /></div>
-        <h1 className="font-display text-xl font-extrabold leading-tight tracking-tight">{kk.home.title}</h1>
+      <section className="mx-auto max-w-6xl px-4 pt-3 md:hidden">
+        <div className="tg-only mb-2"><Logo className="text-base" /></div>
+        <h1 className="text-balance font-display text-[17px] font-extrabold leading-snug tracking-tight">
+          {titleHead} <span className="text-brand">{titleTail}</span>
+        </h1>
       </section>
 
       <Suspense fallback={<div className="mx-auto mt-4 max-w-6xl px-4"><GridSkeleton /></div>}>
@@ -47,6 +49,11 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
     </main>
   );
 }
+
+// The last two words of the title are highlighted on phones ("… өзіңді қос").
+const titleWords = kk.home.title.split(" ");
+const titleHead = titleWords.slice(0, -2).join(" ");
+const titleTail = titleWords.slice(-2).join(" ");
 
 function HowItWorks({ compact = false }: { compact?: boolean }) {
   return (
@@ -72,7 +79,7 @@ async function Feed({ searchParams }: { searchParams: Promise<SP> }) {
     <div className="mx-auto max-w-6xl px-4">
       {/* Sticky category chips, like an app's filter bar */}
       {categories.length > 0 && (
-        <div className="under-header sticky z-20 -mx-4 bg-paper/95 px-4 py-3 backdrop-blur">
+        <div className="under-header sticky z-20 -mx-4 bg-paper/95 px-4 py-2.5 backdrop-blur sm:py-3">
           <CategoryChips categories={categories} active={category} />
         </div>
       )}
