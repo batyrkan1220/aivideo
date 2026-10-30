@@ -68,7 +68,7 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
 
   const awaitingPayment = ["pending", "failed", "cancelled"].includes(o.payment_status) && o.generation_status === "awaiting_payment";
   const priceBox = (
-      <section className="rounded-card bg-[linear-gradient(135deg,#3a2490,#14121c)] p-5 text-white ring-1 ring-white/10 sm:p-6">
+      <section className="rounded-card bg-surface p-5 text-white ring-1 ring-white/10 sm:p-6">
         <dl className="space-y-2 text-sm">
           <Line label={kk.pricing.videoPrice} value={formatKzt(price.basePriceKzt)} />
           {price.qualitySurchargeKzt > 0 && <Line label={kk.pricing.quality} value={`+${formatKzt(price.qualitySurchargeKzt)}`} />}

@@ -29,7 +29,7 @@ export function HeroShowcase({ items }: { items: Item[] }) {
           <Link
             key={t.id}
             href={`/templates/${t.id}`}
-            className={`absolute aspect-[9/16] h-[18rem] overflow-hidden rounded-[1.4rem] border-[5px] sm:h-[22rem] sm:rounded-[1.75rem] sm:border-[6px] md:h-[26rem] border-surface bg-night shadow-[0_24px_60px_-20px_rgba(91,61,245,0.55)] transition-transform duration-300 hover:-translate-y-1 ${pose(i, order.length)}`}
+            className={`absolute aspect-[9/16] h-[18rem] overflow-hidden rounded-[1.4rem] border-[5px] sm:h-[22rem] sm:rounded-[1.75rem] sm:border-[6px] md:h-[26rem] border-surface bg-night shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)] transition-transform duration-300 hover:-translate-y-1 ${pose(i, order.length)}`}
           >
             {t.coverUrl && (
               // eslint-disable-next-line @next/next/no-img-element

@@ -110,7 +110,7 @@ async function Inner({ params }: { params: Promise<{ paymentId: string }> }) {
           <p className="text-sm font-semibold">{kk.tole.simulateTitle}</p>
           <input type="hidden" name="paymentId" value={pay.id} />
           <div className="mt-3 flex gap-2">
-            <button name="status" value="paid" className="h-10 flex-1 rounded-full bg-brand text-sm font-semibold text-white">{kk.tole.simulatePaid}</button>
+            <button name="status" value="paid" className="h-10 flex-1 rounded-full bg-brand text-sm font-semibold text-night">{kk.tole.simulatePaid}</button>
             <button name="status" value="failed" className="h-10 flex-1 rounded-full border border-line text-sm font-semibold">{kk.tole.simulateFailed}</button>
           </div>
           <p className="mt-2 text-xs text-muted">{kk.tole.simulateDone}</p>

@@ -21,7 +21,7 @@ export async function OrderList({ limit = 50 }: { limit?: number }) {
     return (
       <div className="py-8 text-center">
         <p className="text-sm text-muted">{kk.account.ordersEmpty}</p>
-        <Link href="/" className="mt-4 inline-flex h-11 items-center rounded-full bg-brand px-6 text-sm font-semibold text-white hover:bg-brand-dark">
+        <Link href="/" className="mt-4 inline-flex h-11 items-center rounded-full btn-glow px-6 text-sm font-semibold">
           {kk.myVideos.browse}
         </Link>
       </div>

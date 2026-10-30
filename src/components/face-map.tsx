@@ -16,7 +16,7 @@ export function FaceMap({ slots, mediaBase }: { slots: FaceSlot[]; mediaBase?: s
             <div className="relative aspect-[3/4] overflow-hidden rounded-xl border-2 border-brand bg-paper">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={slotPreviewSrc(s.previewImagePath, mediaBase)!} alt={kk.upload.personInVideo(i + 1)} className="h-full w-full object-cover" />
-              <span className="absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">{i + 1}</span>
+              <span className="absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-brand text-xs font-bold text-night">{i + 1}</span>
             </div>
           </li>
         ))}

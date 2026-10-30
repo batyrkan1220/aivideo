@@ -5,7 +5,9 @@ import { listCategories, listTemplates } from "@/lib/templates/queries";
 import { CategoryChips, GridSkeleton, pickCard } from "@/components/catalog-bits";
 import { VideoFeed } from "@/components/video-feed";
 import { HeroShowcase } from "@/components/hero-showcase";
+import Link from "next/link";
 import { Logo } from "@/components/logo";
+import { AutoVideo } from "@/components/auto-video";
 import { resolveShowcase } from "@/lib/templates/showcase";
 
 type SP = { account?: string; category?: string };
@@ -35,12 +37,18 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
         </div>
       </section>
 
-      {/* Phone intro: one line, then straight to the videos */}
+      {/* Phones / Mini App: brand bar (Telegram hides the site header), then a hero banner */}
       <section className="mx-auto max-w-6xl px-4 pt-3 md:hidden">
-        <div className="tg-only mb-2"><Logo className="text-base" /></div>
-        <h1 className="text-balance font-display text-[19px] font-extrabold leading-snug tracking-tight">
-          {titleHead} <span className="text-gradient">{titleTail}</span>
-        </h1>
+        <div className="tg-only">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <Logo className="text-base" />
+            <Link href="/create" className="btn-promo inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold">🔥 {kk.home.promo}</Link>
+          </div>
+        </div>
+        <h1 className="sr-only">{kk.home.title}</h1>
+        <Suspense fallback={<div className="h-56 animate-pulse rounded-[24px] bg-surface" />}>
+          <HeroBanner />
+        </Suspense>
       </section>
 
       <Suspense fallback={<div className="mx-auto mt-4 max-w-6xl px-4"><GridSkeleton /></div>}>
@@ -50,17 +58,12 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
   );
 }
 
-// The last two words of the title are highlighted on phones ("… өзіңді қос").
-const titleWords = kk.home.title.split(" ");
-const titleHead = titleWords.slice(0, -2).join(" ");
-const titleTail = titleWords.slice(-2).join(" ");
-
 function HowItWorks({ compact = false }: { compact?: boolean }) {
   return (
     <ol className={compact ? "no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 text-xs" : "mt-8 grid max-w-xl grid-cols-3 gap-4 text-sm"}>
       {kk.home.steps.map((s, i) => (
         <li key={s.t} className={compact ? "flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full bg-surface py-1.5 pl-1.5 pr-3 ring-1 ring-line" : "border-t-2 border-ink pt-3"}>
-          <span className={compact ? "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-white" : "font-display text-2xl font-bold text-brand"}>{i + 1}</span>
+          <span className={compact ? "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-night" : "font-display text-2xl font-bold text-brand"}>{i + 1}</span>
           <span className={compact ? "font-medium" : "mt-1 block font-semibold"}>{compact ? s.short : s.t}</span>
         </li>
       ))}
@@ -78,8 +81,9 @@ async function Feed({ searchParams }: { searchParams: Promise<SP> }) {
   return (
     <div className="mx-auto max-w-6xl px-4">
       {/* Sticky category chips, like an app's filter bar */}
+      <h2 className="section-title mt-5 text-muted md:hidden">{kk.home.templatesTitle}</h2>
       {categories.length > 0 && (
-        <div className="under-header sticky z-20 -mx-4 bg-paper/80 px-4 py-2.5 backdrop-blur-xl sm:py-3">
+        <div className="under-header sticky z-20 -mx-4 bg-paper/85 px-4 py-2.5 backdrop-blur-xl sm:py-3">
           <CategoryChips categories={categories} active={category} />
         </div>
       )}
@@ -114,4 +118,27 @@ async function Notice({ searchParams }: { searchParams: Promise<SP> }) {
 async function Showcase() {
   const items = (await resolveShowcase()).map(({ id, title, coverUrl, previewUrl }) => ({ id, title, coverUrl, previewUrl }));
   return <HeroShowcase items={items} />;
+}
+
+/** Phone hero: the main showcase template as a rounded banner with a "Try it" button. */
+async function HeroBanner() {
+  const [t] = await resolveShowcase();
+  if (!t) return null;
+  return (
+    <Link href={`/templates/${t.id}`} className="relative block h-56 overflow-hidden rounded-[24px] bg-night ring-1 ring-white/10">
+      {t.previewUrl ? (
+        <AutoVideo src={t.previewUrl} poster={t.coverUrl ?? undefined} className="absolute inset-0 h-full w-full object-cover" />
+      ) : t.coverUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={t.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+      ) : null}
+      <span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/85 via-black/45 to-transparent" />
+      <span className="absolute inset-y-0 left-0 flex max-w-[70%] flex-col justify-end gap-2 p-4 text-white">
+        <span className="section-title text-brand">{kk.home.heroEyebrow}</span>
+        <span className="text-2xl font-extrabold leading-tight tracking-tight">{t.title}</span>
+        <span className="text-[13px] leading-snug text-white/75">{kk.home.title}</span>
+        <span className="btn-glow mt-1 inline-flex h-10 w-fit items-center rounded-full px-5 text-sm font-bold">{kk.home.tryIt}</span>
+      </span>
+    </Link>
+  );
 }

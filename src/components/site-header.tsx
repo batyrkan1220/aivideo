@@ -14,6 +14,7 @@ export function SiteHeader() {
           <Logo className="text-lg" />
         </Link>
         <div className="ml-auto flex items-center gap-2">
+          <Link href="/create" className="btn-promo inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold sm:hidden">🔥 {kk.home.promo}</Link>
           <Suspense fallback={<div className="h-10 w-20" />}>
             <AccountNav />
           </Suspense>
@@ -29,7 +30,7 @@ async function AccountNav() {
     return (
       <>
         <Link href="/login" className="rounded-full px-3 py-2 text-sm font-medium hover:bg-brand-soft">{kk.nav.login}</Link>
-        <ButtonLink href="/signup" className="hidden sm:inline-flex">{kk.auth.signup}</ButtonLink>
+        <span className="hidden sm:block"><ButtonLink href="/signup">{kk.auth.signup}</ButtonLink></span>
       </>
     );
   }

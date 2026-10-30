@@ -18,7 +18,7 @@ export function DownloadVideo({ orderId }: { orderId: string }) {
   const href = `/api/orders/${orderId}/video?download=1`;
 
   if (!inTg) {
-    return <a href={href} className={`${btn} bg-brand text-white hover:bg-brand-dark`}>{r.download}</a>;
+    return <a href={href} className={`${btn} btn-glow text-night`}>{r.download}</a>;
   }
 
   const sendToChat = async () => {

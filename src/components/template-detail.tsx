@@ -47,7 +47,7 @@ export function TemplateDetailView({ t, cta }: { t: TemplateDetail; cta?: React.
     <div className="mt-3 grid gap-5 md:mt-6 md:grid-cols-[minmax(0,360px)_1fr] md:gap-12">
       {/* On phones the sample is capped so the photo step stays close; the title sits on the video. */}
       <figure className="mx-auto w-full max-w-[min(100%,calc(52svh*9/16))] md:sticky md:top-24 md:max-w-none md:self-start">
-        <div className="relative aspect-[9/16] overflow-hidden rounded-[1.75rem] bg-night shadow-[0_30px_80px_-24px_rgba(139,108,255,0.65)] ring-1 ring-white/10">
+        <div className="relative aspect-[9/16] overflow-hidden rounded-[1.75rem] bg-night shadow-[0_30px_80px_-30px_rgba(212,255,50,0.35)] ring-1 ring-white/10">
           {t.previewUrl ? (
             <AutoVideo src={t.previewUrl} poster={t.coverUrl ?? undefined} soundToggle preferSound className="h-full w-full object-cover" />
           ) : t.coverUrl ? (

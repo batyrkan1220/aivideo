@@ -20,7 +20,7 @@ export type CardData = {
  * Keeps at most MAX_PLAYING previews running at once across the whole page: starting a new
  * one pauses the oldest. Many cards on screen then never decode/stream videos in parallel.
  */
-const MAX_PLAYING = 9; // 3 columns × 3 rows on a phone screen
+const MAX_PLAYING = 6; // 2 columns × 3 rows on a phone screen
 const playingNow: HTMLVideoElement[] = [];
 function claimPlayback(v: HTMLVideoElement) {
   const i = playingNow.indexOf(v);
@@ -105,7 +105,7 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
       onFocus={start}
       onBlur={stop}
     >
-      <div className="relative aspect-[9/16] overflow-hidden rounded-2xl bg-night ring-1 ring-white/10 transition-transform duration-200 group-active:scale-[0.97] sm:rounded-card">
+      <div className="relative aspect-[9/16] overflow-hidden rounded-[20px] bg-night ring-1 ring-white/10 transition-transform duration-200 group-active:scale-[0.97]">
         {t.coverUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -129,21 +129,20 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
           />
         )}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
-        <div className="absolute left-1.5 top-1.5 flex flex-col items-start gap-1 sm:left-3 sm:top-3 sm:gap-1.5">
+        <div className="absolute left-2.5 top-2.5 flex flex-col items-start gap-1.5 sm:left-3 sm:top-3">
           {t.isTrending && (
-            <span className="rounded-full bg-flash px-1.5 py-0.5 text-[10px] font-bold text-night sm:px-2.5 sm:py-1 sm:text-xs">{kk.catalog2.trendBadge}</span>
+            <span className="rounded-full bg-brand px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-night">{kk.catalog2.trendBadge}</span>
           )}
-          {/* Phones (3 columns): a compact "👤 2"; wider screens: the full "2 бет фотосы". */}
-          <span className="flex items-center gap-0.5 rounded-full bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm sm:px-2.5 sm:py-1 sm:text-xs sm:font-medium" aria-label={kk.catalog.faces(t.faceCount)}>
-            <svg viewBox="0 0 24 24" className="h-3 w-3 sm:hidden" fill="currentColor" aria-hidden><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm-8.5 9a8.5 8.5 0 0 1 17 0z" /></svg>
-            <span className="sm:hidden">{t.faceCount}</span>
-            <span className="hidden sm:inline">{kk.catalog.faces(t.faceCount)}</span>
+          {/* Number of face photos the template needs. */}
+          <span className="flex items-center gap-1 rounded-full bg-black/55 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-md" aria-label={kk.catalog.faces(t.faceCount)}>
+            <svg viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor" aria-hidden><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm-8.5 9a8.5 8.5 0 0 1 17 0z" /></svg>
+            <span>{t.faceCount}</span>
           </span>
         </div>
-        <div className="absolute inset-x-1.5 bottom-1.5 text-white sm:inset-x-3 sm:bottom-3">
-          <h3 className="line-clamp-2 font-display text-[11px] font-semibold leading-tight sm:text-base sm:leading-snug">{t.title}</h3>
+        <div className="absolute inset-x-3 bottom-3 text-white">
+          <h3 className="line-clamp-2 text-[15px] font-bold leading-tight tracking-tight sm:text-base">{t.title}</h3>
           {t.startingPriceKzt !== null && (
-            <p className="mt-0.5 text-[11px] font-medium text-white/90 sm:mt-1 sm:text-sm sm:font-normal">
+            <p className="mt-1 text-[12px] font-semibold text-brand sm:text-sm">
               {formatKzt(t.startingPriceKzt)}<span className="hidden sm:inline"> {kk.catalog.from}</span>
             </p>
           )}

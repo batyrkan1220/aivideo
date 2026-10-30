@@ -6,7 +6,7 @@ import { TemplateCard, type CardData } from "./template-card";
 /** mobileLimit: on phones only the first N cards are shown (hidden cards never load video). */
 export function TemplateGrid({ items, priorityCount = 0, mobileLimit }: { items: CardData[]; priorityCount?: number; mobileLimit?: number }) {
   return (
-    <ul className="grid grid-cols-3 gap-1.5 sm:gap-4 lg:grid-cols-4">
+    <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
       {items.map((t, i) => (
         <li key={t.id} className={mobileLimit !== undefined && i >= mobileLimit ? "max-sm:hidden" : undefined}>
           <TemplateCard t={pickCard(t)} priority={i < priorityCount} />
@@ -83,9 +83,9 @@ export function SectionHeading({ title, href }: { title: string; href?: string }
 
 export function GridSkeleton({ count = 8 }: { count?: number }) {
   return (
-    <ul className="grid grid-cols-3 gap-1.5 sm:gap-4 lg:grid-cols-4" aria-busy="true" aria-label={kk.common.loading}>
+    <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4" aria-busy="true" aria-label={kk.common.loading}>
       {Array.from({ length: count }).map((_, i) => (
-        <li key={i} className="aspect-[9/16] animate-pulse rounded-xl bg-line sm:rounded-card" />
+        <li key={i} className="aspect-[9/16] animate-pulse rounded-[20px] bg-surface" />
       ))}
     </ul>
   );

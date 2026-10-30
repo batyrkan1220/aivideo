@@ -25,7 +25,7 @@ export default function CreateOwnPage() {
       <ol className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 text-xs">
         {cv.steps.map((s, i) => (
           <li key={s} className="flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full bg-surface py-1.5 pl-1.5 pr-3 ring-1 ring-line">
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-white">{i + 1}</span>
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-night">{i + 1}</span>
             <span className="font-medium">{s}</span>
           </li>
         ))}

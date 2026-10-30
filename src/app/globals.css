@@ -10,7 +10,8 @@
 @theme {
   --color-paper: #fafafc;
   --color-surface: #ffffff;
-  --color-night: #14121c;
+  --color-night: #111113;
+  --color-coral: #ff453a;
   --color-ink: #1e1b2e;
   --color-muted: #6b6880;
   --color-line: #e6e4ee;
@@ -56,48 +57,55 @@ html[data-tg] .tg-only { display: block; }
 .under-header { top: calc(4rem + env(safe-area-inset-top)); }
 html[data-tg] .under-header { top: 0; }
 
-/* ── Premium dark theme for the customer site and the Telegram Mini App ──────────────
-   Only the subtree with .theme-dark is dark (the admin stays light). Same token names,
-   so every component follows. */
+/* ── Dark "Neo-Glow" theme for the customer site and the Telegram Mini App ──────────
+   Deep black, card surfaces #1C1C1E, neon lime (#D4FF32) for actions and the active tab,
+   coral red (#FF453A) for promos. Scoped to .theme-dark (the admin stays light). */
 .theme-dark {
-  --color-paper: #0b0a10;
-  --color-surface: #16141f;
-  --color-ink: #f4f2fb;
-  --color-muted: #9d99b4;
-  --color-line: #2a2638;
-  --color-brand: #8b6cff;
-  --color-brand-dark: #7152ff;
-  --color-brand-soft: #221b3f;
-  --color-danger: #ff5f7e;
-  --color-success: #34d9a5;
+  --color-paper: #0b0b0b;
+  --color-surface: #1c1c1e;
+  --color-ink: #ffffff;
+  --color-muted: #8e8e93;
+  --color-line: #2c2c2e;
+  --color-brand: #d4ff32;
+  --color-brand-dark: #c2ee1f;
+  --color-brand-soft: #23280f;
+  --color-coral: #ff453a;
+  --color-danger: #ff453a;
+  --color-success: #30d158;
+  --color-flash: #ff453a;
+  --font-display: "Inter Variable", system-ui, -apple-system, "SF Pro Display", sans-serif;
   color-scheme: dark;
-  background-image:
-    radial-gradient(60rem 28rem at 50% -12rem, rgba(139, 108, 255, 0.22), transparent 70%),
-    radial-gradient(30rem 20rem at 100% 0, rgba(214, 76, 255, 0.10), transparent 70%);
-  background-repeat: no-repeat;
 }
-body:has(> .theme-dark:not(.fixed)) { background: #0b0a10; }
-.theme-dark ::selection { background: rgba(139, 108, 255, 0.45); }
+body:has(> .theme-dark:not(.fixed)) { background: #0b0b0b; }
+.theme-dark ::selection { background: rgba(212, 255, 50, 0.35); color: #0b0b0b; }
+.theme-dark :focus-visible { outline-color: #d4ff32; }
 
-/* Primary action: violet → magenta gradient with a soft glow. */
+/* Primary action: neon lime with black text (beats text-white utilities on purpose). */
 .btn-glow {
-  background-image: linear-gradient(135deg, #7b5cff 0%, #a64dff 55%, #d84cf0 100%);
-  box-shadow: 0 10px 28px -10px rgba(150, 90, 255, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  background: #d4ff32;
+  color: #0b0b0b !important;
+  box-shadow: 0 8px 26px -10px rgba(212, 255, 50, 0.55);
   transition: filter 0.15s, transform 0.15s;
 }
-.btn-glow:hover { filter: brightness(1.08); }
+.btn-glow:hover { filter: brightness(1.05); }
+.btn-glow * { border-color: rgba(11, 11, 11, 0.25); }
 
-/* Gradient headline text. */
-.text-gradient {
-  background-image: linear-gradient(90deg, #b9a4ff 0%, #ff8ad8 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+/* Promo pill (coral). */
+.btn-promo {
+  background: #ff453a;
+  color: #fff;
+  box-shadow: 0 8px 22px -10px rgba(255, 69, 58, 0.7);
 }
+
+/* Accent text. */
+.text-gradient { color: #d4ff32; }
+
+/* Uppercase section titles. */
+.section-title { font-size: 0.8rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
 
 /* Frosted glass for floating bars. */
 .glass {
-  background: color-mix(in srgb, var(--color-surface) 72%, transparent);
+  background: color-mix(in srgb, var(--color-surface) 82%, transparent);
   -webkit-backdrop-filter: blur(20px) saturate(160%);
   backdrop-filter: blur(20px) saturate(160%);
 }

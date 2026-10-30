@@ -51,7 +51,7 @@ async function Inner({ params }: { params: Promise<{ paymentId: string }> }) {
         </dl>
         <form action={completeSandboxPayment} className="mt-5 space-y-3">
           <input type="hidden" name="paymentId" value={pay.id} />
-          <button name="outcome" value="succeeded" className={`${btn} bg-brand text-white hover:bg-brand-dark`}>{kk.sandbox.succeed}</button>
+          <button name="outcome" value="succeeded" className={`${btn} btn-glow text-night`}>{kk.sandbox.succeed}</button>
           <button name="outcome" value="failed" className={`${btn} border border-line hover:border-ink`}>{kk.sandbox.fail}</button>
           <button name="outcome" value="cancelled" className={`${btn} text-muted hover:text-ink`}>{kk.sandbox.cancel}</button>
         </form>
