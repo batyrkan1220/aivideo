@@ -45,18 +45,10 @@ async function Body({ searchParams }: { searchParams: Promise<SP> }) {
         ))}
       </div>
 
-      <section className="mt-4 rounded-[24px] bg-night p-5 text-white">
+      <section className="mt-4 rounded-[24px] bg-night px-5 py-4 text-white">
         <span className="section-title text-lime">{head.eyebrow}</span>
-        <h1 className="mt-1.5 text-[26px] font-extrabold leading-tight tracking-tight">{head.title}</h1>
+        <h1 className="mt-1 text-[24px] font-extrabold leading-tight tracking-tight">{head.title}</h1>
         <p className="mt-1.5 text-sm text-white/70">{head.lead}</p>
-        <ol className="mt-4 grid grid-cols-3 gap-2 text-[12px]">
-          {head.steps.map((s, i) => (
-            <li key={s} className="rounded-2xl bg-white/10 p-2.5">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#d4ff32] text-[11px] font-extrabold text-black">{i + 1}</span>
-              <span className="mt-1.5 block font-semibold leading-snug">{s}</span>
-            </li>
-          ))}
-        </ol>
       </section>
 
       <div className="mt-4">{type === "photo" ? <PhotoFlow /> : <VideoFlow />}</div>
