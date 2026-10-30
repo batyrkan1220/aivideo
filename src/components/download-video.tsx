@@ -12,13 +12,14 @@ const btn = "inline-flex h-12 items-center justify-center gap-2 rounded-full px-
  *  - always in Telegram: the bot sends the video into the chat, where it can be saved to the gallery.
  * In a normal browser it is the usual download link.
  */
-export function DownloadVideo({ orderId }: { orderId: string }) {
+export function DownloadVideo({ orderId, photo = false }: { orderId: string; photo?: boolean }) {
+  const label = photo ? kk.photos.download : r.download;
   const inTg = useSyncExternalStore(() => () => {}, () => !!launchInitData(), () => false);
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error" | "too_large">("idle");
   const href = `/api/orders/${orderId}/video?download=1`;
 
   if (!inTg) {
-    return <a href={href} className={`${btn} btn-glow text-night`}>{r.download}</a>;
+    return <a href={href} className={`${btn} btn-glow text-night`}>{label}</a>;
   }
 
   const sendToChat = async () => {
@@ -58,7 +59,7 @@ export function DownloadVideo({ orderId }: { orderId: string }) {
           {state === "sending" ? <><span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden />{r.sending}</> : <>✈️ {r.sendToChat}</>}
         </button>
         <button type="button" onClick={nativeDownload} className={`${btn} flex-1 border border-line bg-surface text-ink`}>
-          ⬇️ {r.download}
+          ⬇️ {label}
         </button>
       </div>
       <p className={`text-sm ${state === "sent" ? "font-medium text-success" : state === "error" || state === "too_large" ? "text-danger" : "text-muted"}`} aria-live="polite">

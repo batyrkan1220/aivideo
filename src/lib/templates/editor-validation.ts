@@ -28,6 +28,8 @@ export const M = {
   jsonInvalid: "Ошибка в настройках провайдера.",
   uploadSize: "От 1 до 10 МБ.",
   promptLong: "Текст — не больше 1500 символов.",
+  exampleMissing: "Для публикации загрузите пример фото.",
+  photoPriceMissing: "Укажите цену фото.",
 } as const;
 
 const KEY_RE = /^[a-z0-9_]+$/;
@@ -44,7 +46,7 @@ export function parseConfig(text: string): Record<string, unknown> | null {
   }
 }
 
-export function validateTemplateForm(t: TemplateInput, configText: string, forPublish: boolean): FieldErrors {
+export function validateTemplateForm(t: TemplateInput, configText: string, forPublish: boolean, photo = false): FieldErrors {
   const e: FieldErrors = {};
   const title = t.titleKk.trim();
   if (!title) e.titleKk = M.required;
@@ -52,7 +54,9 @@ export function validateTemplateForm(t: TemplateInput, configText: string, forPu
   else if (title.length > 120) e.titleKk = M.titleLong;
   if (t.descriptionKk.length > 1000) e.descriptionKk = M.descLong;
 
-  if (forPublish && !t.previewVideoPath) e.preview = M.previewMissing;
+  if (forPublish && !photo && !t.previewVideoPath) e.preview = M.previewMissing;
+  if (forPublish && photo && !t.coverAssetPath) e.cover = M.exampleMissing;
+  if (photo && forPublish && !(t.pricing.basePriceKzt > 0)) e["pricing.basePriceKzt"] = M.photoPriceMissing;
 
   const keys = new Map<string, number>();
   t.qualities.forEach((q, i) => {

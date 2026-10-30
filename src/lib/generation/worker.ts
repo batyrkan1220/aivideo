@@ -154,7 +154,9 @@ async function submitJob(job: Job) {
     durationSec: Number(snap.video_duration_sec ?? snap.user_video_duration_sec) || null,
     ...(typeof snap.customer_wish === "string" ? { wish: snap.customer_wish } : {}),
   };
-  const input = { templateVideoUrl, faces, quality, config };
+  // Photo templates: the template's example photo (cover) is the composition reference.
+  const templateFrameUrl = mediaUrl((snap.cover_asset_path as string) ?? null);
+  const input = { templateVideoUrl, templateFrameUrl, faces, quality, config };
 
   const problems = provider.validateInputs(input);
   if (problems.length) return failJob(job, "invalid_inputs", { safe_error_message: safeMessage("invalid_inputs") });
@@ -239,16 +241,14 @@ async function finalize(job: Job, outputUrl: string, cost?: number) {
     return retryLater("output_download_failed");
   }
   if (!bytes.byteLength || bytes.byteLength > MAX_OUTPUT_BYTES) return failJob(job, "output_invalid");
-  const isMp4 = bytes.length > 12 && String.fromCharCode(...bytes.slice(4, 8)) === "ftyp";
-  const isWebm = bytes.length > 4 && bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3;
-  if (!isMp4 && !isWebm) return failJob(job, "output_invalid");
+  const kind = mediaKind(bytes);
+  if (!kind) return failJob(job, "output_invalid");
 
   const { data: order } = await db.from("orders").select("user_id,template_snapshot_json").eq("id", job.order_id).single();
   if (!order) return failJob(job, "order_missing");
-  const ext = isMp4 ? "mp4" : "webm";
-  const path = `${order.user_id}/${job.order_id}.${ext}`;
+  const path = `${order.user_id}/${job.order_id}.${kind.ext}`;
   const { error: upErr } = await db.storage.from("generated-videos")
-    .upload(path, bytes, { contentType: isMp4 ? "video/mp4" : "video/webm", upsert: true });
+    .upload(path, bytes, { contentType: kind.type, upsert: true });
   if (upErr) return retryLater("output_store_failed");
 
   const quality = (order.template_snapshot_json as { quality?: { resolution?: string } }).quality;
@@ -266,4 +266,14 @@ async function finalize(job: Job, outputUrl: string, cost?: number) {
   await notifyOrderOwner(job.order_id, "ready");
   await notifyAdmins(job.order_id, "ready");
   await track("generation_succeeded", { userId: order.user_id, orderId: job.order_id });
+}
+
+/** Output file type by its magic bytes: videos (MP4/WebM) and, for photo templates, images. */
+function mediaKind(b: Uint8Array): { ext: string; type: string } | null {
+  if (b.length > 12 && String.fromCharCode(...b.slice(4, 8)) === "ftyp") return { ext: "mp4", type: "video/mp4" };
+  if (b.length > 4 && b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3) return { ext: "webm", type: "video/webm" };
+  if (b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return { ext: "jpg", type: "image/jpeg" };
+  if (b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return { ext: "png", type: "image/png" };
+  if (b.length > 12 && String.fromCharCode(...b.slice(0, 4)) === "RIFF" && String.fromCharCode(...b.slice(8, 12)) === "WEBP") return { ext: "webp", type: "image/webp" };
+  return null;
 }

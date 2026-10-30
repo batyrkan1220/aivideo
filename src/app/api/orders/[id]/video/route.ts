@@ -17,11 +17,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const { data: v } = await db.from("generated_videos").select("private_storage_path,expires_at").eq("order_id", id).maybeSingle();
   if (!v || new Date(v.expires_at).getTime() < Date.now()) return new NextResponse(null, { status: 410 });
   const download = new URL(req.url).searchParams.has("download");
+  const ext = (/\.([a-z0-9]{3,4})$/i.exec(v.private_storage_path)?.[1] ?? "mp4").toLowerCase();
   const { data: signed } = await db.storage.from("generated-videos").createSignedUrl(v.private_storage_path, 300,
-    download ? { download: `${o.public_order_number}.mp4` } : undefined);
+    download ? { download: `${o.public_order_number}.${ext}` } : undefined);
   if (!signed) return new NextResponse(null, { status: 500 });
   if (download) await track("video_downloaded", { userId: user.id, orderId: id });
   // The Telegram Mini App downloads through Telegram's own downloadFile(), which needs the direct URL.
-  if (new URL(req.url).searchParams.has("json")) return NextResponse.json({ url: signed.signedUrl, fileName: `${o.public_order_number}.mp4` }, { headers: { "cache-control": "no-store" } });
+  if (new URL(req.url).searchParams.has("json")) return NextResponse.json({ url: signed.signedUrl, fileName: `${o.public_order_number}.${ext}` }, { headers: { "cache-control": "no-store" } });
   return NextResponse.redirect(signed.signedUrl, { headers: { "cache-control": "no-store" } });
 }

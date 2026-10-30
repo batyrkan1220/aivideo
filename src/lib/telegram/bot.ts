@@ -97,4 +97,23 @@ export async function sendVideoFile(chatId: number, file: Blob, fileName: string
   }
 }
 
+/** Sends a photo as a document (original quality, can be saved). */
+export async function sendPhotoFile(chatId: number, file: Blob, fileName: string, caption?: string): Promise<boolean> {
+  const token = env().TELEGRAM_BOT_TOKEN;
+  if (!token) return false;
+  try {
+    const fd = new FormData();
+    fd.set("chat_id", String(chatId));
+    if (caption) fd.set("caption", caption);
+    fd.set("document", file, fileName);
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, { method: "POST", body: fd, signal: AbortSignal.timeout(60_000), cache: "no-store" });
+    const body = (await res.json().catch(() => null)) as { ok?: boolean; error_code?: number } | null;
+    if (!body?.ok) { console.error(JSON.stringify({ src: "telegram", event: "api_error", method: "sendDocument", code: body?.error_code ?? res.status })); return false; }
+    return true;
+  } catch {
+    console.error(JSON.stringify({ src: "telegram", event: "api_unreachable", method: "sendDocument" }));
+    return false;
+  }
+}
+
 export const escapeHtml = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);

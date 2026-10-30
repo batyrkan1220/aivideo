@@ -7,6 +7,7 @@ import { env } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { faceSlotSchema, qualitySchema, pricingConfigSchema, orderedSlots, type FaceSlot, type Quality } from "./schema";
 import { startingPrice } from "@/lib/pricing";
+import { PHOTO_PROVIDER, PHOTO_QUALITY } from "./photo-config";
 import { seedancePriceKzt, applySeedancePricing, DEFAULT_SEEDANCE_PRICING, type SeedancePricing } from "@/lib/pricing-seedance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { ensureTemplateDuration } from "./duration";
@@ -49,6 +50,8 @@ export type TemplateDetail = TemplateCard & {
   allowWish: boolean;
   /** swap = face swap only (no wish), scene = Seedance + face swap. */
   seedanceMode: SeedanceMode;
+  /** What the customer gets: a video (Kling video) or a photo (Kling image). */
+  media: "video" | "photo";
 };
 
 const CARD_COLUMNS =
@@ -91,6 +94,10 @@ export function parseRow(r: Row, seedancePricing: SeedancePricing = DEFAULT_SEED
     qualities = { success: true, data: eff.qualities } as typeof parsedQ;
     pricing = { success: true, data: eff.pricing } as typeof parsedP;
     priced = price !== null;
+  } else if (r.provider_key === PHOTO_PROVIDER) {
+    // Photo: one quality (2K), the admin's fixed price.
+    qualities = { success: true, data: [PHOTO_QUALITY] } as typeof parsedQ;
+    priced = parsedP.data.basePriceKzt > 0;
   } else if (r.provider_key !== "dev") {
     priced = false; // a provider this build does not run (e.g. old Akool rows) is never sold
   }
@@ -115,8 +122,9 @@ export function parseRow(r: Row, seedancePricing: SeedancePricing = DEFAULT_SEED
     durationSec: r.video_duration_sec == null ? null : Number(r.video_duration_sec),
     priced,
     photoFraming: r.photo_framing === "face" || r.photo_framing === "full" ? r.photo_framing : "half",
-    allowWish: ["scene", "kling", "k4", "kd"].includes(parseSeedanceMode(r.seedance_mode)) && r.allow_wish !== "false",
+    allowWish: (r.provider_key === PHOTO_PROVIDER || ["scene", "kling", "k4", "kd"].includes(parseSeedanceMode(r.seedance_mode))) && r.allow_wish !== "false",
     seedanceMode: parseSeedanceMode(r.seedance_mode),
+    media: r.provider_key === PHOTO_PROVIDER ? "photo" : "video",
   };
 }
 
@@ -152,13 +160,14 @@ function sanitizeSearch(q: string) {
   return q.replace(/[%_,()*\\:."']/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
 }
 
-export async function listTemplates(opts: { q?: string; category?: string; sort?: CatalogSort; page?: number }) {
+export async function listTemplates(opts: { q?: string; category?: string; sort?: CatalogSort; page?: number; media?: "video" | "photo" }) {
   await connection(); // request-time only: never run during prerender
   const page = Math.max(1, opts.page ?? 1);
   const from = (page - 1) * PAGE_SIZE;
   const cols = opts.category ? CARD_COLUMNS.replace("categories(", "categories!inner(") : CARD_COLUMNS;
   let query = supabasePublic().from("templates").select(cols, { count: "exact" }).eq("status", "published").eq("kind", "catalog");
 
+  query = opts.media === "photo" ? query.eq("provider_key", PHOTO_PROVIDER) : query.neq("provider_key", PHOTO_PROVIDER);
   if (opts.category) query = query.eq("categories.slug", opts.category);
   const q = opts.q ? sanitizeSearch(opts.q) : "";
   if (q) query = query.or(`title_kk.ilike.%${q}%,description_kk.ilike.%${q}%`);
@@ -175,14 +184,14 @@ export async function listTemplates(opts: { q?: string; category?: string; sort?
 export async function listTrending(limit = 8) {
   await connection(); // request-time only: never run during prerender
   const { data } = await supabasePublic().from("templates").select(CARD_COLUMNS)
-    .eq("status", "published").eq("kind", "catalog").eq("is_trending", true).order("sort_order").limit(limit);
+    .eq("status", "published").eq("kind", "catalog").neq("provider_key", PHOTO_PROVIDER).eq("is_trending", true).order("sort_order").limit(limit);
   return await toCards(data as unknown as Row[]);
 }
 
 export async function listNewest(limit = 8) {
   await connection(); // request-time only: never run during prerender
   const { data } = await supabasePublic().from("templates").select(CARD_COLUMNS)
-    .eq("status", "published").eq("kind", "catalog").order("published_at", { ascending: false, nullsFirst: false }).limit(limit);
+    .eq("status", "published").eq("kind", "catalog").neq("provider_key", PHOTO_PROVIDER).order("published_at", { ascending: false, nullsFirst: false }).limit(limit);
   return await toCards(data as unknown as Row[]);
 }
 

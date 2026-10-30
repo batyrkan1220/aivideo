@@ -18,6 +18,7 @@ import { parseSeedanceConfig, seedanceSlots, SEEDANCE_MAX_PEOPLE, SEEDANCE_MIN_S
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { ensureTemplateDuration } from "@/lib/templates/duration";
 import { cleanWish } from "@/lib/generation/seedance";
+import { isPhotoProvider, parsePhotoConfig } from "@/lib/templates/photo-config";
 import { mediaUrl } from "@/lib/templates/queries";
 
 type Fail<E extends string> = { ok: false; error: E | "unauthorized" | "generic" };
@@ -227,7 +228,15 @@ export async function createOrder(raw: unknown): Promise<
     if (new Date(a.expires_at).getTime() < now) return { ok: false, error: "photos_expired" };
   }
 
-  if (tv.snapshot.provider_key !== "seedance" && tv.snapshot.provider_key !== "dev") return { ok: false, error: "template_unavailable" };
+  const photo = isPhotoProvider(tv.snapshot.provider_key as string);
+  if (tv.snapshot.provider_key !== "seedance" && tv.snapshot.provider_key !== "dev" && !photo) return { ok: false, error: "template_unavailable" };
+  if (photo) {
+    // Photo templates: the admin's fixed price; the customer may add a wish.
+    if (!(tv.pricing.basePriceKzt > 0)) return { ok: false, error: "template_unavailable" };
+    const cfg = parsePhotoConfig(tv.snapshot.provider_config_json);
+    const wish = cfg.allowWish ? cleanWish(p.data.wish) : "";
+    if (wish) snapshotExtra = { ...snapshotExtra, customer_wish: wish };
+  }
   // Seedance: one quality (720p), price from the reference video length (or a manual template price).
   let pricing = tv.pricing;
   let qualities = tv.qualities;

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { faceSlotSchema, qualitySchema, pricingConfigSchema, validateFaceSlots, autoFaceSlots } from "./schema";
 import { parseSeedanceConfig, seedanceSlots, SEEDANCE_MIN_SEC, maxSecFor } from "./seedance-config";
+import { parsePhotoConfig, photoSlots, PHOTO_PROVIDER, PHOTO_QUALITY } from "./photo-config";
 
 /** Everything an admin can edit on a template. Validated on the server on every save. */
 export const templateInputSchema = z.object({
@@ -24,12 +25,16 @@ export type TemplateInput = z.infer<typeof templateInputSchema>;
 export type PublishProblem =
   | "missing_cover" | "missing_preview" | "invalid_face_slots" | "no_available_quality"
   | "duplicate_quality_key" | "missing_provider" | "price_out_of_range"
-  | "bad_duration";
+  | "bad_duration" | "missing_example" | "missing_price";
 
 /** A template may be published only when it is complete and coherent. durationSec = template video length. */
 export function publishProblems(t: TemplateInput, durationSec?: number | null): PublishProblem[] {
   const p: PublishProblem[] = [];
-  if (!t.previewVideoPath) p.push("missing_preview");
+  const photo = t.providerKey === PHOTO_PROVIDER;
+  if (photo) {
+    if (!t.coverAssetPath) p.push("missing_example");
+    if (!(t.pricing.basePriceKzt > 0)) p.push("missing_price");
+  } else if (!t.previewVideoPath) p.push("missing_preview");
   if (validateFaceSlots(t.faceSlots, t.faceSlots.length).length) p.push("invalid_face_slots");
   if (!t.qualities.some((q) => q.available)) p.push("no_available_quality");
   if (new Set(t.qualities.map((q) => q.key)).size !== t.qualities.length) p.push("duplicate_quality_key");
@@ -97,10 +102,16 @@ export function inputToRow(t: TemplateInput) {
   //  - others: automatic left → right layout, face_1..face_N.
   let slots = autoFaceSlots(t.faceSlots.length);
   let config = t.providerConfig;
+  let qualities = t.qualities;
   if (t.providerKey === "seedance") {
     const cfg = parseSeedanceConfig(t.providerConfig);
     config = cfg;
     slots = seedanceSlots(cfg.people, "face_", cfg.labels);
+  } else if (t.providerKey === PHOTO_PROVIDER) {
+    const cfg = parsePhotoConfig(t.providerConfig);
+    config = cfg;
+    slots = photoSlots(cfg.people, cfg.labels);
+    qualities = [PHOTO_QUALITY];
   }
   return {
     title_kk: t.titleKk,
@@ -113,7 +124,7 @@ export function inputToRow(t: TemplateInput) {
     preview_video_path: t.previewVideoPath,
     required_face_count: slots.length,
     face_slots_json: slots,
-    supported_qualities_json: t.qualities,
+    supported_qualities_json: qualities,
     pricing_config_json: t.pricing,
     provider_key: t.providerKey,
     provider_config_json: config,

@@ -91,6 +91,7 @@ async function CreateSection({ t }: { t: TemplateDetail }) {
       freeOrders={await isFreeOrderUser(user.id)}
       framing={t.photoFraming}
       allowWish={t.allowWish}
+      media={t.media}
     />
   );
 }

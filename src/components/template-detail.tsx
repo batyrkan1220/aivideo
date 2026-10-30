@@ -55,7 +55,7 @@ export function TemplateDetailView({ t, cta }: { t: TemplateDetail; cta?: React.
             <img src={t.coverUrl} alt="" className="h-full w-full object-cover" />
           ) : null}
           <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-night">
-            {kk.catalog.sample}
+            {t.media === "photo" ? kk.photos.sample : kk.catalog.sample}
           </span>
           <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 pt-16 text-white md:hidden">
             <p className="font-display text-xl font-bold leading-tight">{t.title}</p>

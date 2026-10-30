@@ -14,6 +14,7 @@ import { FaceMap } from "@/components/face-map";
 import { detectVideoPeople } from "@/lib/uploads/photo-quality";
 import { saveTemplate, changeStatus, createUploadUrl } from "./actions";
 import { DeleteTemplateButton } from "./delete-button";
+import { parsePhotoConfig, photoSlots, PHOTO_ASPECTS, PHOTO_MAX_PEOPLE, PHOTO_PROVIDER, PHOTO_QUALITY, type PhotoConfig } from "@/lib/templates/photo-config";
 
 const e = ru.admin.editor;
 type Status = "draft" | "published" | "disabled" | "archived";
@@ -96,14 +97,19 @@ export function TemplateEditor({
   }, [t.previewVideoPath, mediaBase]);
   const [sd, setSdState] = useState<SeedanceConfig>(() =>
     parseSeedanceConfig(initial.providerKey === "seedance" ? initial.providerConfig : {}));
+  // Template type: video (Kling 4.0 video) or photo (Kling image model).
+  const [kind, setKind] = useState<"video" | "photo">(initial.providerKey === PHOTO_PROVIDER ? "photo" : "video");
+  const [ph, setPhState] = useState<PhotoConfig>(() => parsePhotoConfig(initial.providerKey === PHOTO_PROVIDER ? initial.providerConfig : {}));
+  const setPh = (patch: Partial<PhotoConfig>) => { setPhState((p) => ({ ...p, ...patch })); setDirty(true); };
+  const isPhoto = kind === "photo";
   const [dirty, setDirty] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string; problems?: PublishProblem[] } | null>(null);
   const [pending, start] = useTransition();
   // Errors appear after the first save/publish attempt and then update live as the admin types.
   const [mode, setMode] = useState<null | "save" | "publish">(null);
 
-  const configText = JSON.stringify(sd);
-  const errors: FieldErrors = mode ? validateTemplateForm(t, configText, mode === "publish") : {};
+  const configText = JSON.stringify(isPhoto ? ph : sd);
+  const errors: FieldErrors = mode ? validateTemplateForm(t, configText, mode === "publish", isPhoto) : {};
   const err = (k: string) => errors[k];
   const errorCount = Object.keys(errors).length;
 
@@ -132,11 +138,11 @@ export function TemplateEditor({
   };
 
   // Customer photo slots = the number of people to replace, left → right (the server derives them too).
-  const slots = seedanceSlots(sd.people, "face_", sd.labels);
+  const slots = isPhoto ? photoSlots(ph.people, ph.labels) : seedanceSlots(sd.people, "face_", sd.labels);
 
   /** Client check first (shows red fields), then the authoritative server save. */
   const persist = async (forPublish: boolean): Promise<string | null> => {
-    const found = validateTemplateForm(t, configText, forPublish);
+    const found = validateTemplateForm(t, configText, forPublish, isPhoto);
     if (Object.keys(found).length) {
       setMode(forPublish ? "publish" : "save");
       setMsg({ kind: "err", text: forPublish ? e.fixBeforePublish : e.fixBeforeSave });
@@ -146,12 +152,14 @@ export function TemplateEditor({
     const sent = slots.length ? slots : autoFaceSlots(1);
     // Older templates without a cover: make one from the video now.
     let cover = t.coverAssetPath;
-    if (!cover && t.previewVideoPath) {
+    if (!cover && t.previewVideoPath && !isPhoto) {
       const blob = await captureCover(`${mediaBase}/${t.previewVideoPath}`);
       cover = blob ? await uploadCover(blob) : null;
       if (cover) set("coverAssetPath", cover);
     }
-    const payload = { ...t, coverAssetPath: cover, providerKey: "seedance", providerConfig: sd, faceSlots: sent };
+    const payload = isPhoto
+      ? { ...t, coverAssetPath: cover, previewVideoPath: null, providerKey: PHOTO_PROVIDER, providerConfig: ph, faceSlots: sent, qualities: [PHOTO_QUALITY] }
+      : { ...t, coverAssetPath: cover, providerKey: "seedance", providerConfig: sd, faceSlots: sent };
     const r = await saveTemplate(payload, id);
     if (!r.ok) {
       setMsg({ kind: "err", text: r.error === "forbidden" ? ru.admin.forbidden : r.error === "invalid" ? e.invalid : ru.errors.generic });
@@ -202,6 +210,14 @@ export function TemplateEditor({
       <p className="text-xs text-muted">{e.requiredNote}</p>
 
       <Section title={e.sections.basics}>
+        <div className="mb-4 inline-flex rounded-full border border-line p-1" role="radiogroup" aria-label={e.kind}>
+          {(["video", "photo"] as const).map((k) => (
+            <button key={k} type="button" role="radio" aria-checked={kind === k} onClick={() => { setKind(k); setDirty(true); }}
+              className={`rounded-full px-4 py-1.5 text-sm font-semibold ${kind === k ? "bg-ink text-white" : "text-muted hover:text-ink"}`}>
+              {e.kindOptions[k]}
+            </button>
+          ))}
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={e.title} field="titleKk" required error={err("titleKk")} className="sm:col-span-2">
             <input className={inputCls(err("titleKk"))} aria-invalid={!!err("titleKk")} value={t.titleKk} maxLength={120} onChange={(ev) => set("titleKk", ev.target.value)} />
@@ -229,9 +245,52 @@ export function TemplateEditor({
       </Section>
 
       <Section title={e.sections.media}>
-        <VideoField error={err("preview")} path={t.previewVideoPath} mediaBase={mediaBase} onUploaded={(p) => { set("previewVideoPath", p); void detectPeople(p); }} onCover={(p) => set("coverAssetPath", p)} />
+        {isPhoto
+          ? <PhotoExampleField error={err("cover")} path={t.coverAssetPath} mediaBase={mediaBase} onUploaded={(p) => set("coverAssetPath", p)} />
+          : <VideoField error={err("preview")} path={t.previewVideoPath} mediaBase={mediaBase} onUploaded={(p) => { set("previewVideoPath", p); void detectPeople(p); }} onCover={(p) => set("coverAssetPath", p)} />}
       </Section>
 
+      {isPhoto ? (
+      <Section title={e.photo.title}>
+        <p className="text-sm text-muted">{e.photo.intro}</p>
+        <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_minmax(0,320px)]">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label={e.seedance.people}>
+              <select className={inputCls()} value={ph.people} onChange={(ev) => setPh({ people: Number(ev.target.value) })}>
+                {Array.from({ length: PHOTO_MAX_PEOPLE }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </Field>
+            <Field label={e.photo.aspect}>
+              <select className={inputCls()} value={ph.aspectRatio} onChange={(ev) => setPh({ aspectRatio: ev.target.value as PhotoConfig["aspectRatio"] })}>
+                {PHOTO_ASPECTS.map((k) => <option key={k} value={k}>{k}</option>)}
+              </select>
+            </Field>
+            {ph.people > 1 && (
+              <div className="grid gap-2 sm:col-span-2">
+                <span className="text-sm font-medium">{e.seedance.labels}</span>
+                {Array.from({ length: ph.people }, (_, i) => (
+                  <input key={i} className={inputCls()} maxLength={40} placeholder={`${i + 1}-й человек (слева)`} value={ph.labels[i] ?? ""}
+                    onChange={(ev) => { const l = [...ph.labels]; while (l.length < ph.people) l.push(""); l[i] = ev.target.value; setPh({ labels: l.slice(0, ph.people) }); }} />
+                ))}
+              </div>
+            )}
+            <label className="flex items-start gap-2 text-sm sm:col-span-2">
+              <input type="checkbox" className="mt-0.5 h-4 w-4 accent-brand" checked={ph.useExample} onChange={(ev) => setPh({ useExample: ev.target.checked })} />
+              <span>{e.photo.useExample}<span className="block text-xs text-muted">{e.photo.useExampleHint}</span></span>
+            </label>
+            <Field label={e.photo.prompt} field="seedance.prompt" error={err("seedance.prompt")} className="sm:col-span-2">
+              <textarea className={`${inputCls(err("seedance.prompt"))} min-h-24`} value={ph.prompt} maxLength={2000} placeholder={e.photo.promptPlaceholder} onChange={(ev) => setPh({ prompt: ev.target.value })} />
+              <span className="mt-1 block text-xs text-muted">{e.photo.promptHint}</span>
+            </Field>
+            <label className="flex items-center gap-2 text-sm sm:col-span-2">
+              <input type="checkbox" className="h-4 w-4 accent-brand" checked={ph.allowWish} onChange={(ev) => setPh({ allowWish: ev.target.checked })} />
+              {e.seedance.allowWish}
+            </label>
+          </div>
+          {slots.length > 0 && <FaceMap slots={slots} mediaBase={mediaBase} />}
+        </div>
+      </Section>
+      ) : (
       <Section title={e.seedance.title}>
         <p className="text-sm text-muted">{e.seedance.intro}</p>
         <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_minmax(0,320px)]">
@@ -300,8 +359,16 @@ export function TemplateEditor({
           {slots.length > 0 && <FaceMap slots={slots} mediaBase={mediaBase} />}
         </div>
       </Section>
+      )}
 
       <Section title={e.sections.pricing}>
+        {isPhoto ? (
+        <div className="rounded-xl bg-brand-soft p-4">
+          <p className="text-sm font-semibold">{e.pricePreview}</p>
+          <p className="mt-1 font-display text-3xl font-bold">{t.pricing.basePriceKzt > 0 ? formatKzt(calculatePrice({ ...t.pricing, chargeExtraFaces: false }, PHOTO_QUALITY, Math.max(1, slots.length)).totalKzt) : "—"}</p>
+          <p className="mt-1 text-sm text-muted">{e.photo.priceHint(formatKzt(Math.round(seedancePricing.photoCostUsd * seedancePricing.tengePerUsd)))}</p>
+        </div>
+        ) : (
         <div className="rounded-xl bg-brand-soft p-4">
           <p className="text-sm font-semibold">{e.pricePreview}</p>
           <p className="mt-1 font-display text-3xl font-bold">
@@ -316,6 +383,7 @@ export function TemplateEditor({
           </p>
           {autoPrice !== null && costKzt !== null && <p className={`mt-1 text-sm font-medium ${autoPrice - costKzt >= 0 ? "text-success" : "text-danger"}`}>{e.profit(formatKzt(autoPrice - costKzt))}</p>}
         </div>
+        )}
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <Field label={e.basePrice} field="pricing.basePriceKzt" required error={err("pricing.basePriceKzt")}>
             <Num value={t.pricing.basePriceKzt} min={0} error={err("pricing.basePriceKzt")} onChange={(v) => setPricing({ basePriceKzt: v as number })} />
@@ -452,6 +520,51 @@ async function uploadCover(blob: Blob): Promise<string | null> {
   const { error } = await supabaseBrowser().storage.from("template-media")
     .uploadToSignedUrl(r.path, r.token, blob, { contentType: "image/jpeg" });
   return error ? null : r.path;
+}
+
+/** Example photo for a photo template: re-encoded to a JPEG (max 1600 px) and stored as the cover. */
+async function uploadExamplePhoto(file: File): Promise<string | null> {
+  try {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale);
+    c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height);
+    bmp.close();
+    const blob = await new Promise<Blob | null>((res) => c.toBlob(res, "image/jpeg", 0.9));
+    return blob ? await uploadCover(blob) : null;
+  } catch {
+    return null;
+  }
+}
+
+function PhotoExampleField({ error, path, mediaBase, onUploaded }: { error?: string; path: string | null; mediaBase: string; onUploaded: (p: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const url = path ? (/^https?:/.test(path) ? path : `${mediaBase}/${path}`) : null;
+  const onFile = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true); setFailed(false);
+    const p = await uploadExamplePhoto(file);
+    setBusy(false);
+    if (p) onUploaded(p); else setFailed(true);
+  };
+  return (
+    <div data-field="cover" className="flex flex-wrap items-start gap-4">
+      <div className="flex aspect-[3/4] w-40 items-center justify-center overflow-hidden rounded-xl border border-line bg-paper">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {url ? <img src={url} alt="" className="h-full w-full object-cover" /> : <span className="px-3 text-center text-xs text-muted">{ru.admin.editor.photo.noExample}</span>}
+      </div>
+      <div className="min-w-0 flex-1 space-y-2 text-sm">
+        <p className="text-muted">{ru.admin.editor.photo.exampleHint}</p>
+        <label className="inline-flex cursor-pointer items-center rounded-full border border-ink px-4 py-2 font-semibold hover:bg-ink hover:text-white">
+          {busy ? ru.admin.editor.uploading : url ? ru.admin.editor.replace : ru.admin.editor.upload}
+          <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={busy} onChange={(ev) => { void onFile(ev.target.files?.[0]); ev.target.value = ""; }} />
+        </label>
+        {(failed || error) && <p className="text-danger" role="alert">{failed ? ru.admin.editor.uploadFailed : error}</p>}
+      </div>
+    </div>
+  );
 }
 
 const VIDEO_TYPES = ["video/mp4", "video/webm"];

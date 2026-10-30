@@ -19,6 +19,8 @@ export const seedancePricingSchema = z.object({
   klingUnitUsd: z.number().min(0).max(10).default(0.14),
   /** Units per counted second (template video + result), Kling 4.0 720p. */
   klingUnitsPerSec: z.number().min(0).max(10).default(0.6),
+  /** Estimated Kling cost of one photo (image model, 2K), $. */
+  photoCostUsd: z.number().min(0).max(10).default(0.1),
 });
 export type SeedancePricing = z.infer<typeof seedancePricingSchema>;
 export const DEFAULT_SEEDANCE_PRICING: SeedancePricing = seedancePricingSchema.parse({});

@@ -8,7 +8,7 @@ import { loadMoreVideos } from "@/app/(site)/home-actions";
  * Endless video feed: shows the first page, then loads the next page automatically when the
  * end of the list comes into view. Cards themselves load video lazily (see TemplateCard).
  */
-export function VideoFeed({ title, category, initial, initialHasMore, exclude = [], priorityCount = 0 }: { title?: string; category?: string; initial: CardData[]; initialHasMore: boolean; exclude?: string[]; priorityCount?: number }) {
+export function VideoFeed({ title, category, initial, initialHasMore, exclude = [], priorityCount = 0, media = "video" }: { title?: string; category?: string; initial: CardData[]; initialHasMore: boolean; exclude?: string[]; priorityCount?: number; media?: "video" | "photo" }) {
   const [items, setItems] = useState(initial);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(initialHasMore);
@@ -23,7 +23,7 @@ export function VideoFeed({ title, category, initial, initialHasMore, exclude = 
       if (!e.isIntersecting || loading) return;
       setLoading(true);
       try {
-        const next = await loadMoreVideos(page + 1, category);
+        const next = await loadMoreVideos(page + 1, category, media);
         setItems((prev) => {
           const seen = new Set(prev.map((x) => x.id));
           return [...prev, ...next.items.filter((x) => !seen.has(x.id))];
@@ -38,7 +38,7 @@ export function VideoFeed({ title, category, initial, initialHasMore, exclude = 
     }, { rootMargin: "600px 0px" });
     io.observe(el);
     return () => io.disconnect();
-  }, [page, hasMore, loading, category]);
+  }, [page, hasMore, loading, category, media]);
 
   const shown = items.filter((t) => !skip.has(t.id));
   if (!shown.length && !hasMore) return null;

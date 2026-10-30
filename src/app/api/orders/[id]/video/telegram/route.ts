@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseServer, supabaseAdmin } from "@/lib/supabase/server";
-import { sendVideoFile, botConfigured } from "@/lib/telegram/bot";
+import { sendVideoFile, sendPhotoFile, botConfigured } from "@/lib/telegram/bot";
 import { track } from "@/lib/analytics";
 
 const MAX_BYTES = 50 * 1024 * 1024; // Bot API upload limit
@@ -30,7 +30,11 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   if (blob.size > MAX_BYTES) return NextResponse.json({ ok: false, error: "too_large" }, { status: 413 });
 
   const title = (o.template_snapshot_json as { title_kk?: string } | null)?.title_kk ?? "TrendMe";
-  const ok = await sendVideoFile(Number(p.telegram_id), new Blob([blob], { type: "video/mp4" }), `${o.public_order_number}.mp4`, `🎬 ${title} · TrendMe`);
+  const ext = (/\.([a-z0-9]{3,4})$/i.exec(v.private_storage_path)?.[1] ?? "mp4").toLowerCase();
+  const isPhoto = ["jpg", "jpeg", "png", "webp"].includes(ext);
+  const ok = isPhoto
+    ? await sendPhotoFile(Number(p.telegram_id), new Blob([blob], { type: blob.type || "image/jpeg" }), `${o.public_order_number}.${ext}`, `📸 ${title} · TrendMe`)
+    : await sendVideoFile(Number(p.telegram_id), new Blob([blob], { type: "video/mp4" }), `${o.public_order_number}.mp4`, `🎬 ${title} · TrendMe`);
   if (!ok) return NextResponse.json({ ok: false, error: "failed" }, { status: 502 });
   await track("video_downloaded", { userId: user.id, orderId: id });
   return NextResponse.json({ ok: true });

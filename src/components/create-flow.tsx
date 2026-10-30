@@ -83,7 +83,7 @@ function readVideoDuration(url: string): Promise<number | null> {
 }
 
 export function CreateFlow({
-  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, freeOrders = false, customVideo, seedancePricing, allowWish = false, seedanceMode = "wan",
+  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, freeOrders = false, customVideo, seedancePricing, allowWish = false, seedanceMode = "wan", media = "video",
 }: {
   templateId: string;
   slots: FaceSlot[];
@@ -106,6 +106,8 @@ export function CreateFlow({
   allowWish?: boolean;
   /** Template mode: face swap only or Seedance scene + face swap (custom-video price). */
   seedanceMode?: "swap" | "scene" | "kling" | "wan" | "pvr" | "k4" | "kd";
+  /** What the customer gets: a video or (photo templates) a photo. */
+  media?: "video" | "photo";
   /** What photo the template needs (face / waist-up / full body); "auto" = like the person in the video. */
   framing?: Framing;
 }) {
@@ -453,7 +455,7 @@ export function CreateFlow({
             </button>
           </div>
           <p className="mt-1 min-h-4 text-center text-xs text-danger" aria-live="polite">
-            {formError ?? (blocker && blocker !== "consent" ? <span className="text-muted">{hint}</span> : !blocker ? <span className="text-muted">{c.afterPayShort}</span> : "")}
+            {formError ?? (blocker && blocker !== "consent" ? <span className="text-muted">{hint}</span> : !blocker ? <span className="text-muted">{media === "photo" ? kk.photos.afterPayShort : c.afterPayShort}</span> : "")}
           </p>
         </div>
       )}

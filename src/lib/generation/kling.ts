@@ -108,6 +108,74 @@ export async function getKlingTask(id: string): Promise<ProviderJobStatus & { vi
   return { state: status === "submitted" ? "queued" : "processing" };
 }
 
+// ---------------------------------------------------------------- photos (omni-image)
+
+/**
+ * Kling image model (official API): POST /v1/images/omni-image
+ *   { model_name: "kling-image-o1", prompt (refs as <<<image_N>>>), image_list: [{image: url}], resolution, n, aspect_ratio }
+ *   → { code: 0, data: { task_id, task_status } }
+ * GET /v1/images/omni-image/{id} → data.task_status: submitted|processing|succeed|failed,
+ *   task_result.images[{url}], task_status_msg.
+ */
+export async function submitKlingImage(o: { photoUrls: string[]; exampleUrl: string | null; prompt: string; aspectRatio: string; resolution?: string }): Promise<string> {
+  const image_list = [...o.photoUrls, ...(o.exampleUrl ? [o.exampleUrl] : [])].map((image) => ({ image }));
+  const d = await call<{ data?: { task_id?: string; task_status?: string } }>("/v1/images/omni-image", {
+    method: "POST",
+    body: JSON.stringify({ model_name: "kling-image-o1", prompt: o.prompt.slice(0, 2400), image_list, resolution: o.resolution ?? "2k", n: 1, aspect_ratio: o.aspectRatio }),
+  });
+  const id = d.data?.task_id;
+  if (!id) throw new ProviderError("provider_bad_response", false, "no task_id");
+  console.log("[kling] image task", id, d.data?.task_status ?? "");
+  return String(id);
+}
+
+export async function getKlingImageTask(id: string): Promise<ProviderJobStatus> {
+  const d = await call<{ data?: { task_status?: string; task_status_msg?: string; task_result?: { images?: { url?: string }[] }; billing?: unknown; final_unit_deduction?: unknown } }>(
+    `/v1/images/omni-image/${encodeURIComponent(id)}`);
+  const t = d.data;
+  const status = String(t?.task_status ?? "");
+  if (status === "succeed" || status === "succeeded") {
+    const url = t?.task_result?.images?.find((x) => x.url)?.url;
+    if (!url) return { state: "failed", errorCode: "provider_no_output", retryable: false };
+    console.log("[kling] image task", id, "succeeded", `billing=${JSON.stringify(t?.billing ?? t?.final_unit_deduction ?? null)}`);
+    return { state: "succeeded", outputUrl: url };
+  }
+  if (status === "failed") {
+    const reason = String(t?.task_status_msg ?? "").slice(0, 300);
+    console.error("[kling] image task failed", id, reason);
+    const content = /risk|sensitive|policy|moderat|safety|inappropriate|violat/i.test(reason);
+    return { state: "failed", errorCode: content ? "provider_content_rejected" : "provider_failed", retryable: false };
+  }
+  return { state: status === "submitted" ? "queued" : "processing" };
+}
+
+/** Startup check: does our key work for the image API? Logs the status only. */
+export async function klingImageProbe(): Promise<string> {
+  try {
+    await call("/v1/images/omni-image?pageNum=1&pageSize=1");
+    return "ok";
+  } catch (err) {
+    return err instanceof ProviderError ? `${err.code} ${err.message}`.slice(0, 200) : "error";
+  }
+}
+
+/** Photo prompt: the customer (exactly as in their photo) placed into the example photo / scene. */
+export function buildKlingPhotoPrompt(o: { people: number; useExample: boolean; adminPrompt: string; wish: string }): string {
+  const refs = Array.from({ length: o.people }, (_, i) => `<<<image_${i + 1}>>>`);
+  const ex = `<<<image_${o.people + 1}>>>`;
+  const who = o.people === 1 ? `the person from ${refs[0]}` : refs.map((r, i) => `person ${i + 1} from ${r}`).join(", ");
+  const parts = [
+    o.useExample
+      ? `Recreate the photo ${ex}: keep its scene, background, composition, pose, camera angle, lighting, colors and clothing style, but the ${o.people === 1 ? "person" : "people"} in it must be ${who}.`
+      : `A photorealistic photo of ${who}.`,
+    o.adminPrompt ? `Scene and style: ${o.adminPrompt}` : "",
+    o.wish ? `Customer wish: ${o.wish}` : "",
+    `Identity: each person must look 100% identical to their reference photo (${refs.join(", ")}): the same face, facial features, face shape, eyes, nose, lips, teeth, skin tone, moles, hairstyle, hair color, age and body proportions. Do not beautify, stylize or change the face.`,
+    "Photorealistic, natural skin texture, sharp focus, high detail.",
+  ];
+  return parts.filter(Boolean).join("\n");
+}
+
 type KlingBilling = { charge_type?: string; amount?: string; currency?: string; package_type?: string; list_price?: string };
 const billingText = (b?: KlingBilling[]) =>
   (b ?? []).map((x) => (x.charge_type === "unit" ? `${x.amount} units` : `${x.amount} ${x.currency ?? ""}`.trim())).join("+") || "n/a";

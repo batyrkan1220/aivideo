@@ -13,16 +13,16 @@ const items: Item[] = [
     icon: <svg viewBox="0 0 24 24" {...stroke}><rect x="4" y="3" width="16" height="18" rx="4" /><path d="m10 9 5 3-5 3z" fill="currentColor" /></svg>,
   },
   {
-    href: "/orders", label: kk.nav.tabGallery, match: (p) => p.startsWith("/orders"),
-    icon: <svg viewBox="0 0 24 24" {...stroke}><rect x="3" y="3" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="3" width="7.5" height="7.5" rx="2" /><rect x="3" y="13.5" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2" /></svg>,
+    href: "/photos", label: kk.nav.tabPhoto, match: (p) => p.startsWith("/photos"),
+    icon: <svg viewBox="0 0 24 24" {...stroke}><rect x="3" y="4" width="18" height="16" rx="4" /><circle cx="9" cy="10" r="2" /><path d="m21 16-5-5-8 8" /></svg>,
   },
   {
     href: "/create", label: kk.nav.tabCreate, match: (p) => p.startsWith("/create"),
     icon: <svg viewBox="0 0 24 24" {...stroke} strokeWidth={2.2}><rect x="3" y="3" width="18" height="18" rx="6" /><path d="M12 8v8M8 12h8" /></svg>,
   },
   {
-    href: "/support", label: kk.nav.tabHelp, match: (p) => p.startsWith("/support"),
-    icon: <svg viewBox="0 0 24 24" {...stroke}><path d="M4 12a8 8 0 1 1 3.3 6.5L4 20l1.3-3.5A8 8 0 0 1 4 12z" /><path d="M9.8 9.6a2.3 2.3 0 1 1 3.2 2.1c-.6.3-1 .8-1 1.5v.3M12 16.4h.01" /></svg>,
+    href: "/orders", label: kk.nav.tabGallery, match: (p) => p.startsWith("/orders"),
+    icon: <svg viewBox="0 0 24 24" {...stroke}><rect x="3" y="3" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="3" width="7.5" height="7.5" rx="2" /><rect x="3" y="13.5" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2" /></svg>,
   },
   {
     href: "/account", label: kk.nav.tabAccount, match: (p) => p.startsWith("/account"),

@@ -48,8 +48,9 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
   const [{ data: job }, { data: video }] = await Promise.all([
     db.from("generation_jobs").select("status,progress,safe_error_message")
       .eq("order_id", o.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
-    db.from("generated_videos").select("expires_at").eq("order_id", o.id).maybeSingle(),
+    db.from("generated_videos").select("expires_at,private_storage_path").eq("order_id", o.id).maybeSingle(),
   ]);
+  const isPhoto = /\.(jpe?g|png|webp)$/i.test(video?.private_storage_path ?? "");
   const paths = (assets ?? []).map((a) => a.private_storage_path);
   const { data: signed } = paths.length
     ? await db.storage.from("user-uploads").createSignedUrls(paths, 300)
@@ -146,20 +147,23 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
       )}
       {o.generation_status === "completed" && (
         <section className="rounded-card border border-line bg-surface p-5 sm:p-6">
-          <h2 className="font-display text-xl font-bold">{kk.result.ready}</h2>
+          <h2 className="font-display text-xl font-bold">{isPhoto ? kk.photos.ready : kk.result.ready}</h2>
           {video && notExpired(video.expires_at) ? (
             <>
-              <video
+              {isPhoto ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={`/api/orders/${o.id}/video`} alt={kk.photos.watch} className="mt-4 w-full max-w-sm rounded-card bg-night object-contain" />
+              ) : <video
                 src={`/api/orders/${o.id}/video`}
                 controls
                 playsInline
                 preload="metadata"
                 aria-label={kk.result.watch}
                 className="mt-4 aspect-[9/16] w-full max-w-sm rounded-card bg-night"
-              />
+              />}
               <p className="mt-3 text-sm text-muted">{kk.result.keptUntil(dateFmt.format(new Date(video.expires_at)))}</p>
               <div className="mt-4 flex flex-wrap items-center gap-3">
-                <DownloadVideo orderId={o.id} />
+                <DownloadVideo orderId={o.id} photo={isPhoto} />
                 <form action={deleteVideo}>
                   <input type="hidden" name="orderId" value={o.id} />
                   <ConfirmSubmit message={kk.result.deleteVideoConfirm} className="h-12 rounded-full px-4 text-sm font-medium text-muted hover:text-danger">
