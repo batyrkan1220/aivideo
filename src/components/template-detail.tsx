@@ -45,7 +45,7 @@ export function TemplateDetailView({ t, cta }: { t: TemplateDetail; cta?: React.
   return (
     <div className="mt-3 grid gap-5 md:mt-6 md:grid-cols-[minmax(0,360px)_1fr] md:gap-12">
       {/* On phones the sample is capped so the photo step stays close; the title sits on the video. */}
-      <figure className="mx-auto w-full max-w-[min(100%,calc(52svh*9/16))] md:sticky md:top-24 md:max-w-none md:self-start">
+      <figure className="mx-auto w-full max-w-[min(100%,calc(60svh*9/16))] md:sticky md:top-24 md:max-w-none md:self-start">
         <div className="relative aspect-[9/16] overflow-hidden rounded-[1.75rem] bg-night shadow-[0_24px_60px_-24px_rgba(0,0,0,0.35)] ring-1 ring-black/5">
           {t.previewUrl ? (
             <AutoVideo src={t.previewUrl} poster={t.coverUrl ?? undefined} soundToggle preferSound className="h-full w-full object-cover" />
@@ -56,14 +56,6 @@ export function TemplateDetailView({ t, cta }: { t: TemplateDetail; cta?: React.
           <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-night">
             {t.media === "photo" ? kk.photos.sample : kk.catalog.sample}
           </span>
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 pt-16 text-white md:hidden">
-            <p className="font-display text-xl font-bold leading-tight">{t.title}</p>
-            <p className="mt-2 flex flex-wrap gap-1.5 text-xs">
-              {t.startingPriceKzt !== null && <span className="rounded-full bg-surface px-2.5 py-1 font-bold text-ink">{formatKzt(t.startingPriceKzt)}</span>}
-              <span className="rounded-full bg-white/20 px-2.5 py-1 font-medium backdrop-blur-sm">{kk.catalog.faces(t.faceCount)}</span>
-              {t.isTrending && <span className="rounded-full bg-flash px-2.5 py-1 font-bold text-night">{kk.catalog2.trendBadge}</span>}
-            </p>
-          </div>
         </div>
         <figcaption className="mt-3 hidden text-sm text-muted md:block">{kk.template.sampleNote}</figcaption>
       </figure>
@@ -86,11 +78,32 @@ export function TemplateDetailView({ t, cta }: { t: TemplateDetail; cta?: React.
             {t.isTrending && <span className="rounded-full bg-flash px-3 py-1.5 font-bold text-night">{kk.catalog2.trendBadge}</span>}
           </div>
         </div>
-        <h1 className="sr-only md:hidden">{t.title}</h1>
-        {t.description && <p className="max-w-prose text-muted md:mt-5 md:text-lg">{t.description}</p>}
+        {/* Phones: title, facts and how it works, right under the sample */}
+        <div className="md:hidden">
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="text-[26px] font-extrabold leading-tight tracking-tight">{t.title}</h1>
+            {t.startingPriceKzt !== null && <span className="mt-1 shrink-0 rounded-full bg-ink px-3 py-1.5 text-sm font-extrabold text-paper">{formatKzt(t.startingPriceKzt)}</span>}
+          </div>
+          {t.description && <p className="mt-1 text-sm text-muted">{t.description}</p>}
+          <ul className="mt-3 flex flex-wrap gap-1.5 text-[12px] font-semibold">
+            <li className="rounded-full bg-surface px-2.5 py-1 ring-1 ring-line">👤 {kk.catalog.faces(t.faceCount)}</li>
+            {t.media === "video" && t.durationSec ? <li className="rounded-full bg-surface px-2.5 py-1 ring-1 ring-line">⏱ ≈ {Math.round(t.durationSec)} {kk.template.sec}</li> : null}
+            <li className="rounded-full bg-surface px-2.5 py-1 ring-1 ring-line">{t.media === "photo" ? "📸 2K" : "🎬 HD 720p"}</li>
+            {t.isTrending && <li className="rounded-full bg-brand px-2.5 py-1 text-night">🔥 {kk.catalog2.trendBadge}</li>}
+          </ul>
+          <ol className="mt-4 grid grid-cols-3 gap-2 text-[12px]">
+            {(t.media === "photo" ? kk.template.howPhoto : kk.template.howVideo).map((x, i) => (
+              <li key={x} className="rounded-2xl bg-surface p-2.5 ring-1 ring-line">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand text-[11px] font-extrabold text-night">{i + 1}</span>
+                <span className="mt-1.5 block font-semibold leading-snug">{x}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+        {t.description && <p className="hidden max-w-prose text-muted md:mt-5 md:block md:text-lg">{t.description}</p>}
 
 
-        <div className={t.description ? "mt-5 md:mt-8" : "md:mt-8"}>
+        <div className="mt-5 md:mt-8">
           {cta ?? (
             <>
               <QualityPriceList t={t} />

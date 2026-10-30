@@ -140,13 +140,13 @@ async function HeroBanner() {
           <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-night backdrop-blur">
             {i === 0 ? "🔥" : "✨"} {kk.home.heroEyebrow}
           </span>
-          <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-4 text-white">
-            <span className="min-w-0">
-              <span className="block truncate text-[26px] font-extrabold leading-none tracking-tight">{t.title}</span>
-              <span className="mt-1.5 block text-[13px] text-white/80">{kk.home.heroSub}</span>
-              {t.startingPriceKzt !== null && <span className="mt-1 block text-sm font-bold text-lime">{formatKzt(t.startingPriceKzt)}</span>}
+          <span className="absolute inset-x-0 bottom-0 p-4 text-white">
+            <span className="block truncate text-[28px] font-extrabold leading-none tracking-tight">{t.title}</span>
+            <span className="mt-1.5 block text-[13px] text-white/75">{kk.home.heroSub}</span>
+            <span className="mt-3 flex items-center justify-between gap-3">
+              {t.startingPriceKzt !== null ? <span className="text-lg font-extrabold text-lime">{formatKzt(t.startingPriceKzt)}</span> : <span />}
+              <span className="btn-glow inline-flex h-11 shrink-0 items-center rounded-full px-6 text-sm font-extrabold">{kk.home.tryIt} →</span>
             </span>
-            <span className="btn-glow inline-flex h-11 shrink-0 items-center rounded-full px-5 text-sm font-extrabold">{kk.home.tryIt}</span>
           </span>
         </Link>
       ))}

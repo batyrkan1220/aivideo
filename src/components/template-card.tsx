@@ -133,11 +133,13 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
           {t.isTrending && (
             <span className="rounded-full bg-brand px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-night">{kk.catalog2.trendBadge}</span>
           )}
-          {/* Number of face photos the template needs. */}
-          <span className="flex items-center gap-1 rounded-full bg-black/55 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-md" aria-label={kk.catalog.faces(t.faceCount)}>
-            <svg viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor" aria-hidden><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm-8.5 9a8.5 8.5 0 0 1 17 0z" /></svg>
-            <span>{t.faceCount}</span>
-          </span>
+          {/* People in the template (only worth showing for 2+). */}
+          {t.faceCount > 1 && (
+            <span className="flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[11px] font-semibold text-white" aria-label={kk.catalog.faces(t.faceCount)}>
+              <svg viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor" aria-hidden><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm-8.5 9a8.5 8.5 0 0 1 17 0z" /></svg>
+              <span>{t.faceCount}</span>
+            </span>
+          )}
         </div>
         <div className="absolute inset-x-3 bottom-3 text-white">
           <h3 className="line-clamp-2 text-[15px] font-bold leading-tight tracking-tight sm:text-base">{t.title}</h3>

@@ -48,13 +48,13 @@ async function CreateSection({ t }: { t: TemplateDetail }) {
     const next = encodeURIComponent(`/templates/${t.id}`);
     return (
       <>
-        <div className="rounded-card border border-line bg-surface p-5">
+        <div className="hidden rounded-card border border-line bg-surface p-5 sm:block">
           <div className="flex items-baseline justify-between gap-4">
             <h2 className="font-semibold">{kk.template.priceTitle}</h2>
             {price !== null && <p className="font-display text-2xl font-bold">{formatKzt(price)}</p>}
           </div>
           <p className="mt-2 text-sm text-muted">{kk.create.loginText}</p>
-          <div className="mt-4 hidden gap-3 sm:flex">
+          <div className="mt-4 flex gap-3">
             <ButtonLink href={`/login?next=${next}`} size="lg">{kk.auth.login}</ButtonLink>
             <ButtonLink href={`/signup?next=${next}`} size="lg" variant="secondary">{kk.auth.signup}</ButtonLink>
           </div>

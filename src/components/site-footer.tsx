@@ -4,7 +4,7 @@ import { kk } from "@/lib/i18n/kk";
 
 export function SiteFooter() {
   return (
-    <footer className="tg-hide mt-24 border-t border-line">
+    <footer className="tg-hide mt-24 hidden border-t border-line sm:block">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
         <p className="text-ink"><Logo className="text-base" /></p>
         <nav className="flex flex-wrap gap-x-6" aria-label={kk.nav.support}>
