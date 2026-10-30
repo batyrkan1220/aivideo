@@ -20,7 +20,7 @@ export const metadata = { title: kk.order.title };
 type SP = { deleted?: string; error?: string; pay_error?: string };
 export default function OrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<SP> }) {
   return (
-    <main className="mx-auto max-w-3xl px-4 pt-10">
+    <main className="mx-auto max-w-3xl px-4 pb-6 pt-4 sm:pt-10">
       <Suspense fallback={<p className="text-muted">{kk.common.loading}</p>}>
         <OrderView params={params} searchParams={searchParams} />
       </Suspense>
@@ -92,133 +92,124 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
       </section>
   );
 
+  const done = o.generation_status === "completed";
+  const busy = ["queued", "processing", "postprocessing"].includes(o.generation_status);
+  const chip = o.payment_status === "refunded" ? { t: kk.order.payment.refunded, c: "bg-line text-ink" }
+    : o.payment_status !== "succeeded" ? { t: payLabel, c: "bg-[#ff453a] text-white" }
+    : done ? { t: genLabel, c: "bg-brand text-night" }
+    : o.generation_status === "failed" ? { t: genLabel, c: "bg-[#ff453a] text-white" }
+    : { t: genLabel, c: "bg-ink text-paper" };
+  const regenHref = (o.template_snapshot_json as { user_video_path?: string } | null)?.user_video_path ? "/create" : `/templates/${o.template_id}`;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
-        <Link href="/orders" className="-my-2 inline-block py-2 text-sm font-medium text-muted hover:text-ink">← {kk.order.list}</Link>
-        <h1 className="mt-3 font-display text-2xl font-bold sm:text-3xl">{snap.title_kk}</h1>
-        <p className="mt-1 text-sm text-muted">
-          {kk.order.number}: <span className="font-semibold text-ink">{o.public_order_number}</span>
-        </p>
+        <Link href="/orders" className="-my-2 inline-block py-2 text-sm font-medium text-muted hover:text-ink">← {kk.gallery.title}</Link>
+        <h1 className="mt-2 text-[26px] font-extrabold leading-tight tracking-tight sm:text-3xl">{snap.title_kk}</h1>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
+          <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${chip.c}`}>{chip.t}</span>
+          <span>{o.public_order_number} · {fmt.format(new Date(o.created_at))}</span>
+        </div>
       </div>
 
-      {sp.deleted === "video" && <p role="status" className="rounded-card bg-paper p-4 text-sm">{kk.result.videoDeleted}</p>}
-      {sp.deleted === "photos" && <p role="status" className="rounded-card bg-paper p-4 text-sm">{kk.result.photosDeleted}</p>}
-      {sp.error === "busy" && <p role="alert" className="rounded-card bg-danger/10 p-4 text-sm text-danger">{kk.result.busy}</p>}
+      {sp.deleted === "video" && <p role="status" className="rounded-[20px] bg-surface p-4 text-sm ring-1 ring-line">{kk.result.videoDeleted}</p>}
+      {sp.deleted === "photos" && <p role="status" className="rounded-[20px] bg-surface p-4 text-sm ring-1 ring-line">{kk.result.photosDeleted}</p>}
+      {sp.error === "busy" && <p role="alert" className="rounded-[20px] bg-danger/10 p-4 text-sm text-danger">{kk.result.busy}</p>}
       {sp.pay_error && sp.pay_error in kk.order.payErrors && (
-        <p role="alert" className="rounded-card bg-danger/10 p-4 text-sm text-danger">{kk.order.payErrors[sp.pay_error as keyof typeof kk.order.payErrors]}</p>
-      )}
-      {o.payment_status === "succeeded" && ["queued", "processing", "postprocessing"].includes(o.generation_status) && (
-        <p role="status" className="rounded-card bg-success/10 p-4 text-sm font-medium text-success">{kk.order.paidMsg}</p>
+        <p role="alert" className="rounded-[20px] bg-danger/10 p-4 text-sm text-danger">{kk.order.payErrors[sp.pay_error as keyof typeof kk.order.payErrors]}</p>
       )}
       {o.payment_status === "failed" && (
-        <p role="alert" className="rounded-card bg-danger/10 p-4 text-sm font-medium text-danger">{kk.order.failedMsg}</p>
+        <p role="alert" className="rounded-[20px] bg-danger/10 p-4 text-sm font-medium text-danger">{kk.order.failedMsg}</p>
       )}
 
       {/* Awaiting payment: the pay step comes first. */}
       {awaitingPayment && priceBox}
 
-      <section className="rounded-card border border-line bg-surface p-5 sm:p-6">
-        <dl className="grid grid-cols-[auto_minmax(0,1fr)] [&>dd]:break-words gap-x-6 gap-y-2 text-sm">
-          <dt className="text-muted">{kk.order.created}</dt><dd>{fmt.format(new Date(o.created_at))}</dd>
-          <dt className="text-muted">{kk.pricing.quality}</dt><dd>{snap.quality?.labelKk ?? o.quality}</dd>
-          <dt className="text-muted">{kk.order.status}</dt>
-          <dd className="flex flex-wrap gap-2">
-            <span className={`rounded-full px-2.5 py-0.5 font-semibold ${o.payment_status === "succeeded" ? "bg-success/15 text-success" : o.payment_status === "failed" ? "bg-danger/10 text-danger" : "bg-flash/30"}`}>{payLabel}</span>
-            {o.payment_status === "succeeded" && (
-              <span className="rounded-full bg-brand-soft px-2.5 py-0.5 font-semibold text-brand">{genLabel}</span>
-            )}
-          </dd>
-        </dl>
-      </section>
-
-      {o.payment_status === "succeeded" && (
+      {o.payment_status === "succeeded" && busy && (
         <GenerationStatus
           orderId={o.id}
           initial={{ generationStatus: o.generation_status, progress: job?.progress ?? null, error: job?.safe_error_message ?? null }}
         />
       )}
       {o.generation_status === "failed" && (
-        <section role="alert" className="rounded-card border border-danger/30 bg-danger/10 p-5 text-sm">
-          <p className="font-semibold text-danger">{kk.order.generation.failed}</p>
+        <section role="alert" className="rounded-[20px] bg-danger/10 p-5 text-sm">
+          <p className="text-base font-bold text-danger">{kk.order.generation.failed}</p>
           <p className="mt-1 text-ink">{job?.safe_error_message ?? kk.generation.errors.generic}</p>
-          <Link href="/support" className="mt-3 inline-block font-semibold text-brand hover:underline">{kk.result.contactSupport}</Link>
+          <Link href="/support" className="btn-glow mt-4 inline-flex h-10 items-center rounded-full px-5 text-sm font-bold">{kk.result.contactSupport}</Link>
         </section>
       )}
-      {o.generation_status === "completed" && (
-        <section className="rounded-card border border-line bg-surface p-5 sm:p-6">
-          <h2 className="font-display text-xl font-bold">{isPhoto ? kk.photos.ready : kk.result.ready}</h2>
+
+      {done && (
+        <section className="rounded-[24px] bg-surface p-4 ring-1 ring-line sm:p-6">
           {video && notExpired(video.expires_at) ? (
             <>
               {isPhoto ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={`/api/orders/${o.id}/video`} alt={kk.photos.watch} className="mt-4 w-full max-w-sm rounded-card bg-night object-contain" />
-              ) : <video
-                src={`/api/orders/${o.id}/video`}
-                controls
-                playsInline
-                preload="metadata"
-                aria-label={kk.result.watch}
-                className="mt-4 aspect-[9/16] w-full max-w-sm rounded-card bg-night"
-              />}
-              <p className="mt-3 text-sm text-muted">{kk.result.keptUntil(dateFmt.format(new Date(video.expires_at)))}</p>
-              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <img src={`/api/orders/${o.id}/video`} alt={kk.photos.watch} className="mx-auto w-full max-w-sm rounded-[20px] bg-night object-contain" />
+              ) : (
+                <video src={`/api/orders/${o.id}/video`} controls playsInline preload="metadata" aria-label={kk.result.watch}
+                  className="mx-auto aspect-[9/16] w-full max-w-sm rounded-[20px] bg-night" />
+              )}
+              <div className="mx-auto mt-4 max-w-sm">
                 <DownloadVideo orderId={o.id} photo={isPhoto} />
-                <form action={deleteVideo}>
-                  <input type="hidden" name="orderId" value={o.id} />
-                  <ConfirmSubmit message={kk.result.deleteVideoConfirm} className="h-12 rounded-full px-4 text-sm font-medium text-muted hover:text-danger">
-                    {kk.result.deleteVideo}
-                  </ConfirmSubmit>
-                </form>
+                <p className="mt-3 text-center text-xs text-muted">{kk.result.keptUntil(dateFmt.format(new Date(video.expires_at)))}</p>
               </div>
             </>
           ) : (
-            <p className="mt-2 text-sm text-muted">{video ? kk.result.expired : kk.result.videoDeleted}</p>
+            <p className="text-sm text-muted">{video ? kk.result.expired : kk.result.videoDeleted}</p>
           )}
-          <dl className="mt-5 grid grid-cols-[auto_minmax(0,1fr)] [&>dd]:break-words gap-x-6 gap-y-1 border-t border-line pt-4 text-sm">
-            <dt className="text-muted">{kk.result.orderNumber}</dt><dd>{o.public_order_number}</dd>
-            {o.completed_at && (<><dt className="text-muted">{kk.order.created}</dt><dd>{fmt.format(new Date(o.created_at))}</dd></>)}
-            <dt className="text-muted">{kk.pricing.quality}</dt><dd>{snap.quality?.labelKk ?? o.quality}</dd>
-          </dl>
-          <div className="mt-5 rounded-xl bg-brand-soft p-4 text-sm">
-            <p className="text-muted">{kk.result.regenerateNote}</p>
-            <div className="mt-3 flex flex-wrap gap-4">
-              <Link href={(o.template_snapshot_json as { user_video_path?: string } | null)?.user_video_path ? "/create" : `/templates/${o.template_id}`} className="font-semibold text-brand hover:underline">{kk.result.regenerate}</Link>
-              <Link href="/support" className="font-semibold text-brand hover:underline">{kk.result.contactSupport}</Link>
-            </div>
+          <div className="mx-auto mt-4 grid max-w-sm grid-cols-2 gap-2">
+            <Link href={regenHref} className="flex h-11 items-center justify-center rounded-full bg-ink text-sm font-bold text-paper">↻ {kk.result.regenerate}</Link>
+            <Link href="/support" className="flex h-11 items-center justify-center rounded-full bg-paper text-sm font-bold ring-1 ring-line">{kk.nav.support}</Link>
           </div>
         </section>
       )}
 
-      <section className="rounded-card border border-line bg-surface p-5 sm:p-6">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="font-semibold">{kk.order.photos}</h2>
-          {photos.length > 0 && !["queued", "processing", "postprocessing"].includes(o.generation_status) && (
-            <form action={deleteOrderPhotos}>
-              <input type="hidden" name="orderId" value={o.id} />
-              <ConfirmSubmit message={kk.result.deletePhotosConfirm} className="text-sm font-medium text-muted hover:text-danger">
-                {kk.result.deletePhotos}
-              </ConfirmSubmit>
-            </form>
+      {/* Details: price, photos and housekeeping — tucked away once the work is done. */}
+      <details className="group rounded-[20px] bg-surface ring-1 ring-line" open={!done && !awaitingPayment}>
+        <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3.5 text-[15px] font-semibold">
+          {kk.order.details}
+          <span className="text-muted transition-transform group-open:rotate-45" aria-hidden>＋</span>
+        </summary>
+        <div className="space-y-4 border-t border-line px-4 pb-4 pt-3 text-sm">
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-6 gap-y-1.5 [&>dd]:break-words">
+            <dt className="text-muted">{kk.result.orderNumber}</dt><dd>{o.public_order_number}</dd>
+            <dt className="text-muted">{kk.order.created}</dt><dd>{fmt.format(new Date(o.created_at))}</dd>
+            <dt className="text-muted">{kk.pricing.quality}</dt><dd>{snap.quality?.labelKk ?? o.quality}</dd>
+            {!awaitingPayment && <><dt className="text-muted">{kk.pricing.total}</dt><dd className="font-bold">{formatKzt(o.amount_kzt)}</dd></>}
+          </dl>
+          {photos.length > 0 && (
+            <div>
+              <p className="mb-2 font-semibold">{kk.order.photos}</p>
+              <ol className="flex gap-2">
+                {photos.map((p, i) => (
+                  <li key={p.key} className="w-20">
+                    <div className="aspect-[3/4] overflow-hidden rounded-xl bg-line">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      {p.url && <img src={p.url} alt={autoFaceLabel(i, photos.length)} className="h-full w-full object-cover" />}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
           )}
+          {o.photos_deleted_at && photos.length === 0 && <p className="text-muted">{kk.result.photosDeleted}</p>}
+          <div className="flex flex-wrap gap-x-5 gap-y-2 border-t border-line pt-3">
+            {photos.length > 0 && !busy && (
+              <form action={deleteOrderPhotos}>
+                <input type="hidden" name="orderId" value={o.id} />
+                <ConfirmSubmit message={kk.result.deletePhotosConfirm} className="font-medium text-muted hover:text-danger">{kk.result.deletePhotos}</ConfirmSubmit>
+              </form>
+            )}
+            {done && video && notExpired(video.expires_at) && (
+              <form action={deleteVideo}>
+                <input type="hidden" name="orderId" value={o.id} />
+                <ConfirmSubmit message={kk.result.deleteVideoConfirm} className="font-medium text-muted hover:text-danger">{isPhoto ? kk.result.deletePhoto : kk.result.deleteVideo}</ConfirmSubmit>
+              </form>
+            )}
+          </div>
         </div>
-        {o.photos_deleted_at && photos.length === 0 && <p className="text-sm text-muted">{kk.result.photosDeleted}</p>}
-        <ol className={`grid gap-3 ${photos.length === 1 ? "max-w-[160px] grid-cols-1" : photos.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
-          {photos.map((p, i) => (
-            <li key={p.key}>
-              <div className="aspect-[3/4] overflow-hidden rounded-xl bg-line">
-                {p.url && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={p.url} alt="" className="h-full w-full object-cover" />
-                )}
-              </div>
-              <p className="mt-1 text-xs text-muted">{autoFaceLabel(i, photos.length)}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      {!awaitingPayment && priceBox}
+      </details>
     </div>
   );
 }
