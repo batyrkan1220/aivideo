@@ -25,7 +25,7 @@ export function FaceMap({ slots, mediaBase }: { slots: FaceSlot[]; mediaBase?: s
   }
   return (
     <div className="space-y-3">
-      <div className="relative aspect-[16/7] w-full max-w-md overflow-hidden rounded-card border border-line bg-white" aria-hidden>
+      <div className="relative aspect-[16/7] w-full max-w-md overflow-hidden rounded-card border border-line bg-surface" aria-hidden>
         {slots.map((s, i) => (
           <div
             key={s.key}

@@ -72,7 +72,7 @@ export function TelegramBridge() {
       const wa = telegramApp();
       if (!wa) return;
       wa.ready(); wa.expand();
-      wa.setHeaderColor?.("#fafafc"); wa.setBackgroundColor?.("#fafafc");
+      wa.setHeaderColor?.("#0b0a10"); wa.setBackgroundColor?.("#0b0a10"); wa.setBottomBarColor?.("#0b0a10");
       window.dispatchEvent(new Event(TG_READY_EVENT));
     };
     if (window.Telegram?.WebApp) ui();
@@ -105,7 +105,7 @@ export function TelegramBridge() {
   }
   if (!(pending && tgOnAuthPage) || manual) return null;
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-4 bg-paper" role="status" aria-live="polite">
+    <div className="theme-dark fixed inset-0 z-[100] flex flex-col items-center justify-center gap-4 bg-paper" role="status" aria-live="polite">
       <span className="h-10 w-10 animate-spin rounded-full border-4 border-brand/20 border-t-brand" aria-hidden />
       <p className="text-sm font-medium text-muted">{kk.telegram.signingIn}</p>
     </div>

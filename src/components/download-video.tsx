@@ -57,7 +57,7 @@ export function DownloadVideo({ orderId }: { orderId: string }) {
           className={`${btn} flex-1 bg-[#2AABEE] text-white disabled:opacity-70`}>
           {state === "sending" ? <><span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden />{r.sending}</> : <>✈️ {r.sendToChat}</>}
         </button>
-        <button type="button" onClick={nativeDownload} className={`${btn} flex-1 border border-line bg-white text-ink`}>
+        <button type="button" onClick={nativeDownload} className={`${btn} flex-1 border border-line bg-surface text-ink`}>
           ⬇️ {r.download}
         </button>
       </div>

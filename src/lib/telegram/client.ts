@@ -9,6 +9,7 @@ export type TelegramWebApp = {
   openLink(url: string, opts?: { try_instant_view?: boolean }): void;
   setHeaderColor?(color: string): void;
   setBackgroundColor?(color: string): void;
+  setBottomBarColor?(color: string): void;
   showConfirm?(message: string, cb: (ok: boolean) => void): void;
   close?(): void;
   BackButton: { show(): void; hide(): void; onClick(cb: () => void): void; offClick(cb: () => void): void };

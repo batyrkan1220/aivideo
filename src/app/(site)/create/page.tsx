@@ -22,7 +22,7 @@ export default function CreateOwnPage() {
       <p className="mt-1 text-muted">{cv.lead}</p>
       <ol className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 text-xs">
         {cv.steps.map((s, i) => (
-          <li key={s} className="flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full bg-white py-1.5 pl-1.5 pr-3 ring-1 ring-line">
+          <li key={s} className="flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full bg-surface py-1.5 pl-1.5 pr-3 ring-1 ring-line">
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-white">{i + 1}</span>
             <span className="font-medium">{s}</span>
           </li>
@@ -44,7 +44,7 @@ async function Flow() {
   const t = s.enabled && id ? await getTemplateForAdmin(id) : null;
   if (!t) {
     return (
-      <div className="rounded-card border border-dashed border-line bg-white px-6 py-12 text-center">
+      <div className="rounded-card border border-dashed border-line bg-surface px-6 py-12 text-center">
         <h2 className="font-display text-lg font-bold">{cv.disabledTitle}</h2>
         <p className="mt-1 text-sm text-muted">{cv.disabledText}</p>
         <ButtonLink href="/" className="mt-5">{cv.browse}</ButtonLink>

@@ -22,14 +22,14 @@ function WebPay({ orderId, label, sandbox, askPhone = false }: { orderId: string
             name="phone" type="tel" inputMode="tel" autoComplete="tel" required value={phone} onChange={(e) => setPhone(e.target.value)}
             placeholder={kk.tole.phonePlaceholder}
             aria-invalid={state.error === "phone_invalid"}
-            className={`h-12 w-full rounded-xl border bg-white px-4 text-base text-ink outline-none focus:border-brand ${state.error === "phone_invalid" ? "border-danger" : "border-line"}`}
+            className={`h-12 w-full rounded-xl border bg-surface px-4 text-base text-ink outline-none focus:border-brand ${state.error === "phone_invalid" ? "border-danger" : "border-line"}`}
           />
           <span className="mt-1 block text-xs opacity-80">{kk.tole.phoneHint}</span>
         </label>
       )}
       <button
         disabled={pending}
-        className="h-13 w-full rounded-full bg-flash font-semibold text-ink transition-opacity hover:opacity-90 disabled:opacity-60"
+        className="h-13 w-full rounded-full bg-flash font-semibold text-night transition-opacity hover:opacity-90 disabled:opacity-60"
       >
         {pending ? kk.order.paying : label}
       </button>

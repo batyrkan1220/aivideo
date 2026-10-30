@@ -27,7 +27,7 @@ export default function AccountPage() {
 
 async function AccountDetails() {
   const user = await requireUser("/account");
-  const card = "rounded-card border border-line bg-white p-6";
+  const card = "rounded-card border border-line bg-surface p-6";
   return (
     <div className="space-y-6">
       <section className={card}>
@@ -59,7 +59,7 @@ async function AccountDetails() {
         <DeleteAllPhotosForm />
       </section>
 
-      <section className="tg-hide rounded-card border border-danger/30 bg-white p-6">
+      <section className="tg-hide rounded-card border border-danger/30 bg-surface p-6">
         <h2 className="mb-2 font-semibold text-danger">{kk.account.deleteAccount}</h2>
         <TelegramDeleteNote />
         <DeleteAccountForm />

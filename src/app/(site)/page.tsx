@@ -38,8 +38,8 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
       {/* Phone intro: one line, then straight to the videos */}
       <section className="mx-auto max-w-6xl px-4 pt-3 md:hidden">
         <div className="tg-only mb-2"><Logo className="text-base" /></div>
-        <h1 className="text-balance font-display text-[17px] font-extrabold leading-snug tracking-tight">
-          {titleHead} <span className="text-brand">{titleTail}</span>
+        <h1 className="text-balance font-display text-[19px] font-extrabold leading-snug tracking-tight">
+          {titleHead} <span className="text-gradient">{titleTail}</span>
         </h1>
       </section>
 
@@ -59,7 +59,7 @@ function HowItWorks({ compact = false }: { compact?: boolean }) {
   return (
     <ol className={compact ? "no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 text-xs" : "mt-8 grid max-w-xl grid-cols-3 gap-4 text-sm"}>
       {kk.home.steps.map((s, i) => (
-        <li key={s.t} className={compact ? "flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full bg-white py-1.5 pl-1.5 pr-3 ring-1 ring-line" : "border-t-2 border-ink pt-3"}>
+        <li key={s.t} className={compact ? "flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full bg-surface py-1.5 pl-1.5 pr-3 ring-1 ring-line" : "border-t-2 border-ink pt-3"}>
           <span className={compact ? "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-white" : "font-display text-2xl font-bold text-brand"}>{i + 1}</span>
           <span className={compact ? "font-medium" : "mt-1 block font-semibold"}>{compact ? s.short : s.t}</span>
         </li>
@@ -79,12 +79,12 @@ async function Feed({ searchParams }: { searchParams: Promise<SP> }) {
     <div className="mx-auto max-w-6xl px-4">
       {/* Sticky category chips, like an app's filter bar */}
       {categories.length > 0 && (
-        <div className="under-header sticky z-20 -mx-4 bg-paper/95 px-4 py-2.5 backdrop-blur sm:py-3">
+        <div className="under-header sticky z-20 -mx-4 bg-paper/80 px-4 py-2.5 backdrop-blur-xl sm:py-3">
           <CategoryChips categories={categories} active={category} />
         </div>
       )}
       {first.items.length === 0 ? (
-        <div className="mt-4 rounded-card border border-dashed border-line bg-white px-6 py-16 text-center">
+        <div className="mt-4 rounded-card border border-dashed border-line bg-surface px-6 py-16 text-center">
           <h2 className="font-display text-xl font-bold">{kk.home.emptyTitle}</h2>
           <p className="mx-auto mt-2 max-w-md text-muted">{kk.home.emptyText}</p>
         </div>

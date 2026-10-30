@@ -42,7 +42,7 @@ export function GenerationStatus({ orderId, initial }: { orderId: string; initia
     : s.generationStatus === "postprocessing" ? kk.generation.finishing : kk.generation.working;
 
   return (
-    <section className="rounded-card border border-line bg-white p-5 sm:p-6" aria-live="polite">
+    <section className="rounded-card border border-line bg-surface p-5 sm:p-6" aria-live="polite">
       <h2 className="font-semibold">{kk.generation.title}</h2>
       <p className="mt-1 text-sm text-muted">{text}</p>
       {s.progress !== null && s.generationStatus !== "queued" ? (

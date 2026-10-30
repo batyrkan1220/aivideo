@@ -314,7 +314,7 @@ export function CreateFlow({
     <div className="space-y-4">
       {/* Step: the customer's own video */}
       {customVideo && (
-        <section ref={videoRef} className={`rounded-card border bg-white p-4 transition-shadow sm:p-5 ${nudge === "video" ? "border-brand ring-4 ring-brand/20" : "border-line"}`}>
+        <section ref={videoRef} className={`rounded-card border bg-surface p-4 transition-shadow sm:p-5 ${nudge === "video" ? "border-brand ring-4 ring-brand/20" : "border-line"}`}>
           <StepTitle n={++step} done={video.phase === "ready"}>{cv.stepVideo}</StepTitle>
           <p className="mt-1 text-sm text-muted">{cv.videoHint(customVideo.maxSeconds)}</p>
           <div className="mt-3">
@@ -324,7 +324,7 @@ export function CreateFlow({
       )}
 
       {/* Step: photos */}
-      <section ref={photosRef} className={`rounded-card border bg-white p-4 transition-shadow sm:p-5 ${nudge === "photo" ? "border-brand ring-4 ring-brand/20" : "border-line"}`}>
+      <section ref={photosRef} className={`rounded-card border bg-surface p-4 transition-shadow sm:p-5 ${nudge === "photo" ? "border-brand ring-4 ring-brand/20" : "border-line"}`}>
         <StepTitle n={++step} done={missing === 0}>{slots.length > 1 ? c.stepPhotos(slots.length) : c.stepPhoto}</StepTitle>
         {slots.length > 1 && <p className="mt-1 text-sm text-muted">{c.photosHint}</p>}
         {customVideo && readyVideoId && !["kling", "wan", "k4", "kd"].includes(seedanceMode) && (
@@ -338,7 +338,7 @@ export function CreateFlow({
                     for (const s of seedanceSlots(peopleCount, "p_").slice(n)) onRemove(s);
                     setPeopleCount(n);
                   }}
-                  className={`h-10 min-w-10 rounded-full px-3 text-sm font-semibold ${peopleCount === n ? "bg-ink text-white" : "bg-paper text-ink ring-1 ring-line"}`}>{n}</button>
+                  className={`h-10 min-w-10 rounded-full px-3 text-sm font-semibold ${peopleCount === n ? "bg-ink text-paper" : "bg-paper text-ink ring-1 ring-line"}`}>{n}</button>
               ))}
             </div>
             <p className="mt-1 text-xs text-muted">{cv.howManyHint}</p>
@@ -363,12 +363,12 @@ export function CreateFlow({
 
       {/* Customer's wish for the AI: background, outfit, style (optional). */}
       {allowWish && (
-        <section className="rounded-card border border-line bg-white p-4 sm:p-5">
+        <section className="rounded-card border border-line bg-surface p-4 sm:p-5">
           <StepTitle n={++step} done={!!wish.trim()}>{c.wish.title}</StepTitle>
           <p className="mt-1 text-sm text-muted">{c.wish.hint}</p>
           <textarea value={wish} onChange={(e) => setWish(e.target.value.slice(0, 300))} maxLength={300} rows={2}
             placeholder={c.wish.placeholder} aria-label={c.wish.title}
-            className="mt-3 w-full rounded-xl border border-line bg-white px-3 py-2 text-base outline-none focus:border-brand" />
+            className="mt-3 w-full rounded-xl border border-line bg-surface px-3 py-2 text-base outline-none focus:border-brand" />
           <div className="mt-2 flex flex-wrap gap-2">
             {c.wish.examples.map((x) => (
               <button key={x} type="button" onClick={() => setWish((w) => (w.trim() ? `${w.trim()}; ${x}` : x).slice(0, 300))}
@@ -380,7 +380,7 @@ export function CreateFlow({
       )}
 
       {/* Quality: one tier (720p); the picker only appears when there is a real choice. */}
-      {effQualities.length > 1 && <section className="rounded-card border border-line bg-white p-4 sm:p-5">
+      {effQualities.length > 1 && <section className="rounded-card border border-line bg-surface p-4 sm:p-5">
         <StepTitle n={++step} done>{c.qualityTitle}</StepTitle>
         <div role="radiogroup" className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line">
           {effQualities.map((q) => {
@@ -402,13 +402,13 @@ export function CreateFlow({
 
       {/* Step: Kaspi phone */}
       {needPhone && (
-        <section className={`rounded-card border bg-white p-4 transition-shadow sm:p-5 ${nudge === "phone" ? "border-brand ring-4 ring-brand/20" : "border-line"}`}>
+        <section className={`rounded-card border bg-surface p-4 transition-shadow sm:p-5 ${nudge === "phone" ? "border-brand ring-4 ring-brand/20" : "border-line"}`}>
           <StepTitle n={++step} done={phoneOk && !!phone}>{c.stepPhone}</StepTitle>
           <input
             ref={phoneRef}
             type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
             placeholder={kk.tole.phonePlaceholder} aria-label={kk.tole.phoneLabel}
-            className={`mt-3 h-13 w-full rounded-xl border-2 bg-paper px-4 text-lg tracking-wide text-ink outline-none transition-colors focus:border-brand focus:bg-white ${phone && !phoneOk ? "border-danger" : "border-line"}`}
+            className={`mt-3 h-13 w-full rounded-xl border-2 bg-paper px-4 text-lg tracking-wide text-ink outline-none transition-colors focus:border-brand focus:bg-surface ${phone && !phoneOk ? "border-danger" : "border-line"}`}
           />
           <p className={`mt-1.5 text-xs ${phone && !phoneOk ? "text-danger" : "text-muted"}`}>
             {phone && !phoneOk ? kk.order.payErrors.phone_invalid : kk.tole.phoneHint}
@@ -418,7 +418,7 @@ export function CreateFlow({
 
       {/* Price breakdown only when there is more than one line; the total and pay button stick at the bottom. */}
       {price && (price.extraFacesKzt > 0 || price.platformFeeKzt > 0 || price.discountKzt > 0) && (
-        <section className="rounded-card border border-line bg-white p-4 sm:p-5">
+        <section className="rounded-card border border-line bg-surface p-4 sm:p-5">
             <dl className="space-y-1.5 text-sm">
               <Row label={`${kk.pricing.videoPrice}${selected ? ` · ${selected.labelKk}` : ""}`} value={formatKzt(price.basePriceKzt + price.qualitySurchargeKzt)} />
               {price.extraFacesKzt > 0 && <Row label={`${kk.pricing.extraFaces} (${price.extraFaces})`} value={`+${formatKzt(price.extraFacesKzt)}`} />}
@@ -429,7 +429,7 @@ export function CreateFlow({
       )}
 
       {(price || waitingForVideo) && (
-        <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 -mx-4 border-t border-line bg-white/95 px-4 pb-2 pt-2.5 shadow-[0_-8px_24px_-12px_rgba(30,27,46,0.18)] backdrop-blur sm:static sm:mx-0 sm:rounded-card sm:border sm:p-4 sm:shadow-none">
+        <div className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 -mx-1 rounded-[1.5rem] border border-white/10 px-4 pb-2 pt-2.5 shadow-[0_18px_40px_-14px_rgba(0,0,0,0.75)] glass sm:static sm:mx-0 sm:rounded-card sm:p-4">
           <label ref={consentRef} className={`-mx-1 mb-2 flex cursor-pointer items-start gap-2.5 rounded-lg px-1 py-1 text-xs leading-snug transition-colors ${nudge === "consent" ? "bg-flash/40 ring-2 ring-flash" : ""}`}>
             <input type="checkbox" className="mt-px h-[18px] w-[18px] shrink-0 accent-brand" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
             <span className="text-muted">{customVideo ? cv.consent : kk.consent.combined}</span>
@@ -443,7 +443,7 @@ export function CreateFlow({
               type="button"
               onClick={onPay}
               aria-disabled={!!blocker || pending}
-              className={`flex h-13 flex-1 items-center justify-center gap-2 rounded-full px-5 font-semibold transition-all active:scale-[0.98] ${blocker === "photo" || blocker === "video" ? "bg-ink text-white" : "bg-brand text-white hover:bg-brand-dark"} ${pending || (blocker === "photo" && busyUpload) || (blocker === "video" && busyVideo) ? "opacity-70" : ""}`}
+              className={`flex h-13 flex-1 items-center justify-center gap-2 rounded-full px-5 font-semibold transition-all active:scale-[0.98] ${blocker === "photo" || blocker === "video" ? "bg-ink text-paper" : "btn-glow text-white"} ${pending || (blocker === "photo" && busyUpload) || (blocker === "video" && busyVideo) ? "opacity-70" : ""}`}
             >
               {pending && <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden />}
               {pending ? (freeOrders ? c.creating : c.paying)
@@ -481,7 +481,7 @@ function VideoPicker({ st, limits, onPick, onRemove }: { st: VideoState; limits:
     <div>
       {preview ? (
         <div className="flex items-start gap-4">
-          <div className="relative aspect-[9/16] w-32 shrink-0 overflow-hidden rounded-xl bg-ink">
+          <div className="relative aspect-[9/16] w-32 shrink-0 overflow-hidden rounded-xl bg-night">
             <video src={preview} muted loop playsInline autoPlay className="h-full w-full object-cover" />
             {busy && (
               <span className="absolute inset-0 flex items-center justify-center bg-black/40">
@@ -511,9 +511,9 @@ function VideoPicker({ st, limits, onPick, onRemove }: { st: VideoState; limits:
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className={`flex w-full items-center gap-4 rounded-xl border-2 border-dashed p-4 text-left transition-colors hover:border-brand ${st.phase === "error" ? "border-danger bg-red-50" : "border-brand/40 bg-brand-soft/50"}`}
+          className={`flex w-full items-center gap-4 rounded-xl border-2 border-dashed p-4 text-left transition-colors hover:border-brand ${st.phase === "error" ? "border-danger bg-danger/10" : "border-brand/40 bg-brand-soft/50"}`}
         >
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-white text-brand">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-surface text-brand">
             <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <rect x="3" y="5" width="13" height="14" rx="2" /><path d="m16 10 5-3v10l-5-3" />
             </svg>
@@ -543,9 +543,9 @@ function SinglePhoto({ slot, st, onPick, onRemove }: { slot: FaceSlot; st: SlotS
         disabled={busy}
         onClick={() => inputRef.current?.click()}
         aria-label={`${slot.labelKk}: ${preview ? kk.upload.replace : kk.upload.choose}`}
-        className={`flex w-full items-center gap-4 rounded-2xl border-2 p-3 text-left transition-[colors,transform] active:scale-[0.99] ${st.phase === "ready" ? "border-success bg-emerald-50" : st.phase === "error" ? "border-danger bg-red-50" : "border-dashed border-brand/50 bg-brand-soft/60 hover:border-brand"}`}
+        className={`flex w-full items-center gap-4 rounded-2xl border-2 p-3 text-left transition-[colors,transform] active:scale-[0.99] ${st.phase === "ready" ? "border-success bg-success/10" : st.phase === "error" ? "border-danger bg-danger/10" : "border-dashed border-brand/50 bg-brand-soft/60 hover:border-brand"}`}
       >
-        <span className="relative h-32 w-24 shrink-0 overflow-hidden rounded-xl bg-white shadow-sm">
+        <span className="relative h-32 w-24 shrink-0 overflow-hidden rounded-xl bg-surface shadow-sm">
           {preview ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={preview} alt="" className="h-full w-full object-cover" />
@@ -616,7 +616,7 @@ function SlotCard({
         disabled={busy}
         onClick={() => inputRef.current?.click()}
         aria-label={`${slot.labelKk}: ${preview ? kk.upload.replace : kk.upload.choose}`}
-        className={`relative flex aspect-[3/4] w-full flex-col items-center justify-center overflow-hidden rounded-card border-2 bg-white text-center transition-colors hover:border-brand ${border}`}
+        className={`relative flex aspect-[3/4] w-full flex-col items-center justify-center overflow-hidden rounded-card border-2 bg-surface text-center transition-colors hover:border-brand ${border}`}
       >
         {preview ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -635,7 +635,7 @@ function SlotCard({
           </span>
         )}
         {(st.phase === "uploading" || st.phase === "verifying" || st.phase === "ready") && (
-          <span className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-xs font-semibold ${st.phase === "ready" ? "bg-success text-white" : "bg-white/90 text-ink"}`}>
+          <span className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-xs font-semibold ${st.phase === "ready" ? "bg-success text-white" : "bg-white/90 text-night"}`}>
             {st.phase === "uploading" ? `${st.progress}%` : st.phase === "verifying" ? c.verifying : `✓ ${c.ready}`}
           </span>
         )}

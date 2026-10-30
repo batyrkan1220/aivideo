@@ -5,7 +5,7 @@ import { kk } from "@/lib/i18n/kk";
 import { confirmAsync, setNoAutoLogin, useIsTelegram } from "@/lib/telegram/client";
 import { updateDisplayName, deleteAllPhotos, deleteAccount, type FormState } from "@/lib/account/actions";
 
-const inputCls = "w-full rounded-xl border border-line bg-white px-3 py-2 outline-none focus:border-brand";
+const inputCls = "w-full rounded-xl border border-line bg-surface px-3 py-2 outline-none focus:border-brand";
 
 /** Submit button that asks for confirmation before a destructive action. */
 export function ConfirmSubmit({ message, children, className = "" }: { message: string; children: React.ReactNode; className?: string }) {
@@ -41,7 +41,7 @@ export function DisplayNameForm({ current }: { current: string }) {
         <span className="mb-1 block text-xs font-medium text-muted">{kk.account.editName}</span>
         <input name="displayName" defaultValue={current} maxLength={80} required className={inputCls} />
       </label>
-      <button disabled={pending} className="h-10 rounded-full border border-ink px-5 text-sm font-semibold hover:bg-ink hover:text-white disabled:opacity-50">
+      <button disabled={pending} className="h-10 rounded-full border border-ink px-5 text-sm font-semibold hover:bg-ink hover:text-paper disabled:opacity-50">
         {kk.common.save}
       </button>
       <div className="w-full"><Msg s={state} /></div>
@@ -86,7 +86,7 @@ export function LogoutButton({ action }: { action: () => Promise<void> }) {
   const inTelegram = useIsTelegram();
   return (
     <form action={action} onSubmit={() => { if (inTelegram) setNoAutoLogin(true); }}>
-      <button className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium hover:border-ink">
+      <button className="rounded-full border border-line bg-surface px-4 py-2 text-sm font-medium hover:border-ink">
         {kk.nav.logout}
       </button>
     </form>

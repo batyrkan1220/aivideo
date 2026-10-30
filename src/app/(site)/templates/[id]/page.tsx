@@ -48,7 +48,7 @@ async function CreateSection({ t }: { t: TemplateDetail }) {
     const next = encodeURIComponent(`/templates/${t.id}`);
     return (
       <>
-        <div className="rounded-card border border-line bg-white p-5">
+        <div className="rounded-card border border-line bg-surface p-5">
           <div className="flex items-baseline justify-between gap-4">
             <h2 className="font-semibold">{kk.template.priceTitle}</h2>
             {price !== null && <p className="font-display text-2xl font-bold">{formatKzt(price)}</p>}
@@ -60,7 +60,7 @@ async function CreateSection({ t }: { t: TemplateDetail }) {
           </div>
         </div>
         {/* Phones: one big action always in reach, above the bottom tab bar. */}
-        <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-line bg-white/95 px-4 py-3 backdrop-blur sm:hidden">
+        <div className="fixed inset-x-3 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-30 rounded-[1.5rem] border border-white/10 px-3 py-3 shadow-[0_18px_40px_-14px_rgba(0,0,0,0.75)] glass sm:hidden">
           <ButtonLink href={`/signup?next=${next}`} size="lg" className="w-full">
             {kk.create.loginCta}{price !== null ? ` · ${formatKzt(price)}` : ""}
           </ButtonLink>
@@ -68,12 +68,12 @@ async function CreateSection({ t }: { t: TemplateDetail }) {
             {kk.create.haveAccount} <a href={`/login?next=${next}`} className="font-semibold text-brand">{kk.auth.login}</a>
           </p>
         </div>
-        <div className="h-24 sm:hidden" aria-hidden />
+        <div className="h-28 sm:hidden" aria-hidden />
       </>
     );
   }
   if (!t.priced) {
-    return <p className="rounded-card border border-line bg-white p-5 text-sm text-muted">{kk.template.pricePending}</p>;
+    return <p className="rounded-card border border-line bg-surface p-5 text-sm text-muted">{kk.template.pricePending}</p>;
   }
   const e = env();
   return (

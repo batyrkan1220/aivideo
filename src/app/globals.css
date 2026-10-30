@@ -9,6 +9,8 @@
    flash   — warm yellow, reserved for the "Тренд" mark */
 @theme {
   --color-paper: #fafafc;
+  --color-surface: #ffffff;
+  --color-night: #14121c;
   --color-ink: #1e1b2e;
   --color-muted: #6b6880;
   --color-line: #e6e4ee;
@@ -53,3 +55,49 @@ html[data-tg] .tg-only { display: block; }
 /* Sticky bars that sit right under the (sticky) site header; flush to the top inside Telegram. */
 .under-header { top: calc(4rem + env(safe-area-inset-top)); }
 html[data-tg] .under-header { top: 0; }
+
+/* ── Premium dark theme for the customer site and the Telegram Mini App ──────────────
+   Only the subtree with .theme-dark is dark (the admin stays light). Same token names,
+   so every component follows. */
+.theme-dark {
+  --color-paper: #0b0a10;
+  --color-surface: #16141f;
+  --color-ink: #f4f2fb;
+  --color-muted: #9d99b4;
+  --color-line: #2a2638;
+  --color-brand: #8b6cff;
+  --color-brand-dark: #7152ff;
+  --color-brand-soft: #221b3f;
+  --color-danger: #ff5f7e;
+  --color-success: #34d9a5;
+  color-scheme: dark;
+  background-image:
+    radial-gradient(60rem 28rem at 50% -12rem, rgba(139, 108, 255, 0.22), transparent 70%),
+    radial-gradient(30rem 20rem at 100% 0, rgba(214, 76, 255, 0.10), transparent 70%);
+  background-repeat: no-repeat;
+}
+body:has(> .theme-dark:not(.fixed)) { background: #0b0a10; }
+.theme-dark ::selection { background: rgba(139, 108, 255, 0.45); }
+
+/* Primary action: violet → magenta gradient with a soft glow. */
+.btn-glow {
+  background-image: linear-gradient(135deg, #7b5cff 0%, #a64dff 55%, #d84cf0 100%);
+  box-shadow: 0 10px 28px -10px rgba(150, 90, 255, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  transition: filter 0.15s, transform 0.15s;
+}
+.btn-glow:hover { filter: brightness(1.08); }
+
+/* Gradient headline text. */
+.text-gradient {
+  background-image: linear-gradient(90deg, #b9a4ff 0%, #ff8ad8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Frosted glass for floating bars. */
+.glass {
+  background: color-mix(in srgb, var(--color-surface) 72%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+}

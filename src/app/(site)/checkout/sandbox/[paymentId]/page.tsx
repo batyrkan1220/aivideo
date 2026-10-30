@@ -35,13 +35,13 @@ async function Inner({ params }: { params: Promise<{ paymentId: string }> }) {
   if (!pay || pay.provider !== "sandbox" || order?.user_id !== user.id) notFound();
 
   if (pay.status !== "pending") {
-    return <p className="rounded-card border border-line bg-white p-6 text-center text-muted">{kk.sandbox.unavailable}</p>;
+    return <p className="rounded-card border border-line bg-surface p-6 text-center text-muted">{kk.sandbox.unavailable}</p>;
   }
 
   const btn = "h-12 w-full rounded-full font-semibold";
   return (
-    <div className="overflow-hidden rounded-card border-2 border-dashed border-flash bg-white">
-      <p className="bg-flash px-4 py-2 text-center text-sm font-bold tracking-wide text-ink">{kk.sandbox.badge}</p>
+    <div className="overflow-hidden rounded-card border-2 border-dashed border-flash bg-surface">
+      <p className="bg-flash px-4 py-2 text-center text-sm font-bold tracking-wide text-night">{kk.sandbox.badge}</p>
       <div className="p-6">
         <h1 className="font-display text-xl font-bold">{kk.sandbox.title}</h1>
         <p className="mt-2 text-sm text-muted">{kk.sandbox.text}</p>

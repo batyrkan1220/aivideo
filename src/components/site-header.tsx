@@ -8,7 +8,7 @@ import { ButtonLink } from "./ui/button";
 
 export function SiteHeader() {
   return (
-    <header className="tg-hide sticky top-0 z-30 border-b border-line bg-paper/90 pt-[env(safe-area-inset-top)] backdrop-blur">
+    <header className="tg-hide sticky top-0 z-30 border-b border-white/5 pt-[env(safe-area-inset-top)] glass">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4">
         <Link href="/" aria-label={kk.brand.name} className="flex h-11 items-center">
           <Logo className="text-lg" />

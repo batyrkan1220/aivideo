@@ -47,7 +47,7 @@ async function Inner({ params }: { params: Promise<{ paymentId: string }> }) {
   if (pay.status === "succeeded") redirect(`/orders/${pay.order_id}`);
 
   const sandbox = pay.provider === "tole_sandbox";
-  const card = "rounded-card border border-line bg-white p-6";
+  const card = "rounded-card border border-line bg-surface p-6";
 
   if (pay.status !== "pending") {
     return (
@@ -60,7 +60,7 @@ async function Inner({ params }: { params: Promise<{ paymentId: string }> }) {
 
   const header = (
     <>
-      {sandbox && <p className="-mx-6 -mt-6 mb-5 rounded-t-card bg-flash px-4 py-2 text-center text-sm font-bold text-ink">{kk.sandbox.badge}</p>}
+      {sandbox && <p className="-mx-6 -mt-6 mb-5 rounded-t-card bg-flash px-4 py-2 text-center text-sm font-bold text-night">{kk.sandbox.badge}</p>}
       <h1 className="font-display text-xl font-bold">{kk.tole.title}</h1>
       <dl className="mt-4 flex items-baseline justify-between border-y border-line py-4">
         <dt className="text-sm text-muted">{kk.order.number}: {order?.public_order_number}</dt>

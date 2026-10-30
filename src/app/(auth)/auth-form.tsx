@@ -26,7 +26,7 @@ export function AuthForm({
             autoComplete={f.autoComplete}
             minLength={f.minLength}
             required
-            className="w-full rounded-xl border border-line bg-white px-4 py-3 text-base outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
+            className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-base outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
           />
         </label>
       ))}

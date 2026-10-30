@@ -68,7 +68,7 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
 
   const awaitingPayment = ["pending", "failed", "cancelled"].includes(o.payment_status) && o.generation_status === "awaiting_payment";
   const priceBox = (
-      <section className="rounded-card bg-ink p-5 text-white sm:p-6">
+      <section className="rounded-card bg-[linear-gradient(135deg,#3a2490,#14121c)] p-5 text-white ring-1 ring-white/10 sm:p-6">
         <dl className="space-y-2 text-sm">
           <Line label={kk.pricing.videoPrice} value={formatKzt(price.basePriceKzt)} />
           {price.qualitySurchargeKzt > 0 && <Line label={kk.pricing.quality} value={`+${formatKzt(price.qualitySurchargeKzt)}`} />}
@@ -103,27 +103,27 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
 
       {sp.deleted === "video" && <p role="status" className="rounded-card bg-paper p-4 text-sm">{kk.result.videoDeleted}</p>}
       {sp.deleted === "photos" && <p role="status" className="rounded-card bg-paper p-4 text-sm">{kk.result.photosDeleted}</p>}
-      {sp.error === "busy" && <p role="alert" className="rounded-card bg-red-50 p-4 text-sm text-danger">{kk.result.busy}</p>}
+      {sp.error === "busy" && <p role="alert" className="rounded-card bg-danger/10 p-4 text-sm text-danger">{kk.result.busy}</p>}
       {sp.pay_error && sp.pay_error in kk.order.payErrors && (
-        <p role="alert" className="rounded-card bg-red-50 p-4 text-sm text-danger">{kk.order.payErrors[sp.pay_error as keyof typeof kk.order.payErrors]}</p>
+        <p role="alert" className="rounded-card bg-danger/10 p-4 text-sm text-danger">{kk.order.payErrors[sp.pay_error as keyof typeof kk.order.payErrors]}</p>
       )}
       {o.payment_status === "succeeded" && ["queued", "processing", "postprocessing"].includes(o.generation_status) && (
-        <p role="status" className="rounded-card bg-emerald-50 p-4 text-sm font-medium text-success">{kk.order.paidMsg}</p>
+        <p role="status" className="rounded-card bg-success/10 p-4 text-sm font-medium text-success">{kk.order.paidMsg}</p>
       )}
       {o.payment_status === "failed" && (
-        <p role="alert" className="rounded-card bg-red-50 p-4 text-sm font-medium text-danger">{kk.order.failedMsg}</p>
+        <p role="alert" className="rounded-card bg-danger/10 p-4 text-sm font-medium text-danger">{kk.order.failedMsg}</p>
       )}
 
       {/* Awaiting payment: the pay step comes first. */}
       {awaitingPayment && priceBox}
 
-      <section className="rounded-card border border-line bg-white p-5 sm:p-6">
+      <section className="rounded-card border border-line bg-surface p-5 sm:p-6">
         <dl className="grid grid-cols-[auto_minmax(0,1fr)] [&>dd]:break-words gap-x-6 gap-y-2 text-sm">
           <dt className="text-muted">{kk.order.created}</dt><dd>{fmt.format(new Date(o.created_at))}</dd>
           <dt className="text-muted">{kk.pricing.quality}</dt><dd>{snap.quality?.labelKk ?? o.quality}</dd>
           <dt className="text-muted">{kk.order.status}</dt>
           <dd className="flex flex-wrap gap-2">
-            <span className={`rounded-full px-2.5 py-0.5 font-semibold ${o.payment_status === "succeeded" ? "bg-emerald-100 text-success" : o.payment_status === "failed" ? "bg-red-50 text-danger" : "bg-flash/30"}`}>{payLabel}</span>
+            <span className={`rounded-full px-2.5 py-0.5 font-semibold ${o.payment_status === "succeeded" ? "bg-success/15 text-success" : o.payment_status === "failed" ? "bg-danger/10 text-danger" : "bg-flash/30"}`}>{payLabel}</span>
             {o.payment_status === "succeeded" && (
               <span className="rounded-full bg-brand-soft px-2.5 py-0.5 font-semibold text-brand">{genLabel}</span>
             )}
@@ -138,14 +138,14 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
         />
       )}
       {o.generation_status === "failed" && (
-        <section role="alert" className="rounded-card border border-danger/30 bg-red-50 p-5 text-sm">
+        <section role="alert" className="rounded-card border border-danger/30 bg-danger/10 p-5 text-sm">
           <p className="font-semibold text-danger">{kk.order.generation.failed}</p>
           <p className="mt-1 text-ink">{job?.safe_error_message ?? kk.generation.errors.generic}</p>
           <Link href="/support" className="mt-3 inline-block font-semibold text-brand hover:underline">{kk.result.contactSupport}</Link>
         </section>
       )}
       {o.generation_status === "completed" && (
-        <section className="rounded-card border border-line bg-white p-5 sm:p-6">
+        <section className="rounded-card border border-line bg-surface p-5 sm:p-6">
           <h2 className="font-display text-xl font-bold">{kk.result.ready}</h2>
           {video && notExpired(video.expires_at) ? (
             <>
@@ -155,7 +155,7 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
                 playsInline
                 preload="metadata"
                 aria-label={kk.result.watch}
-                className="mt-4 aspect-[9/16] w-full max-w-sm rounded-card bg-ink"
+                className="mt-4 aspect-[9/16] w-full max-w-sm rounded-card bg-night"
               />
               <p className="mt-3 text-sm text-muted">{kk.result.keptUntil(dateFmt.format(new Date(video.expires_at)))}</p>
               <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -186,7 +186,7 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
         </section>
       )}
 
-      <section className="rounded-card border border-line bg-white p-5 sm:p-6">
+      <section className="rounded-card border border-line bg-surface p-5 sm:p-6">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="font-semibold">{kk.order.photos}</h2>
           {photos.length > 0 && !["queued", "processing", "postprocessing"].includes(o.generation_status) && (

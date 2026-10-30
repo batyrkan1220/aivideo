@@ -105,7 +105,7 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
       onFocus={start}
       onBlur={stop}
     >
-      <div className="relative aspect-[9/16] overflow-hidden rounded-xl bg-ink/90 sm:rounded-card">
+      <div className="relative aspect-[9/16] overflow-hidden rounded-2xl bg-night ring-1 ring-white/10 transition-transform duration-200 group-active:scale-[0.97] sm:rounded-card">
         {t.coverUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -128,10 +128,10 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
             className="absolute inset-0 h-full w-full object-cover"
           />
         )}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
         <div className="absolute left-1.5 top-1.5 flex flex-col items-start gap-1 sm:left-3 sm:top-3 sm:gap-1.5">
           {t.isTrending && (
-            <span className="rounded-full bg-flash px-1.5 py-0.5 text-[10px] font-bold text-ink sm:px-2.5 sm:py-1 sm:text-xs">{kk.catalog2.trendBadge}</span>
+            <span className="rounded-full bg-flash px-1.5 py-0.5 text-[10px] font-bold text-night sm:px-2.5 sm:py-1 sm:text-xs">{kk.catalog2.trendBadge}</span>
           )}
           {/* Phones (3 columns): a compact "👤 2"; wider screens: the full "2 бет фотосы". */}
           <span className="flex items-center gap-0.5 rounded-full bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm sm:px-2.5 sm:py-1 sm:text-xs sm:font-medium" aria-label={kk.catalog.faces(t.faceCount)}>

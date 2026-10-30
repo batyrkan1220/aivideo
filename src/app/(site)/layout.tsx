@@ -5,7 +5,7 @@ import { MobileNav } from "@/components/mobile-nav";
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
-    <>
+    <div className="theme-dark flex min-h-full flex-1 flex-col bg-paper text-ink">
       <SiteHeader />
       <div className="flex-1">{children}</div>
       <SiteFooter />
@@ -13,7 +13,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
         <MobileNav />
       </Suspense>
       {/* keeps the footer clear of the fixed bottom bar on phones */}
-      <div className="h-16 sm:hidden" aria-hidden />
-    </>
+      <div className="h-24 sm:hidden" aria-hidden />
+    </div>
   );
 }
