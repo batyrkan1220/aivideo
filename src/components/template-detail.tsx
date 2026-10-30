@@ -2,7 +2,6 @@ import Link from "next/link";
 import { kk } from "@/lib/i18n/kk";
 import type { TemplateDetail } from "@/lib/templates/queries";
 import { calculatePrice, formatKzt } from "@/lib/pricing";
-import { FaceMap } from "@/components/face-map";
 import { AutoVideo } from "@/components/auto-video";
 
 /** Per-quality prices (server-computed). Shown to guests and in admin preview. */
@@ -90,16 +89,8 @@ export function TemplateDetailView({ t, cta }: { t: TemplateDetail; cta?: React.
         <h1 className="sr-only md:hidden">{t.title}</h1>
         {t.description && <p className="max-w-prose text-muted md:mt-5 md:text-lg">{t.description}</p>}
 
-        {t.faceCount > 1 && (
-          <section className="mt-6 md:mt-8">
-            <h2 className="font-semibold">{kk.template.facesTitle}</h2>
-            <div className="mt-4">
-              <FaceMap slots={t.faceSlots} />
-            </div>
-          </section>
-        )}
 
-        <div className={t.description || t.faceCount > 1 ? "mt-5 md:mt-8" : "md:mt-8"}>
+        <div className={t.description ? "mt-5 md:mt-8" : "md:mt-8"}>
           {cta ?? (
             <>
               <QualityPriceList t={t} />

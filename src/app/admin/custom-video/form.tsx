@@ -3,7 +3,7 @@ import { useActionState } from "react";
 import { ru } from "@/lib/i18n/ru";
 import { saveCustomVideoSettings, type CustomVideoState } from "./actions";
 
-export function CustomVideoForm({ value }: { value: { enabled: boolean; maxSeconds: number; maxMb: number } }) {
+export function CustomVideoForm({ value }: { value: { enabled: boolean; maxSeconds: number; maxMb: number; photoPriceKzt: number } }) {
   const C = ru.admin.customVideo;
   const [state, action, pending] = useActionState<CustomVideoState, FormData>(saveCustomVideoSettings, {});
   const input = "mt-1 h-10 w-full rounded-xl border border-line px-3 text-base sm:text-sm";
@@ -19,6 +19,8 @@ export function CustomVideoForm({ value }: { value: { enabled: boolean; maxSecon
           <input name="maxSeconds" type="number" min={3} max={60} defaultValue={value.maxSeconds} className={input} /></label>
         <label className="text-sm"><span className="font-medium">{C.maxMb}</span>
           <input name="maxMb" type="number" min={5} max={50} defaultValue={value.maxMb} className={input} /></label>
+        <label className="text-sm"><span className="font-medium">{C.photoPrice}</span>
+          <input name="photoPriceKzt" type="number" min={100} step={10} defaultValue={value.photoPriceKzt} className={input} /></label>
         <div className="flex items-center gap-3">
           <button disabled={pending} className="h-10 rounded-full bg-ink px-4 text-sm font-semibold text-white disabled:opacity-50">{pending ? ru.common.loading : C.save}</button>
           {state.ok && <span className="text-sm text-success">{C.saved}</span>}

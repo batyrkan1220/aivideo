@@ -14,6 +14,7 @@ export async function saveCustomVideoSettings(_: CustomVideoState, fd: FormData)
     enabled: fd.get("enabled") === "on",
     maxSeconds: Number(fd.get("maxSeconds")),
     maxMb: Number(fd.get("maxMb")),
+    photoPriceKzt: Number(fd.get("photoPriceKzt")),
   });
   if (!p.success) return { error: "invalid" };
   const { error } = await supabaseAdmin().from("site_settings").upsert({

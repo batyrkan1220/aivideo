@@ -165,7 +165,7 @@ const orderSchema = z.object({
 
 export async function createOrder(raw: unknown): Promise<
   { ok: true; orderId: string; free?: boolean } |
-  Fail<"consent_required" | "template_unavailable" | "quality_unavailable" | "photos_missing" | "photos_expired" | "rate_limited" | "video_missing">
+  Fail<"consent_required" | "template_unavailable" | "quality_unavailable" | "photos_missing" | "photos_expired" | "rate_limited" | "video_missing" | "wish_required">
 > {
   const user = await getSessionUser();
   if (!user) return { ok: false, error: "unauthorized" };
@@ -230,16 +230,21 @@ export async function createOrder(raw: unknown): Promise<
 
   const photo = isPhotoProvider(tv.snapshot.provider_key as string);
   if (tv.snapshot.provider_key !== "seedance" && tv.snapshot.provider_key !== "dev" && !photo) return { ok: false, error: "template_unavailable" };
+  // Seedance: one quality (720p), price from the reference video length (or a manual template price).
+  let pricing = tv.pricing;
+  let qualities = tv.qualities;
   if (photo) {
     // Photo templates: the admin's fixed price; the customer may add a wish.
     if (!(tv.pricing.basePriceKzt > 0)) return { ok: false, error: "template_unavailable" };
     const cfg = parsePhotoConfig(tv.snapshot.provider_config_json);
     const wish = cfg.allowWish ? cleanWish(p.data.wish) : "";
+    if (tv.template.kind === "custom_photo") {
+      // Create → AI photo: the customer's description is the whole brief; price from settings.
+      if (wish.length < 3) return { ok: false, error: "wish_required" };
+      pricing = { ...pricing, basePriceKzt: (await customVideoSettings()).photoPriceKzt };
+    }
     if (wish) snapshotExtra = { ...snapshotExtra, customer_wish: wish };
   }
-  // Seedance: one quality (720p), price from the reference video length (or a manual template price).
-  let pricing = tv.pricing;
-  let qualities = tv.qualities;
   if (tv.snapshot.provider_key === "seedance") {
     if (!custom) {
       durationSec = tv.template.video_duration_sec == null ? null : Number(tv.template.video_duration_sec);

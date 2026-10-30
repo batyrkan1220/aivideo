@@ -9,6 +9,8 @@ export const customVideoSettingsSchema = z.object({
   priceKzt: z.number().int().min(100).max(1_000_000).default(2990),
   maxSeconds: z.number().int().min(3).max(60).default(20),
   maxMb: z.number().int().min(5).max(50).default(50),
+  /** Price of an AI photo made from the customer's own description (Create → Photo). */
+  photoPriceKzt: z.number().int().min(100).max(1_000_000).default(990),
 });
 export type CustomVideoSettings = z.infer<typeof customVideoSettingsSchema>;
 /** Seedance: the customer's video is the motion reference (4–30 s). */
@@ -30,5 +32,11 @@ export async function customVideoSettings(): Promise<CustomVideoSettings> {
 /** The hidden published template that carries the photo slot + provider config for custom orders. */
 export async function customTemplateId(): Promise<string | null> {
   const { data } = await supabaseAdmin().from("templates").select("id").eq("kind", "custom").eq("status", "published").limit(1).maybeSingle();
+  return data?.id ?? null;
+}
+
+/** The hidden published photo template for Create → AI photo (Kling image, the customer's description). */
+export async function customPhotoTemplateId(): Promise<string | null> {
+  const { data } = await supabaseAdmin().from("templates").select("id").eq("kind", "custom_photo").eq("status", "published").limit(1).maybeSingle();
   return data?.id ?? null;
 }

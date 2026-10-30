@@ -83,7 +83,7 @@ function readVideoDuration(url: string): Promise<number | null> {
 }
 
 export function CreateFlow({
-  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, freeOrders = false, customVideo, seedancePricing, allowWish = false, seedanceMode = "wan", media = "video",
+  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, freeOrders = false, customVideo, seedancePricing, allowWish = false, seedanceMode = "wan", media = "video", wishRequired = false,
 }: {
   templateId: string;
   slots: FaceSlot[];
@@ -108,6 +108,8 @@ export function CreateFlow({
   seedanceMode?: "swap" | "scene" | "kling" | "wan" | "pvr" | "k4" | "kd";
   /** What the customer gets: a video or (photo templates) a photo. */
   media?: "video" | "photo";
+  /** Create → AI photo: the description is required (it is the whole brief). */
+  wishRequired?: boolean;
   /** What photo the template needs (face / waist-up / full body); "auto" = like the person in the video. */
   framing?: Framing;
 }) {
@@ -245,10 +247,12 @@ export function CreateFlow({
   const photosRef = useRef<HTMLElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
   const consentRef = useRef<HTMLLabelElement>(null);
-  const [nudge, setNudge] = useState<null | "video" | "photo" | "phone" | "consent">(null);
+  const [nudge, setNudge] = useState<null | "video" | "photo" | "wish" | "phone" | "consent">(null);
+  const wishRef = useRef<HTMLTextAreaElement>(null);
   const videoMissing = !!customVideo && video.phase !== "ready";
   const busyVideo = video.phase === "uploading" || video.phase === "verifying";
-  const blocker = videoMissing ? "video" : missing > 0 ? "photo" : !phoneOk || (needPhone && !phone) ? "phone" : !consent ? "consent" : null;
+  const wishMissing = wishRequired && wish.trim().length < 3;
+  const blocker = videoMissing ? "video" : missing > 0 ? "photo" : wishMissing ? "wish" : !phoneOk || (needPhone && !phone) ? "phone" : !consent ? "consent" : null;
   const busyUpload = slots.some((s) => (state[s.key] ?? EMPTY).phase === "uploading" || (state[s.key] ?? EMPTY).phase === "verifying");
 
   /** The pay button is always tappable: it points the user to whatever is still missing. */
@@ -268,9 +272,10 @@ export function CreateFlow({
     }
     if (blocker) {
       setNudge(blocker);
-      const el = blocker === "photo" ? photosRef.current as HTMLElement | null : blocker === "phone" ? phoneRef.current : consentRef.current;
+      const el = blocker === "photo" ? photosRef.current as HTMLElement | null : blocker === "wish" ? wishRef.current : blocker === "phone" ? phoneRef.current : consentRef.current;
       el?.scrollIntoView({ behavior: "smooth", block: "center" });
       if (blocker === "phone") phoneRef.current?.focus({ preventScroll: true });
+      if (blocker === "wish") wishRef.current?.focus({ preventScroll: true });
       setTimeout(() => setNudge(null), 1800);
       return;
     }
@@ -310,7 +315,7 @@ export function CreateFlow({
 
   const gridCols = slots.length === 2 ? "grid-cols-2" : "grid-cols-3";
   let step = 0;
-  const hint = blocker === "video" ? cv.priceAfterUpload : blocker === "phone" ? c.needPhone : blocker === "consent" ? c.needConsent : null;
+  const hint = blocker === "video" ? cv.priceAfterUpload : blocker === "wish" ? c.needWish : blocker === "phone" ? c.needPhone : blocker === "consent" ? c.needConsent : null;
 
   return (
     <div className="space-y-4">
@@ -364,22 +369,25 @@ export function CreateFlow({
       </section>
 
       {/* Customer's wish for the AI: background, outfit, style (optional). */}
-      {allowWish && (
-        <section className="rounded-card border border-line bg-surface p-4 sm:p-5">
-          <StepTitle n={++step} done={!!wish.trim()}>{c.wish.title}</StepTitle>
-          <p className="mt-1 text-sm text-muted">{c.wish.hint}</p>
-          <textarea value={wish} onChange={(e) => setWish(e.target.value.slice(0, 300))} maxLength={300} rows={2}
-            placeholder={c.wish.placeholder} aria-label={c.wish.title}
-            className="mt-3 w-full rounded-xl border border-line bg-surface px-3 py-2 text-base outline-none focus:border-brand" />
+      {allowWish && (() => {
+        const w = wishRequired ? c.photoBrief : c.wish;
+        return (
+        <section className={`rounded-card border bg-surface p-4 transition-shadow sm:p-5 ${nudge === "wish" ? "border-ink ring-4 ring-brand/60" : "border-line"}`}>
+          <StepTitle n={++step} done={!!wish.trim()}>{w.title}</StepTitle>
+          <p className="mt-1 text-sm text-muted">{w.hint}</p>
+          <textarea ref={wishRef} value={wish} onChange={(e) => setWish(e.target.value.slice(0, 300))} maxLength={300} rows={wishRequired ? 3 : 2}
+            placeholder={w.placeholder} aria-label={w.title} required={wishRequired}
+            className="mt-3 w-full rounded-xl border border-line bg-surface px-3 py-2 text-base outline-none focus:border-ink" />
           <div className="mt-2 flex flex-wrap gap-2">
-            {c.wish.examples.map((x) => (
-              <button key={x} type="button" onClick={() => setWish((w) => (w.trim() ? `${w.trim()}; ${x}` : x).slice(0, 300))}
-                className="rounded-full bg-paper px-3 py-1.5 text-xs font-medium ring-1 ring-line hover:ring-brand">+ {x}</button>
+            {w.examples.map((x) => (
+              <button key={x} type="button" onClick={() => setWish((v) => (v.trim() ? `${v.trim()}; ${x}` : x).slice(0, 300))}
+                className="rounded-full bg-paper px-3 py-1.5 text-xs font-medium ring-1 ring-line hover:ring-ink">+ {x}</button>
             ))}
           </div>
           <p className="mt-1 text-right text-xs text-muted">{wish.length}/300</p>
         </section>
-      )}
+        );
+      })()}
 
       {/* Quality: one tier (720p); the picker only appears when there is a real choice. */}
       {effQualities.length > 1 && <section className="rounded-card border border-line bg-surface p-4 sm:p-5">

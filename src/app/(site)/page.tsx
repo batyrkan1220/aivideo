@@ -8,6 +8,7 @@ import { HeroShowcase } from "@/components/hero-showcase";
 import Link from "next/link";
 import { Logo } from "@/components/logo";
 import { AutoVideo } from "@/components/auto-video";
+import { formatKzt } from "@/lib/pricing";
 import { resolveShowcase } from "@/lib/templates/showcase";
 
 type SP = { account?: string; category?: string };
@@ -46,7 +47,7 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
           </div>
         </div>
         <h1 className="sr-only">{kk.home.title}</h1>
-        <Suspense fallback={<div className="h-56 animate-pulse rounded-[24px] bg-surface" />}>
+        <Suspense fallback={<div className="h-[19rem] animate-pulse rounded-[24px] bg-surface" />}>
           <HeroBanner />
         </Suspense>
       </section>
@@ -120,25 +121,35 @@ async function Showcase() {
   return <HeroShowcase items={items} />;
 }
 
-/** Phone hero: the main showcase template as a rounded banner with a "Try it" button. */
+/** Phone hero: swipeable showcase cards (admin-chosen / trending templates) with a "Try it" button. */
 async function HeroBanner() {
-  const [t] = await resolveShowcase();
-  if (!t) return null;
+  const items = (await resolveShowcase()).slice(0, 3);
+  if (!items.length) return null;
   return (
-    <Link href={`/templates/${t.id}`} className="relative block h-56 overflow-hidden rounded-[24px] bg-night ring-1 ring-black/5">
-      {t.previewUrl ? (
-        <AutoVideo src={t.previewUrl} poster={t.coverUrl ?? undefined} className="absolute inset-0 h-full w-full object-cover" />
-      ) : t.coverUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={t.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
-      ) : null}
-      <span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/85 via-black/45 to-transparent" />
-      <span className="absolute inset-y-0 left-0 flex max-w-[70%] flex-col justify-end gap-2 p-4 text-white">
-        <span className="section-title text-lime">{kk.home.heroEyebrow}</span>
-        <span className="text-2xl font-extrabold leading-tight tracking-tight">{t.title}</span>
-        <span className="text-[13px] leading-snug text-white/75">{kk.home.title}</span>
-        <span className="btn-glow mt-1 inline-flex h-10 w-fit items-center rounded-full px-5 text-sm font-bold">{kk.home.tryIt}</span>
-      </span>
-    </Link>
+    <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
+      {items.map((t, i) => (
+        <Link key={t.id} href={`/templates/${t.id}`}
+          className={`relative block h-[19rem] shrink-0 snap-center overflow-hidden rounded-[24px] bg-night shadow-[0_18px_40px_-22px_rgba(0,0,0,0.55)] ${items.length > 1 ? "w-[84%]" : "w-full"}`}>
+          {t.previewUrl ? (
+            <AutoVideo src={t.previewUrl} poster={t.coverUrl ?? undefined} className="absolute inset-0 h-full w-full object-cover" />
+          ) : t.coverUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={t.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          ) : null}
+          <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/10" />
+          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-night backdrop-blur">
+            {i === 0 ? "🔥" : "✨"} {kk.home.heroEyebrow}
+          </span>
+          <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-4 text-white">
+            <span className="min-w-0">
+              <span className="block truncate text-[26px] font-extrabold leading-none tracking-tight">{t.title}</span>
+              <span className="mt-1.5 block text-[13px] text-white/80">{kk.home.heroSub}</span>
+              {t.startingPriceKzt !== null && <span className="mt-1 block text-sm font-bold text-lime">{formatKzt(t.startingPriceKzt)}</span>}
+            </span>
+            <span className="btn-glow inline-flex h-11 shrink-0 items-center rounded-full px-5 text-sm font-extrabold">{kk.home.tryIt}</span>
+          </span>
+        </Link>
+      ))}
+    </div>
   );
 }
