@@ -37,7 +37,7 @@ export function AuthForm({
       <button
         type="submit"
         disabled={pending}
-        className="h-12 w-full rounded-full bg-brand px-4 font-semibold text-white transition-colors hover:bg-brand-dark disabled:opacity-60"
+        className="h-12 w-full btn-glow rounded-full px-4 font-semibold text-white disabled:opacity-60"
       >
         {pending ? kk.common.loading : submitLabel}
       </button>

@@ -10,6 +10,8 @@ import { isFreeOrderUser } from "@/lib/orders/free";
 import { ButtonLink } from "@/components/ui/button";
 import { formatKzt } from "@/lib/pricing";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
+import { seedanceAutoPriceKzt } from "@/lib/pricing-seedance";
+import { SEEDANCE_MIN_SEC } from "@/lib/templates/seedance-config";
 
 export const metadata = { title: kk.customVideo.title };
 
@@ -56,7 +58,7 @@ async function Flow() {
       <div className="rounded-card bg-brand-soft p-6">
         <h2 className="font-display text-lg font-bold">{kk.create.loginTitle}</h2>
         <p className="mt-1 text-sm text-muted">{kk.create.loginText}</p>
-        <p className="mt-3 text-sm text-muted">{cv.priceFrom(formatKzt(ap.minPriceKzt))}</p>
+        <p className="mt-3 text-sm text-muted">{cv.priceFrom(formatKzt(seedanceAutoPriceKzt(SEEDANCE_MIN_SEC, ap)))}</p>
         <div className="mt-4 flex flex-wrap gap-3">
           <ButtonLink href="/login?next=/create" size="lg">{kk.auth.login}</ButtonLink>
           <ButtonLink href="/signup?next=/create" size="lg" variant="secondary">{kk.auth.signup}</ButtonLink>
