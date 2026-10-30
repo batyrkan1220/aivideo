@@ -1,5 +1,6 @@
 "use server";
 import { redirect } from "next/navigation";
+import { forgetProfile } from "@/lib/auth/session";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { audit, getSessionUser } from "@/lib/auth/session";
@@ -16,6 +17,7 @@ export async function updateDisplayName(_: FormState, fd: FormData): Promise<For
   if (!name.success) return { error: kk.errors.generic };
   const sb = await supabaseServer(); // RLS: users may update only their own row (role is locked)
   const { error } = await sb.from("profiles").update({ display_name: name.data }).eq("id", user.id);
+  forgetProfile(user.id);
   if (error) return { error: kk.errors.generic };
   revalidatePath("/account");
   return { ok: kk.account.nameSaved };

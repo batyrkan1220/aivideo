@@ -1,4 +1,5 @@
 import "server-only";
+import { clearMemo } from "@/lib/cache/memo";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { mp4DurationSec } from "@/lib/custom-video/mp4";
 
@@ -20,6 +21,6 @@ export async function fetchVideoDuration(url: string): Promise<number | null> {
 export async function ensureTemplateDuration(templateId: string, videoUrl: string | null): Promise<number | null> {
   if (!videoUrl) return null;
   const d = await fetchVideoDuration(videoUrl);
-  if (d && d > 0) await supabaseAdmin().from("templates").update({ video_duration_sec: d }).eq("id", templateId);
+  if (d && d > 0) { await supabaseAdmin().from("templates").update({ video_duration_sec: d }).eq("id", templateId); clearMemo("cat:"); }
   return d;
 }

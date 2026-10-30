@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { clearMemo } from "@/lib/cache/memo";
 import { audit, getSessionUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabase/server";
@@ -26,6 +27,7 @@ export async function saveShowcase(_: ShowcaseState, fd: FormData): Promise<Show
   });
   if (error) return { error: ru.errors.generic };
   await audit(u.id, "home.showcase_update", "site_settings", SHOWCASE_KEY, { value: parsed.data });
+  clearMemo();
   revalidatePath("/");
   return { ok: ru.admin.home.saved };
 }

@@ -1,4 +1,5 @@
 import "server-only";
+import { memo } from "@/lib/cache/memo";
 import { connection } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/server";
@@ -24,6 +25,11 @@ export async function readShowcaseSetting(): Promise<(string | null)[]> {
  * unpublished slot is filled automatically (trending, then newest). Returns [center, left, right].
  */
 export async function resolveShowcase(): Promise<TemplateDetail[]> {
+  await connection();
+  return memo("cat:showcase", 60_000, loadShowcase);
+}
+
+async function loadShowcase(): Promise<TemplateDetail[]> {
   const chosen = await readShowcaseSetting();
   const picked = await Promise.all(chosen.map((id) => (id ? getTemplate(id) : Promise.resolve(null))));
   const hasMedia = (t: TemplateDetail | null): t is TemplateDetail => !!t && !!(t.coverUrl || t.previewUrl);

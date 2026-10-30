@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { clearMemo } from "@/lib/cache/memo";
 import { audit, getSessionUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabase/server";
@@ -23,6 +24,7 @@ export async function saveSeedancePricing(_: SeedancePricingState, fd: FormData)
   });
   if (error) return { error: "failed" };
   await audit(u.id, "seedance_pricing.update", "site_settings", null, p.data);
+  clearMemo();
   revalidatePath("/admin");
   revalidatePath("/");
   return { ok: true };

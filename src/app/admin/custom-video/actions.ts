@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { clearMemo } from "@/lib/cache/memo";
 import { audit, getSessionUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabase/server";
@@ -22,6 +23,7 @@ export async function saveCustomVideoSettings(_: CustomVideoState, fd: FormData)
   });
   if (error) return { error: "failed" };
   await audit(u.id, "custom_video.settings", "site_settings", null, p.data);
+  clearMemo();
   revalidatePath("/admin");
   return { ok: true };
 }

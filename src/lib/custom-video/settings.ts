@@ -1,4 +1,5 @@
 import "server-only";
+import { memo } from "@/lib/cache/memo";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC } from "@/lib/templates/seedance-config";
@@ -18,6 +19,10 @@ export const MIN_VIDEO_SECONDS = SEEDANCE_MIN_SEC;
 export const VIDEO_TYPES = ["video/mp4", "video/quicktime"] as const;
 
 export async function customVideoSettings(): Promise<CustomVideoSettings> {
+  return memo("settings:custom", 60_000, loadCustom);
+}
+
+async function loadCustom(): Promise<CustomVideoSettings> {
   try {
     const { data } = await supabaseAdmin().from("site_settings").select("value").eq("key", CUSTOM_VIDEO_KEY).maybeSingle();
     const p = customVideoSettingsSchema.safeParse(data?.value ?? {});
@@ -31,12 +36,16 @@ export async function customVideoSettings(): Promise<CustomVideoSettings> {
 
 /** The hidden published template that carries the photo slot + provider config for custom orders. */
 export async function customTemplateId(): Promise<string | null> {
+  return memo("tpl:custom", 300_000, async () => {
   const { data } = await supabaseAdmin().from("templates").select("id").eq("kind", "custom").eq("status", "published").limit(1).maybeSingle();
   return data?.id ?? null;
+  });
 }
 
 /** The hidden published photo template for Create → AI photo (Kling image, the customer's description). */
 export async function customPhotoTemplateId(): Promise<string | null> {
+  return memo("tpl:custom_photo", 300_000, async () => {
   const { data } = await supabaseAdmin().from("templates").select("id").eq("kind", "custom_photo").eq("status", "published").limit(1).maybeSingle();
   return data?.id ?? null;
+  });
 }

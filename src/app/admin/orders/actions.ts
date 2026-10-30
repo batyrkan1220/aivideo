@@ -1,5 +1,6 @@
 "use server";
 import { randomUUID } from "node:crypto";
+import { forgetProfile } from "@/lib/auth/session";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { audit, getSessionUser } from "@/lib/auth/session";
@@ -118,6 +119,7 @@ export async function changeRole(_: AdminState, fd: FormData): Promise<AdminStat
   const db = supabaseAdmin();
   const { data: before } = await db.from("profiles").select("role").eq("id", id.data).single();
   const { error } = await db.from("profiles").update({ role: role.data as Role }).eq("id", id.data);
+  forgetProfile(id.data);
   if (error) return { error: E.generic };
   await audit(u.id, "user.role_change", "profile", id.data, { from: before?.role, to: role.data });
   revalidatePath("/admin/users");

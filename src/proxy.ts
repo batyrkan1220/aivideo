@@ -32,7 +32,9 @@ export async function proxy(request: NextRequest) {
     },
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  // getClaims() refreshes the session when needed and verifies the JWT (locally with asymmetric keys).
+  const { data: claims } = await supabase.auth.getClaims();
+  const user = claims?.claims?.sub ? { id: claims.claims.sub } : null;
   const path = request.nextUrl.pathname;
 
   if (!user && PROTECTED.some((p) => path === p || path.startsWith(p + "/"))) {

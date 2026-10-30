@@ -20,7 +20,7 @@ export type CardData = {
  * Keeps at most MAX_PLAYING previews running at once across the whole page: starting a new
  * one pauses the oldest. Many cards on screen then never decode/stream videos in parallel.
  */
-const MAX_PLAYING = 6; // 2 columns × 3 rows on a phone screen
+const MAX_PLAYING = 4; // phones: the cards in view; fewer parallel downloads keep taps responsive
 const playingNow: HTMLVideoElement[] = [];
 function claimPlayback(v: HTMLVideoElement) {
   const i = playingNow.indexOf(v);
@@ -48,7 +48,7 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
   useEffect(() => {
     const el = cardRef.current;
     if (!el || !t.previewUrl) return;
-    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setNear(true); io.disconnect(); } }, { rootMargin: "400px 0px" });
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setNear(true); io.disconnect(); } }, { rootMargin: "200px 0px" });
     io.observe(el);
     return () => io.disconnect();
   }, [t.previewUrl]);
@@ -79,7 +79,7 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
     if (!el || !near) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     if ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return;
-    const io = new IntersectionObserver(([e]) => (e.isIntersecting ? play() : stop()), { threshold: 0.4 });
+    const io = new IntersectionObserver(([e]) => (e.isIntersecting ? play() : stop()), { threshold: 0.6 });
     io.observe(el);
     return () => { io.disconnect(); stop(); };
   }, [near]); // eslint-disable-line react-hooks/exhaustive-deps

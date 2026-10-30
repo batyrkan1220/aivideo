@@ -1,4 +1,5 @@
 import "server-only";
+import { forgetProfile } from "@/lib/auth/session";
 import { supabaseAdmin, supabaseServer } from "@/lib/supabase/server";
 import type { TelegramUser } from "./init-data";
 
@@ -48,6 +49,7 @@ export async function signInTelegramUser(u: TelegramUser): Promise<string> {
     telegram_id: u.id, telegram_username: u.username ?? null,
   }).eq("id", userId);
   await admin.from("profiles").update({ display_name: name }).eq("id", userId).is("display_name", null);
+  forgetProfile(userId!);
 
   if (!email) {
     const { data } = await admin.auth.admin.getUserById(userId!);

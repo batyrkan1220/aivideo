@@ -1,5 +1,6 @@
 "use server";
 import { ensureTemplateDuration } from "@/lib/templates/duration";
+import { clearMemo } from "@/lib/cache/memo";
 import { mediaUrl } from "@/lib/templates/queries";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -41,6 +42,7 @@ export async function saveTemplate(raw: unknown, id: string | null): Promise<Sav
     if (error) { console.error("[admin.template.create]", error.code, error.message); return { ok: false, error: "generic" }; }
     if (row.preview_video_path) await ensureTemplateDuration(data.id, mediaUrl(row.preview_video_path));
     await audit(user.id, "template.create", "template", data.id, { title: row.title_kk });
+    clearMemo();
     revalidatePath("/admin/templates");
     return { ok: true, id: data.id };
   }
@@ -69,6 +71,8 @@ export async function saveTemplate(raw: unknown, id: string | null): Promise<Sav
   }
   // A published template's live configuration changed → snapshot a new version for future orders.
   if (before.status === "published") await snapshotVersion(id);
+
+  clearMemo();
 
   revalidatePath("/admin/templates");
   revalidatePath(`/templates/${id}`);
@@ -122,6 +126,7 @@ export async function changeStatus(
   }
 
   await audit(user.id, `template.${action}`, "template", id);
+  clearMemo();
   revalidatePath("/admin/templates");
   revalidatePath("/");
   return { ok: true };
@@ -162,6 +167,7 @@ export async function deleteTemplate(id: string): Promise<DeleteResult> {
   }
 
   await audit(user.id, "template.delete", "template", id, { mode });
+  clearMemo();
   revalidatePath("/admin/templates");
   revalidatePath("/");
   return { ok: true, mode };
@@ -219,6 +225,7 @@ export async function createPhotoTemplates(raw: unknown): Promise<BulkResult> {
     ids.push(data.id);
   }
   await audit(user.id, "template.bulk_photo", "template", null, { count: ids.length, publish });
+  clearMemo();
   revalidatePath("/admin/templates");
   revalidatePath("/photos");
   return { ok: true, ids };
