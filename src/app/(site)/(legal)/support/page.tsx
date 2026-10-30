@@ -42,7 +42,7 @@ async function Contact() {
   if (!bot) return null;
   return (
     <a href={`https://t.me/${bot}`} target="_blank" rel="noopener noreferrer" className="btn-glow mt-4 inline-flex h-11 items-center gap-2 rounded-full px-5 text-sm font-bold">
-      ✈️ {S.write} @{bot}
+      ✈️ {S.write}
     </a>
   );
 }

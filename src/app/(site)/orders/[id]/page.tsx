@@ -145,10 +145,10 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
             <>
               {isPhoto ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={`/api/orders/${o.id}/video`} alt={kk.photos.watch} className="mx-auto w-full max-w-sm rounded-[20px] bg-night object-contain" />
+                <img src={`/api/orders/${o.id}/video`} alt={kk.photos.watch} className="mx-auto max-h-[56svh] w-auto max-w-full rounded-[20px] bg-night object-contain sm:max-h-none sm:max-w-sm" />
               ) : (
                 <video src={`/api/orders/${o.id}/video`} controls playsInline preload="metadata" aria-label={kk.result.watch}
-                  className="mx-auto aspect-[9/16] w-full max-w-sm rounded-[20px] bg-night" />
+                  className="mx-auto aspect-[9/16] w-full max-w-[min(100%,calc(56svh*9/16))] rounded-[20px] bg-night sm:max-w-sm" />
               )}
               <div className="mx-auto mt-4 max-w-sm">
                 <DownloadVideo orderId={o.id} photo={isPhoto} />
