@@ -4,7 +4,7 @@ import { kk } from "@/lib/i18n/kk";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <main className="theme-dark grid min-h-dvh bg-paper text-ink md:grid-cols-[1fr_minmax(0,520px)]">
+    <main className="theme-app grid min-h-dvh bg-paper text-ink md:grid-cols-[1fr_minmax(0,520px)]">
       {/* Brand panel (tablet/desktop only) */}
       <section className="relative hidden overflow-hidden bg-night p-12 text-white md:flex md:flex-col md:justify-between">
         <Link href="/" aria-label={kk.brand.name}><Logo className="text-xl" /></Link>

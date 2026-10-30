@@ -36,7 +36,7 @@ export function MobileNav() {
   return (
     <nav
       aria-label={kk.nav.home}
-      className="glass fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] z-40 rounded-[1.75rem] border border-white/10 shadow-[0_18px_40px_-12px_rgba(0,0,0,0.8)] sm:hidden"
+      className="glass fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] z-40 rounded-[1.75rem] border border-black/5 shadow-[0_14px_36px_-14px_rgba(0,0,0,0.25)] sm:hidden"
     >
       <ul className="grid h-[4.25rem] grid-cols-5 items-center px-1">
         {items.map((it) => {
@@ -48,7 +48,7 @@ export function MobileNav() {
                 aria-current={on ? "page" : undefined}
                 className={`flex min-w-0 flex-col items-center gap-1 text-[10px] font-semibold leading-none transition-colors ${on ? "text-ink" : "text-muted"}`}
               >
-                <span className={`flex h-9 w-12 items-center justify-center rounded-[0.9rem] transition-all active:scale-95 ${on ? "bg-brand text-night shadow-[0_6px_18px_-6px_rgba(212,255,50,0.7)]" : "text-ink"}`}>
+                <span className={`flex h-9 w-12 items-center justify-center rounded-[0.9rem] transition-all active:scale-95 ${on ? "bg-brand text-night shadow-[0_6px_16px_-6px_rgba(120,160,0,0.6)]" : "text-ink"}`}>
                   <span className="h-[22px] w-[22px] [&>svg]:h-full [&>svg]:w-full" aria-hidden>{it.icon}</span>
                 </span>
                 <span className="max-w-full truncate px-0.5">{it.label}</span>

@@ -54,7 +54,7 @@ export function CategoryChips({
   };
   const chip = (isActive: boolean) =>
     `shrink-0 rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition-colors active:scale-95 sm:px-4 sm:py-2 sm:text-sm sm:font-medium ${
-      isActive ? "btn-glow border-transparent text-white" : "border-white/10 bg-surface/70 text-ink/85 hover:border-white/25"
+      isActive ? "btn-glow border-transparent text-white" : "border-line bg-surface text-ink/80 hover:border-ink/30"
     }`;
   return (
     <nav aria-label={kk.nav.categories} className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">

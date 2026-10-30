@@ -60,7 +60,7 @@ async function CreateSection({ t }: { t: TemplateDetail }) {
           </div>
         </div>
         {/* Phones: one big action always in reach, above the bottom tab bar. */}
-        <div className="fixed inset-x-3 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-30 rounded-[1.5rem] border border-white/10 px-3 py-3 shadow-[0_18px_40px_-14px_rgba(0,0,0,0.75)] glass sm:hidden">
+        <div className="fixed inset-x-3 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-30 rounded-[1.5rem] border border-black/5 px-3 py-3 shadow-[0_14px_36px_-14px_rgba(0,0,0,0.25)] glass sm:hidden">
           <ButtonLink href={`/signup?next=${next}`} size="lg" className="w-full">
             {kk.create.loginCta}{price !== null ? ` · ${formatKzt(price)}` : ""}
           </ButtonLink>

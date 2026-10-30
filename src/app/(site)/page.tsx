@@ -83,7 +83,7 @@ async function Feed({ searchParams }: { searchParams: Promise<SP> }) {
       {/* Sticky category chips, like an app's filter bar */}
       <h2 className="section-title mt-5 text-muted md:hidden">{kk.home.templatesTitle}</h2>
       {categories.length > 0 && (
-        <div className="under-header sticky z-20 -mx-4 bg-paper/85 px-4 py-2.5 backdrop-blur-xl sm:py-3">
+        <div className="under-header sticky z-20 -mx-4 bg-paper/90 px-4 py-2.5 backdrop-blur-xl sm:py-3">
           <CategoryChips categories={categories} active={category} />
         </div>
       )}
@@ -125,7 +125,7 @@ async function HeroBanner() {
   const [t] = await resolveShowcase();
   if (!t) return null;
   return (
-    <Link href={`/templates/${t.id}`} className="relative block h-56 overflow-hidden rounded-[24px] bg-night ring-1 ring-white/10">
+    <Link href={`/templates/${t.id}`} className="relative block h-56 overflow-hidden rounded-[24px] bg-night ring-1 ring-black/5">
       {t.previewUrl ? (
         <AutoVideo src={t.previewUrl} poster={t.coverUrl ?? undefined} className="absolute inset-0 h-full w-full object-cover" />
       ) : t.coverUrl ? (
@@ -134,7 +134,7 @@ async function HeroBanner() {
       ) : null}
       <span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/85 via-black/45 to-transparent" />
       <span className="absolute inset-y-0 left-0 flex max-w-[70%] flex-col justify-end gap-2 p-4 text-white">
-        <span className="section-title text-brand">{kk.home.heroEyebrow}</span>
+        <span className="section-title text-lime">{kk.home.heroEyebrow}</span>
         <span className="text-2xl font-extrabold leading-tight tracking-tight">{t.title}</span>
         <span className="text-[13px] leading-snug text-white/75">{kk.home.title}</span>
         <span className="btn-glow mt-1 inline-flex h-10 w-fit items-center rounded-full px-5 text-sm font-bold">{kk.home.tryIt}</span>

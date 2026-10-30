@@ -57,55 +57,61 @@ html[data-tg] .tg-only { display: block; }
 .under-header { top: calc(4rem + env(safe-area-inset-top)); }
 html[data-tg] .under-header { top: 0; }
 
-/* ── Dark "Neo-Glow" theme for the customer site and the Telegram Mini App ──────────
-   Deep black, card surfaces #1C1C1E, neon lime (#D4FF32) for actions and the active tab,
-   coral red (#FF453A) for promos. Scoped to .theme-dark (the admin stays light). */
-.theme-dark {
-  --color-paper: #0b0b0b;
-  --color-surface: #1c1c1e;
-  --color-ink: #ffffff;
-  --color-muted: #8e8e93;
-  --color-line: #2c2c2e;
+/* ── Light "Neo-Glow" theme for the customer site and the Telegram Mini App ─────────
+   Soft light-grey canvas, white cards, near-black text, neon lime (#D4FF32) for actions and
+   the active tab (always with black text), coral red (#FF453A) for promos.
+   Lime is not readable as text on white, so text in the brand colour uses a deep olive.
+   Scoped to .theme-app (the admin keeps its own look). */
+.theme-app {
+  --color-paper: #f4f4f6;
+  --color-surface: #ffffff;
+  --color-ink: #0b0b0b;
+  --color-muted: #6e6e73;
+  --color-line: #e5e5ea;
   --color-brand: #d4ff32;
   --color-brand-dark: #c2ee1f;
-  --color-brand-soft: #23280f;
+  --color-brand-soft: #f1ffc2;
   --color-coral: #ff453a;
-  --color-danger: #ff453a;
-  --color-success: #30d158;
+  --color-danger: #e5302a;
+  --color-success: #1f9d55;
   --color-flash: #ff453a;
   --font-display: "Inter Variable", system-ui, -apple-system, "SF Pro Display", sans-serif;
-  color-scheme: dark;
+  color-scheme: light;
 }
-body:has(> .theme-dark:not(.fixed)) { background: #0b0b0b; }
-.theme-dark ::selection { background: rgba(212, 255, 50, 0.35); color: #0b0b0b; }
-.theme-dark :focus-visible { outline-color: #d4ff32; }
+body:has(> .theme-app:not(.fixed)) { background: #f4f4f6; }
+.theme-app ::selection { background: rgba(212, 255, 50, 0.6); color: #0b0b0b; }
+.theme-app :focus-visible { outline-color: #0b0b0b; }
+/* Brand-coloured text and borders on light surfaces: deep olive instead of neon lime. */
+.theme-app .text-brand { color: #4a6a00; }
+.theme-app .border-brand { border-color: #8fb300; }
+/* On dark media (video/photo overlays) the neon lime stays. */
+.theme-app .text-lime { color: #d4ff32; }
 
 /* Primary action: neon lime with black text (beats text-white utilities on purpose). */
 .btn-glow {
   background: #d4ff32;
   color: #0b0b0b !important;
-  box-shadow: 0 8px 26px -10px rgba(212, 255, 50, 0.55);
+  box-shadow: 0 8px 22px -10px rgba(120, 160, 0, 0.55), inset 0 0 0 1px rgba(11, 11, 11, 0.06);
   transition: filter 0.15s, transform 0.15s;
 }
-.btn-glow:hover { filter: brightness(1.05); }
-.btn-glow * { border-color: rgba(11, 11, 11, 0.25); }
+.btn-glow:hover { filter: brightness(0.97); }
 
 /* Promo pill (coral). */
 .btn-promo {
   background: #ff453a;
   color: #fff;
-  box-shadow: 0 8px 22px -10px rgba(255, 69, 58, 0.7);
+  box-shadow: 0 8px 20px -10px rgba(255, 69, 58, 0.7);
 }
 
 /* Accent text. */
-.text-gradient { color: #d4ff32; }
+.text-gradient { color: #4a6a00; }
 
 /* Uppercase section titles. */
 .section-title { font-size: 0.8rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
 
 /* Frosted glass for floating bars. */
 .glass {
-  background: color-mix(in srgb, var(--color-surface) 82%, transparent);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-  backdrop-filter: blur(20px) saturate(160%);
+  background: color-mix(in srgb, var(--color-surface) 86%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
 }

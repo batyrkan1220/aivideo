@@ -5,7 +5,7 @@ import { MobileNav } from "@/components/mobile-nav";
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="theme-dark flex min-h-full flex-1 flex-col bg-paper text-ink">
+    <div className="theme-app flex min-h-full flex-1 flex-col bg-paper text-ink">
       <SiteHeader />
       <div className="flex-1">{children}</div>
       <SiteFooter />

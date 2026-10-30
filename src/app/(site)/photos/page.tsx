@@ -19,11 +19,11 @@ export default function PhotosPage() {
           <Link href="/create" className="btn-promo inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold">🔥 {kk.home.promo}</Link>
         </div>
       </div>
-      <section className="relative overflow-hidden rounded-[24px] bg-surface p-5 ring-1 ring-white/10">
+      <section className="relative overflow-hidden rounded-[24px] bg-surface p-5 ring-1 ring-black/5">
         <span className="section-title text-brand">{kk.photos.eyebrow}</span>
         <h1 className="mt-2 text-2xl font-extrabold leading-tight tracking-tight">{kk.photos.title}</h1>
         <p className="mt-1.5 max-w-md text-sm text-muted">{kk.photos.lead}</p>
-        <span className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-brand/15 blur-3xl" aria-hidden />
+        <span className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-brand/60 blur-3xl" aria-hidden />
       </section>
       <h2 className="section-title mb-3 mt-5 text-muted">{kk.photos.templatesTitle}</h2>
       <Suspense fallback={<GridSkeleton />}>

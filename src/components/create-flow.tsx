@@ -431,7 +431,7 @@ export function CreateFlow({
       )}
 
       {(price || waitingForVideo) && (
-        <div className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 -mx-1 rounded-[1.5rem] border border-white/10 px-4 pb-2 pt-2.5 shadow-[0_18px_40px_-14px_rgba(0,0,0,0.75)] glass sm:static sm:mx-0 sm:rounded-card sm:p-4">
+        <div className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 -mx-1 rounded-[1.5rem] border border-black/5 px-4 pb-2 pt-2.5 shadow-[0_14px_36px_-14px_rgba(0,0,0,0.25)] glass sm:static sm:mx-0 sm:rounded-card sm:p-4">
           <label ref={consentRef} className={`-mx-1 mb-2 flex cursor-pointer items-start gap-2.5 rounded-lg px-1 py-1 text-xs leading-snug transition-colors ${nudge === "consent" ? "bg-flash/40 ring-2 ring-flash" : ""}`}>
             <input type="checkbox" className="mt-px h-[18px] w-[18px] shrink-0 accent-brand" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
             <span className="text-muted">{customVideo ? cv.consent : kk.consent.combined}</span>

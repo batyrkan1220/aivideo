@@ -105,7 +105,7 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
       onFocus={start}
       onBlur={stop}
     >
-      <div className="relative aspect-[9/16] overflow-hidden rounded-[20px] bg-night ring-1 ring-white/10 transition-transform duration-200 group-active:scale-[0.97]">
+      <div className="relative aspect-[9/16] overflow-hidden rounded-[20px] bg-night ring-1 ring-black/5 transition-transform duration-200 group-active:scale-[0.97]">
         {t.coverUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -142,7 +142,7 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
         <div className="absolute inset-x-3 bottom-3 text-white">
           <h3 className="line-clamp-2 text-[15px] font-bold leading-tight tracking-tight sm:text-base">{t.title}</h3>
           {t.startingPriceKzt !== null && (
-            <p className="mt-1 text-[12px] font-semibold text-brand sm:text-sm">
+            <p className="mt-1 text-[12px] font-semibold text-lime sm:text-sm">
               {formatKzt(t.startingPriceKzt)}<span className="hidden sm:inline"> {kk.catalog.from}</span>
             </p>
           )}
