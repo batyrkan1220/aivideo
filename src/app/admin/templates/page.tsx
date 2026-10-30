@@ -20,7 +20,10 @@ export default function TemplatesAdminPage() {
     <div>
       <div className="mb-6 flex items-center justify-between gap-4">
         <h1 className="font-display text-2xl font-bold">{ru.admin.nav.templates}</h1>
-        <ButtonLink href="/admin/templates/new">+ {ru.admin.list.newTemplate}</ButtonLink>
+        <div className="flex flex-wrap gap-2">
+          <ButtonLink href="/admin/templates/bulk" variant="secondary">📸 {ru.admin.bulk.open}</ButtonLink>
+          <ButtonLink href="/admin/templates/new">+ {ru.admin.list.newTemplate}</ButtonLink>
+        </div>
       </div>
       <Suspense fallback={<p className="text-muted">{ru.common.loading}</p>}>
         <List />
@@ -35,7 +38,7 @@ async function List() {
   if (!can(u.role, "templates.manage")) return <p className="text-muted">{ru.admin.forbidden}</p>;
 
   const { data } = await supabaseAdmin().from("templates")
-    .select("id,title_kk,status,required_face_count,updated_at,is_trending")
+    .select("id,title_kk,status,required_face_count,updated_at,is_trending,provider_key")
     .eq("kind", "catalog")
     .is("deleted_at", null)
     .order("updated_at", { ascending: false });
@@ -61,6 +64,7 @@ async function List() {
           {data.map((t) => (
             <tr key={t.id}>
               <td className="px-4 py-3 font-medium">
+                <span className="mr-2 text-xs" title={t.provider_key === "kling_photo" ? "Фото" : "Видео"}>{t.provider_key === "kling_photo" ? "📸" : "🎬"}</span>
                 {t.title_kk}
                 {t.is_trending && <span className="ml-2 rounded-full bg-flash px-2 py-0.5 text-xs font-bold">{ru.catalog2.trendBadge}</span>}
               </td>

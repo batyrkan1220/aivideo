@@ -7,8 +7,9 @@ import { z } from "zod";
 import { audit, requirePermission, ForbiddenError } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import {
-  templateInputSchema, publishProblems, rowToInput, inputToRow, type PublishProblem,
+  templateInputSchema, publishProblems, rowToInput, inputToRow, emptyTemplate, type PublishProblem,
 } from "@/lib/templates/admin-schema";
+import { PHOTO_ASPECTS, PHOTO_MAX_PEOPLE, PHOTO_PROVIDER, PHOTO_QUALITY } from "@/lib/templates/photo-config";
 
 export type SaveResult =
   | { ok: true; id: string }
@@ -164,6 +165,63 @@ export async function deleteTemplate(id: string): Promise<DeleteResult> {
   revalidatePath("/admin/templates");
   revalidatePath("/");
   return { ok: true, mode };
+}
+
+const bulkSchema = z.object({
+  items: z.array(z.object({
+    coverPath: z.string().regex(/^covers\/[0-9a-f-]{36}\.(jpg|png|webp)$/),
+    title: z.string().trim().min(2).max(120),
+  })).min(1).max(20),
+  categoryId: z.string().uuid().nullable(),
+  priceKzt: z.number().int().min(1).max(1_000_000),
+  people: z.number().int().min(1).max(PHOTO_MAX_PEOPLE),
+  aspectRatio: z.enum(PHOTO_ASPECTS),
+  prompt: z.string().trim().max(2000).default(""),
+  allowWish: z.boolean().default(true),
+  publish: z.boolean().default(true),
+});
+
+export type BulkResult = { ok: true; ids: string[] } | { ok: false; error: "forbidden" | "invalid" | "generic" };
+
+/**
+ * Bulk photo templates: every uploaded example photo becomes its own photo template
+ * (Kling image model) with the shared settings; published right away when asked.
+ */
+export async function createPhotoTemplates(raw: unknown): Promise<BulkResult> {
+  const user = await guard("templates.manage");
+  if (!user) return { ok: false, error: "forbidden" };
+  const p = bulkSchema.safeParse(raw);
+  if (!p.success) return { ok: false, error: "invalid" };
+  const d = p.data;
+  const publish = d.publish && !!(await guard("templates.publish"));
+  const db = supabaseAdmin();
+  const base = emptyTemplate();
+  const ids: string[] = [];
+  for (const it of d.items) {
+    const input = {
+      ...base,
+      titleKk: it.title,
+      categoryId: d.categoryId,
+      coverAssetPath: it.coverPath,
+      previewVideoPath: null,
+      providerKey: PHOTO_PROVIDER,
+      providerConfig: { prompt: d.prompt, people: d.people, aspectRatio: d.aspectRatio, useExample: true, allowWish: d.allowWish, labels: [] },
+      qualities: [PHOTO_QUALITY],
+      pricing: { ...base.pricing, basePriceKzt: d.priceKzt },
+    };
+    const row = inputToRow(templateInputSchema.parse(input));
+    const now = new Date().toISOString();
+    const { data, error } = await db.from("templates")
+      .insert({ ...row, created_by: user.id, status: publish ? "published" : "draft", ...(publish ? { published_at: now } : {}) })
+      .select("id").single();
+    if (error || !data) { console.error("[admin.template.bulk]", error?.code, error?.message); return ids.length ? { ok: true, ids } : { ok: false, error: "generic" }; }
+    if (publish) await snapshotVersion(data.id);
+    ids.push(data.id);
+  }
+  await audit(user.id, "template.bulk_photo", "template", null, { count: ids.length, publish });
+  revalidatePath("/admin/templates");
+  revalidatePath("/photos");
+  return { ok: true, ids };
 }
 
 const uploadSchema = z.object({
