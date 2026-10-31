@@ -42,9 +42,8 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
       {/* Phones / Mini App: brand bar (Telegram hides the site header) + a light, text-only hero (no videos) */}
       <section className="mx-auto max-w-6xl px-4 pt-3 md:hidden">
         <div className="tg-only">
-          <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="mb-3 flex items-center">
             <Logo className="text-base" />
-            <Link href="/create" className="btn-promo inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold">🔥 {kk.home.promo}</Link>
           </div>
         </div>
         <TextHero />
