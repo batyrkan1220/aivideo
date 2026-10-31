@@ -107,7 +107,7 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
       onFocus={start}
       onBlur={stop}
     >
-      <div className="relative aspect-[9/16] overflow-hidden rounded-[20px] bg-night ring-1 ring-black/5 transition-transform duration-200 group-active:scale-[0.97]">
+      <div className="relative aspect-[9/16] overflow-hidden rounded-[14px] bg-night sm:rounded-[18px] ring-1 ring-black/5 transition-transform duration-200 group-active:scale-[0.97]">
         {t.coverUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -131,27 +131,27 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
           />
         )}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
-        <div className="absolute left-2.5 top-2.5 flex flex-col items-start gap-1.5 sm:left-3 sm:top-3">
+        <div className="absolute left-1.5 top-1.5 flex flex-col items-start gap-1 sm:left-2.5 sm:top-2.5">
           {t.isTrending && (
-            <span className="rounded-full bg-brand px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-night">{kk.catalog2.trendBadge}</span>
+            <span className="rounded-full bg-brand px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-night sm:px-2.5 sm:py-1 sm:text-[11px]">{kk.catalog2.trendBadge}</span>
           )}
           {/* People in the template (only worth showing for 2+). */}
           {t.faceCount > 1 && (
             // Overlapping avatar stack (+count) — one circle per person in the video.
             <span className="flex items-center" aria-label={kk.catalog.faces(t.faceCount)}>
               {["bg-brand-soft", "bg-peach", "bg-rose"].slice(0, Math.min(t.faceCount, 3)).map((bg, i) => (
-                <span key={bg} className={`-ml-1.5 flex h-6 w-6 items-center justify-center rounded-full text-night ring-2 ring-white first:ml-0 ${bg}`} style={{ zIndex: 3 - i }} aria-hidden>
-                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm-8.5 9a8.5 8.5 0 0 1 17 0z" /></svg>
+                <span key={bg} className={`-ml-1.5 flex h-5 w-5 items-center justify-center rounded-full text-night ring-2 ring-white first:ml-0 sm:h-6 sm:w-6 ${bg}`} style={{ zIndex: 3 - i }} aria-hidden>
+                  <svg viewBox="0 0 24 24" className="h-3 w-3 sm:h-3.5 sm:w-3.5" fill="currentColor"><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm-8.5 9a8.5 8.5 0 0 1 17 0z" /></svg>
                 </span>
               ))}
-              {t.faceCount > 3 && <span className="-ml-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-night px-1 text-[10px] font-bold text-white ring-2 ring-white">+{t.faceCount - 3}</span>}
+              {t.faceCount > 3 && <span className="-ml-1.5 flex h-5 min-w-5 items-center sm:h-6 sm:min-w-6 justify-center rounded-full bg-night px-1 text-[10px] font-bold text-white ring-2 ring-white">+{t.faceCount - 3}</span>}
             </span>
           )}
         </div>
-        <div className="absolute inset-x-3 bottom-3 text-white">
-          <h3 className="line-clamp-2 text-[15px] font-bold leading-tight tracking-tight sm:text-base">{t.title}</h3>
+        <div className="absolute inset-x-2 bottom-2 text-white sm:inset-x-3 sm:bottom-3">
+          <h3 className="line-clamp-2 text-[12px] font-bold leading-tight tracking-tight sm:text-[15px]">{t.title}</h3>
           {t.startingPriceKzt !== null && (
-            <p className="mt-1 text-[12px] font-semibold text-lime sm:text-sm">
+            <p className="mt-0.5 text-[11px] font-semibold text-lime sm:mt-1 sm:text-sm">
               {formatKzt(t.startingPriceKzt)}<span className="hidden sm:inline"> {kk.catalog.from}</span>
             </p>
           )}

@@ -149,7 +149,7 @@ async function Feed({ searchParams }: { searchParams: Promise<SP> }) {
           category={category}
           initial={first.items.map(pickCard)}
           initialHasMore={first.items.length < first.total}
-          priorityCount={4}
+          priorityCount={6}
         />
       )}
     </div>
