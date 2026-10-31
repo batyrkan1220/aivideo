@@ -61,7 +61,7 @@ async function Profile() {
   const videos = (done ?? []).length - photos;
   const tg = isTelegramEmail(user.email);
   const name = user.displayName?.trim() || (prof?.telegram_username ? `@${prof.telegram_username}` : tg ? P.guest : (user.email ?? "").split("@")[0] || P.guest);
-  const since = prof?.created_at ? new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric", timeZone: "Asia/Almaty" }).format(new Date(prof.created_at)) : null;
+  const since = prof?.created_at ? new Intl.DateTimeFormat("kk-KZ", { month: "long", year: "numeric", timeZone: "Asia/Almaty" }).format(new Date(prof.created_at)) : null;
 
   return (
     <>

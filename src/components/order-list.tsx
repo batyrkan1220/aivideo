@@ -45,7 +45,7 @@ export async function OrderList({ limit = 50 }: { limit?: number }) {
   const photoUrl = new Map(photoPaths.map((f, i) => [f.order_id, signed?.[i]?.signedUrl ?? null]));
   const isPhoto = (o: Row) => photoUrl.has(o.id) || (o.template_snapshot_json as { provider_key?: string }).provider_key === "kling_photo";
 
-  const fmt = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short", timeZone: "Asia/Almaty" });
+  const fmt = new Intl.DateTimeFormat("kk-KZ", { day: "numeric", month: "short", timeZone: "Asia/Almaty" });
   const state = (o: Row): { text: string; tone: "ok" | "work" | "pay" | "bad" | "muted" } => {
     if (o.payment_status === "refunded") return { text: kk.order.payment.refunded, tone: "muted" };
     if (o.payment_status !== "succeeded") return { text: kk.myVideos.pay, tone: "pay" };

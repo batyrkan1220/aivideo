@@ -15,9 +15,9 @@ export async function pushBotProfile(base = env().NEXT_PUBLIC_APP_URL.replace(/\
 /** Bot command menus: everyone, plus extra admin commands in each admin's own chat. */
 export async function pushBotCommands() {
   await tg("setMyCommands", { commands: [
-    { command: "start", description: "Создать видео" },
-    { command: "videos", description: "Мои заказы" },
-    { command: "help", description: "Помощь" },
+    { command: "start", description: "Видео жасау" },
+    { command: "videos", description: "Тапсырыстарым" },
+    { command: "help", description: "Көмек" },
   ] });
   for (const id of await botAdminIds()) {
     await tg("setMyCommands", { scope: { type: "chat", chat_id: id }, commands: [

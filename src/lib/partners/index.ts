@@ -130,7 +130,7 @@ export async function notifyPartnerCommission(orderId: string) {
     const { data: o } = await db.from("orders").select("public_order_number").eq("id", orderId).maybeSingle();
     await tg("sendMessage", {
       chat_id: Number(p.telegram_id), parse_mode: "HTML",
-      text: `💰 <b>+${formatKzt(c.commission_kzt)}</b>\nКлиент по вашей ссылке оплатил заказ: ${escapeHtml(o?.public_order_number ?? "")} · ${formatKzt(c.order_amount_kzt)}\n\nВаш баланс: /partner`,
+      text: `💰 <b>+${formatKzt(c.commission_kzt)}</b>\nСіздің сілтемеңізбен келген клиент тапсырысты төледі: ${escapeHtml(o?.public_order_number ?? "")} · ${formatKzt(c.order_amount_kzt)}\n\nБалансыңыз: /partner`,
     });
   } catch {
     console.error(JSON.stringify({ src: "partners", event: "notify_failed" }));
@@ -161,15 +161,15 @@ export async function partnerSelfReport(telegramId: number): Promise<string | nu
   const t = { visits: one.period.visits, users: one.period.users, paidOrders: one.period.paidOrders, revenueKzt: one.period.revenueKzt, earnedKzt: one.lifetime.earnedKzt, paidOutKzt: one.lifetime.paidOutKzt, balanceKzt: one.lifetime.earnedKzt - one.lifetime.paidOutKzt };
   const links = partnerLinks(p.code, await botUsername());
   return [
-    `🤝 <b>${escapeHtml(p.name)}</b> — партнёрская программа${p.active ? "" : " (приостановлена)"}`,
-    `Вознаграждение: <b>${Number(p.percent)}%</b> с каждой оплаты`,
+    `🤝 <b>${escapeHtml(p.name)}</b> — серіктестік бағдарлама${p.active ? "" : " (тоқтатылған)"}`,
+    `Сыйақы: әр төлемнен <b>${Number(p.percent)}%</b>`,
     "",
-    `👀 Переходы: ${t?.visits ?? 0} · 👤 Клиенты: ${t?.users ?? 0}`,
-    `🧾 Оплаты: ${t?.paidOrders ?? 0} · на сумму ${formatKzt(t?.revenueKzt ?? 0)}`,
-    `💰 Заработано: <b>${formatKzt(t?.earnedKzt ?? 0)}</b> · выплачено: ${formatKzt(t?.paidOutKzt ?? 0)}`,
+    `👀 Өтулер: ${t?.visits ?? 0} · 👤 Клиенттер: ${t?.users ?? 0}`,
+    `🧾 Төлемдер: ${t?.paidOrders ?? 0} · сомасы ${formatKzt(t?.revenueKzt ?? 0)}`,
+    `💰 Табыс: <b>${formatKzt(t?.earnedKzt ?? 0)}</b> · төленді: ${formatKzt(t?.paidOutKzt ?? 0)}`,
     `💳 Баланс: <b>${formatKzt(t?.balanceKzt ?? 0)}</b>`,
     "",
-    "<b>Ваши ссылки:</b>",
+    "<b>Сілтемелеріңіз:</b>",
     ...(links.bot ? [`Telegram бот: ${links.bot}`] : []),
     `Сайт: ${links.site}`,
   ].join("\n");

@@ -43,9 +43,9 @@ describe("inputToRow", () => {
     const row = inputToRow(t);
     expect(row.required_face_count).toBe(3);
     expect(row.face_slots_json.map((s) => [s.key, s.providerInput, s.labelKk])).toEqual([
-      ["face_1", "face_1", "1-е лицо — слева"],
-      ["face_2", "face_2", "2-е лицо — в центре"],
-      ["face_3", "face_3", "3-е лицо — справа"],
+      ["face_1", "face_1", "1-бет — сол жақта"],
+      ["face_2", "face_2", "2-бет — ортада"],
+      ["face_3", "face_3", "3-бет — оң жақта"],
     ]);
     const xs = row.face_slots_json.map((s) => s.position.x);
     expect(xs).toEqual([...xs].sort((a, b) => a - b));

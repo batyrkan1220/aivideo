@@ -59,12 +59,12 @@ export function validateFaceSlots(slots: FaceSlot[], requiredCount: number): str
 
 /** Slot label by position: left → right. */
 export function autoFaceLabel(i: number, n: number): string {
-  if (n === 1) return "Загрузите фото лица";
-  const num = `${i + 1}-е лицо`;
-  if (n === 2) return `${num} — ${i === 0 ? "слева" : "справа"}`;
-  if (n === 3) return `${num} — ${["слева", "в центре", "справа"][i]}`;
-  if (i === 0) return `${num} — крайнее слева`;
-  if (i === n - 1) return `${num} — крайнее справа`;
+  if (n === 1) return "Бет фотосын жүктеңіз";
+  const num = `${i + 1}-бет`;
+  if (n === 2) return `${num} — ${i === 0 ? "сол жақта" : "оң жақта"}`;
+  if (n === 3) return `${num} — ${["сол жақта", "ортада", "оң жақта"][i]}`;
+  if (i === 0) return `${num} — ең сол жақта`;
+  if (i === n - 1) return `${num} — ең оң жақта`;
   return num;
 }
 

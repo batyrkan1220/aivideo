@@ -61,9 +61,9 @@ describe("face slots", () => {
 
 describe("autoFaceSlots", () => {
   it("labels by count", () => {
-    expect(autoFaceSlots(1).map((s) => s.labelKk)).toEqual(["Загрузите фото лица"]);
-    expect(autoFaceSlots(2).map((s) => s.labelKk)).toEqual(["1-е лицо — слева", "2-е лицо — справа"]);
-    expect(autoFaceSlots(5).map((s) => s.labelKk)).toEqual(["1-е лицо — крайнее слева", "2-е лицо", "3-е лицо", "4-е лицо", "5-е лицо — крайнее справа"]);
+    expect(autoFaceSlots(1).map((s) => s.labelKk)).toEqual(["Бет фотосын жүктеңіз"]);
+    expect(autoFaceSlots(2).map((s) => s.labelKk)).toEqual(["1-бет — сол жақта", "2-бет — оң жақта"]);
+    expect(autoFaceSlots(5).map((s) => s.labelKk)).toEqual(["1-бет — ең сол жақта", "2-бет", "3-бет", "4-бет", "5-бет — ең оң жақта"]);
   });
   it("is valid, evenly spaced and clamped to 1..10", () => {
     expect(validateFaceSlots(autoFaceSlots(4), 4)).toEqual([]);
