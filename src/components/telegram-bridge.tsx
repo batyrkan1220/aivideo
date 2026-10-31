@@ -83,15 +83,12 @@ export function TelegramBridge() {
     }
   }, [router]);
 
-  // Telegram's native Back button on every page except home.
+  // Never show Telegram's native Back button: it takes the place of the Close (×) button, and
+  // people want to close the Mini App from any page in one tap. In-app navigation uses the
+  // bottom tabs and on-page back links.
   useEffect(() => {
-    const wa = telegramApp();
-    if (!wa) return;
-    const back = () => router.back();
-    if (pathname === "/") wa.BackButton.hide();
-    else { wa.BackButton.show(); wa.BackButton.onClick(back); }
-    return () => wa.BackButton.offClick(back);
-  }, [pathname, search, router]);
+    telegramApp()?.BackButton.hide();
+  }, [pathname, search]);
 
   if (manual && tgOnAuthPage && !pending) {
     return (
