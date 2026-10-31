@@ -53,8 +53,6 @@ export async function OrderList({ limit = 50, day }: { limit?: number; day?: str
   const isPhoto = (o: Row) => photoUrl.has(o.id) || (o.template_snapshot_json as { provider_key?: string }).provider_key === "kling_photo";
 
   const tz = { timeZone: "Asia/Almaty" } as const;
-  const wd = new Intl.DateTimeFormat("kk-KZ", { weekday: "short", ...tz });
-  const dn = new Intl.DateTimeFormat("kk-KZ", { day: "numeric", ...tz });
   const head = new Intl.DateTimeFormat("kk-KZ", { day: "numeric", month: "long", weekday: "long", ...tz });
   const time = new Intl.DateTimeFormat("kk-KZ", { hour: "2-digit", minute: "2-digit", ...tz });
   const noon = (k: string) => new Date(`${k}T12:00:00+05:00`);
@@ -71,25 +69,6 @@ export async function OrderList({ limit = 50, day }: { limit?: number; day?: str
 
   return (
     <>
-      {/* Date strip: days that have works; the chosen day is black */}
-      <nav aria-label={kk.gallery.days} className="no-scrollbar -mx-4 mb-5 flex gap-2 overflow-x-auto px-4">
-        <Link href="/orders" aria-current={!active ? "page" : undefined}
-          className={`flex h-[68px] min-w-[64px] shrink-0 flex-col items-center justify-center rounded-[20px] px-3 text-[13px] font-bold ${!active ? "bg-night text-white" : "border border-line bg-surface text-ink"}`}>
-          {kk.catalog.all}
-          <span className={`mt-0.5 text-[11px] font-medium ${!active ? "text-white/60" : "text-muted"}`}>{all.length}</span>
-        </Link>
-        {days.map((k) => {
-          const on = k === active;
-          return (
-            <Link key={k} href={`/orders?day=${k}`} aria-current={on ? "page" : undefined}
-              className={`flex h-[68px] w-[56px] shrink-0 flex-col items-center justify-center rounded-[20px] ${on ? "bg-night text-white" : "border border-line bg-surface text-ink"}`}>
-              <span className={`text-[11px] font-medium capitalize ${on ? "text-white/60" : "text-muted"}`}>{wd.format(noon(k))}</span>
-              <span className="mt-0.5 text-[20px] font-extrabold leading-none">{dn.format(noon(k))}</span>
-            </Link>
-          );
-        })}
-      </nav>
-
       {groups.map((g) => (
         <section key={g.k} className="mb-6">
           <h2 className="mb-3 text-[15px] font-extrabold first-letter:uppercase">{head.format(noon(g.k))}</h2>
