@@ -2,8 +2,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { kk } from "@/lib/i18n/kk";
+import { PHOTOS_SOON } from "@/lib/features";
 
-type Item = { href: string; label: string; icon: React.ReactNode; match: (p: string) => boolean };
+type Item = { href: string; label: string; icon: React.ReactNode; match: (p: string) => boolean; soon?: boolean };
 
 const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
@@ -13,7 +14,7 @@ const items: Item[] = [
     icon: <svg viewBox="0 0 24 24" {...stroke}><rect x="4" y="3" width="16" height="18" rx="4" /><path d="m10 9 5 3-5 3z" fill="currentColor" /></svg>,
   },
   {
-    href: "/photos", label: kk.nav.tabPhoto, match: (p) => p.startsWith("/photos"),
+    href: "/photos", label: kk.nav.tabPhoto, match: (p) => p.startsWith("/photos"), soon: PHOTOS_SOON,
     icon: <svg viewBox="0 0 24 24" {...stroke}><rect x="3" y="4" width="18" height="16" rx="4" /><circle cx="9" cy="10" r="2" /><path d="m21 16-5-5-8 8" /></svg>,
   },
   {
@@ -41,6 +42,17 @@ export function MobileNav() {
       <ul className="grid h-[4.25rem] grid-cols-5 items-center px-1">
         {items.map((it) => {
           const on = it.match(path);
+          if (it.soon) return (
+            <li key={it.href} className="flex justify-center">
+              <span aria-disabled className="relative flex min-w-0 cursor-default flex-col items-center gap-1 text-[10px] font-semibold leading-none text-muted/60">
+                <span className="flex h-9 w-12 items-center justify-center rounded-full text-ink/30">
+                  <span className="h-[22px] w-[22px] [&>svg]:h-full [&>svg]:w-full" aria-hidden>{it.icon}</span>
+                </span>
+                <span className="max-w-full truncate px-0.5">{it.label}</span>
+                <span className="absolute -right-2 -top-1 rounded-full bg-brand px-1.5 py-[3px] text-[8px] font-extrabold uppercase leading-none tracking-wide text-night">{kk.nav.soon}</span>
+              </span>
+            </li>
+          );
           return (
             <li key={it.href} className="flex justify-center">
               <Link

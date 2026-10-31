@@ -5,6 +5,7 @@ import { kk } from "@/lib/i18n/kk";
 import { Logo } from "@/components/logo";
 import { listCombos } from "@/lib/combos/catalog";
 import { formatKzt } from "@/lib/pricing";
+import { PHOTOS_SOON } from "@/lib/features";
 
 export const metadata = { title: kk.photos.title };
 
@@ -18,9 +19,11 @@ export default function PhotosPage() {
         </div>
       </div>
       <h1 className="sr-only">{kk.photos.title}</h1>
-      <Suspense fallback={null}>
-        <Combos />
-      </Suspense>
+      {PHOTOS_SOON ? <Soon /> : (
+        <Suspense fallback={null}>
+          <Combos />
+        </Suspense>
+      )}
     </main>
   );
 }
@@ -66,5 +69,18 @@ async function Combos() {
         })}
       </ul>
     </section>
+  );
+}
+
+function Soon() {
+  const P = kk.photos;
+  return (
+    <div className="relative mt-2 overflow-hidden rounded-[24px] bg-night px-6 py-12 text-center text-white">
+      <span aria-hidden className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(215,244,67,0.28),transparent_65%)]" />
+      <span className="relative inline-flex rounded-full bg-[#d7f443] px-3 py-1 text-xs font-extrabold text-night">📸 {kk.nav.soon}</span>
+      <h2 className="relative mt-3 text-2xl font-extrabold tracking-tight">{P.soonTitle}</h2>
+      <p className="relative mx-auto mt-2 max-w-sm text-sm text-white/70">{P.soonText}</p>
+      <Link href="/" className="btn-lime relative mx-auto mt-6 flex h-12 max-w-xs items-center justify-center rounded-full text-[15px] font-extrabold">🎬 {P.toVideos}</Link>
+    </div>
   );
 }

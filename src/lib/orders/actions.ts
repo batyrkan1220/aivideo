@@ -19,6 +19,7 @@ import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { ensureTemplateDuration } from "@/lib/templates/duration";
 import { cleanWish } from "@/lib/generation/seedance";
 import { isPhotoProvider, parsePhotoConfig } from "@/lib/templates/photo-config";
+import { PHOTOS_SOON } from "@/lib/features";
 import { mediaUrl } from "@/lib/templates/queries";
 
 type Fail<E extends string> = { ok: false; error: E | "unauthorized" | "generic" };
@@ -232,6 +233,7 @@ export async function createOrder(raw: unknown): Promise<
   const combo = tv.snapshot.provider_key === "combo" && tv.template.kind === "combo";
   if (tv.snapshot.provider_key !== "seedance" && tv.snapshot.provider_key !== "dev" && !photo && !combo) return { ok: false, error: "template_unavailable" };
   // Photo combo: one selfie, the combo's computed price; its photos are made after payment.
+  if ((photo || combo) && PHOTOS_SOON) return { ok: false, error: "template_unavailable" };
   if (combo && !(tv.pricing.basePriceKzt > 0)) return { ok: false, error: "template_unavailable" };
   // Seedance: one quality (720p), price from the reference video length (or a manual template price).
   let pricing = tv.pricing;

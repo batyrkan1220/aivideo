@@ -7,6 +7,7 @@ import { kk } from "@/lib/i18n/kk";
 import { isTelegramEmail } from "@/lib/telegram/session";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { DisplayNameForm, DeleteAllPhotosForm, DeleteAccountForm, LogoutButton, TelegramDeleteNote } from "@/components/account-forms";
+import { PHOTOS_SOON } from "@/lib/features";
 
 export const metadata = { title: kk.account.title };
 
@@ -98,7 +99,7 @@ async function Profile() {
 
       <Group title={P.creative}>
         <Row href="/" icon="🎬" label={P.videoTemplates} hint={P.videoTemplatesHint} />
-        <Row href="/photos" icon="📸" label={P.photoTemplates} hint={P.photoTemplatesHint} />
+        {!PHOTOS_SOON && <Row href="/photos" icon="📸" label={P.photoTemplates} hint={P.photoTemplatesHint} />}
         <Row href="/create" icon="✨" label={P.ownVideo} hint={P.ownVideoHint} />
       </Group>
 

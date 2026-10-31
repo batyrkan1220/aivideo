@@ -12,6 +12,7 @@ import { formatKzt } from "@/lib/pricing";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { seedanceAutoPriceKzt } from "@/lib/pricing-seedance";
 import { SEEDANCE_MIN_SEC } from "@/lib/templates/seedance-config";
+import { PHOTOS_SOON } from "@/lib/features";
 
 export const metadata = { title: kk.createHub.title };
 
@@ -48,7 +49,7 @@ function FlowSkeleton() {
 
 async function Body({ searchParams }: { searchParams: Promise<SP> }) {
   await connection(); // request-time only: reads settings and the session
-  const type = (await searchParams).type === "photo" ? "photo" : "video";
+  const type = !PHOTOS_SOON && (await searchParams).type === "photo" ? "photo" : "video";
   const head = type === "photo" ? H.photo : H.video;
   return (
     <>

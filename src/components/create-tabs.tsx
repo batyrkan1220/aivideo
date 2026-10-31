@@ -2,19 +2,26 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { kk } from "@/lib/i18n/kk";
+import { PHOTOS_SOON } from "@/lib/features";
 
 const H = kk.createHub;
 
 /** Video / AI-photo segmented switch: renders instantly (no server wait), the active side is black. */
 export function CreateTabs() {
-  const type = useSearchParams().get("type") === "photo" ? "photo" : "video";
+  const want = useSearchParams().get("type");
+  const type = !PHOTOS_SOON && want === "photo" ? "photo" : "video";
   return <TabsView type={type} />;
 }
 
 export function TabsView({ type }: { type: "video" | "photo" }) {
   return (
     <div className="grid grid-cols-2 gap-1 rounded-full border border-line bg-surface p-1" role="tablist" aria-label={H.title}>
-      {(["video", "photo"] as const).map((k) => (
+      {(["video", "photo"] as const).map((k) => k === "photo" && PHOTOS_SOON ? (
+        <span key={k} role="tab" aria-selected={false} aria-disabled className="flex h-11 cursor-default items-center justify-center gap-2 rounded-full text-sm font-bold text-muted/60">
+          {H.tabs[k]}
+          <span className="rounded-full bg-brand px-2 py-0.5 text-[10px] font-extrabold text-night">{kk.nav.soon}</span>
+        </span>
+      ) : (
         <Link key={k} href={k === "photo" ? "/create?type=photo" : "/create"} role="tab" aria-selected={type === k} replace scroll={false} prefetch
           className={`flex h-11 items-center justify-center gap-2 rounded-full text-sm font-bold transition-colors ${type === k ? "bg-night text-white" : "text-muted active:text-ink"}`}>
           {k === "video"
