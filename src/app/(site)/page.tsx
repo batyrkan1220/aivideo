@@ -2,12 +2,13 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import { kk } from "@/lib/i18n/kk";
 import { listCategories, listTemplates } from "@/lib/templates/queries";
-import { CategoryChips, GridSkeleton, pickCard } from "@/components/catalog-bits";
+import { CategoryChips, pickCard } from "@/components/catalog-bits";
 import { VideoFeed } from "@/components/video-feed";
 import { HeroShowcase } from "@/components/hero-showcase";
 import Link from "next/link";
 import { Logo } from "@/components/logo";
 import { DesktopOnly } from "@/components/desktop-only";
+import { CachedFeedFallback } from "@/components/cached-feed";
 import { resolveShowcase } from "@/lib/templates/showcase";
 
 type SP = { account?: string; category?: string };
@@ -49,7 +50,7 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
         <TextHero />
       </section>
 
-      <Suspense fallback={<div className="mx-auto mt-4 max-w-6xl px-4"><GridSkeleton /></div>}>
+      <Suspense fallback={<div className="mx-auto mt-4 max-w-6xl px-4"><CachedFeedFallback /></div>}>
         <Feed searchParams={searchParams} />
       </Suspense>
     </main>

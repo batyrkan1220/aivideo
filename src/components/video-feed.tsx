@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { kk } from "@/lib/i18n/kk";
 import { TemplateCard, type CardData } from "./template-card";
 import { loadMoreVideos } from "@/app/(site)/home-actions";
+import { saveFeed } from "./cached-feed";
 
 /**
  * Endless video feed: shows the first page, then loads the next page automatically when the
@@ -15,6 +16,9 @@ export function VideoFeed({ title, category, initial, initialHasMore, exclude = 
   const [loading, setLoading] = useState(false);
   const sentinel = useRef<HTMLDivElement>(null);
   const skip = new Set(exclude);
+
+  // Keep the first page on the phone so the next visit shows it instantly (see CachedFeedFallback).
+  useEffect(() => { if (media === "video") saveFeed(category, initial); }, [initial, category, media]);
 
   useEffect(() => {
     const el = sentinel.current;

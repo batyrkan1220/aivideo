@@ -5,6 +5,7 @@ import "./globals.css";
 import { Suspense } from "react";
 import { kk } from "@/lib/i18n/kk";
 import { TelegramBridge } from "@/components/telegram-bridge";
+import { SwRegister } from "@/components/sw-register";
 
 // Self-hosted Inter (body) + Unbounded (display); cyrillic-ext covers Kazakh letters Ә Ғ Қ Ң Ө Ұ Ү Һ І
 
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         <Suspense fallback={null}>
           <TelegramBridge />
+          <SwRegister />
         </Suspense>
       </body>
     </html>
