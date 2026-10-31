@@ -25,7 +25,7 @@ export default function PhotosPage() {
   );
 }
 
-/** Combos: a left → right rail; each card shows its photos fanned like a stack. */
+/** Combos: a vertical list; each card shows its photos fanned like a stack. */
 async function Combos() {
   await connection();
   const combos = await listCombos();
@@ -38,15 +38,15 @@ async function Combos() {
         <h2 className="section-title text-muted">{C.section}</h2>
         <span className="truncate text-xs text-muted">{C.sectionLead}</span>
       </div>
-      <ul className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
+      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {combos.map((c) => {
           const covers = c.covers.slice(0, 4);
           const off = fan.length - covers.length; // the last cover sits on top, straight
           const save = c.sumKzt > c.priceKzt ? Math.round((1 - c.priceKzt / c.sumKzt) * 100) : 0;
           return (
-            <li key={c.id} className="w-[72%] shrink-0 snap-start sm:w-64">
+            <li key={c.id}>
               <Link href={`/templates/${c.id}`} className="block rounded-[24px] bg-surface p-3 ring-1 ring-line transition-transform active:scale-[0.99]">
-                <div className="relative flex h-44 items-center justify-center overflow-hidden rounded-[18px] bg-lavender">
+                <div className="relative flex h-52 items-center justify-center overflow-hidden rounded-[18px] bg-lavender">
                   {covers.map((src, i) => (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img key={src} src={src} alt="" loading="lazy"
