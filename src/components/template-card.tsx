@@ -137,9 +137,14 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
           )}
           {/* People in the template (only worth showing for 2+). */}
           {t.faceCount > 1 && (
-            <span className="flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[11px] font-semibold text-white" aria-label={kk.catalog.faces(t.faceCount)}>
-              <svg viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor" aria-hidden><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm-8.5 9a8.5 8.5 0 0 1 17 0z" /></svg>
-              <span>{t.faceCount}</span>
+            // Overlapping avatar stack (+count) — one circle per person in the video.
+            <span className="flex items-center" aria-label={kk.catalog.faces(t.faceCount)}>
+              {["bg-brand-soft", "bg-peach", "bg-rose"].slice(0, Math.min(t.faceCount, 3)).map((bg, i) => (
+                <span key={bg} className={`-ml-1.5 flex h-6 w-6 items-center justify-center rounded-full text-night ring-2 ring-white first:ml-0 ${bg}`} style={{ zIndex: 3 - i }} aria-hidden>
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor"><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm-8.5 9a8.5 8.5 0 0 1 17 0z" /></svg>
+                </span>
+              ))}
+              {t.faceCount > 3 && <span className="-ml-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-night px-1 text-[10px] font-bold text-white ring-2 ring-white">+{t.faceCount - 3}</span>}
             </span>
           )}
         </div>

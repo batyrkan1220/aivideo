@@ -81,6 +81,7 @@ function TextHero() {
           <svg viewBox="0 0 84 84" className="h-full w-full -rotate-90">
             <circle cx="42" cy="42" r={r} fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth="8" />
             <circle cx="42" cy="42" r={r} fill="none" stroke="#d7f443" strokeWidth="8" strokeLinecap="round" strokeDasharray={`${c * 0.72} ${c}`} />
+            <circle cx="42" cy="42" r={r} fill="none" stroke="#ffffff" strokeWidth="8" strokeLinecap="round" strokeDasharray={`${c * 0.1} ${c}`} strokeDashoffset={-c * 0.78} />
           </svg>
           <span className="absolute inset-0 flex flex-col items-center justify-center leading-none">
             <span className="text-[22px] font-extrabold">3</span>

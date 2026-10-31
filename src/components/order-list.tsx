@@ -16,22 +16,29 @@ const IMG = /\.(jpe?g|png|webp)$/i;
  * The signed-in user's works as a gallery grid (RLS restricts the query to their own rows).
  * Finished photos show the result itself; videos show the template cover; status sits on the card.
  */
-export async function OrderList({ limit = 50 }: { limit?: number }) {
+export async function OrderList({ limit = 50, day }: { limit?: number; day?: string }) {
   const sb = await supabaseServer();
   const { data } = await sb.from("orders")
     .select("id,public_order_number,created_at,amount_kzt,payment_status,generation_status,template_snapshot_json,templates(cover_asset_path)")
     .order("created_at", { ascending: false }).limit(limit);
-  const orders = (data ?? []) as unknown as Row[];
-  if (!orders.length) {
+  const all = (data ?? []) as unknown as Row[];
+  if (!all.length) {
     return (
-      <div className="rounded-[24px] bg-surface px-6 py-14 text-center ring-1 ring-line">
-        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-2xl" aria-hidden>✨</span>
+      <div className="rounded-[28px] bg-surface px-6 py-14 text-center ring-1 ring-line">
+        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand text-2xl" aria-hidden>✨</span>
         <p className="mt-4 text-lg font-bold">{kk.gallery.emptyTitle}</p>
         <p className="mx-auto mt-1 max-w-xs text-sm text-muted">{kk.account.ordersEmpty}</p>
         <Link href="/" className="btn-glow mt-5 inline-flex h-11 items-center rounded-full px-6 text-sm font-bold">{kk.myVideos.browse}</Link>
       </div>
     );
   }
+
+  // Almaty calendar day of each order; the date strip shows the days that have works.
+  const dayKey = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Almaty" });
+  const keyOf = (o: Row) => dayKey.format(new Date(o.created_at));
+  const days = [...new Set(all.map(keyOf))];
+  const active = day && days.includes(day) ? day : undefined;
+  const orders = active ? all.filter((o) => keyOf(o) === active) : all;
 
   // Finished results: which are photos (shown as the thumbnail itself, via a short-lived signed URL).
   const done = orders.filter((o) => o.generation_status === "completed").map((o) => o.id);
@@ -45,50 +52,92 @@ export async function OrderList({ limit = 50 }: { limit?: number }) {
   const photoUrl = new Map(photoPaths.map((f, i) => [f.order_id, signed?.[i]?.signedUrl ?? null]));
   const isPhoto = (o: Row) => photoUrl.has(o.id) || (o.template_snapshot_json as { provider_key?: string }).provider_key === "kling_photo";
 
-  const fmt = new Intl.DateTimeFormat("kk-KZ", { day: "numeric", month: "short", timeZone: "Asia/Almaty" });
-  const state = (o: Row): { text: string; tone: "ok" | "work" | "pay" | "bad" | "muted" } => {
-    if (o.payment_status === "refunded") return { text: kk.order.payment.refunded, tone: "muted" };
-    if (o.payment_status !== "succeeded") return { text: kk.myVideos.pay, tone: "pay" };
+  const tz = { timeZone: "Asia/Almaty" } as const;
+  const wd = new Intl.DateTimeFormat("kk-KZ", { weekday: "short", ...tz });
+  const dn = new Intl.DateTimeFormat("kk-KZ", { day: "numeric", ...tz });
+  const head = new Intl.DateTimeFormat("kk-KZ", { day: "numeric", month: "long", weekday: "long", ...tz });
+  const time = new Intl.DateTimeFormat("kk-KZ", { hour: "2-digit", minute: "2-digit", ...tz });
+  const noon = (k: string) => new Date(`${k}T12:00:00+05:00`);
+  const state = (o: Row): { text: string; tone: "ok" | "work" | "pay" | "bad" | "muted"; action: string } => {
+    if (o.payment_status === "refunded") return { text: kk.order.payment.refunded, tone: "muted", action: kk.order.open };
+    if (o.payment_status !== "succeeded") return { text: kk.status.awaiting_payment, tone: "pay", action: kk.myVideos.pay };
     const g = o.generation_status as keyof typeof kk.order.generation;
-    if (g === "completed") return { text: kk.gallery.ready, tone: "ok" };
-    if (g === "failed") return { text: kk.order.generation.failed, tone: "bad" };
-    return { text: kk.myVideos.progress, tone: "work" };
+    if (g === "completed") return { text: kk.gallery.ready, tone: "ok", action: kk.myVideos.watch };
+    if (g === "failed") return { text: kk.order.generation.failed, tone: "bad", action: kk.order.open };
+    return { text: kk.myVideos.progress, tone: "work", action: kk.order.open };
   };
-  const toneCls = { ok: "bg-brand-soft text-night", work: "bg-peach text-night", pay: "bg-lavender text-night", bad: "bg-rose text-night", muted: "bg-white/85 text-night" };
+  const toneCls = { ok: "bg-brand-soft", work: "bg-peach", pay: "bg-lavender", bad: "bg-rose", muted: "bg-line" };
+  const groups = (active ? [active] : days).map((k) => ({ k, items: orders.filter((o) => keyOf(o) === k) })).filter((g) => g.items.length);
 
   return (
-    <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
-      {orders.map((o) => {
-        const st = state(o);
-        const t = Array.isArray(o.templates) ? o.templates[0] : o.templates;
-        const photo = isPhoto(o);
-        const thumb = photoUrl.get(o.id) ?? mediaUrl(t?.cover_asset_path ?? null);
-        const title = (o.template_snapshot_json as { title_kk?: string }).title_kk ?? "TrendMe";
-        return (
-          <li key={o.id}>
-            <Link href={`/orders/${o.id}`} className="group relative block aspect-[3/4] overflow-hidden rounded-[20px] bg-night ring-1 ring-black/5">
-              {thumb ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={thumb} alt="" loading="lazy" className={`absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-active:scale-[1.03] ${st.tone === "ok" ? "" : "opacity-60"}`} />
-              ) : (
-                <span className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#2a2a2a] to-[#161616] text-4xl" aria-hidden>{photo ? "📸" : "🎬"}</span>
-              )}
-              <span className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/85 to-transparent" />
-              <span className={`absolute left-2 top-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold ${toneCls[st.tone]}`}>
-                {st.tone === "work" && <span className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-black/25 border-t-black" aria-hidden />}
-                {st.text}
-              </span>
-              <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/45 text-[13px] backdrop-blur" aria-label={photo ? kk.nav.tabPhoto : kk.nav.tabHome}>
-                {photo ? "📸" : "▶"}
-              </span>
-              <span className="absolute inset-x-2.5 bottom-2.5 text-white">
-                <span className="block truncate text-[14px] font-bold leading-tight">{title}</span>
-                <span className="mt-0.5 block text-[11px] text-white/70">{fmt.format(new Date(o.created_at))} · {formatKzt(o.amount_kzt)}</span>
-              </span>
+    <>
+      {/* Date strip: days that have works; the chosen day is black */}
+      <nav aria-label={kk.gallery.days} className="no-scrollbar -mx-4 mb-5 flex gap-2 overflow-x-auto px-4">
+        <Link href="/orders" aria-current={!active ? "page" : undefined}
+          className={`flex h-[68px] min-w-[64px] shrink-0 flex-col items-center justify-center rounded-[20px] px-3 text-[13px] font-bold ${!active ? "bg-night text-white" : "border border-line bg-surface text-ink"}`}>
+          {kk.catalog.all}
+          <span className={`mt-0.5 text-[11px] font-medium ${!active ? "text-white/60" : "text-muted"}`}>{all.length}</span>
+        </Link>
+        {days.map((k) => {
+          const on = k === active;
+          return (
+            <Link key={k} href={`/orders?day=${k}`} aria-current={on ? "page" : undefined}
+              className={`flex h-[68px] w-[56px] shrink-0 flex-col items-center justify-center rounded-[20px] ${on ? "bg-night text-white" : "border border-line bg-surface text-ink"}`}>
+              <span className={`text-[11px] font-medium capitalize ${on ? "text-white/60" : "text-muted"}`}>{wd.format(noon(k))}</span>
+              <span className="mt-0.5 text-[20px] font-extrabold leading-none">{dn.format(noon(k))}</span>
             </Link>
-          </li>
-        );
-      })}
-    </ul>
+          );
+        })}
+      </nav>
+
+      {groups.map((g) => (
+        <section key={g.k} className="mb-6">
+          <h2 className="mb-3 text-[15px] font-extrabold first-letter:uppercase">{head.format(noon(g.k))}</h2>
+          {/* Timeline: time on the left, dashed connector, white work cards */}
+          <ol className="relative">
+            {g.items.map((o, i) => {
+              const st = state(o);
+              const t = Array.isArray(o.templates) ? o.templates[0] : o.templates;
+              const photo = isPhoto(o);
+              const thumb = photoUrl.get(o.id) ?? mediaUrl(t?.cover_asset_path ?? null);
+              const title = (o.template_snapshot_json as { title_kk?: string }).title_kk ?? "TrendMe";
+              const last = i === g.items.length - 1;
+              return (
+                <li key={o.id} className="relative grid grid-cols-[44px_1fr] gap-3 pb-3">
+                  <div className="relative flex flex-col items-center pt-4">
+                    <span className="text-[11px] font-semibold text-muted">{time.format(new Date(o.created_at))}</span>
+                    <span className={`mt-2 h-2.5 w-2.5 rounded-full ring-4 ring-paper ${st.tone === "ok" ? "bg-[#9cbf12]" : st.tone === "bad" ? "bg-danger" : "bg-night"}`} aria-hidden />
+                    {!last && <span className="mt-1 w-0 flex-1 border-l-2 border-dashed border-line" aria-hidden />}
+                  </div>
+                  <Link href={`/orders/${o.id}`} className="flex items-center gap-3 rounded-[24px] bg-surface p-2.5 pr-3.5 ring-1 ring-line transition-transform active:scale-[0.99]">
+                    <span className="relative block h-[76px] w-[60px] shrink-0 overflow-hidden rounded-[16px] bg-night">
+                      {thumb ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={thumb} alt="" loading="lazy" className={`h-full w-full object-cover ${st.tone === "ok" ? "" : "opacity-60"}`} />
+                      ) : (
+                        <span className="flex h-full w-full items-center justify-center text-2xl" aria-hidden>{photo ? "📸" : "🎬"}</span>
+                      )}
+                      <span className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/55 text-[10px] text-white" aria-hidden>{photo ? "📸" : "▶"}</span>
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[15px] font-bold leading-tight">{title}</span>
+                      <span className="mt-0.5 block text-[12px] text-muted">{o.public_order_number} · {formatKzt(o.amount_kzt)}</span>
+                      <span className="mt-2 flex flex-wrap items-center gap-1.5">
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold text-night ${toneCls[st.tone]}`}>
+                          {st.tone === "work" && <span className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-black/20 border-t-black" aria-hidden />}
+                          {st.text}
+                        </span>
+                        <span className="rounded-full bg-lavender px-2.5 py-1 text-[11px] font-bold text-night">{photo ? kk.nav.tabPhoto : kk.nav.tabHome}</span>
+                      </span>
+                    </span>
+                    <span className={`shrink-0 rounded-full px-3 py-2 text-[12px] font-bold ${st.tone === "ok" ? "bg-night text-white" : st.tone === "pay" ? "bg-cobalt text-white" : "bg-paper text-ink"}`}>{st.action}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      ))}
+    </>
   );
 }

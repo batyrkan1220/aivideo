@@ -55,7 +55,7 @@ export function DownloadVideo({ orderId, photo = false }: { orderId: string; pho
     <div className="w-full space-y-2">
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={sendToChat} disabled={state === "sending"}
-          className={`${btn} flex-1 bg-[#2AABEE] text-white disabled:opacity-70`}>
+          className={`${btn} flex-1 bg-cobalt text-white shadow-[0_10px_24px_-12px_rgba(47,101,246,0.7)] disabled:opacity-70`}>
           {state === "sending" ? <><span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden />{r.sending}</> : <>✈️ {r.sendToChat}</>}
         </button>
         <button type="button" onClick={nativeDownload} className={`${btn} flex-1 border border-line bg-surface text-ink`}>

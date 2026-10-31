@@ -352,7 +352,7 @@ export function CreateFlow({
           </div>
         )}
         {customVideo && !readyVideoId ? (
-          <p className="mt-3 rounded-xl bg-paper px-4 py-5 text-center text-sm text-muted">{cv.photoAfterVideo}</p>
+          <p className="mt-3 rounded-2xl bg-paper px-4 py-5 text-center text-sm text-muted">{cv.photoAfterVideo}</p>
         ) : slots.length === 1 ? (
           <div className="mt-3">
             <SinglePhoto slot={slots[0]} st={state[slots[0].key] ?? EMPTY} onPick={(f) => pickPhoto(slots[0], f)} onRemove={() => onRemove(slots[0])} />
@@ -377,12 +377,23 @@ export function CreateFlow({
           <p className="mt-1 text-sm text-muted">{w.hint}</p>
           <textarea ref={wishRef} value={wish} onChange={(e) => setWish(e.target.value.slice(0, 300))} maxLength={300} rows={wishRequired ? 3 : 2}
             placeholder={w.placeholder} aria-label={w.title} required={wishRequired}
-            className="mt-3 w-full rounded-xl border border-line bg-surface px-3 py-2 text-base outline-none focus:border-ink" />
+            className="mt-3 w-full rounded-2xl border border-line bg-surface px-3 py-2 text-base outline-none focus:border-ink" />
           <div className="mt-2 flex flex-wrap gap-2">
-            {w.examples.map((x) => (
-              <button key={x} type="button" onClick={() => setWish((v) => (v.trim() ? `${v.trim()}; ${x}` : x).slice(0, 300))}
-                className="rounded-full bg-paper px-3 py-1.5 text-xs font-medium ring-1 ring-line hover:ring-ink">+ {x}</button>
-            ))}
+            {w.examples.map((x) => {
+              // Tag chips: tap adds the idea to the text; a chosen one shows × and removes it again.
+              const parts = wish.split(";").map((p) => p.trim()).filter(Boolean);
+              const on = parts.includes(x);
+              return (
+                <button key={x} type="button" aria-pressed={on}
+                  onClick={() => setWish((v) => {
+                    const ps = v.split(";").map((p) => p.trim()).filter(Boolean);
+                    return (ps.includes(x) ? ps.filter((p) => p !== x) : [...ps, x]).join("; ").slice(0, 300);
+                  })}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors active:scale-95 ${on ? "bg-night text-white" : "bg-lavender text-ink"}`}>
+                  {on ? <>{x} <span aria-hidden className="text-white/70">✕</span></> : <>+ {x}</>}
+                </button>
+              );
+            })}
           </div>
           <p className="mt-1 text-right text-xs text-muted">{wish.length}/300</p>
         </section>
@@ -392,7 +403,7 @@ export function CreateFlow({
       {/* Quality: one tier (720p); the picker only appears when there is a real choice. */}
       {effQualities.length > 1 && <section className="rounded-card border border-line bg-surface p-4 sm:p-5">
         <StepTitle n={++step} done>{c.qualityTitle}</StepTitle>
-        <div role="radiogroup" className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line">
+        <div role="radiogroup" className="mt-3 divide-y divide-line overflow-hidden rounded-2xl border border-line">
           {effQualities.map((q) => {
             const p = waitingForVideo ? null : calculatePrice(effPricing, q, faceCount).totalKzt;
             const specs = [q.resolution && !q.labelKk.includes(q.resolution) ? q.resolution : null, q.fps ? `${q.fps} ${kk.template.fps}` : null].filter(Boolean).join(", ");
@@ -418,7 +429,7 @@ export function CreateFlow({
             ref={phoneRef}
             type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
             placeholder={kk.tole.phonePlaceholder} aria-label={kk.tole.phoneLabel}
-            className={`mt-3 h-13 w-full rounded-xl border-2 bg-paper px-4 text-lg tracking-wide text-ink outline-none transition-colors focus:border-brand focus:bg-surface ${phone && !phoneOk ? "border-danger" : "border-line"}`}
+            className={`mt-3 h-13 w-full rounded-2xl border-2 bg-paper px-4 text-lg tracking-wide text-ink outline-none transition-colors focus:border-brand focus:bg-surface ${phone && !phoneOk ? "border-danger" : "border-line"}`}
           />
           <p className={`mt-1.5 text-xs ${phone && !phoneOk ? "text-danger" : "text-muted"}`}>
             {phone && !phoneOk ? kk.order.payErrors.phone_invalid : kk.tole.phoneHint}
@@ -491,7 +502,7 @@ function VideoPicker({ st, limits, onPick, onRemove }: { st: VideoState; limits:
     <div>
       {preview ? (
         <div className="flex items-start gap-4">
-          <div className="relative aspect-[9/16] w-32 shrink-0 overflow-hidden rounded-xl bg-night">
+          <div className="relative aspect-[9/16] w-32 shrink-0 overflow-hidden rounded-2xl bg-night">
             <video src={preview} muted loop playsInline autoPlay className="h-full w-full object-cover" />
             {busy && (
               <span className="absolute inset-0 flex items-center justify-center bg-black/40">
@@ -521,9 +532,9 @@ function VideoPicker({ st, limits, onPick, onRemove }: { st: VideoState; limits:
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className={`flex w-full items-center gap-4 rounded-xl border-2 border-dashed p-4 text-left transition-colors hover:border-brand ${st.phase === "error" ? "border-danger bg-danger/10" : "border-brand/40 bg-brand-soft/50"}`}
+          className={`flex w-full items-center gap-4 rounded-2xl border-2 border-dashed p-4 text-left transition-colors hover:border-brand ${st.phase === "error" ? "border-danger bg-danger/10" : "border-brand/40 bg-brand-soft/50"}`}
         >
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-surface text-brand">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-surface text-brand">
             <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <rect x="3" y="5" width="13" height="14" rx="2" /><path d="m16 10 5-3v10l-5-3" />
             </svg>
@@ -555,7 +566,7 @@ function SinglePhoto({ slot, st, onPick, onRemove }: { slot: FaceSlot; st: SlotS
         aria-label={`${slot.labelKk}: ${preview ? kk.upload.replace : kk.upload.choose}`}
         className={`flex w-full items-center gap-4 rounded-2xl border-2 p-3 text-left transition-[colors,transform] active:scale-[0.99] ${st.phase === "ready" ? "border-success bg-success/10" : st.phase === "error" ? "border-danger bg-danger/10" : "border-dashed border-brand/50 bg-brand-soft/60 hover:border-brand"}`}
       >
-        <span className="relative h-32 w-24 shrink-0 overflow-hidden rounded-xl bg-surface shadow-sm">
+        <span className="relative h-32 w-24 shrink-0 overflow-hidden rounded-2xl bg-surface shadow-sm">
           {preview ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={preview} alt="" className="h-full w-full object-cover" />
