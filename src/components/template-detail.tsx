@@ -80,7 +80,6 @@ export function TemplateDetailView({ t, cta, combo }: { t: TemplateDetail; cta?:
                 {formatKzt(t.startingPriceKzt)} {kk.catalog.from}
               </span>
             )}
-            <span className="rounded-full border border-line bg-surface px-3 py-1.5 font-medium">{kk.catalog.faces(t.faceCount)}</span>
             {t.isTrending && <span className="rounded-full bg-flash px-3 py-1.5 font-bold text-night">{kk.catalog2.trendBadge}</span>}
           </div>
         </div>
@@ -91,13 +90,12 @@ export function TemplateDetailView({ t, cta, combo }: { t: TemplateDetail; cta?:
             {t.startingPriceKzt !== null && <span className="mt-1 shrink-0 rounded-full bg-ink px-3 py-1.5 text-sm font-extrabold text-paper">{formatKzt(t.startingPriceKzt)}</span>}
           </div>
           {t.description && <p className="mt-1 text-sm text-muted">{t.description}</p>}
-          <ul className="mt-3 flex flex-wrap gap-1.5 text-[12px] font-semibold">
-            {combo ? <li className="rounded-full bg-brand px-2.5 py-1 text-night">{kk.combo.badge(combo.length)}</li>
-              : <li className="rounded-full bg-surface px-2.5 py-1 ring-1 ring-line">👤 {kk.catalog.faces(t.faceCount)}</li>}
-            {t.media === "video" && t.durationSec ? <li className="rounded-full bg-surface px-2.5 py-1 ring-1 ring-line">⏱ ≈ {Math.round(t.durationSec)} {kk.template.sec}</li> : null}
-            <li className="rounded-full bg-surface px-2.5 py-1 ring-1 ring-line">{t.media === "photo" ? "📸 2K" : "🎬 HD 720p"}</li>
-            {t.isTrending && <li className="rounded-full bg-brand px-2.5 py-1 text-night">🔥 {kk.catalog2.trendBadge}</li>}
-          </ul>
+          {(combo || t.isTrending) && (
+            <ul className="mt-3 flex flex-wrap gap-1.5 text-[12px] font-semibold">
+              {combo && <li className="rounded-full bg-brand px-2.5 py-1 text-night">{kk.combo.badge(combo.length)}</li>}
+              {t.isTrending && <li className="rounded-full bg-brand px-2.5 py-1 text-night">🔥 {kk.catalog2.trendBadge}</li>}
+            </ul>
+          )}
         </div>
         {t.description && <p className="hidden max-w-prose text-muted md:mt-5 md:block md:text-lg">{t.description}</p>}
 
