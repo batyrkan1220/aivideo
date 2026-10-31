@@ -1,27 +1,9 @@
 import "server-only";
-import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { faceSlotSchema, pricingConfigSchema } from "@/lib/templates/schema";
-import { PHOTO_PROVIDER } from "@/lib/templates/photo-config";
+import { pricingConfigSchema } from "@/lib/templates/schema";
 import { mediaUrl } from "@/lib/templates/queries";
 import { memo } from "@/lib/cache/memo";
 import { comboConfigSchema } from "./worker";
-
-/** A photo template that can go into a combo: published, catalog, Kling photo, one person. */
-export type ComboItem = { id: string; title: string; priceKzt: number; cover: string | null };
-
-export async function comboEligibleTemplates(): Promise<ComboItem[]> {
-  const { data } = await supabaseAdmin().from("templates")
-    .select("id,title_kk,cover_asset_path,face_slots_json,pricing_config_json")
-    .eq("status", "published").eq("kind", "catalog").eq("provider_key", PHOTO_PROVIDER).is("deleted_at", null)
-    .order("sort_order").order("title_kk");
-  return (data ?? []).flatMap((t) => {
-    const slots = z.array(faceSlotSchema).safeParse(t.face_slots_json);
-    const pricing = pricingConfigSchema.safeParse(t.pricing_config_json);
-    if (!slots.success || slots.data.length !== 1 || !pricing.success || !(pricing.data.basePriceKzt > 0)) return [];
-    return [{ id: t.id, title: t.title_kk, priceKzt: pricing.data.basePriceKzt, cover: mediaUrl(t.cover_asset_path) }];
-  });
-}
 
 /** Combo price: sum of the photo prices, minus the discount, rounded to 10 ₸. */
 export function comboPrice(prices: number[], discountPercent: number): { sum: number; price: number } {

@@ -21,7 +21,6 @@ export default function TemplatesAdminPage() {
       <div className="mb-6 flex items-center justify-between gap-4">
         <h1 className="font-display text-2xl font-bold">{ru.admin.nav.templates}</h1>
         <div className="flex flex-wrap gap-2">
-          <ButtonLink href="/admin/templates/bulk" variant="secondary">📸 {ru.admin.bulk.open}</ButtonLink>
           <ButtonLink href="/admin/templates/new">+ {ru.admin.list.newTemplate}</ButtonLink>
         </div>
       </div>

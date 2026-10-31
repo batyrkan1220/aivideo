@@ -18,6 +18,7 @@ export const COMBO_PROVIDER = "combo";
 export const comboConfigSchema = z.object({
   templateIds: z.array(z.string().uuid()).min(2).max(20),
   discountPercent: z.number().min(0).max(90).default(0),
+  pricePerPhoto: z.number().int().min(0).optional(),
 });
 export type ComboConfig = z.infer<typeof comboConfigSchema>;
 
@@ -50,7 +51,7 @@ export async function startCombo(job: Job): Promise<Result> {
   for (const templateId of cfg.data.templateIds) {
     if (have.has(templateId)) { children.push(have.get(templateId)!); continue; }
     const { data: t } = await db.from("templates").select("id,status,kind,current_version_id").eq("id", templateId).maybeSingle();
-    if (!t || t.status !== "published" || t.kind !== "catalog" || !t.current_version_id) continue;
+    if (!t || t.status !== "published" || !["catalog", "combo_item"].includes(t.kind as string) || !t.current_version_id) continue;
     const { data: v } = await db.from("template_versions").select("id,configuration_snapshot").eq("id", t.current_version_id).single();
     const cs = (v?.configuration_snapshot ?? {}) as Record<string, unknown>;
     if (!v || !isPhotoProvider(cs.provider_key as string)) continue;

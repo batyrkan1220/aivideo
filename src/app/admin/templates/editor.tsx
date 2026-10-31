@@ -210,6 +210,8 @@ export function TemplateEditor({
       <p className="text-xs text-muted">{e.requiredNote}</p>
 
       <Section title={e.sections.basics}>
+        {/* New templates are video only (photos live in combos); old photo templates keep their editor. */}
+        {initial.providerKey === PHOTO_PROVIDER && (
         <div className="mb-4 inline-flex rounded-full border border-line p-1" role="radiogroup" aria-label={e.kind}>
           {(["video", "photo"] as const).map((k) => (
             <button key={k} type="button" role="radio" aria-checked={kind === k} onClick={() => { setKind(k); setDirty(true); }}
@@ -218,6 +220,7 @@ export function TemplateEditor({
             </button>
           ))}
         </div>
+        )}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={e.title} field="titleKk" required error={err("titleKk")} className="sm:col-span-2">
             <input className={inputCls(err("titleKk"))} aria-invalid={!!err("titleKk")} value={t.titleKk} maxLength={120} onChange={(ev) => set("titleKk", ev.target.value)} />
