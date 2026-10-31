@@ -91,7 +91,7 @@ async function recentOrders() {
   if (!data?.length) return "🧾 Заказов пока нет.";
   return ["🧾 <b>Последние 10 заказов</b>", "", ...data.map((o) =>
     `<code>${o.public_order_number}</code> · ${title(o.template_snapshot_json)} · ${formatKzt(o.amount_kzt)}${o.quality ? ` · ${escapeHtml(o.quality)}` : ""}\n   ${fmtTime.format(new Date(o.created_at))} · ${PAY[o.payment_status] ?? o.payment_status}${o.payment_status === "succeeded" && GEN[o.generation_status] ? ` · ${GEN[o.generation_status]}` : ""}`),
-    "", "Подробнее: /order TV-100001"].join("\n");
+    "", "Подробнее: /order TM-100001"].join("\n");
 }
 
 async function problems() {
@@ -118,13 +118,13 @@ async function problems() {
 }
 
 async function orderDetails(raw: string) {
-  const n = raw.trim().toUpperCase().replace(/^TV-?/, "");
-  if (!/^\d{1,9}$/.test(n)) return { text: "Напишите номер так: <code>/order TV-100014</code>" };
+  const n = raw.trim().toUpperCase().replace(/^(TV|TM)-?/, "");
+  if (!/^\d{1,9}$/.test(n)) return { text: "Напишите номер так: <code>/order TM-100014</code>" };
   const db = supabaseAdmin();
   const { data: o } = await db.from("orders")
     .select("id,public_order_number,created_at,completed_at,amount_kzt,quality,face_count,payment_status,generation_status,template_snapshot_json,user_id,profiles(email,telegram_username,display_name),payments(provider,status,provider_phone_last4,failure_reason,created_at),generation_jobs(status,error_code,provider_cost,attempt_count)")
-    .eq("public_order_number", `TV-${n}`).maybeSingle();
-  if (!o) return { text: `TV-${n} не найден.` };
+    .eq("public_order_number", `TM-${n}`).maybeSingle();
+  if (!o) return { text: `TM-${n} не найден.` };
   const prof = (Array.isArray(o.profiles) ? o.profiles[0] : o.profiles) as { email?: string; telegram_username?: string; display_name?: string } | null;
   const who = prof?.telegram_username ? `@${escapeHtml(prof.telegram_username)}` : prof?.email && !prof.email.endsWith("@telegram.trendme.kz") ? escapeHtml(prof.email) : prof?.display_name ? escapeHtml(prof.display_name) : "—";
   const pays = ((o.payments ?? []) as { provider: string; status: string; provider_phone_last4: string | null; failure_reason: string | null; created_at: string }[])

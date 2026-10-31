@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   const chatId = msg?.chat?.id;
   if (!chatId || msg?.chat?.type !== "private") return NextResponse.json({ ok: true });
 
-  // Admin commands (/admin, /stats, /orders, /problems, /order TV-…) — only for listed Telegram ids.
+  // Admin commands (/admin, /stats, /orders, /problems, /order TM-…) — only for listed Telegram ids.
   if (msg.text && (await isBotAdmin(msg.from?.id)) && (await handleAdminMessage(chatId, msg.text))) {
     return NextResponse.json({ ok: true });
   }

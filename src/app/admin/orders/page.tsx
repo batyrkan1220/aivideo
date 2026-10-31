@@ -45,7 +45,7 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
   const term = (sp.q ?? "").trim().slice(0, 80);
   if (term) {
     if (/^tv-?\d+$/i.test(term)) {
-      q = q.ilike("public_order_number", term.toUpperCase().replace(/^TV-?/, "TV-"));
+      q = q.ilike("public_order_number", term.toUpperCase().replace(/^(TV|TM)-?(?=\d)/, "TM-"));
     } else {
       const { data: ps } = await db.from("profiles").select("id").ilike("email", `%${term.replace(/[%_,()]/g, "")}%`).limit(50);
       q = q.in("user_id", (ps ?? []).map((p) => p.id).concat("00000000-0000-0000-0000-000000000000"));

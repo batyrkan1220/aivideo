@@ -25,7 +25,7 @@ export async function pushBotCommands() {
       { command: "stats", description: "Статистика за сегодня" },
       { command: "orders", description: "Последние заказы" },
       { command: "problems", description: "Проблемы" },
-      { command: "order", description: "Заказ: /order TV-100014" },
+      { command: "order", description: "Заказ: /order TM-100014" },
       { command: "start", description: "Создать видео" },
     ] });
   }
