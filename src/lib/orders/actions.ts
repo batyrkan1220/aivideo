@@ -162,6 +162,8 @@ const orderSchema = z.object({
   videoId: z.string().uuid().optional(),
   /** Customer's wish for the AI (background, outfit, style…). */
   wish: z.string().max(600).optional(),
+  /** Templates with outfit "choice": what the customer picked. */
+  outfit: z.enum(["photo", "template"]).optional(),
 });
 
 export async function createOrder(raw: unknown): Promise<
@@ -265,7 +267,10 @@ export async function createOrder(raw: unknown): Promise<
     pricing = eff.pricing;
     qualities = eff.qualities;
     const wish = ["scene", "kling", "k4", "kd"].includes(cfg.mode) && cfg.allowWish ? cleanWish(p.data.wish) : "";
-    snapshotExtra = { ...snapshotExtra, pricing_config_json: pricing, video_duration_sec: durationSec, ...(wish ? { customer_wish: wish } : {}) };
+    snapshotExtra = {
+      ...snapshotExtra, pricing_config_json: pricing, video_duration_sec: durationSec, ...(wish ? { customer_wish: wish } : {}),
+      ...(cfg.outfit === "choice" ? { customer_outfit: p.data.outfit ?? "template" } : {}),
+    };
   }
   const quality = qualities.find((q) => q.key === p.data.quality && q.available) ?? (qualities.length === 1 ? qualities[0] : undefined);
   if (!quality) return { ok: false, error: "quality_unavailable" };

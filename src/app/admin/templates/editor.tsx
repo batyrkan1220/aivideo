@@ -308,6 +308,7 @@ export function TemplateEditor({
               <select className={inputCls()} value={sd.outfit} onChange={(ev) => setSd({ outfit: ev.target.value as SeedanceConfig["outfit"] })}>
                 <option value="photo">{e.seedance.outfitOptions.photo}</option>
                 <option value="template">{e.seedance.outfitOptions.template}</option>
+                <option value="choice">{e.seedance.outfitOptions.choice}</option>
               </select>
             </Field>
             <Field label={e.seedance.people}>

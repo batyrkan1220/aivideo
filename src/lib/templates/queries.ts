@@ -51,6 +51,8 @@ export type TemplateDetail = TemplateCard & {
   photoFraming: PhotoFraming;
   /** The customer may write a wish for the AI (background, outfit, style). */
   allowWish: boolean;
+  /** Clothing: customer's own, as in the template, or the customer picks ("choice"). Video templates only. */
+  outfit: "photo" | "template" | "choice";
   /** swap = face swap only (no wish), scene = Seedance + face swap. */
   seedanceMode: SeedanceMode;
   /** What the customer gets: a video (Kling video) or a photo (Kling image). */
@@ -60,14 +62,14 @@ export type TemplateDetail = TemplateCard & {
 };
 
 const CARD_COLUMNS =
-  "id,title_kk,description_kk,required_face_count,cover_asset_path,preview_video_path,preview_lite_path,supported_qualities_json,pricing_config_json,face_slots_json,max_upload_bytes,is_trending,provider_key,video_duration_sec,photo_framing:provider_config_json->>framing,allow_wish:provider_config_json->>allowWish,seedance_mode:provider_config_json->>mode,seedance_prepare:provider_config_json->>prepare,seedance_faceswap:provider_config_json->>faceSwap,combo_ids:provider_config_json->templateIds,categories(id,title_kk,slug)";
+  "id,title_kk,description_kk,required_face_count,cover_asset_path,preview_video_path,preview_lite_path,supported_qualities_json,pricing_config_json,face_slots_json,max_upload_bytes,is_trending,provider_key,video_duration_sec,photo_framing:provider_config_json->>framing,allow_wish:provider_config_json->>allowWish,outfit:provider_config_json->>outfit,seedance_mode:provider_config_json->>mode,seedance_prepare:provider_config_json->>prepare,seedance_faceswap:provider_config_json->>faceSwap,combo_ids:provider_config_json->templateIds,categories(id,title_kk,slug)";
 
 type Row = {
   id: string; title_kk: string; description_kk: string; required_face_count: number;
   cover_asset_path: string | null; preview_video_path: string | null; preview_lite_path?: string | null;
   supported_qualities_json: unknown; pricing_config_json: unknown; face_slots_json: unknown;
   max_upload_bytes: number; is_trending: boolean;
-  provider_key?: string | null; video_duration_sec?: number | string | null; photo_framing?: string | null; allow_wish?: string | null; seedance_mode?: string | null; seedance_prepare?: string | null; seedance_faceswap?: string | null; combo_ids?: unknown[] | null;
+  provider_key?: string | null; video_duration_sec?: number | string | null; photo_framing?: string | null; allow_wish?: string | null; outfit?: string | null; seedance_mode?: string | null; seedance_prepare?: string | null; seedance_faceswap?: string | null; combo_ids?: unknown[] | null;
   categories: { id: string; title_kk: string; slug: string } | { id: string; title_kk: string; slug: string }[] | null;
 };
 
@@ -129,6 +131,7 @@ export function parseRow(r: Row, seedancePricing: SeedancePricing = DEFAULT_SEED
     priced,
     photoFraming: r.photo_framing === "face" || r.photo_framing === "full" ? r.photo_framing : "half",
     allowWish: (r.provider_key === PHOTO_PROVIDER || ["scene", "kling", "k4", "kd"].includes(parseSeedanceMode(r.seedance_mode))) && r.allow_wish !== "false",
+    outfit: r.provider_key === PHOTO_PROVIDER || r.provider_key === "combo" ? "photo" : r.outfit === "template" || r.outfit === "choice" ? r.outfit : "photo",
     seedanceMode: parseSeedanceMode(r.seedance_mode),
     media: r.provider_key === PHOTO_PROVIDER || r.provider_key === "combo" ? "photo" : "video",
     comboIds: r.provider_key === "combo" ? (r.combo_ids ?? []).filter((x): x is string => typeof x === "string") : null,

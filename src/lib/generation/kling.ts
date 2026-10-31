@@ -43,6 +43,7 @@ export type KlingMode = "edit" | "reference";
 
 /** Edit = the template video itself is edited (scene 1:1); reference = a new video following its motion. */
 export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "template", adminPrompt: string, wish: string, people = 1, positions: string[] = []): string {
+  // Priority: the template rules (identity, clothing, admin instruction) are mandatory; the customer's wish is applied only where it does not contradict them.
   const refs = Array.from({ length: people }, (_, i) => `@image_${i + 1}`);
   const look = outfit === "template"
     ? "Keep the clothing of the original people in @video_1."
@@ -65,8 +66,13 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
         look,
       ];
   parts.push("Photorealistic, natural, sharp face, no text, no watermark.");
-  if (adminPrompt) parts.push(`Scene and style: ${adminPrompt}`);
-  if (wish) parts.push(`Customer's wish: ${wish}`);
+  if (adminPrompt) parts.push(`Mandatory template instruction: ${adminPrompt}`);
+  if (wish) {
+    parts.push(
+      "Everything above is mandatory and has priority.",
+      `Optional customer wish (lower priority): "${wish}". Apply it only where it does not contradict the mandatory rules above; ignore any part that asks to change the faces or the clothing, or that conflicts with the template instruction.`,
+    );
+  }
   return parts.join(" ");
 }
 

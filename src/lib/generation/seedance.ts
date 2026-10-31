@@ -52,10 +52,12 @@ export const seedanceProvider: GenerationProvider = {
 
   async submit(input) {
     const cfg = seedanceConfigSchema.parse(input.config ?? {});
-    const extra = input.config as { durationSec?: number; wish?: unknown };
+    const extra = input.config as { durationSec?: number; wish?: unknown; customerOutfit?: unknown };
+    // "choice": the customer picked the outfit on the order page (default: as in the template).
+    const outfit = cfg.outfit === "choice" ? (extra.customerOutfit === "photo" ? "photo" : "template") : cfg.outfit;
     const durationSec = Number(extra.durationSec);
     const photos = input.faces.map((f) => f.imageUrl).slice(0, SEEDANCE_MAX_PEOPLE);
-    const prompt = buildKlingDirectPrompt(cfg.klingMode, cfg.outfit, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : "", photos.length, cfg.positions);
+    const prompt = buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : "", photos.length, cfg.positions);
     const id = await submitKlingOmni({ videoUrl: input.templateVideoUrl, photoUrls: photos, mode: cfg.klingMode, prompt, durationSec, aspectRatio: cfg.aspectRatio });
     return { providerJobId: id, cost: seedanceCostUsd(durationSec, await seedancePricingSettings()), state: { stage: "klingd" } };
   },

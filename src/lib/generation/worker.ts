@@ -155,6 +155,7 @@ async function submitJob(job: Job) {
     ...((snap.provider_config_json as Record<string, unknown>) ?? {}),
     durationSec: Number(snap.video_duration_sec ?? snap.user_video_duration_sec) || null,
     ...(typeof snap.customer_wish === "string" ? { wish: snap.customer_wish } : {}),
+    ...(snap.customer_outfit === "photo" || snap.customer_outfit === "template" ? { customerOutfit: snap.customer_outfit } : {}),
   };
   // Photo templates: the template's example photo (cover) is the composition reference.
   const templateFrameUrl = mediaUrl((snap.cover_asset_path as string) ?? null);

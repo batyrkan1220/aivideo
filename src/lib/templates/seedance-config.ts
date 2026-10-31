@@ -26,8 +26,8 @@ export const seedanceConfigSchema = z.object({
   allowWish: z.boolean().default(true),
   /** Photo labels for the customer, one per person (e.g. "Баланың фотосы"). */
   labels: z.array(z.string().trim().max(40)).max(5).default([]),
-  /** The outfit: the customer's own (photo) or the original person's in the template. */
-  outfit: z.enum(["photo", "template"]).default("photo"),
+  /** The outfit: the customer's own (photo), the original person's in the template, or the customer picks one (default: template). */
+  outfit: z.enum(["photo", "template", "choice"]).catch("photo").default("photo"),
   /** Where each person is in the frame (English for the model), e.g. "on the left". */
   positions: z.array(z.string().trim().max(60)).max(5).default([]),
 });

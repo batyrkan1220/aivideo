@@ -83,7 +83,7 @@ function readVideoDuration(url: string): Promise<number | null> {
 }
 
 export function CreateFlow({
-  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, freeOrders = false, customVideo, seedancePricing, allowWish = false, seedanceMode = "wan", media = "video", wishRequired = false,
+  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, freeOrders = false, customVideo, seedancePricing, allowWish = false, seedanceMode = "wan", media = "video", wishRequired = false, outfit = "photo",
 }: {
   templateId: string;
   slots: FaceSlot[];
@@ -110,6 +110,8 @@ export function CreateFlow({
   media?: "video" | "photo";
   /** Create → AI photo: the description is required (it is the whole brief). */
   wishRequired?: boolean;
+  /** Video templates: clothing rule; "choice" = the customer picks (default: as in the template). */
+  outfit?: "photo" | "template" | "choice";
   /** What photo the template needs (face / waist-up / full body); "auto" = like the person in the video. */
   framing?: Framing;
 }) {
@@ -175,6 +177,8 @@ export function CreateFlow({
   const [peopleCount, setPeopleCount] = useState(1);
   const slots = customVideo ? seedanceSlots(peopleCount, "p_") : baseSlots;
   const [wish, setWish] = useState("");
+  const [outfitPick, setOutfitPick] = useState<"template" | "photo">("template");
+  const effOutfit = outfit === "choice" ? outfitPick : outfit;
   // Create → AI photo: the first photo is the customer's own example, the next one is their face.
   const refPhoto = media === "photo" && baseSlots.some((s) => s.providerInput === "example");
   // Optional prompt stays folded; a checkbox opens it (a required one, for AI photos, is always open).
@@ -298,7 +302,7 @@ export function CreateFlow({
     }
     if (!Object.keys(assets).length) { setFormError(c.errors.photos_missing); return; }
     if (customVideo && video.phase !== "ready") { setFormError(cv.errors.missing); return; }
-    const r = await createOrder({ templateId, quality, assets, consent: true, ...(allowWish && wish.trim() ? { wish: wish.trim() } : {}), ...(customVideo && video.phase === "ready" ? { videoId: video.videoId } : {}) });
+    const r = await createOrder({ templateId, quality, assets, consent: true, ...(allowWish && wish.trim() ? { wish: wish.trim() } : {}), ...(outfit === "choice" ? { outfit: outfitPick } : {}), ...(customVideo && video.phase === "ready" ? { videoId: video.videoId } : {}) });
     if (!r.ok) {
       if (r.error === "unauthorized") { router.push(customVideo ? "/login?next=/create" : `/login?next=/templates/${templateId}`); return; }
       if (r.error === "video_missing") { setVideo({ phase: "empty" }); setFormError(cv.errors.missing); return; }
@@ -372,7 +376,23 @@ export function CreateFlow({
         )}
       </section>
 
-      {/* Customer's wish for the AI: background, outfit, style (optional). */}
+      {/* Clothing: the customer picks (only on templates that allow it). */}
+      {outfit === "choice" && media === "video" && (
+        <section className="rounded-card border border-line bg-surface p-4 sm:p-5">
+          <p className="text-[16px] font-extrabold tracking-tight">{c.outfit.title}</p>
+          <div className="mt-3 grid grid-cols-2 gap-1 rounded-full border border-line bg-paper p-1" role="radiogroup" aria-label={c.outfit.title}>
+            {(["template", "photo"] as const).map((k) => (
+              <button key={k} type="button" role="radio" aria-checked={outfitPick === k} onClick={() => setOutfitPick(k)}
+                className={`h-11 rounded-full text-sm font-bold transition-colors ${outfitPick === k ? "bg-night text-white" : "text-muted active:text-ink"}`}>
+                {c.outfit[k]}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-muted">{outfitPick === "template" ? c.outfit.hintTemplate : c.outfit.hintPhoto}</p>
+        </section>
+      )}
+
+      {/* Customer's wish for the AI: mood, style, details (optional, lower priority than the template rules). */}
       {allowWish && (() => {
         const w = wishRequired ? c.photoBrief : c.wish;
         return (
@@ -388,7 +408,7 @@ export function CreateFlow({
           )}
           {(wishRequired || promptOn) && (
             <>
-              <p className="mt-1 text-sm text-muted">{w.hint}</p>
+              <p className="mt-1 text-sm text-muted">{!wishRequired && media === "video" && !customVideo ? c.wishOutfitNote(effOutfit) : w.hint}</p>
               <textarea ref={wishRef} value={wish} onChange={(e) => setWish(e.target.value.slice(0, 300))} maxLength={300} rows={wishRequired ? 3 : 2}
                 placeholder={w.placeholder} aria-label={w.title} required={wishRequired}
                 className="mt-3 w-full rounded-2xl border border-line bg-surface px-3 py-2 text-base outline-none focus:border-ink" />
