@@ -6,7 +6,7 @@ declare t record; v_id uuid; last int;
 begin
   for t in select * from templates where kind = 'custom_photo' loop
     update templates set face_slots_json = slots, required_face_count = 2,
-      description_kk = 'Үлгі фото + сіздің фотоңыз',
+      title_kk = 'Өз фотом', description_kk = 'Үлгі фото + сіздің фотоңыз',
       provider_config_json = provider_config_json || '{"useExample": false, "allowWish": true}'::jsonb
       where id = t.id;
     select coalesce(max(version_number), 0) into last from template_versions where template_id = t.id;
