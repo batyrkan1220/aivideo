@@ -175,6 +175,8 @@ export function CreateFlow({
   const [peopleCount, setPeopleCount] = useState(1);
   const slots = customVideo ? seedanceSlots(peopleCount, "p_") : baseSlots;
   const [wish, setWish] = useState("");
+  // Optional prompt stays folded; a checkbox opens it (a required one, for AI photos, is always open).
+  const [promptOn, setPromptOn] = useState(false);
   const limits = { maxBytes: maxUploadBytes, minDimension, maxDimension };
 
   const onPick = async (slot: FaceSlot, file: File | undefined) => {
@@ -373,12 +375,24 @@ export function CreateFlow({
         const w = wishRequired ? c.photoBrief : c.wish;
         return (
         <section className={`rounded-card border bg-surface p-4 transition-shadow sm:p-5 ${nudge === "wish" ? "border-ink ring-4 ring-lavender" : "border-line"}`}>
-          <StepTitle n={++step} done={!!wish.trim()}>{w.title}</StepTitle>
-          <p className="mt-1 text-sm text-muted">{w.hint}</p>
-          <textarea ref={wishRef} value={wish} onChange={(e) => setWish(e.target.value.slice(0, 300))} maxLength={300} rows={wishRequired ? 3 : 2}
-            placeholder={w.placeholder} aria-label={w.title} required={wishRequired}
-            className="mt-3 w-full rounded-2xl border border-line bg-surface px-3 py-2 text-base outline-none focus:border-ink" />
-          <p className="mt-1 text-right text-xs text-muted">{wish.length}/300</p>
+          {wishRequired ? (
+            <StepTitle n={++step} done={!!wish.trim()}>{w.title}</StepTitle>
+          ) : (
+            <label className="flex cursor-pointer items-center justify-between gap-3">
+              <span className="text-[16px] font-extrabold tracking-tight">{c.promptToggle}</span>
+              <input type="checkbox" className="h-5 w-5 shrink-0 accent-[#161616]" checked={promptOn}
+                onChange={(e) => { setPromptOn(e.target.checked); if (!e.target.checked) setWish(""); else setTimeout(() => wishRef.current?.focus(), 50); }} />
+            </label>
+          )}
+          {(wishRequired || promptOn) && (
+            <>
+              <p className="mt-1 text-sm text-muted">{w.hint}</p>
+              <textarea ref={wishRef} value={wish} onChange={(e) => setWish(e.target.value.slice(0, 300))} maxLength={300} rows={wishRequired ? 3 : 2}
+                placeholder={w.placeholder} aria-label={w.title} required={wishRequired}
+                className="mt-3 w-full rounded-2xl border border-line bg-surface px-3 py-2 text-base outline-none focus:border-ink" />
+              <p className="mt-1 text-right text-xs text-muted">{wish.length}/300</p>
+            </>
+          )}
         </section>
         );
       })()}

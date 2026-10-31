@@ -355,6 +355,7 @@ export const kk = {
       placeholder: "Мысалы: мен Дубайдағы зәулім үйдің төбесінде ақ костюммен тұрмын, күн батып жатыр, Vogue журналының стилі",
     },
     needWish: "Фотоны сипаттаңыз",
+    promptToggle: "Промт қосу",
     stepPhoto: "Өз фотоңызды жүктеңіз",
     stepPhotos: (n: number) => `${n} фото жүктеңіз`,
     stepPhone: "Kaspi нөміріңіз",
