@@ -95,10 +95,10 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
   const done = o.generation_status === "completed";
   const busy = ["queued", "processing", "postprocessing"].includes(o.generation_status);
   const chip = o.payment_status === "refunded" ? { t: kk.order.payment.refunded, c: "bg-line text-ink" }
-    : o.payment_status !== "succeeded" ? { t: payLabel, c: "bg-[#ff453a] text-white" }
-    : done ? { t: genLabel, c: "bg-brand text-night" }
-    : o.generation_status === "failed" ? { t: genLabel, c: "bg-[#ff453a] text-white" }
-    : { t: genLabel, c: "bg-ink text-paper" };
+    : o.payment_status !== "succeeded" ? { t: payLabel, c: "bg-lavender text-night" }
+    : done ? { t: genLabel, c: "bg-brand-soft text-night" }
+    : o.generation_status === "failed" ? { t: genLabel, c: "bg-rose text-night" }
+    : { t: genLabel, c: "bg-peach text-night" };
   const regenHref = (o.template_snapshot_json as { user_video_path?: string } | null)?.user_video_path ? "/create" : `/templates/${o.template_id}`;
 
   return (

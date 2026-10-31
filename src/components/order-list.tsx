@@ -54,7 +54,7 @@ export async function OrderList({ limit = 50 }: { limit?: number }) {
     if (g === "failed") return { text: kk.order.generation.failed, tone: "bad" };
     return { text: kk.myVideos.progress, tone: "work" };
   };
-  const toneCls = { ok: "bg-[#d4ff32] text-black", work: "bg-white/90 text-black", pay: "bg-[#ff453a] text-white", bad: "bg-[#ff453a] text-white", muted: "bg-white/80 text-black" };
+  const toneCls = { ok: "bg-brand-soft text-night", work: "bg-peach text-night", pay: "bg-lavender text-night", bad: "bg-rose text-night", muted: "bg-white/85 text-night" };
 
   return (
     <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
@@ -71,7 +71,7 @@ export async function OrderList({ limit = 50 }: { limit?: number }) {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={thumb} alt="" loading="lazy" className={`absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-active:scale-[1.03] ${st.tone === "ok" ? "" : "opacity-60"}`} />
               ) : (
-                <span className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#2a2a2e] to-[#111113] text-4xl" aria-hidden>{photo ? "📸" : "🎬"}</span>
+                <span className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#2a2a2a] to-[#161616] text-4xl" aria-hidden>{photo ? "📸" : "🎬"}</span>
               )}
               <span className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/85 to-transparent" />
               <span className={`absolute left-2 top-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold ${toneCls[st.tone]}`}>

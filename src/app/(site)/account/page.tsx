@@ -67,9 +67,9 @@ async function Profile() {
     <>
       {/* Header card */}
       <section className="relative overflow-hidden rounded-[24px] bg-night p-5 text-white">
-        <span className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full bg-[#d4ff32]/25 blur-3xl" aria-hidden />
+        <span className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full bg-[#d7f443]/20 blur-3xl" aria-hidden />
         <div className="relative flex items-center gap-4">
-          <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.25rem] bg-[#d4ff32] text-2xl font-extrabold text-black" aria-hidden>
+          <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#d7f443] text-2xl font-extrabold text-black" aria-hidden>
             {name.replace(/^@/, "").charAt(0).toUpperCase() || "T"}
           </span>
           <div className="min-w-0">

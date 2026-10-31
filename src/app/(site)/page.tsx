@@ -8,6 +8,7 @@ import { HeroShowcase } from "@/components/hero-showcase";
 import Link from "next/link";
 import { Logo } from "@/components/logo";
 import { DesktopOnly } from "@/components/desktop-only";
+import { getSessionUser } from "@/lib/auth/session";
 import { resolveShowcase } from "@/lib/templates/showcase";
 
 type SP = { account?: string; category?: string };
@@ -45,6 +46,9 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
           <div className="mb-3 flex items-center">
             <Logo className="text-base" />
           </div>
+          <Suspense fallback={<div className="mb-3 h-12" />}>
+            <Greeting />
+          </Suspense>
         </div>
         <TextHero />
       </section>
@@ -56,45 +60,59 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
   );
 }
 
-/** Phone hero: pure CSS (gradients, no blur filters, no media) so the Mini App opens instantly. */
+/** Phone hero: dark "metric" card (chartreuse progress ring + stat list) — pure CSS/SVG, no media. */
 function TextHero() {
   const H = kk.home;
+  const r = 34, c = 2 * Math.PI * r;
   return (
-    <div
-      className="relative overflow-hidden rounded-[24px] bg-night px-5 pb-5 pt-5 text-white"
-      style={{
-        backgroundImage:
-          "radial-gradient(120% 80% at 100% 0%, rgba(212,255,50,0.28) 0%, rgba(212,255,50,0) 55%), radial-gradient(90% 70% at 0% 100%, rgba(255,69,58,0.22) 0%, rgba(255,69,58,0) 60%)",
-      }}
-    >
-      {/* fine grid texture */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.07]"
-        style={{ backgroundImage: "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)", backgroundSize: "22px 22px" }}
-      />
-      <span className="relative inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white/90 ring-1 ring-white/15">
-        <span className="h-1.5 w-1.5 rounded-full bg-[#d4ff32] shadow-[0_0_8px_#d4ff32]" aria-hidden />
-        {H.heroBadge}
-      </span>
-      <h1 className="relative mt-3 text-[30px] font-extrabold leading-[1.05] tracking-tight">
-        {H.heroLine1}
-        <br />
-        <span className="relative inline-block text-[#d4ff32]">
-          {H.heroLine2}
-          <svg aria-hidden viewBox="0 0 200 12" preserveAspectRatio="none" className="absolute -bottom-1.5 left-0 h-2.5 w-full text-[#d4ff32]/70">
-            <path d="M2 9 C 50 2, 110 2, 198 7" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    <div className="relative overflow-hidden rounded-[28px] bg-night p-5 text-white shadow-[0_24px_48px_-28px_rgba(22,22,22,0.7)]">
+      <div className="flex items-start gap-4">
+        <div className="min-w-0 flex-1">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white/80">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#d7f443]" aria-hidden />
+            {H.heroBadge}
+          </span>
+          <h1 className="mt-3 text-[27px] font-extrabold leading-[1.08] tracking-tight">
+            {H.heroLine1} <span className="text-[#d7f443]">{H.heroLine2}</span>
+          </h1>
+        </div>
+        {/* progress ring: "3 min" */}
+        <div className="relative h-[84px] w-[84px] shrink-0" aria-hidden>
+          <svg viewBox="0 0 84 84" className="h-full w-full -rotate-90">
+            <circle cx="42" cy="42" r={r} fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth="8" />
+            <circle cx="42" cy="42" r={r} fill="none" stroke="#d7f443" strokeWidth="8" strokeLinecap="round" strokeDasharray={`${c * 0.72} ${c}`} />
           </svg>
-        </span>
-      </h1>
-      <p className="relative mt-3.5 max-w-[22rem] text-[14px] leading-snug text-white/70">{H.heroText}</p>
-      <div className="relative mt-4 grid grid-cols-[1.4fr_1fr] gap-2">
-        <a href="#templates" className="btn-glow flex h-12 items-center justify-center rounded-full text-[15px] font-extrabold">{H.heroPick} ↓</a>
-        <Link href="/photos" className="flex h-12 items-center justify-center rounded-full bg-white/10 text-[15px] font-bold text-white ring-1 ring-white/15 active:bg-white/20">📸 {H.heroPhoto}</Link>
+          <span className="absolute inset-0 flex flex-col items-center justify-center leading-none">
+            <span className="text-[22px] font-extrabold">3</span>
+            <span className="mt-0.5 text-[10px] font-medium text-white/60">{H.heroRingUnit}</span>
+          </span>
+        </div>
       </div>
-      <ul className="relative mt-4 flex flex-wrap gap-x-3 gap-y-1 text-[12px] font-medium text-white/60">
-        {H.heroPerks.map((p) => <li key={p}>{p}</li>)}
-      </ul>
+      <p className="mt-3 text-[14px] leading-snug text-white/65">{H.heroText}</p>
+      <dl className="mt-4 divide-y divide-white/10 rounded-2xl bg-white/[0.06] px-4">
+        {H.heroStats.map((st) => (
+          <div key={st.k} className="flex items-center justify-between py-2.5 text-[13px]">
+            <dt className="text-white/60">{st.k}</dt>
+            <dd className="font-semibold">{st.v}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="mt-4 grid grid-cols-[1.4fr_1fr] gap-2">
+        <a href="#templates" className="btn-lime flex h-12 items-center justify-center rounded-full text-[15px] font-extrabold">{H.heroPick} ↓</a>
+        <Link href="/photos" className="flex h-12 items-center justify-center rounded-full bg-white/10 text-[15px] font-semibold text-white active:bg-white/20">📸 {H.heroPhoto}</Link>
+      </div>
+    </div>
+  );
+}
+
+/** Friendly greeting for a signed-in customer (Mini App header). */
+async function Greeting() {
+  const user = await getSessionUser();
+  const name = user?.displayName?.trim().split(/\s+/)[0];
+  return (
+    <div className="mb-3">
+      <p className="text-[13px] font-medium text-muted">{kk.home.greetingSub}</p>
+      <p className="text-[22px] font-extrabold leading-tight tracking-tight">{name ? kk.home.greeting(name) : kk.home.greetingGuest}</p>
     </div>
   );
 }

@@ -72,7 +72,7 @@ export function TelegramBridge() {
       const wa = telegramApp();
       if (!wa) return;
       wa.ready(); wa.expand();
-      wa.setHeaderColor?.("#f4f4f6"); wa.setBackgroundColor?.("#f4f4f6"); wa.setBottomBarColor?.("#f4f4f6");
+      wa.setHeaderColor?.("#faf5f1"); wa.setBackgroundColor?.("#faf5f1"); wa.setBottomBarColor?.("#faf5f1");
       window.dispatchEvent(new Event(TG_READY_EVENT));
     };
     if (window.Telegram?.WebApp) ui();

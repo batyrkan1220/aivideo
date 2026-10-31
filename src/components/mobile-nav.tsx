@@ -5,7 +5,7 @@ import { kk } from "@/lib/i18n/kk";
 
 type Item = { href: string; label: string; icon: React.ReactNode; match: (p: string) => boolean };
 
-const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round" } as const;
+const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
 const items: Item[] = [
   {
@@ -30,13 +30,13 @@ const items: Item[] = [
   },
 ];
 
-/** App-style floating tab bar on phones: 5 tabs, the active one sits in a neon-lime pill. Hidden from sm up. */
+/** Floating white dock on phones: 5 tabs, the active icon sits in a dark capsule. Hidden from sm up. */
 export function MobileNav() {
   const path = usePathname();
   return (
     <nav
       aria-label={kk.nav.home}
-      className="glass fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] z-40 rounded-[1.75rem] border border-black/5 shadow-[0_14px_36px_-14px_rgba(0,0,0,0.25)] sm:hidden"
+      className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] z-40 rounded-[2rem] border border-line bg-white shadow-[0_16px_40px_-18px_rgba(60,40,20,0.35)] sm:hidden"
     >
       <ul className="grid h-[4.25rem] grid-cols-5 items-center px-1">
         {items.map((it) => {
@@ -48,7 +48,7 @@ export function MobileNav() {
                 aria-current={on ? "page" : undefined}
                 className={`flex min-w-0 flex-col items-center gap-1 text-[10px] font-semibold leading-none transition-colors ${on ? "text-ink" : "text-muted"}`}
               >
-                <span className={`flex h-9 w-12 items-center justify-center rounded-[0.9rem] transition-all active:scale-95 ${on ? "bg-brand text-night shadow-[0_6px_16px_-6px_rgba(120,160,0,0.6)]" : "text-ink"}`}>
+                <span className={`flex h-9 w-12 items-center justify-center rounded-full transition-all active:scale-95 ${on ? "bg-night text-white shadow-[0_8px_18px_-8px_rgba(22,22,22,0.6)]" : "text-ink/70"}`}>
                   <span className="h-[22px] w-[22px] [&>svg]:h-full [&>svg]:w-full" aria-hidden>{it.icon}</span>
                 </span>
                 <span className="max-w-full truncate px-0.5">{it.label}</span>
