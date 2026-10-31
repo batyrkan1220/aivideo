@@ -14,7 +14,6 @@ export function SiteHeader() {
           <Logo className="text-lg" />
         </Link>
         <div className="ml-auto flex items-center gap-2">
-          <Link href="/create" className="btn-promo inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold sm:hidden">🔥 {kk.home.promo}</Link>
           <Suspense fallback={<div className="h-10 w-20" />}>
             <AccountNav />
           </Suspense>

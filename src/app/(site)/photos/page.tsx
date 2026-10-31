@@ -14,9 +14,8 @@ export default function PhotosPage() {
   return (
     <main className="mx-auto max-w-6xl px-4 pb-6 pt-3 md:pt-10">
       <div className="tg-only">
-        <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="mb-3 flex items-center">
           <Logo className="text-base" />
-          <Link href="/create" className="btn-promo inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold">🔥 {kk.home.promo}</Link>
         </div>
       </div>
       <h1 className="sr-only">{kk.photos.title}</h1>
