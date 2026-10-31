@@ -194,7 +194,7 @@ export const kk = {
     heroLine2: "жұлдызы бол",
     heroText: "Шаблон таңда, бір фото жүкте — AI 3–5 минутта сен бар видео жасайды.",
     heroPick: "Видео таңдау",
-    heroPhoto: "AI-фото",
+    heroPhoto: "Фото",
     heroPerks: ["⚡ 3–5 минут", "🔒 Фото өшіріледі", "💳 Kaspi"],
     heroRingUnit: "мин",
     heroChips: ["⚡ 3–5 мин", "1 фото", "Kaspi"],
@@ -241,7 +241,7 @@ export const kk = {
     creative: "Жасау",
     videoTemplates: "Видео-шаблондар",
     videoTemplatesHint: "Сіз бар трендтегі видеолар",
-    photoTemplates: "AI-фото",
+    photoTemplates: "Фото",
     photoTemplatesHint: "Кез келген стильдегі фото-шаблондар",
     ownVideo: "Өзім жасаймын",
     ownVideoHint: "Өз видеоң немесе сипаттама бойынша фото",
@@ -257,7 +257,7 @@ export const kk = {
   },
   createHub: {
     title: "Жасау",
-    tabs: { video: "Видео", photo: "AI-фото" },
+    tabs: { video: "Видео", photo: "Фото" },
     video: {
       eyebrow: "Өз видеом",
       title: "Сіз — кез келген видеода",
@@ -265,7 +265,7 @@ export const kk = {
       steps: ["Үлгі видео", "Өз фотоңыз", "Төлеңіз — дайын"],
     },
     photo: {
-      eyebrow: "AI-фото",
+      eyebrow: "Фото",
       title: "Кез келген фотода — сіз",
       lead: "Ұнаған фотоны және өз фотоңызды жүктеңіз — AI сол фотодағыдай етіп сізді салады.",
       steps: ["Үлгі фото", "Өз фотоңыз", "Төлеңіз — дайын"],
@@ -273,7 +273,7 @@ export const kk = {
     },
   },
   photos: {
-    title: "Кез келген стильдегі AI-фото",
+    title: "Кез келген стильдегі фото",
     eyebrow: "Фото",
     lead: "Стиль + сіздің селфиіңіз = жаңа фото",
     templatesTitle: "Фото-шаблондар",
