@@ -194,7 +194,7 @@ export const kk = {
     heroLine2: "трендтегі видеодасың",
     heroText: "Шаблон таңда, бір фото жүкте — AI 3–5 минутта сен бар видео жасайды.",
     heroPick: "Видео таңдау",
-    heroFrom: (p: string) => `${p}-ден`,
+    heroFrom: (p: string) => `${p}-ден бастап`,
     heroPath: ["📷 1 фото", "✨ AI", "🎬 3–5 мин"],
     heroTrust: "🔒 Фото өшіріледі · 💳 Kaspi",
     heroCombo: "Фото комбо",
