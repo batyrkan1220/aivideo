@@ -12,7 +12,7 @@ describe("bot messages", () => {
   });
   it("falls back to defaults and tidies an empty name", async () => {
     const m = await botMessage("welcome", { name: "" });
-    expect(m.text.startsWith("Сәлем! 👋")).toBe(true);
+    expect(m.text.startsWith("Привет! 👋")).toBe(true);
     expect(m.button).toBe(BOT_MESSAGES.welcome.button);
   });
   it("profile texts fit Telegram limits", () => {

@@ -97,7 +97,7 @@ export async function saveCombo(raw: unknown): Promise<ComboState> {
     title_kk: d.title, description_kk: d.description, kind: "combo", status: "published" as const,
     provider_key: COMBO_PROVIDER,
     provider_config_json: { templateIds: itemIds, discountPercent: d.discountPercent, pricePerPhoto: d.pricePerPhoto },
-    face_slots_json: [{ key: "face_1", labelKk: "Сіздің фотоңыз", position: { x: 0.5, y: 0.42 }, providerInput: "img_1", order: 0 }],
+    face_slots_json: [{ key: "face_1", labelKk: "Ваше фото", position: { x: 0.5, y: 0.42 }, providerInput: "img_1", order: 0 }],
     required_face_count: 1, supported_qualities_json: [PHOTO_QUALITY], pricing_config_json: PRICING(price),
     cover_asset_path: first?.cover_asset_path ?? null, preview_video_path: null, max_upload_bytes: 10485760,
   };

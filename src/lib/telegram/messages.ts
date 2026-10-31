@@ -7,48 +7,48 @@ import { supabaseAdmin } from "@/lib/supabase/server";
  */
 export const BOT_MESSAGES = {
   welcome: {
-    group: "commands", vars: ["name"], button: "🎬 Видео жасау", max: 4000,
-    text: "Сәлем, {name}! 👋\n\n<b>TrendMe</b> — өзіңізді трендтегі видеодан көріңіз.\n\n<b>Қалай жұмыс істейді:</b>\n1️⃣ Ұнаған видеоны таңдаңыз\n2️⃣ Өз фотоңызды жүктеңіз\n3️⃣ Kaspi арқылы төлеңіз\n4️⃣ Бірнеше минутта видео дайын — осы ботқа хабарлаймыз\n\nБастау үшін төмендегі батырманы басыңыз 👇",
+    group: "commands", vars: ["name"], button: "🎬 Создать видео", max: 4000,
+    text: "Привет, {name}! 👋\n\n<b>TrendMe</b> — увидь себя в трендовом видео.\n\n<b>Как это работает:</b>\n1️⃣ Выберите понравившееся видео\n2️⃣ Загрузите своё фото\n3️⃣ Оплатите через Kaspi\n4️⃣ Через несколько минут видео готово — сообщим в этом боте\n\nЧтобы начать, нажмите кнопку ниже 👇",
   },
   help: {
-    group: "commands", vars: [], button: "🎬 Видео жасау", max: 4000,
-    text: "<b>TrendMe көмегі</b>\n\n🎬 <b>Видео жасау</b> — төмендегі батырма немесе /start\n📂 <b>Тапсырыстарым</b> — /videos\n\n<b>Фото бойынша кеңес:</b> беті анық көрінетін, жарығы жақсы, тек бір адам бар фото таңдаңыз.\n\n<b>Төлем:</b> Kaspi нөміріңізге шот келеді. Оны Kaspi қосымшасында → «Төлем шоттары» бөлімінен төлеңіз.\n\nВидео дайын болғанда, осы ботқа хабарлама келеді.",
+    group: "commands", vars: [], button: "🎬 Создать видео", max: 4000,
+    text: "<b>Помощь TrendMe</b>\n\n🎬 <b>Создать видео</b> — кнопка ниже или /start\n📂 <b>Мои заказы</b> — /videos\n\n<b>Совет по фото:</b> выберите фото, где хорошо видно лицо, хороший свет и только один человек.\n\n<b>Оплата:</b> счёт придёт на ваш номер Kaspi. Оплатите его в приложении Kaspi → «Счета на оплату».\n\nКогда видео будет готово, в этот бот придёт сообщение.",
   },
   videos: {
-    group: "commands", vars: [], button: "📂 Тапсырыстарым", max: 4000,
-    text: "Барлық тапсырысыңыз осында сақталады.",
+    group: "commands", vars: [], button: "📂 Мои заказы", max: 4000,
+    text: "Все ваши заказы хранятся здесь.",
   },
   hint: {
-    group: "commands", vars: [], button: "🎬 Видео жасау", max: 4000,
-    text: "Видео жасау үшін төмендегі батырманы басыңыз.",
+    group: "commands", vars: [], button: "🎬 Создать видео", max: 4000,
+    text: "Чтобы создать видео, нажмите кнопку ниже.",
   },
   invoice_sent: {
-    group: "notifications", vars: ["title"], button: "Тапсырысты ашу", max: 4000,
-    text: "🧾 Kaspi-ге шот жіберілді: <b>{title}</b>\n\nKaspi қосымшасында → «Менің Банкім» → «Төлем шоттары» бөлімінен төлеңіз. Төлем түскен бойда видео жасала бастайды.",
+    group: "notifications", vars: ["title"], button: "Открыть заказ", max: 4000,
+    text: "🧾 Счёт отправлен в Kaspi: <b>{title}</b>\n\nОплатите в приложении Kaspi → «Мой Банк» → «Счета на оплату». Как только оплата поступит, видео начнёт создаваться.",
   },
   paid: {
-    group: "notifications", vars: ["title"], button: "Тапсырысты ашу", max: 4000,
-    text: "✅ Төлем алынды: <b>{title}</b>\nВидео жасалып жатыр — дайын болғанда осында хабарлаймыз.",
+    group: "notifications", vars: ["title"], button: "Открыть заказ", max: 4000,
+    text: "✅ Оплата получена: <b>{title}</b>\nВидео создаётся — когда будет готово, сообщим здесь.",
   },
   ready: {
-    group: "notifications", vars: ["title"], button: "▶️ Видеоны көру", max: 4000,
-    text: "🎉 Видеоңыз дайын: <b>{title}</b>\n\nКөріңіз, жүктеп алыңыз және достарыңызбен бөлісіңіз!",
+    group: "notifications", vars: ["title"], button: "▶️ Смотреть видео", max: 4000,
+    text: "🎉 Ваше видео готово: <b>{title}</b>\n\nСмотрите, скачивайте и делитесь с друзьями!",
   },
   failed: {
-    group: "notifications", vars: ["title"], button: "Тапсырысты ашу", max: 4000,
-    text: "⚠️ <b>{title}</b> видеосын жасау мүмкін болмады. Қолдау қызметі тапсырысты тексереді.",
+    group: "notifications", vars: ["title"], button: "Открыть заказ", max: 4000,
+    text: "⚠️ Не удалось создать видео <b>{title}</b>. Поддержка проверит заказ.",
   },
   description: {
     group: "profile", vars: [], button: null, max: 512,
-    text: "🎬 TrendMe — бір фотоңыздан трендтегі AI-видео мен фото жасайтын бот.\n\nНе істей алады:\n🔥 Трендтегі видеоға сізді қояды\n📸 Фото-комбо: 1 селфиден бірнеше стильде фото\n✨ Өз шаблоныңыз бойынша видео не фото\n\nҚалай жұмыс істейді:\n1️⃣ Шаблон таңдаңыз\n2️⃣ Фотоңызды жүктеңіз\n3️⃣ Kaspi арқылы төлеңіз\n4️⃣ 3–5 минутта дайын — бот өзі хабарлайды\n\n👇 «Бастау» батырмасын басыңыз",
+    text: "🎬 TrendMe — бот, который делает трендовые AI-видео с вами по одному фото.\n\nЧто умеет:\n🔥 Ставит вас в трендовое видео\n📸 Фото-комбо: несколько фото в разных стилях из 1 селфи\n✨ Видео или фото по вашему шаблону\n\nКак это работает:\n1️⃣ Выберите шаблон\n2️⃣ Загрузите своё фото\n3️⃣ Оплатите через Kaspi\n4️⃣ Готово за 3–5 минут — бот сам сообщит\n\n👇 Нажмите «Старт»",
   },
   short_description: {
     group: "profile", vars: [], button: null, max: 120,
-    text: "Бір фото — және сен трендтегі видеодасың 🔥 AI-видео мен фото 3–5 минутта. Төлем Kaspi арқылы. trendme.kz",
+    text: "Одно фото — и ты в трендовом видео 🔥 AI-видео и фото за 3–5 минут. Оплата через Kaspi. trendme.kz",
   },
   menu_button: {
     group: "profile", vars: [], button: null, max: 64,
-    text: "Видео жасау",
+    text: "Создать видео",
   },
 } as const satisfies Record<string, { group: "commands" | "notifications" | "profile"; vars: readonly string[]; button: string | null; max: number; text: string }>;
 
@@ -82,7 +82,7 @@ export async function botMessage(key: BotMessageKey, vars: Record<string, string
   const o = (await botMessageOverrides()).get(key);
   let text = o?.text ?? def.text;
   for (const v of def.vars) text = text.replaceAll(`{${v}}`, esc((vars[v] ?? "").slice(0, 80)));
-  // "Сәлем, !" when Telegram gives no first name → "Сәлем!"
+  // "Привет, !" when Telegram gives no first name → "Привет!"
   text = text.replace(/,\s*!/g, "!");
   return { text, button: def.button === null ? null : (o?.button ?? def.button) };
 }

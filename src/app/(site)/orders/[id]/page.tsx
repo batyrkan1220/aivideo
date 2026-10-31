@@ -67,8 +67,8 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
     ? await db.from("orders").select("id,generation_status").eq("parent_order_id", o.id).eq("user_id", user.id).order("created_at")
     : { data: [] as { id: string; generation_status: string }[] };
   const price = o.pricing_breakdown_json as PriceBreakdown;
-  const fmt = new Intl.DateTimeFormat("kk-KZ", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Almaty" });
-  const dateFmt = new Intl.DateTimeFormat("kk-KZ", { dateStyle: "long", timeZone: "Asia/Almaty" });
+  const fmt = new Intl.DateTimeFormat("ru-RU", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Almaty" });
+  const dateFmt = new Intl.DateTimeFormat("ru-RU", { dateStyle: "long", timeZone: "Asia/Almaty" });
   const payLabel = kk.order.payment[o.payment_status as keyof typeof kk.order.payment];
   const genLabel = kk.order.generation[o.generation_status as keyof typeof kk.order.generation];
 

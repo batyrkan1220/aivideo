@@ -24,7 +24,7 @@ export const seedanceConfigSchema = z.object({
   prompt: z.string().trim().max(1500).default(""),
   /** Customer may describe a wish (background, outfit…). */
   allowWish: z.boolean().default(true),
-  /** Photo labels for the customer, one per person (e.g. "Баланың фотосы"). */
+  /** Photo labels for the customer, one per person (e.g. "Фото ребёнка"). */
   labels: z.array(z.string().trim().max(40)).max(5).default([]),
   /** The outfit: the customer's own (photo), the original person's in the template, or the customer picks one (default: template). */
   outfit: z.enum(["photo", "template", "choice"]).catch("photo").default("photo"),
@@ -44,7 +44,7 @@ export function parseSeedanceConfig(raw: unknown): SeedanceConfig {
 }
 
 export function seedanceSlotLabel(i: number, n: number) {
-  return n === 1 ? "Сіздің фотоңыз" : `${i + 1}-адам (сол жақтан)`;
+  return n === 1 ? "Ваше фото" : `${i + 1}-й человек (слева)`;
 }
 
 /** Customer upload slots. providerInput = `img_<n>` (= @image_<n> in the prompt). */

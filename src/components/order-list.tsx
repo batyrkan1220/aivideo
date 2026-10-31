@@ -80,8 +80,8 @@ export async function OrderList({ limit = 50, day }: { limit?: number; day?: str
   const isPhoto = (o: Row) => photoUrl.has(o.id) || ["kling_photo", "combo"].includes((o.template_snapshot_json as { provider_key?: string }).provider_key ?? "");
 
   const tz = { timeZone: "Asia/Almaty" } as const;
-  const head = new Intl.DateTimeFormat("kk-KZ", { day: "numeric", month: "long", weekday: "long", ...tz });
-  const time = new Intl.DateTimeFormat("kk-KZ", { hour: "2-digit", minute: "2-digit", ...tz });
+  const head = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", weekday: "long", ...tz });
+  const time = new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit", ...tz });
   const noon = (k: string) => new Date(`${k}T12:00:00+05:00`);
   const state = (o: Row): { text: string; tone: "ok" | "work" | "pay" | "bad" | "muted"; action: string } => {
     if (o.payment_status === "refunded") return { text: kk.order.payment.refunded, tone: "muted", action: kk.order.open };
