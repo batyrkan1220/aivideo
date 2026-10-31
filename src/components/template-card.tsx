@@ -13,6 +13,8 @@ export type CardData = {
   startingPriceKzt: number | null;
   coverUrl: string | null;
   previewUrl: string | null;
+  /** Light 480p copy made by the server; cards prefer it. */
+  previewLiteUrl?: string | null;
   isTrending: boolean;
 };
 
@@ -119,7 +121,7 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
           <video
             ref={videoRef}
             // Without a cover image the first video frame acts as the poster.
-            src={t.coverUrl ? t.previewUrl : `${t.previewUrl}#t=0.1`}
+            src={t.coverUrl ? (t.previewLiteUrl ?? t.previewUrl) : `${t.previewLiteUrl ?? t.previewUrl}#t=0.1`}
             muted
             loop
             playsInline

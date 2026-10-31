@@ -32,6 +32,8 @@ export type TemplateCard = {
   startingPriceKzt: number | null;
   coverUrl: string | null;
   previewUrl: string | null;
+  /** Light 480p silent copy for cards (falls back to previewUrl). */
+  previewLiteUrl: string | null;
   isTrending: boolean;
   category: Category | null;
 };
@@ -56,11 +58,11 @@ export type TemplateDetail = TemplateCard & {
 };
 
 const CARD_COLUMNS =
-  "id,title_kk,description_kk,required_face_count,cover_asset_path,preview_video_path,supported_qualities_json,pricing_config_json,face_slots_json,max_upload_bytes,is_trending,provider_key,video_duration_sec,photo_framing:provider_config_json->>framing,allow_wish:provider_config_json->>allowWish,seedance_mode:provider_config_json->>mode,seedance_prepare:provider_config_json->>prepare,seedance_faceswap:provider_config_json->>faceSwap,categories(id,title_kk,slug)";
+  "id,title_kk,description_kk,required_face_count,cover_asset_path,preview_video_path,preview_lite_path,supported_qualities_json,pricing_config_json,face_slots_json,max_upload_bytes,is_trending,provider_key,video_duration_sec,photo_framing:provider_config_json->>framing,allow_wish:provider_config_json->>allowWish,seedance_mode:provider_config_json->>mode,seedance_prepare:provider_config_json->>prepare,seedance_faceswap:provider_config_json->>faceSwap,categories(id,title_kk,slug)";
 
 type Row = {
   id: string; title_kk: string; description_kk: string; required_face_count: number;
-  cover_asset_path: string | null; preview_video_path: string | null;
+  cover_asset_path: string | null; preview_video_path: string | null; preview_lite_path?: string | null;
   supported_qualities_json: unknown; pricing_config_json: unknown; face_slots_json: unknown;
   max_upload_bytes: number; is_trending: boolean;
   provider_key?: string | null; video_duration_sec?: number | string | null; photo_framing?: string | null; allow_wish?: string | null; seedance_mode?: string | null; seedance_prepare?: string | null; seedance_faceswap?: string | null;
@@ -113,6 +115,7 @@ export function parseRow(r: Row, seedancePricing: SeedancePricing = DEFAULT_SEED
     startingPriceKzt: priced ? startingPrice(pricing.data, qualities.data, r.required_face_count) : null,
     coverUrl: mediaUrl(r.cover_asset_path),
     previewUrl: mediaUrl(r.preview_video_path),
+    previewLiteUrl: mediaUrl(r.preview_lite_path ?? null),
     isTrending: r.is_trending,
     category: cat ? { id: cat.id, title: cat.title_kk, slug: cat.slug } : null,
     // Slot preview images (if any) as absolute public URLs, so any component can show them.

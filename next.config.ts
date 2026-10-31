@@ -29,6 +29,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // ffmpeg binary for light card previews: resolved from node_modules at runtime, not bundled.
+  serverExternalPackages: ["ffmpeg-static"],
   // The separate catalog page was merged into the home feed.
   async redirects() {
     return [{ source: "/templates", destination: "/", permanent: false }];

@@ -15,6 +15,18 @@ export async function register() {
       }
     })();
   }, 8_000);
+  // Light card previews for templates that don't have one yet (one ffmpeg job at a time).
+  setTimeout(() => {
+    void (async () => {
+      try {
+        const { backfillLitePreviews } = await import("@/lib/templates/lite-preview");
+        const n = await backfillLitePreviews();
+        if (n) console.log(`[lite-preview] queued ${n}`);
+      } catch (err) {
+        console.error("[lite-preview] backfill failed", err instanceof Error ? err.message : err);
+      }
+    })();
+  }, 20_000);
   setTimeout(() => {
     void (async () => {
       try {
