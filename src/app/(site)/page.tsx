@@ -8,7 +8,6 @@ import { HeroShowcase } from "@/components/hero-showcase";
 import Link from "next/link";
 import { Logo } from "@/components/logo";
 import { DesktopOnly } from "@/components/desktop-only";
-import { getSessionUser } from "@/lib/auth/session";
 import { resolveShowcase } from "@/lib/templates/showcase";
 
 type SP = { account?: string; category?: string };
@@ -46,9 +45,6 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
           <div className="mb-3 flex items-center">
             <Logo className="text-base" />
           </div>
-          <Suspense fallback={<div className="mb-3 h-12" />}>
-            <Greeting />
-          </Suspense>
         </div>
         <TextHero />
       </section>
@@ -60,60 +56,48 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
   );
 }
 
-/** Phone hero: dark "metric" card (chartreuse progress ring + stat list) — pure CSS/SVG, no media. */
+/** Phone hero: compact dark card — small chartreuse/white progress ring, two-line title,
+    one row of perk chips, two buttons. Pure CSS/SVG, no media. */
 function TextHero() {
   const H = kk.home;
-  const r = 34, c = 2 * Math.PI * r;
+  const r = 22, c = 2 * Math.PI * r;
   return (
-    <div className="relative overflow-hidden rounded-[28px] bg-night p-5 text-white shadow-[0_24px_48px_-28px_rgba(22,22,22,0.7)]">
-      <div className="flex items-start gap-4">
+    <div className="relative overflow-hidden rounded-[24px] bg-night px-4 py-4 text-white shadow-[0_20px_40px_-26px_rgba(22,22,22,0.7)]">
+      <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white/80">
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/55">
             <span className="h-1.5 w-1.5 rounded-full bg-[#d7f443]" aria-hidden />
             {H.heroBadge}
           </span>
-          <h1 className="mt-3 text-[27px] font-extrabold leading-[1.08] tracking-tight">
+          <h1 className="mt-1.5 text-[21px] font-extrabold leading-[1.12] tracking-tight">
             {H.heroLine1} <span className="text-[#d7f443]">{H.heroLine2}</span>
           </h1>
         </div>
-        {/* progress ring: "3 min" */}
-        <div className="relative h-[84px] w-[84px] shrink-0" aria-hidden>
-          <svg viewBox="0 0 84 84" className="h-full w-full -rotate-90">
-            <circle cx="42" cy="42" r={r} fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth="8" />
-            <circle cx="42" cy="42" r={r} fill="none" stroke="#d7f443" strokeWidth="8" strokeLinecap="round" strokeDasharray={`${c * 0.72} ${c}`} />
-            <circle cx="42" cy="42" r={r} fill="none" stroke="#ffffff" strokeWidth="8" strokeLinecap="round" strokeDasharray={`${c * 0.1} ${c}`} strokeDashoffset={-c * 0.78} />
+        {/* progress ring: "3 min" (chartreuse + white) */}
+        <div className="relative h-[58px] w-[58px] shrink-0" aria-hidden>
+          <svg viewBox="0 0 58 58" className="h-full w-full -rotate-90">
+            <circle cx="29" cy="29" r={r} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="6" />
+            <circle cx="29" cy="29" r={r} fill="none" stroke="#d7f443" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${c * 0.72} ${c}`} />
+            <circle cx="29" cy="29" r={r} fill="none" stroke="#ffffff" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${c * 0.08} ${c}`} strokeDashoffset={-c * 0.79} />
           </svg>
           <span className="absolute inset-0 flex flex-col items-center justify-center leading-none">
-            <span className="text-[22px] font-extrabold">3</span>
-            <span className="mt-0.5 text-[10px] font-medium text-white/60">{H.heroRingUnit}</span>
+            <span className="text-[16px] font-extrabold">3</span>
+            <span className="text-[8px] font-medium text-white/55">{H.heroRingUnit}</span>
           </span>
         </div>
       </div>
-      <p className="mt-3 text-[14px] leading-snug text-white/65">{H.heroText}</p>
-      <dl className="mt-4 divide-y divide-white/10 rounded-2xl bg-white/[0.06] px-4">
-        {H.heroStats.map((st) => (
-          <div key={st.k} className="flex items-center justify-between py-2.5 text-[13px]">
-            <dt className="text-white/60">{st.k}</dt>
-            <dd className="font-semibold">{st.v}</dd>
-          </div>
+      <ul className="mt-3 flex gap-1.5">
+        {H.heroChips.map((x) => (
+          <li key={x} className="rounded-full bg-white/[0.08] px-2.5 py-1 text-[11.5px] font-medium text-white/80">{x}</li>
         ))}
-      </dl>
-      <div className="mt-4 grid grid-cols-[1.4fr_1fr] gap-2">
-        <a href="#templates" className="btn-lime flex h-12 items-center justify-center rounded-full text-[15px] font-extrabold">{H.heroPick} ↓</a>
-        <Link href="/photos" className="flex h-12 items-center justify-center rounded-full bg-white/10 text-[15px] font-semibold text-white active:bg-white/20">📸 {H.heroPhoto}</Link>
+      </ul>
+      <div className="mt-3.5 grid grid-cols-[1.35fr_1fr] gap-2">
+        <a href="#templates" className="btn-lime flex h-11 items-center justify-center rounded-full text-[14px] font-extrabold">{H.heroPick} ↓</a>
+        <Link href="/photos" className="flex h-11 items-center justify-center gap-1.5 rounded-full bg-white/10 text-[14px] font-semibold text-white active:bg-white/20">
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><rect x="3" y="5" width="18" height="15" rx="4" /><circle cx="12" cy="12.5" r="3.5" /><path d="M8 5l1.5-2h5L16 5" /></svg>
+          {H.heroPhoto}
+        </Link>
       </div>
-    </div>
-  );
-}
-
-/** Friendly greeting for a signed-in customer (Mini App header). */
-async function Greeting() {
-  const user = await getSessionUser();
-  const name = user?.displayName?.trim().split(/\s+/)[0];
-  return (
-    <div className="mb-3">
-      <p className="text-[13px] font-medium text-muted">{kk.home.greetingSub}</p>
-      <p className="text-[22px] font-extrabold leading-tight tracking-tight">{name ? kk.home.greeting(name) : kk.home.greetingGuest}</p>
     </div>
   );
 }
