@@ -2,11 +2,11 @@
 -- Slot "ref" (providerInput "example") is the example; "face_1" is the person. Prompt is optional.
 do $$
 declare t record; v_id uuid; last int;
-  slots jsonb := '[{"key":"ref","labelKk":"Үлгі фото","position":{"x":0.3,"y":0.42},"providerInput":"example","order":0},{"key":"face_1","labelKk":"Сіздің фотоңыз","position":{"x":0.7,"y":0.42},"providerInput":"img_1","order":1}]';
+  slots jsonb := '[{"key":"ref","labelKk":"Шаблон фото","position":{"x":0.3,"y":0.42},"providerInput":"example","order":0},{"key":"face_1","labelKk":"Сіздің фотоңыз","position":{"x":0.7,"y":0.42},"providerInput":"img_1","order":1}]';
 begin
   for t in select * from templates where kind = 'custom_photo' loop
     update templates set face_slots_json = slots, required_face_count = 2,
-      title_kk = 'Өз фотом', description_kk = 'Үлгі фото + сіздің фотоңыз',
+      title_kk = 'Өз фотом', description_kk = 'Шаблон фото + сіздің фотоңыз',
       provider_config_json = provider_config_json || '{"useExample": false, "allowWish": true}'::jsonb
       where id = t.id;
     select coalesce(max(version_number), 0) into last from template_versions where template_id = t.id;

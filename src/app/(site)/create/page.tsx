@@ -128,7 +128,7 @@ async function PhotoFlow() {
   return (
     <CreateFlow
       templateId={t.id} slots={t.faceSlots} qualities={t.qualities} pricing={{ ...t.pricing, basePriceKzt: s.photoPriceKzt }}
-      allowWish wishRequired={!t.faceSlots.some((s) => s.providerInput === "example")} media="photo"
+      allowWish media="photo"
       maxUploadBytes={Math.min(t.maxUploadBytes, c.uploadMax)} minDimension={c.minDimension} maxDimension={c.maxDimension}
       supabaseUrl={c.supabaseUrl} anonKey={c.anonKey} askPhone={c.askPhone}
       freeOrders={await isFreeOrderUser(user.id)}
