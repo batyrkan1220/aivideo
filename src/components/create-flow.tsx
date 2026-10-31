@@ -12,6 +12,7 @@ import { normalizeKzPhone } from "@/lib/payments/phone";
 import { useSavedPhone, savePhone } from "@/lib/payments/saved-phone";
 import { compressPhoto } from "@/lib/uploads/compress";
 import type { Framing } from "@/lib/uploads/photo-quality";
+import { PhotoTips } from "./photo-tips";
 import { seedanceSlots, SEEDANCE_MAX_PEOPLE } from "@/lib/templates/seedance-config";
 import { haptic } from "@/lib/telegram/client";
 import { requestVideoUpload, confirmVideoUpload, removeVideoUpload, type VideoError } from "@/lib/custom-video/actions";
@@ -342,6 +343,7 @@ export function CreateFlow({
       <section ref={photosRef} className={`rounded-card border bg-surface p-4 transition-shadow sm:p-5 ${nudge === "photo" ? "border-ink ring-4 ring-lavender" : "border-line"}`}>
         <StepTitle n={++step} done={missing === 0}>{refPhoto ? c.stepRefPhotos : slots.length > 1 ? c.stepPhotos(slots.length) : c.stepPhoto}</StepTitle>
         {slots.length > 1 && <p className="mt-1 text-sm text-muted">{refPhoto ? c.refPhotosHint : c.photosHint}</p>}
+        {!refPhoto && <PhotoTips />}
         {customVideo && readyVideoId && !["kling", "wan", "k4", "kd"].includes(seedanceMode) && (
           <div className="mt-3">
             <p className="text-sm font-medium">{cv.howMany}</p>
