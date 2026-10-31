@@ -1,13 +1,14 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
 import { kk } from "@/lib/i18n/kk";
-import { listCategories, listTemplates } from "@/lib/templates/queries";
+import { listCategories, listTemplates, listTrending } from "@/lib/templates/queries";
 import { CategoryChips, pickCard } from "@/components/catalog-bits";
 import { VideoFeed } from "@/components/video-feed";
 import { HeroShowcase } from "@/components/hero-showcase";
 import Link from "next/link";
 import { Logo } from "@/components/logo";
 import { DesktopOnly } from "@/components/desktop-only";
+import { formatKzt } from "@/lib/pricing";
 import { CachedFeedFallback } from "@/components/cached-feed";
 import { resolveShowcase } from "@/lib/templates/showcase";
 
@@ -47,7 +48,9 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
             <Logo className="text-base" />
           </div>
         </div>
-        <TextHero />
+        <Suspense fallback={<HeroView covers={[]} minPrice={null} />}>
+          <TextHero />
+        </Suspense>
       </section>
 
       <Suspense fallback={<div className="mx-auto mt-4 max-w-6xl px-4"><CachedFeedFallback /></div>}>
@@ -57,47 +60,55 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
   );
 }
 
-/** Phone hero: compact dark card — small chartreuse/white progress ring, two-line title,
-    one row of perk chips, two buttons. Pure CSS/SVG, no media. */
-function TextHero() {
+/** Phone hero (conversion): one promise, visual proof (real template covers, images only),
+    the 3-step path, one primary button with the real starting price, short trust line. */
+async function TextHero() {
+  const [show, trending] = await Promise.all([resolveShowcase(), listTrending(12)]);
+  const covers = [...show, ...trending].map((t) => t.coverUrl).filter((u): u is string => !!u);
+  const prices = [...show, ...trending].map((t) => t.startingPriceKzt).filter((p): p is number => p !== null && p > 0);
+  return <HeroView covers={[...new Set(covers)].slice(0, 3)} minPrice={prices.length ? Math.min(...prices) : null} />;
+}
+
+function HeroView({ covers, minPrice }: { covers: string[]; minPrice: number | null }) {
   const H = kk.home;
-  const r = 22, c = 2 * Math.PI * r;
+  const fan = ["-rotate-[10deg] -translate-x-[38%] translate-y-1 scale-[0.84]", "rotate-[10deg] translate-x-[38%] translate-y-1 scale-[0.84]", "rotate-0"];
+  const off = fan.length - covers.length;
   return (
-    <div className="relative overflow-hidden rounded-[24px] bg-night px-4 py-4 text-white shadow-[0_20px_40px_-26px_rgba(22,22,22,0.7)]">
-      <div className="flex items-center gap-3">
+    <div className="relative overflow-hidden rounded-[24px] bg-night p-4 text-white shadow-[0_20px_40px_-26px_rgba(22,22,22,0.7)]">
+      <span aria-hidden className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(215,244,67,0.28),transparent_65%)]" />
+      <div className="relative flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/55">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#d7f443]" aria-hidden />
-            {H.heroBadge}
-          </span>
-          <h1 className="mt-1.5 text-[21px] font-extrabold leading-[1.12] tracking-tight">
+          <span className="inline-flex items-center gap-1 rounded-full bg-[#d7f443]/15 px-2 py-0.5 text-[11px] font-bold text-[#d7f443]">🔥 {H.heroBadge}</span>
+          <h1 className="mt-2 text-[22px] font-extrabold leading-[1.1] tracking-tight">
             {H.heroLine1} <span className="text-[#d7f443]">{H.heroLine2}</span>
           </h1>
         </div>
-        {/* progress ring: "3 min" (chartreuse + white) */}
-        <div className="relative h-[58px] w-[58px] shrink-0" aria-hidden>
-          <svg viewBox="0 0 58 58" className="h-full w-full -rotate-90">
-            <circle cx="29" cy="29" r={r} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="6" />
-            <circle cx="29" cy="29" r={r} fill="none" stroke="#d7f443" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${c * 0.72} ${c}`} />
-            <circle cx="29" cy="29" r={r} fill="none" stroke="#ffffff" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${c * 0.08} ${c}`} strokeDashoffset={-c * 0.79} />
-          </svg>
-          <span className="absolute inset-0 flex flex-col items-center justify-center leading-none">
-            <span className="text-[16px] font-extrabold">3</span>
-            <span className="text-[8px] font-medium text-white/55">{H.heroRingUnit}</span>
-          </span>
+        {/* Visual proof: three real template covers fanned like phones */}
+        <div className="relative h-[112px] w-[96px] shrink-0" aria-hidden>
+          {covers.length ? covers.map((src, i) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={src} src={src} alt="" className={`absolute inset-x-[18px] top-0 h-[104px] w-[60px] rounded-[12px] object-cover ring-2 ring-white/90 shadow-[0_10px_20px_-8px_rgba(0,0,0,0.6)] ${fan[off + i]}`} />
+          )) : <span className="absolute inset-x-[18px] top-0 h-[104px] w-[60px] rounded-[12px] bg-white/10" />}
+          <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 rounded-full bg-[#d7f443] px-2 py-0.5 text-[10px] font-extrabold text-night">AI</span>
         </div>
       </div>
-      <ul className="mt-3 flex gap-1.5">
-        {H.heroChips.map((x) => (
-          <li key={x} className="rounded-full bg-white/[0.08] px-2.5 py-1 text-[11.5px] font-medium text-white/80">{x}</li>
+
+      {/* The path: 1 photo → AI → video */}
+      <ol className="relative mt-3 flex items-center gap-1.5 text-[12px] font-semibold">
+        {H.heroPath.map((step, i) => (
+          <li key={step} className="flex items-center gap-1.5">
+            {i > 0 && <span className="text-white/35" aria-hidden>→</span>}
+            <span className="rounded-full bg-white/[0.08] px-2.5 py-1 text-white/85">{step}</span>
+          </li>
         ))}
-      </ul>
-      <div className="mt-3.5 grid grid-cols-[1.35fr_1fr] gap-2">
-        <a href="#templates" className="btn-lime flex h-11 items-center justify-center rounded-full text-[14px] font-extrabold">{H.heroPick} ↓</a>
-        <Link href="/photos" className="flex h-11 items-center justify-center gap-1.5 rounded-full bg-white/10 text-[14px] font-semibold text-white active:bg-white/20">
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><rect x="3" y="5" width="18" height="15" rx="4" /><circle cx="12" cy="12.5" r="3.5" /><path d="M8 5l1.5-2h5L16 5" /></svg>
-          {H.heroPhoto}
-        </Link>
+      </ol>
+
+      <a href="#templates" className="btn-lime relative mt-3.5 flex h-12 items-center justify-center gap-1.5 rounded-full text-[15px] font-extrabold">
+        {H.heroPick}{minPrice ? <span className="font-bold opacity-70">· {H.heroFrom(formatKzt(minPrice))}</span> : null} ↓
+      </a>
+      <div className="relative mt-2.5 flex items-center justify-between gap-2 text-[11.5px] text-white/55">
+        <span className="truncate">{H.heroTrust}</span>
+        <Link href="/photos" className="shrink-0 font-semibold text-white/85 underline-offset-2 active:underline">{H.heroCombo} →</Link>
       </div>
     </div>
   );
