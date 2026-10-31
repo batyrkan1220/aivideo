@@ -229,7 +229,10 @@ export async function createOrder(raw: unknown): Promise<
   }
 
   const photo = isPhotoProvider(tv.snapshot.provider_key as string);
-  if (tv.snapshot.provider_key !== "seedance" && tv.snapshot.provider_key !== "dev" && !photo) return { ok: false, error: "template_unavailable" };
+  const combo = tv.snapshot.provider_key === "combo" && tv.template.kind === "combo";
+  if (tv.snapshot.provider_key !== "seedance" && tv.snapshot.provider_key !== "dev" && !photo && !combo) return { ok: false, error: "template_unavailable" };
+  // Photo combo: one selfie, the combo's computed price; its photos are made after payment.
+  if (combo && !(tv.pricing.basePriceKzt > 0)) return { ok: false, error: "template_unavailable" };
   // Seedance: one quality (720p), price from the reference video length (or a manual template price).
   let pricing = tv.pricing;
   let qualities = tv.qualities;

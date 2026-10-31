@@ -13,6 +13,7 @@ import { ProviderError } from "./types";
 import { isTestPaymentProvider } from "@/lib/payments/types";
 import { notifyOrderOwner } from "@/lib/telegram/bot";
 import { notifyAdmins } from "@/lib/telegram/admin";
+import { COMBO_PROVIDER, stepCombo } from "@/lib/combos/worker";
 
 type Job = {
   id: string; order_id: string; provider: string; provider_job_id: string | null; status: string;
@@ -71,6 +72,7 @@ export async function runWorker({ limit = 5, budgetMs = 20_000 } = {}) {
 }
 
 async function step(job: Job) {
+  if (job.provider === COMBO_PROVIDER) return stepCombo(job); // photo combo: opens and tracks child orders
   if (job.status === "queued") return submitJob(job);
   return pollJob(job);
 }
@@ -117,7 +119,7 @@ async function submitJob(job: Job) {
 
   // Concurrency and spending limits: wait, don't fail.
   const { count: running } = await db.from("generation_jobs").select("id", { count: "exact", head: true })
-    .eq("status", "processing");
+    .eq("status", "processing").neq("provider", COMBO_PROVIDER); // a combo only waits for its children
   if ((running ?? 0) >= e.WORKER_CONCURRENCY) return delay(job, 30_000);
   const { data: spent } = await db.rpc("provider_spend_today");
   if (Number(spent ?? 0) >= e.DAILY_PROVIDER_SPEND_LIMIT_USD) {

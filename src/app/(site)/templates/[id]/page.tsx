@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { kk } from "@/lib/i18n/kk";
 import { getTemplate } from "@/lib/templates/queries";
 import { TemplateDetailView } from "@/components/template-detail";
+import { comboItems } from "@/lib/combos/catalog";
 import { formatKzt } from "@/lib/pricing";
 import { track } from "@/lib/analytics";
 import { CreateFlow } from "@/components/create-flow";
@@ -29,11 +30,13 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
   if (!t) notFound();
   void track("template_viewed", { templateId: t.id });
   const photo = t.media === "photo";
+  const combo = t.comboIds ? await comboItems(t.comboIds) : undefined;
   return (
     <>
     <Link href={photo ? "/photos" : "/"} className="-my-2 inline-block py-2 text-sm font-medium text-muted hover:text-ink">← {photo ? kk.template.backPhotos : kk.template.back}</Link>
     <TemplateDetailView
       t={t}
+      combo={combo}
       cta={
         <Suspense fallback={<div className="h-64 animate-pulse rounded-card bg-line" />}>
           <CreateSection t={t} />

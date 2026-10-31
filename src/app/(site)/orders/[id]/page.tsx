@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { DownloadVideo } from "@/components/download-video";
+import { DownloadVideo, SendComboToChat } from "@/components/download-video";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
@@ -60,7 +60,12 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
     .map((a, i) => ({ key: a.face_slot_key, url: signed?.[i]?.signedUrl ?? null }))
     .sort((a, b) => order(a.key) - order(b.key));
 
-  const snap = o.template_snapshot_json as { title_kk?: string; quality?: { labelKk?: string } };
+  const snap = o.template_snapshot_json as { title_kk?: string; quality?: { labelKk?: string }; provider_key?: string };
+  // Photo combo: its photos are separate child orders (made after payment).
+  const isCombo = snap.provider_key === "combo";
+  const { data: kids } = isCombo
+    ? await db.from("orders").select("id,generation_status").eq("parent_order_id", o.id).eq("user_id", user.id).order("created_at")
+    : { data: [] as { id: string; generation_status: string }[] };
   const price = o.pricing_breakdown_json as PriceBreakdown;
   const fmt = new Intl.DateTimeFormat("kk-KZ", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Almaty" });
   const dateFmt = new Intl.DateTimeFormat("kk-KZ", { dateStyle: "long", timeZone: "Asia/Almaty" });
@@ -139,7 +144,31 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
         </section>
       )}
 
-      {done && (
+      {isCombo && (kids ?? []).length > 0 && (
+        <section className="rounded-[24px] bg-surface p-4 ring-1 ring-line sm:p-6">
+          <p className="text-[15px] font-extrabold">
+            {kk.combo.ready((kids ?? []).filter((k) => k.generation_status === "completed").length, (kids ?? []).length)}
+          </p>
+          <ul className="mt-3 grid grid-cols-3 gap-2">
+            {(kids ?? []).map((k, i) => (
+              <li key={k.id}>
+                <Link href={`/orders/${k.id}`} className="relative block aspect-[3/4] overflow-hidden rounded-[16px] bg-paper ring-1 ring-line">
+                  {k.generation_status === "completed"
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={`/api/orders/${k.id}/video`} alt="" loading={i < 6 ? "eager" : "lazy"} className="h-full w-full object-cover" />
+                    : k.generation_status === "failed"
+                      ? <span className="flex h-full items-center justify-center bg-rose text-xl" aria-label={kk.order.generation.failed}>⚠️</span>
+                      : <span className="flex h-full items-center justify-center bg-peach"><span className="h-6 w-6 animate-spin rounded-full border-2 border-black/15 border-t-black" aria-label={kk.myVideos.progress} /></span>}
+                  <span className="absolute left-1.5 top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-white/90 px-1 text-[10px] font-extrabold text-night">{i + 1}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          {done && <div className="mt-4"><SendComboToChat orderId={o.id} /></div>}
+        </section>
+      )}
+
+      {done && !isCombo && (
         <section className="rounded-[24px] bg-surface p-4 ring-1 ring-line sm:p-6">
           {video && notExpired(video.expires_at) ? (
             <>

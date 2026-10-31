@@ -175,8 +175,8 @@ export async function notifyAdmins(orderId: string, event: "paid" | "failed" | "
     const ids = await botAdminIds();
     if (!ids.length || !env().TELEGRAM_BOT_TOKEN) return;
     const { data: o } = await supabaseAdmin().from("orders")
-      .select("id,public_order_number,amount_kzt,quality,template_snapshot_json,generation_jobs(error_code)").eq("id", orderId).maybeSingle();
-    if (!o) return;
+      .select("id,public_order_number,amount_kzt,quality,template_snapshot_json,parent_order_id,generation_jobs(error_code)").eq("id", orderId).maybeSingle();
+    if (!o || o.parent_order_id) return; // combo parts: admins hear about the combo once
     const err = ((o.generation_jobs ?? []) as { error_code: string | null }[]).find((j) => j.error_code)?.error_code;
     const head = event === "paid" ? "💰 <b>Новая оплата</b>" : event === "ready" ? "🎬 <b>Видео готово</b>" : "⚠️ <b>Видео не создано</b>";
     const text = `${head}\n<code>${o.public_order_number}</code> · ${title(o.template_snapshot_json)} · ${formatKzt(o.amount_kzt)}${o.quality ? ` · ${escapeHtml(o.quality)}` : ""}${event === "failed" && err ? `\nОшибка: ${escapeHtml(err)}` : ""}`;

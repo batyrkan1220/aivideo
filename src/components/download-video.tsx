@@ -68,3 +68,35 @@ export function DownloadVideo({ orderId, photo = false }: { orderId: string; pho
     </div>
   );
 }
+
+/** Photo combo: one tap sends every finished photo into the Telegram chat with the bot. */
+export function SendComboToChat({ orderId }: { orderId: string }) {
+  const inTg = useSyncExternalStore(() => () => {}, () => !!launchInitData(), () => false);
+  const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  if (!inTg) return <p className="text-center text-xs text-muted">{kk.result.tgDownloadHint}</p>;
+  const send = async () => {
+    if (state === "sending") return;
+    haptic("tap");
+    setState("sending");
+    try {
+      const res = await fetch(`/api/orders/${orderId}/combo/telegram`, { method: "POST", credentials: "same-origin" });
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean };
+      haptic(j.ok ? "success" : "error");
+      setState(j.ok ? "sent" : "error");
+    } catch {
+      haptic("error");
+      setState("error");
+    }
+  };
+  return (
+    <div className="space-y-2">
+      <button type="button" onClick={send} disabled={state === "sending"}
+        className={`${btn} w-full bg-cobalt text-white shadow-[0_10px_24px_-12px_rgba(47,101,246,0.7)] disabled:opacity-70`}>
+        {state === "sending" ? <><span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden />{r.sending}</> : <>✈️ {kk.combo.sendAll}</>}
+      </button>
+      <p className={`text-center text-sm ${state === "sent" ? "font-medium text-success" : state === "error" ? "text-danger" : "text-muted"}`} aria-live="polite">
+        {state === "sent" ? kk.combo.sentAll : state === "error" ? r.sendFailed : ""}
+      </p>
+    </div>
+  );
+}

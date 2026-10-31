@@ -55,17 +55,19 @@ export type TemplateDetail = TemplateCard & {
   seedanceMode: SeedanceMode;
   /** What the customer gets: a video (Kling video) or a photo (Kling image). */
   media: "video" | "photo";
+  /** Photo combo: the photo templates it makes (one selfie → all of them); null otherwise. */
+  comboIds: string[] | null;
 };
 
 const CARD_COLUMNS =
-  "id,title_kk,description_kk,required_face_count,cover_asset_path,preview_video_path,preview_lite_path,supported_qualities_json,pricing_config_json,face_slots_json,max_upload_bytes,is_trending,provider_key,video_duration_sec,photo_framing:provider_config_json->>framing,allow_wish:provider_config_json->>allowWish,seedance_mode:provider_config_json->>mode,seedance_prepare:provider_config_json->>prepare,seedance_faceswap:provider_config_json->>faceSwap,categories(id,title_kk,slug)";
+  "id,title_kk,description_kk,required_face_count,cover_asset_path,preview_video_path,preview_lite_path,supported_qualities_json,pricing_config_json,face_slots_json,max_upload_bytes,is_trending,provider_key,video_duration_sec,photo_framing:provider_config_json->>framing,allow_wish:provider_config_json->>allowWish,seedance_mode:provider_config_json->>mode,seedance_prepare:provider_config_json->>prepare,seedance_faceswap:provider_config_json->>faceSwap,combo_ids:provider_config_json->templateIds,categories(id,title_kk,slug)";
 
 type Row = {
   id: string; title_kk: string; description_kk: string; required_face_count: number;
   cover_asset_path: string | null; preview_video_path: string | null; preview_lite_path?: string | null;
   supported_qualities_json: unknown; pricing_config_json: unknown; face_slots_json: unknown;
   max_upload_bytes: number; is_trending: boolean;
-  provider_key?: string | null; video_duration_sec?: number | string | null; photo_framing?: string | null; allow_wish?: string | null; seedance_mode?: string | null; seedance_prepare?: string | null; seedance_faceswap?: string | null;
+  provider_key?: string | null; video_duration_sec?: number | string | null; photo_framing?: string | null; allow_wish?: string | null; seedance_mode?: string | null; seedance_prepare?: string | null; seedance_faceswap?: string | null; combo_ids?: unknown[] | null;
   categories: { id: string; title_kk: string; slug: string } | { id: string; title_kk: string; slug: string }[] | null;
 };
 
@@ -97,8 +99,8 @@ export function parseRow(r: Row, seedancePricing: SeedancePricing = DEFAULT_SEED
     qualities = { success: true, data: eff.qualities } as typeof parsedQ;
     pricing = { success: true, data: eff.pricing } as typeof parsedP;
     priced = price !== null;
-  } else if (r.provider_key === PHOTO_PROVIDER) {
-    // Photo: one quality (2K), the admin's fixed price.
+  } else if (r.provider_key === PHOTO_PROVIDER || r.provider_key === "combo") {
+    // Photo (and photo combo): one quality (2K), the admin's fixed (combo: computed) price.
     qualities = { success: true, data: [PHOTO_QUALITY] } as typeof parsedQ;
     priced = parsedP.data.basePriceKzt > 0;
   } else if (r.provider_key !== "dev") {
@@ -128,7 +130,8 @@ export function parseRow(r: Row, seedancePricing: SeedancePricing = DEFAULT_SEED
     photoFraming: r.photo_framing === "face" || r.photo_framing === "full" ? r.photo_framing : "half",
     allowWish: (r.provider_key === PHOTO_PROVIDER || ["scene", "kling", "k4", "kd"].includes(parseSeedanceMode(r.seedance_mode))) && r.allow_wish !== "false",
     seedanceMode: parseSeedanceMode(r.seedance_mode),
-    media: r.provider_key === PHOTO_PROVIDER ? "photo" : "video",
+    media: r.provider_key === PHOTO_PROVIDER || r.provider_key === "combo" ? "photo" : "video",
+    comboIds: r.provider_key === "combo" ? (r.combo_ids ?? []).filter((x): x is string => typeof x === "string") : null,
   };
 }
 
@@ -217,7 +220,7 @@ export async function getTemplate(id: string): Promise<TemplateDetail | null> {
   if (!z.string().uuid().safeParse(id).success) return null;
   return memo(`cat:tpl:${id}`, 60_000, async () => {
     const { data } = await supabasePublic().from("templates").select(CARD_COLUMNS)
-      .eq("id", id).eq("status", "published").eq("kind", "catalog").maybeSingle();
+      .eq("id", id).eq("status", "published").in("kind", ["catalog", "combo"]).maybeSingle();
     return data ? await parseOne(data as unknown as Row) : null;
   });
 }

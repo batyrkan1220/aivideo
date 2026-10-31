@@ -65,8 +65,8 @@ export async function notifyOrderOwner(orderId: string, key: "invoice_sent" | "p
   if (!botConfigured()) return;
   try {
     const db = supabaseAdmin();
-    const { data: o } = await db.from("orders").select("user_id,template_snapshot_json").eq("id", orderId).maybeSingle();
-    if (!o?.user_id) return;
+    const { data: o } = await db.from("orders").select("user_id,template_snapshot_json,parent_order_id").eq("id", orderId).maybeSingle();
+    if (!o?.user_id || o.parent_order_id) return; // combo parts: the combo itself sends one message
     const { data: p } = await db.from("profiles").select("telegram_id").eq("id", o.user_id).maybeSingle();
     if (!p?.telegram_id) return;
     const title = (o.template_snapshot_json as { title_kk?: string } | null)?.title_kk ?? "TrendMe";

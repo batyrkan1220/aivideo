@@ -20,6 +20,7 @@ export async function OrderList({ limit = 50, day }: { limit?: number; day?: str
   const sb = await supabaseServer();
   const { data } = await sb.from("orders")
     .select("id,public_order_number,created_at,amount_kzt,payment_status,generation_status,template_snapshot_json,templates(cover_asset_path)")
+    .is("parent_order_id", null) // combo parts live inside their combo card
     .order("created_at", { ascending: false }).limit(limit);
   const all = (data ?? []) as unknown as Row[];
   if (!all.length) {
@@ -50,7 +51,33 @@ export async function OrderList({ limit = 50, day }: { limit?: number; day?: str
     ? await supabaseAdmin().storage.from("generated-videos").createSignedUrls(photoPaths.map((f) => f.private_storage_path), 600)
     : { data: [] as { signedUrl: string | null }[] };
   const photoUrl = new Map(photoPaths.map((f, i) => [f.order_id, signed?.[i]?.signedUrl ?? null]));
-  const isPhoto = (o: Row) => photoUrl.has(o.id) || (o.template_snapshot_json as { provider_key?: string }).provider_key === "kling_photo";
+
+  // Photo combos: one card each — its first finished photo as the thumbnail, "7/10" progress.
+  const comboIds = orders.filter((o) => (o.template_snapshot_json as { provider_key?: string }).provider_key === "combo").map((o) => o.id);
+  const comboInfo = new Map<string, { ok: number; all: number }>();
+  if (comboIds.length) {
+    const { data: kids } = await supabaseAdmin().from("orders").select("id,parent_order_id,generation_status").in("parent_order_id", comboIds);
+    for (const k of kids ?? []) {
+      const c = comboInfo.get(k.parent_order_id as string) ?? { ok: 0, all: 0 };
+      c.all++; if (k.generation_status === "completed") c.ok++;
+      comboInfo.set(k.parent_order_id as string, c);
+    }
+    const doneKids = (kids ?? []).filter((k) => k.generation_status === "completed");
+    const { data: kf } = doneKids.length
+      ? await supabaseAdmin().from("generated_videos").select("order_id,private_storage_path").in("order_id", doneKids.map((k) => k.id))
+      : { data: [] as { order_id: string; private_storage_path: string }[] };
+    const firstOf = new Map<string, string>();
+    for (const k of doneKids) {
+      const f = kf?.find((x) => x.order_id === k.id);
+      if (f && !firstOf.has(k.parent_order_id as string)) firstOf.set(k.parent_order_id as string, f.private_storage_path);
+    }
+    const parents = [...firstOf.keys()];
+    const { data: ks } = parents.length
+      ? await supabaseAdmin().storage.from("generated-videos").createSignedUrls(parents.map((p) => firstOf.get(p)!), 600)
+      : { data: [] as { signedUrl: string | null }[] };
+    parents.forEach((p, i) => photoUrl.set(p, ks?.[i]?.signedUrl ?? null));
+  }
+  const isPhoto = (o: Row) => photoUrl.has(o.id) || ["kling_photo", "combo"].includes((o.template_snapshot_json as { provider_key?: string }).provider_key ?? "");
 
   const tz = { timeZone: "Asia/Almaty" } as const;
   const head = new Intl.DateTimeFormat("kk-KZ", { day: "numeric", month: "long", weekday: "long", ...tz });
@@ -80,6 +107,7 @@ export async function OrderList({ limit = 50, day }: { limit?: number; day?: str
               const photo = isPhoto(o);
               const thumb = photoUrl.get(o.id) ?? mediaUrl(t?.cover_asset_path ?? null);
               const title = (o.template_snapshot_json as { title_kk?: string }).title_kk ?? "TrendMe";
+              const combo = comboInfo.get(o.id);
               const last = i === g.items.length - 1;
               return (
                 <li key={o.id} className="relative grid grid-cols-[44px_1fr] gap-3 pb-3">
@@ -106,7 +134,7 @@ export async function OrderList({ limit = 50, day }: { limit?: number; day?: str
                           {st.tone === "work" && <span className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-black/20 border-t-black" aria-hidden />}
                           {st.text}
                         </span>
-                        <span className="rounded-full bg-lavender px-2.5 py-1 text-[11px] font-bold text-night">{photo ? kk.nav.tabPhoto : kk.nav.tabHome}</span>
+                        <span className="rounded-full bg-lavender px-2.5 py-1 text-[11px] font-bold text-night">{combo ? `${kk.combo.section} · ${kk.combo.ready(combo.ok, combo.all)}` : photo ? kk.nav.tabPhoto : kk.nav.tabHome}</span>
                       </span>
                     </span>
                     <span className={`shrink-0 rounded-full px-3 py-2 text-[12px] font-bold ${st.tone === "ok" ? "bg-night text-white" : st.tone === "pay" ? "bg-cobalt text-white" : "bg-paper text-ink"}`}>{st.action}</span>
