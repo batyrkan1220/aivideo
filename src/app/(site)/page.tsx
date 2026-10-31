@@ -7,8 +7,7 @@ import { VideoFeed } from "@/components/video-feed";
 import { HeroShowcase } from "@/components/hero-showcase";
 import Link from "next/link";
 import { Logo } from "@/components/logo";
-import { AutoVideo } from "@/components/auto-video";
-import { formatKzt } from "@/lib/pricing";
+import { DesktopOnly } from "@/components/desktop-only";
 import { resolveShowcase } from "@/lib/templates/showcase";
 
 type SP = { account?: string; category?: string };
@@ -32,24 +31,23 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
           <HowItWorks />
         </div>
         <div className="min-w-0">
-          <Suspense fallback={<div className="h-[30rem]" />}>
-            <Showcase />
-          </Suspense>
+          <DesktopOnly>
+            <Suspense fallback={<div className="h-[30rem]" />}>
+              <Showcase />
+            </Suspense>
+          </DesktopOnly>
         </div>
       </section>
 
-      {/* Phones / Mini App: brand bar (Telegram hides the site header), then a hero banner */}
+      {/* Phones / Mini App: brand bar only (Telegram hides the site header) — no hero videos, the feed starts right away */}
       <section className="mx-auto max-w-6xl px-4 pt-3 md:hidden">
         <div className="tg-only">
-          <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-3">
             <Logo className="text-base" />
             <Link href="/create" className="btn-promo inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold">🔥 {kk.home.promo}</Link>
           </div>
         </div>
         <h1 className="sr-only">{kk.home.title}</h1>
-        <Suspense fallback={<div className="h-[19rem] animate-pulse rounded-[24px] bg-surface" />}>
-          <HeroBanner />
-        </Suspense>
       </section>
 
       <Suspense fallback={<div className="mx-auto mt-4 max-w-6xl px-4"><GridSkeleton /></div>}>
@@ -119,37 +117,4 @@ async function Notice({ searchParams }: { searchParams: Promise<SP> }) {
 async function Showcase() {
   const items = (await resolveShowcase()).map(({ id, title, coverUrl, previewUrl }) => ({ id, title, coverUrl, previewUrl }));
   return <HeroShowcase items={items} />;
-}
-
-/** Phone hero: swipeable showcase cards (admin-chosen / trending templates) with a "Try it" button. */
-async function HeroBanner() {
-  const items = (await resolveShowcase()).slice(0, 3);
-  if (!items.length) return null;
-  return (
-    <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
-      {items.map((t, i) => (
-        <Link key={t.id} href={`/templates/${t.id}`}
-          className={`relative block h-[19rem] shrink-0 snap-center overflow-hidden rounded-[24px] bg-night shadow-[0_18px_40px_-22px_rgba(0,0,0,0.55)] ${items.length > 1 ? "w-[84%]" : "w-full"}`}>
-          {t.previewUrl ? (
-            <AutoVideo src={t.previewUrl} poster={t.coverUrl ?? undefined} className="absolute inset-0 h-full w-full object-cover" />
-          ) : t.coverUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={t.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
-          ) : null}
-          <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/10" />
-          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-night backdrop-blur">
-            {i === 0 ? "🔥" : "✨"} {kk.home.heroEyebrow}
-          </span>
-          <span className="absolute inset-x-0 bottom-0 p-4 text-white">
-            <span className="block truncate text-[28px] font-extrabold leading-none tracking-tight">{t.title}</span>
-            <span className="mt-1.5 block text-[13px] text-white/75">{kk.home.heroSub}</span>
-            <span className="mt-3 flex items-center justify-between gap-3">
-              {t.startingPriceKzt !== null ? <span className="text-lg font-extrabold text-lime">{formatKzt(t.startingPriceKzt)}</span> : <span />}
-              <span className="btn-glow inline-flex h-11 shrink-0 items-center rounded-full px-6 text-sm font-extrabold">{kk.home.tryIt} →</span>
-            </span>
-          </span>
-        </Link>
-      ))}
-    </div>
-  );
 }
