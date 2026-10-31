@@ -39,21 +39,64 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
         </div>
       </section>
 
-      {/* Phones / Mini App: brand bar only (Telegram hides the site header) — no hero videos, the feed starts right away */}
+      {/* Phones / Mini App: brand bar (Telegram hides the site header) + a light, text-only hero (no videos) */}
       <section className="mx-auto max-w-6xl px-4 pt-3 md:hidden">
         <div className="tg-only">
-          <div className="flex items-center justify-between gap-3">
+          <div className="mb-3 flex items-center justify-between gap-3">
             <Logo className="text-base" />
             <Link href="/create" className="btn-promo inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold">🔥 {kk.home.promo}</Link>
           </div>
         </div>
-        <h1 className="sr-only">{kk.home.title}</h1>
+        <TextHero />
       </section>
 
       <Suspense fallback={<div className="mx-auto mt-4 max-w-6xl px-4"><GridSkeleton /></div>}>
         <Feed searchParams={searchParams} />
       </Suspense>
     </main>
+  );
+}
+
+/** Phone hero: pure CSS (gradients, no blur filters, no media) so the Mini App opens instantly. */
+function TextHero() {
+  const H = kk.home;
+  return (
+    <div
+      className="relative overflow-hidden rounded-[24px] bg-night px-5 pb-5 pt-5 text-white"
+      style={{
+        backgroundImage:
+          "radial-gradient(120% 80% at 100% 0%, rgba(212,255,50,0.28) 0%, rgba(212,255,50,0) 55%), radial-gradient(90% 70% at 0% 100%, rgba(255,69,58,0.22) 0%, rgba(255,69,58,0) 60%)",
+      }}
+    >
+      {/* fine grid texture */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[0.07]"
+        style={{ backgroundImage: "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)", backgroundSize: "22px 22px" }}
+      />
+      <span className="relative inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white/90 ring-1 ring-white/15">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#d4ff32] shadow-[0_0_8px_#d4ff32]" aria-hidden />
+        {H.heroBadge}
+      </span>
+      <h1 className="relative mt-3 text-[30px] font-extrabold leading-[1.05] tracking-tight">
+        {H.heroLine1}
+        <br />
+        <span className="relative inline-block text-[#d4ff32]">
+          {H.heroLine2}
+          <svg aria-hidden viewBox="0 0 200 12" preserveAspectRatio="none" className="absolute -bottom-1.5 left-0 h-2.5 w-full text-[#d4ff32]/70">
+            <path d="M2 9 C 50 2, 110 2, 198 7" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+          </svg>
+        </span>
+      </h1>
+      <p className="relative mt-3.5 max-w-[22rem] text-[14px] leading-snug text-white/70">{H.heroText}</p>
+      <div className="relative mt-4 grid grid-cols-[1.4fr_1fr] gap-2">
+        <a href="#templates" className="btn-glow flex h-12 items-center justify-center rounded-full text-[15px] font-extrabold">{H.heroPick} ↓</a>
+        <Link href="/photos" className="flex h-12 items-center justify-center rounded-full bg-white/10 text-[15px] font-bold text-white ring-1 ring-white/15 active:bg-white/20">📸 {H.heroPhoto}</Link>
+      </div>
+      <ul className="relative mt-4 flex flex-wrap gap-x-3 gap-y-1 text-[12px] font-medium text-white/60">
+        {H.heroPerks.map((p) => <li key={p}>{p}</li>)}
+      </ul>
+    </div>
   );
 }
 
@@ -80,7 +123,7 @@ async function Feed({ searchParams }: { searchParams: Promise<SP> }) {
   return (
     <div className="mx-auto max-w-6xl px-4">
       {/* Sticky category chips, like an app's filter bar */}
-      <h2 className="section-title mt-5 text-muted md:hidden">{kk.home.templatesTitle}</h2>
+      <h2 id="templates" className="section-title mt-5 scroll-mt-20 text-muted md:hidden">{kk.home.templatesTitle}</h2>
       {categories.length > 0 && (
         <div className="under-header sticky z-20 -mx-4 bg-paper/90 px-4 py-2.5 backdrop-blur-xl sm:py-3">
           <CategoryChips categories={categories} active={category} />
