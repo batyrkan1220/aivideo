@@ -24,7 +24,7 @@ export async function EditorLoader({ id }: { id: string | null }) {
   if (!id) {
     return (
       <>
-        <h1 className="mb-6 font-display text-2xl font-bold">{ru.admin.editor.createTitle}</h1>
+        <h1 className="mb-6 text-2xl font-extrabold tracking-tight">{ru.admin.editor.createTitle}</h1>
         <TemplateEditor id={null} initial={emptyTemplate()} status="draft" categories={categories} mediaBase={mediaBase} seedancePricing={seedancePricing} />
       </>
     );
@@ -37,7 +37,7 @@ export async function EditorLoader({ id }: { id: string | null }) {
   return (
     <>
       <div className="mb-6 flex flex-wrap items-center gap-3">
-        <h1 className="font-display text-2xl font-bold">{ru.admin.editor.editTitle}</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight">{ru.admin.editor.editTitle}</h1>
         <span className="rounded-full bg-line px-3 py-1 text-xs font-semibold">
           {ru.admin.status[row.status as keyof typeof ru.admin.status]}
         </span>

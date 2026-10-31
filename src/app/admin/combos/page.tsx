@@ -13,7 +13,7 @@ const T = ru.admin.combos;
 export default function AdminCombosPage() {
   return (
     <div>
-      <h1 className="font-display text-2xl font-bold">{T.title}</h1>
+      <h1 className="text-2xl font-extrabold tracking-tight">{T.title}</h1>
       <p className="mb-6 mt-2 max-w-2xl text-sm text-muted">{T.hint}</p>
       <Suspense fallback={<p className="text-muted">{ru.common.loading}</p>}>
         <Body />

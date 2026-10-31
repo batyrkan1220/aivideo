@@ -60,7 +60,7 @@ async function Content({ params, searchParams }: { params: Promise<{ id: string 
     <div className="space-y-6">
       <Link href="/admin/partners" className="text-sm text-muted hover:text-ink">← {T.title}</Link>
       <div className="flex flex-wrap items-baseline gap-3">
-        <h1 className="font-display text-2xl font-bold">{p.name}</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight">{p.name}</h1>
         <span className="text-sm text-muted">{Number(p.percent)}% · {p.code}{p.active ? "" : ` · ${T.inactive}`}</span>
       </div>
 

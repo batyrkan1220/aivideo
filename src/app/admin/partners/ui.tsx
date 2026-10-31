@@ -5,7 +5,7 @@ export function Tile({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-card border border-line bg-white p-4">
       <dt className="text-sm text-muted">{label}</dt>
-      <dd className="mt-1 font-display text-2xl font-bold">{value}</dd>
+      <dd className="mt-1 text-2xl font-extrabold tracking-tight">{value}</dd>
     </div>
   );
 }

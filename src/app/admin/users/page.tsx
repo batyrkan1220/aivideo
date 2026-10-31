@@ -12,7 +12,7 @@ const U = ru.admin.users;
 export default function UsersPage() {
   return (
     <div>
-      <h1 className="mb-2 font-display text-2xl font-bold">{ru.admin.nav.users}</h1>
+      <h1 className="mb-2 text-2xl font-extrabold tracking-tight">{ru.admin.nav.users}</h1>
       <p className="mb-6 text-sm text-muted">{U.freeHint}</p>
       <Suspense fallback={<p className="text-muted">{ru.common.loading}</p>}>
         <List />

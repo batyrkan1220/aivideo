@@ -11,7 +11,7 @@ const C = ru.admin.categories;
 export default function AdminCategoriesPage() {
   return (
     <div>
-      <h1 className="font-display text-2xl font-bold">{C.title}</h1>
+      <h1 className="text-2xl font-extrabold tracking-tight">{C.title}</h1>
       <p className="mb-6 mt-2 max-w-2xl text-sm text-muted">{C.hint}</p>
       <Suspense fallback={<p className="text-muted">{ru.common.loading}</p>}>
         <Body />

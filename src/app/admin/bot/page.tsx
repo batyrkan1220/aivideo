@@ -4,6 +4,8 @@ import { getSessionUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { BOT_MESSAGES, BOT_MESSAGE_KEYS, botMessageOverrides, clearBotMessageCache } from "@/lib/telegram/messages";
 import { BotMessageForm } from "./message-form";
+import { env } from "@/lib/env";
+import { TelegramSetup } from "../telegram/setup";
 
 export const metadata = { title: ru.admin.bot.title };
 
@@ -18,8 +20,9 @@ export default async function BotMessagesPage() {
   const groups = ["commands", "notifications", "profile"] as const;
   return (
     <div>
-      <h1 className="font-display text-2xl font-bold">{B.title}</h1>
+      <h1 className="text-2xl font-extrabold tracking-tight">{B.title}</h1>
       <p className="mt-2 max-w-2xl text-sm text-muted">{B.lead}</p>
+      <div className="mt-5"><TelegramSetup configured={!!env().TELEGRAM_BOT_TOKEN} appUrl={env().NEXT_PUBLIC_APP_URL} /></div>
       {groups.map((g) => (
         <section key={g} className="mt-8">
           <h2 className="text-lg font-semibold">{B.groups[g]}</h2>

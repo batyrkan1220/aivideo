@@ -11,7 +11,7 @@ const L = ru.admin.audit;
 export default function AuditPage() {
   return (
     <div>
-      <h1 className="mb-6 font-display text-2xl font-bold">{ru.admin.nav.audit}</h1>
+      <h1 className="mb-6 text-2xl font-extrabold tracking-tight">{ru.admin.nav.audit}</h1>
       <Suspense fallback={<p className="text-muted">{ru.common.loading}</p>}>
         <List />
       </Suspense>

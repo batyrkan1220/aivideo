@@ -41,7 +41,7 @@ async function Content({ searchParams }: { searchParams: Promise<SP> }) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-bold">{T.title}</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight">{T.title}</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted">{T.lead}</p>
         </div>
         <CreatePartnerForm />
