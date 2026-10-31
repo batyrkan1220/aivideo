@@ -175,6 +175,8 @@ export function CreateFlow({
   const [peopleCount, setPeopleCount] = useState(1);
   const slots = customVideo ? seedanceSlots(peopleCount, "p_") : baseSlots;
   const [wish, setWish] = useState("");
+  // Create → AI photo: the first photo is the customer's own example, the next one is their face.
+  const refPhoto = media === "photo" && baseSlots.some((s) => s.providerInput === "example");
   // Optional prompt stays folded; a checkbox opens it (a required one, for AI photos, is always open).
   const [promptOn, setPromptOn] = useState(false);
   const limits = { maxBytes: maxUploadBytes, minDimension, maxDimension };
@@ -334,8 +336,8 @@ export function CreateFlow({
 
       {/* Step: photos */}
       <section ref={photosRef} className={`rounded-card border bg-surface p-4 transition-shadow sm:p-5 ${nudge === "photo" ? "border-ink ring-4 ring-lavender" : "border-line"}`}>
-        <StepTitle n={++step} done={missing === 0}>{slots.length > 1 ? c.stepPhotos(slots.length) : c.stepPhoto}</StepTitle>
-        {slots.length > 1 && <p className="mt-1 text-sm text-muted">{c.photosHint}</p>}
+        <StepTitle n={++step} done={missing === 0}>{refPhoto ? c.stepRefPhotos : slots.length > 1 ? c.stepPhotos(slots.length) : c.stepPhoto}</StepTitle>
+        {slots.length > 1 && <p className="mt-1 text-sm text-muted">{refPhoto ? c.refPhotosHint : c.photosHint}</p>}
         {customVideo && readyVideoId && !["kling", "wan", "k4", "kd"].includes(seedanceMode) && (
           <div className="mt-3">
             <p className="text-sm font-medium">{cv.howMany}</p>

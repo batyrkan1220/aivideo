@@ -239,8 +239,9 @@ export async function createOrder(raw: unknown): Promise<
     const cfg = parsePhotoConfig(tv.snapshot.provider_config_json);
     const wish = cfg.allowWish ? cleanWish(p.data.wish) : "";
     if (tv.template.kind === "custom_photo") {
-      // Create → AI photo: the customer's description is the whole brief; price from settings.
-      if (wish.length < 3) return { ok: false, error: "wish_required" };
+      // Create → AI photo: the customer's example photo (or, without one, the description) is the brief.
+      const hasExample = slots.some((s) => s.providerInput === "example");
+      if (!hasExample && wish.length < 3) return { ok: false, error: "wish_required" };
       pricing = { ...pricing, basePriceKzt: (await customVideoSettings()).photoPriceKzt };
     }
     if (wish) snapshotExtra = { ...snapshotExtra, customer_wish: wish };
