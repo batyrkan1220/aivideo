@@ -5,7 +5,6 @@ import { listCategories, listTemplates, listTrending } from "@/lib/templates/que
 import { CategoryChips, pickCard } from "@/components/catalog-bits";
 import { VideoFeed } from "@/components/video-feed";
 import { HeroShowcase } from "@/components/hero-showcase";
-import Link from "next/link";
 import { Logo } from "@/components/logo";
 import { DesktopOnly } from "@/components/desktop-only";
 import { formatKzt } from "@/lib/pricing";
