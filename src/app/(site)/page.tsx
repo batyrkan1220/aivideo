@@ -106,10 +106,6 @@ function HeroView({ covers, minPrice }: { covers: string[]; minPrice: number | n
       <a href="#templates" className="btn-lime relative mt-3.5 flex h-12 items-center justify-center gap-1.5 rounded-full text-[15px] font-extrabold">
         {H.heroPick}{minPrice ? <span className="font-bold opacity-70">· {H.heroFrom(formatKzt(minPrice))}</span> : null} ↓
       </a>
-      <div className="relative mt-2.5 flex items-center justify-between gap-2 text-[11.5px] text-white/55">
-        <span className="truncate">{H.heroTrust}</span>
-        <Link href="/photos" className="shrink-0 font-semibold text-white/85 underline-offset-2 active:underline">{H.heroCombo} →</Link>
-      </div>
     </div>
   );
 }
