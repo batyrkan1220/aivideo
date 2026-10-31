@@ -1,6 +1,7 @@
 "use server";
 import { randomUUID } from "node:crypto";
 import { forgetProfile } from "@/lib/auth/session";
+import { clearMemo } from "@/lib/cache/memo";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { audit, getSessionUser } from "@/lib/auth/session";
@@ -138,6 +139,7 @@ export async function setFreeOrders(_: AdminState, fd: FormData): Promise<AdminS
     ? await db.from("free_order_users").upsert({ user_id: id.data, granted_by: u.id })
     : await db.from("free_order_users").delete().eq("user_id", id.data);
   if (error) return { error: E.generic };
+  clearMemo(`free:${id.data}`);
   await audit(u.id, on ? "user.free_orders_on" : "user.free_orders_off", "profile", id.data);
   revalidatePath("/admin/users");
   return { ok: ru.admin.users.saved };

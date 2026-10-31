@@ -1,12 +1,11 @@
 import { Suspense } from "react";
-import Link from "next/link";
 import { connection } from "next/server";
 import { kk } from "@/lib/i18n/kk";
 import { env } from "@/lib/env";
 import { getSessionUser } from "@/lib/auth/session";
-import { getTemplateForAdmin } from "@/lib/templates/queries";
-import { customPhotoTemplateId, customTemplateId, customVideoSettings } from "@/lib/custom-video/settings";
+import { customFlowTemplate, customVideoSettings } from "@/lib/custom-video/settings";
 import { CreateFlow } from "@/components/create-flow";
+import { CreateTabs, TabsView } from "@/components/create-tabs";
 import { isFreeOrderUser } from "@/lib/orders/free";
 import { ButtonLink } from "@/components/ui/button";
 import { formatKzt } from "@/lib/pricing";
@@ -17,40 +16,50 @@ import { SEEDANCE_MIN_SEC } from "@/lib/templates/seedance-config";
 export const metadata = { title: kk.createHub.title };
 
 type SP = { type?: string };
+const H = kk.createHub;
 
-/** Create: your own video (your video + your photo) or an AI photo from your own description. */
+/** Create: your own video (your video + your photo) or an AI photo from your own description.
+    Title and tabs paint instantly; only the flow below waits for data (all fetched in parallel, cached). */
 export default function CreatePage({ searchParams }: { searchParams: Promise<SP> }) {
   return (
     <main className="mx-auto w-full max-w-xl px-4 pb-4 pt-4 md:pt-10">
-      <Suspense fallback={<div className="h-96 animate-pulse rounded-[24px] bg-surface" />}>
+      <h1 className="text-[28px] font-extrabold leading-none tracking-tight">{H.title}</h1>
+      <div className="mt-4">
+        <Suspense fallback={<TabsView type="video" />}>
+          <CreateTabs />
+        </Suspense>
+      </div>
+      <Suspense fallback={<FlowSkeleton />}>
         <Body searchParams={searchParams} />
       </Suspense>
     </main>
   );
 }
 
+function FlowSkeleton() {
+  return (
+    <div className="mt-4 space-y-3" aria-hidden>
+      <div className="h-16 animate-pulse rounded-[24px] bg-surface" />
+      <div className="h-44 animate-pulse rounded-[24px] bg-surface" />
+      <div className="h-24 animate-pulse rounded-[24px] bg-surface" />
+    </div>
+  );
+}
+
 async function Body({ searchParams }: { searchParams: Promise<SP> }) {
   await connection(); // request-time only: reads settings and the session
   const type = (await searchParams).type === "photo" ? "photo" : "video";
-  const H = kk.createHub;
   const head = type === "photo" ? H.photo : H.video;
   return (
     <>
-      <div className="grid grid-cols-2 gap-1 rounded-full bg-surface p-1 ring-1 ring-line" role="tablist" aria-label={H.title}>
-        {(["video", "photo"] as const).map((k) => (
-          <Link key={k} href={k === "photo" ? "/create?type=photo" : "/create"} role="tab" aria-selected={type === k} replace scroll={false}
-            className={`flex h-11 items-center justify-center gap-2 rounded-full text-sm font-bold transition-colors ${type === k ? "bg-ink text-paper" : "text-muted hover:text-ink"}`}>
-            {k === "video" ? "🎬" : "📸"} {H.tabs[k]}
-          </Link>
-        ))}
+      {/* Short intro: what you get + 3 tiny steps */}
+      <div className="mt-4 flex items-center gap-3 rounded-[24px] bg-surface p-3.5 ring-1 ring-line">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand text-lg" aria-hidden>{type === "photo" ? "✨" : "🎬"}</span>
+        <div className="min-w-0">
+          <p className="text-[15px] font-extrabold leading-tight">{head.title}</p>
+          <p className="mt-0.5 truncate text-[12px] text-muted">{head.steps.join(" → ")}</p>
+        </div>
       </div>
-
-      <section className="mt-4 rounded-[24px] bg-night px-5 py-4 text-white">
-        <span className="section-title text-lime">{head.eyebrow}</span>
-        <h1 className="mt-1 text-[24px] font-extrabold leading-tight tracking-tight">{head.title}</h1>
-        <p className="mt-1.5 text-sm text-white/70">{head.lead}</p>
-      </section>
-
       <div className="mt-4">{type === "photo" ? <PhotoFlow /> : <VideoFlow />}</div>
     </>
   );
@@ -59,7 +68,7 @@ async function Body({ searchParams }: { searchParams: Promise<SP> }) {
 function Disabled() {
   const cv = kk.customVideo;
   return (
-    <div className="rounded-[20px] border border-dashed border-line bg-surface px-6 py-12 text-center">
+    <div className="rounded-[24px] border border-dashed border-line bg-surface px-6 py-12 text-center">
       <h2 className="text-lg font-bold">{cv.disabledTitle}</h2>
       <p className="mt-1 text-sm text-muted">{cv.disabledText}</p>
       <ButtonLink href="/" className="mt-5">{cv.browse}</ButtonLink>
@@ -69,10 +78,10 @@ function Disabled() {
 
 function Login({ next, price }: { next: string; price: string }) {
   return (
-    <div className="rounded-[20px] bg-surface p-5 ring-1 ring-line">
+    <div className="rounded-[24px] bg-surface p-5 ring-1 ring-line">
       <h2 className="text-lg font-bold">{kk.create.loginTitle}</h2>
       <p className="mt-1 text-sm text-muted">{kk.create.loginText}</p>
-      <p className="mt-3 text-sm font-semibold">{price}</p>
+      <p className="mt-3 inline-flex rounded-full bg-lavender px-3 py-1 text-sm font-semibold">{price}</p>
       <div className="mt-4 flex flex-wrap gap-3">
         <ButtonLink href={`/login?next=${encodeURIComponent(next)}`} size="lg">{kk.auth.login}</ButtonLink>
         <ButtonLink href={`/signup?next=${encodeURIComponent(next)}`} size="lg" variant="secondary">{kk.auth.signup}</ButtonLink>
@@ -94,9 +103,8 @@ function common() {
 }
 
 async function VideoFlow() {
-  const [user, s, id, ap] = await Promise.all([getSessionUser(), customVideoSettings(), customTemplateId(), seedancePricingSettings()]);
-  const t = s.enabled && id ? await getTemplateForAdmin(id) : null;
-  if (!t) return <Disabled />;
+  const [user, s, t, ap] = await Promise.all([getSessionUser(), customVideoSettings(), customFlowTemplate("custom"), seedancePricingSettings()]);
+  if (!s.enabled || !t) return <Disabled />;
   if (!user) return <Login next="/create" price={kk.customVideo.priceFrom(formatKzt(seedanceAutoPriceKzt(SEEDANCE_MIN_SEC, ap)))} />;
   const c = common();
   return (
@@ -112,11 +120,10 @@ async function VideoFlow() {
 }
 
 async function PhotoFlow() {
-  const [user, s, id] = await Promise.all([getSessionUser(), customVideoSettings(), customPhotoTemplateId()]);
-  const t = id ? await getTemplateForAdmin(id) : null;
+  const [user, s, t] = await Promise.all([getSessionUser(), customVideoSettings(), customFlowTemplate("custom_photo")]);
   if (!t) return <Disabled />;
   const price = formatKzt(s.photoPriceKzt);
-  if (!user) return <Login next="/create?type=photo" price={kk.createHub.photo.price(price)} />;
+  if (!user) return <Login next="/create?type=photo" price={H.photo.price(price)} />;
   const c = common();
   return (
     <CreateFlow

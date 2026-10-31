@@ -1,5 +1,6 @@
 import "server-only";
 import { memo } from "@/lib/cache/memo";
+import { getTemplateForAdmin, type TemplateDetail } from "@/lib/templates/queries";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC } from "@/lib/templates/seedance-config";
@@ -48,4 +49,11 @@ export async function customPhotoTemplateId(): Promise<string | null> {
   const { data } = await supabaseAdmin().from("templates").select("id").eq("kind", "custom_photo").eq("status", "published").limit(1).maybeSingle();
   return data?.id ?? null;
   });
+}
+
+/** The hidden template behind Create → Video / AI photo, cached (cleared on admin writes). */
+export async function customFlowTemplate(kind: "custom" | "custom_photo"): Promise<TemplateDetail | null> {
+  const id = kind === "custom" ? await customTemplateId() : await customPhotoTemplateId();
+  if (!id) return null;
+  return memo(`tpl:flow:${id}`, 300_000, () => getTemplateForAdmin(id));
 }

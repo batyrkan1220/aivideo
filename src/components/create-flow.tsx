@@ -321,7 +321,7 @@ export function CreateFlow({
     <div className="space-y-4">
       {/* Step: the customer's own video */}
       {customVideo && (
-        <section ref={videoRef} className={`rounded-card border bg-surface p-4 transition-shadow sm:p-5 ${nudge === "video" ? "border-brand ring-4 ring-brand/20" : "border-line"}`}>
+        <section ref={videoRef} className={`rounded-card border bg-surface p-4 transition-shadow sm:p-5 ${nudge === "video" ? "border-ink ring-4 ring-lavender" : "border-line"}`}>
           <StepTitle n={++step} done={video.phase === "ready"}>{cv.stepVideo}</StepTitle>
           <p className="mt-1 text-sm text-muted">{cv.videoHint(customVideo.maxSeconds)}</p>
           <div className="mt-3">
@@ -331,7 +331,7 @@ export function CreateFlow({
       )}
 
       {/* Step: photos */}
-      <section ref={photosRef} className={`rounded-card border bg-surface p-4 transition-shadow sm:p-5 ${nudge === "photo" ? "border-brand ring-4 ring-brand/20" : "border-line"}`}>
+      <section ref={photosRef} className={`rounded-card border bg-surface p-4 transition-shadow sm:p-5 ${nudge === "photo" ? "border-ink ring-4 ring-lavender" : "border-line"}`}>
         <StepTitle n={++step} done={missing === 0}>{slots.length > 1 ? c.stepPhotos(slots.length) : c.stepPhoto}</StepTitle>
         {slots.length > 1 && <p className="mt-1 text-sm text-muted">{c.photosHint}</p>}
         {customVideo && readyVideoId && !["kling", "wan", "k4", "kd"].includes(seedanceMode) && (
@@ -372,7 +372,7 @@ export function CreateFlow({
       {allowWish && (() => {
         const w = wishRequired ? c.photoBrief : c.wish;
         return (
-        <section className={`rounded-card border bg-surface p-4 transition-shadow sm:p-5 ${nudge === "wish" ? "border-ink ring-4 ring-brand/60" : "border-line"}`}>
+        <section className={`rounded-card border bg-surface p-4 transition-shadow sm:p-5 ${nudge === "wish" ? "border-ink ring-4 ring-lavender" : "border-line"}`}>
           <StepTitle n={++step} done={!!wish.trim()}>{w.title}</StepTitle>
           <p className="mt-1 text-sm text-muted">{w.hint}</p>
           <textarea ref={wishRef} value={wish} onChange={(e) => setWish(e.target.value.slice(0, 300))} maxLength={300} rows={wishRequired ? 3 : 2}
@@ -409,7 +409,7 @@ export function CreateFlow({
             const specs = [q.resolution && !q.labelKk.includes(q.resolution) ? q.resolution : null, q.fps ? `${q.fps} ${kk.template.fps}` : null].filter(Boolean).join(", ");
             return (
               <label key={q.key} className="flex cursor-pointer items-center gap-4 px-4 py-3 has-[:checked]:bg-brand-soft">
-                <input type="radio" name="quality" value={q.key} checked={quality === q.key} onChange={() => setQuality(q.key)} className="h-4 w-4 accent-brand" />
+                <input type="radio" name="quality" value={q.key} checked={quality === q.key} onChange={() => setQuality(q.key)} className="h-4 w-4 accent-[#161616]" />
                 <span className="flex-1">
                   <span className="block font-medium">{q.labelKk}</span>
                   {specs && <span className="block text-sm text-muted">{specs}</span>}
@@ -423,13 +423,13 @@ export function CreateFlow({
 
       {/* Step: Kaspi phone */}
       {needPhone && (
-        <section className={`rounded-card border bg-surface p-4 transition-shadow sm:p-5 ${nudge === "phone" ? "border-brand ring-4 ring-brand/20" : "border-line"}`}>
+        <section className={`rounded-card border bg-surface p-4 transition-shadow sm:p-5 ${nudge === "phone" ? "border-ink ring-4 ring-lavender" : "border-line"}`}>
           <StepTitle n={++step} done={phoneOk && !!phone}>{c.stepPhone}</StepTitle>
           <input
             ref={phoneRef}
             type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
             placeholder={kk.tole.phonePlaceholder} aria-label={kk.tole.phoneLabel}
-            className={`mt-3 h-13 w-full rounded-2xl border-2 bg-paper px-4 text-lg tracking-wide text-ink outline-none transition-colors focus:border-brand focus:bg-surface ${phone && !phoneOk ? "border-danger" : "border-line"}`}
+            className={`mt-3 h-13 w-full rounded-2xl border-2 bg-paper px-4 text-lg tracking-wide text-ink outline-none transition-colors focus:border-ink focus:bg-surface ${phone && !phoneOk ? "border-danger" : "border-line"}`}
           />
           <p className={`mt-1.5 text-xs ${phone && !phoneOk ? "text-danger" : "text-muted"}`}>
             {phone && !phoneOk ? kk.order.payErrors.phone_invalid : kk.tole.phoneHint}
@@ -450,9 +450,9 @@ export function CreateFlow({
       )}
 
       {(price || waitingForVideo) && (
-        <div className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 -mx-1 rounded-[1.5rem] border border-black/5 px-4 pb-2 pt-2.5 shadow-[0_14px_36px_-14px_rgba(0,0,0,0.25)] glass sm:static sm:mx-0 sm:rounded-card sm:p-4">
-          <label ref={consentRef} className={`-mx-1 mb-2 flex cursor-pointer items-start gap-2.5 rounded-lg px-1 py-1 text-xs leading-snug transition-colors ${nudge === "consent" ? "bg-flash/40 ring-2 ring-flash" : ""}`}>
-            <input type="checkbox" className="mt-px h-[18px] w-[18px] shrink-0 accent-brand" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+        <div className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 -mx-1 rounded-[28px] border border-line bg-white px-4 pb-2.5 pt-2.5 shadow-[0_16px_40px_-18px_rgba(60,40,20,0.35)] sm:static sm:mx-0 sm:rounded-card sm:p-4">
+          <label ref={consentRef} className={`-mx-1 mb-2 flex cursor-pointer items-start gap-2.5 rounded-lg px-1 py-1 text-xs leading-snug transition-colors ${nudge === "consent" ? "bg-peach ring-2 ring-peach" : ""}`}>
+            <input type="checkbox" className="mt-px h-[18px] w-[18px] shrink-0 accent-[#161616]" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
             <span className="text-muted">{customVideo ? cv.consent : kk.consent.combined}</span>
           </label>
           <div className="flex items-center gap-3">
@@ -484,8 +484,8 @@ export function CreateFlow({
 
 function StepTitle({ n, done, children }: { n: number; done: boolean; children: React.ReactNode }) {
   return (
-    <h2 className="flex items-center gap-2.5 font-display text-base font-bold sm:text-lg">
-      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm ${done ? "bg-success text-white" : "bg-brand-soft text-brand"}`}>
+    <h2 className="flex items-center gap-2.5 text-[16px] font-extrabold tracking-tight sm:text-lg">
+      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-extrabold ${done ? "bg-brand text-night" : "bg-night text-white"}`}>
         {done ? "✓" : n}
       </span>
       {children}
@@ -532,9 +532,9 @@ function VideoPicker({ st, limits, onPick, onRemove }: { st: VideoState; limits:
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className={`flex w-full items-center gap-4 rounded-2xl border-2 border-dashed p-4 text-left transition-colors hover:border-brand ${st.phase === "error" ? "border-danger bg-danger/10" : "border-brand/40 bg-brand-soft/50"}`}
+          className={`flex w-full items-center gap-4 rounded-2xl border-2 border-dashed p-4 text-left transition-colors hover:border-ink ${st.phase === "error" ? "border-danger bg-danger/10" : "border-[#c9cdf5] bg-lavender/60"}`}
         >
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-surface text-brand">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-surface text-night">
             <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <rect x="3" y="5" width="13" height="14" rx="2" /><path d="m16 10 5-3v10l-5-3" />
             </svg>
@@ -564,14 +564,14 @@ function SinglePhoto({ slot, st, onPick, onRemove }: { slot: FaceSlot; st: SlotS
         disabled={busy}
         onClick={() => inputRef.current?.click()}
         aria-label={`${slot.labelKk}: ${preview ? kk.upload.replace : kk.upload.choose}`}
-        className={`flex w-full items-center gap-4 rounded-2xl border-2 p-3 text-left transition-[colors,transform] active:scale-[0.99] ${st.phase === "ready" ? "border-success bg-success/10" : st.phase === "error" ? "border-danger bg-danger/10" : "border-dashed border-brand/50 bg-brand-soft/60 hover:border-brand"}`}
+        className={`flex w-full items-center gap-4 rounded-2xl border-2 p-3 text-left transition-[colors,transform] active:scale-[0.99] ${st.phase === "ready" ? "border-[#9cbf12] bg-brand-soft/50" : st.phase === "error" ? "border-danger bg-danger/10" : "border-dashed border-[#c9cdf5] bg-lavender/60 hover:border-brand"}`}
       >
         <span className="relative h-32 w-24 shrink-0 overflow-hidden rounded-2xl bg-surface shadow-sm">
           {preview ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={preview} alt="" className="h-full w-full object-cover" />
           ) : (
-            <svg viewBox="0 0 24 24" className="absolute inset-0 m-auto h-9 w-9 text-brand" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <svg viewBox="0 0 24 24" className="absolute inset-0 m-auto h-9 w-9 text-night" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M4 8a2 2 0 0 1 2-2h1.5l1.2-1.8A1 1 0 0 1 9.5 4h5a1 1 0 0 1 .8.4L16.5 6H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" /><circle cx="12" cy="12.5" r="3.5" />
             </svg>
           )}
@@ -620,7 +620,7 @@ function SlotCard({
   const busy = st.phase === "uploading" || st.phase === "verifying";
   const preview = "preview" in st ? st.preview : undefined;
   const border =
-    st.phase === "ready" ? "border-success" : st.phase === "error" ? "border-danger" : "border-line border-dashed";
+    st.phase === "ready" ? "border-[#9cbf12]" : st.phase === "error" ? "border-danger" : "border-line border-dashed";
 
   return (
     <div>
@@ -637,14 +637,14 @@ function SlotCard({
         disabled={busy}
         onClick={() => inputRef.current?.click()}
         aria-label={`${slot.labelKk}: ${preview ? kk.upload.replace : kk.upload.choose}`}
-        className={`relative flex aspect-[3/4] w-full flex-col items-center justify-center overflow-hidden rounded-card border-2 bg-surface text-center transition-colors hover:border-brand ${border}`}
+        className={`relative flex aspect-[3/4] w-full flex-col items-center justify-center overflow-hidden rounded-card border-2 bg-surface text-center transition-colors hover:border-ink ${border}`}
       >
         {preview ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={preview} alt="" className="absolute inset-0 h-full w-full object-cover" />
         ) : (
           <>
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-soft font-display text-lg font-bold text-brand">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-night text-lg font-extrabold text-white">
               {index + 1}
             </span>
             <span className="mt-2 px-2 text-xs font-medium text-muted">{kk.upload.choose}</span>
