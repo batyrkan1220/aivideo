@@ -378,23 +378,6 @@ export function CreateFlow({
           <textarea ref={wishRef} value={wish} onChange={(e) => setWish(e.target.value.slice(0, 300))} maxLength={300} rows={wishRequired ? 3 : 2}
             placeholder={w.placeholder} aria-label={w.title} required={wishRequired}
             className="mt-3 w-full rounded-2xl border border-line bg-surface px-3 py-2 text-base outline-none focus:border-ink" />
-          <div className="mt-2 flex flex-wrap gap-2">
-            {w.examples.map((x) => {
-              // Tag chips: tap adds the idea to the text; a chosen one shows × and removes it again.
-              const parts = wish.split(";").map((p) => p.trim()).filter(Boolean);
-              const on = parts.includes(x);
-              return (
-                <button key={x} type="button" aria-pressed={on}
-                  onClick={() => setWish((v) => {
-                    const ps = v.split(";").map((p) => p.trim()).filter(Boolean);
-                    return (ps.includes(x) ? ps.filter((p) => p !== x) : [...ps, x]).join("; ").slice(0, 300);
-                  })}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors active:scale-95 ${on ? "bg-night text-white" : "bg-lavender text-ink"}`}>
-                  {on ? <>{x} <span aria-hidden className="text-white/70">✕</span></> : <>+ {x}</>}
-                </button>
-              );
-            })}
-          </div>
           <p className="mt-1 text-right text-xs text-muted">{wish.length}/300</p>
         </section>
         );
