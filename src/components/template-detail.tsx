@@ -98,14 +98,6 @@ export function TemplateDetailView({ t, cta, combo }: { t: TemplateDetail; cta?:
             <li className="rounded-full bg-surface px-2.5 py-1 ring-1 ring-line">{t.media === "photo" ? "📸 2K" : "🎬 HD 720p"}</li>
             {t.isTrending && <li className="rounded-full bg-brand px-2.5 py-1 text-night">🔥 {kk.catalog2.trendBadge}</li>}
           </ul>
-          <ol className="mt-4 grid grid-cols-3 gap-2 text-[12px]">
-            {(combo ? kk.combo.how(combo.length) : t.media === "photo" ? kk.template.howPhoto : kk.template.howVideo).map((x, i) => (
-              <li key={x} className="rounded-2xl bg-surface p-2.5 ring-1 ring-line">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand text-[11px] font-extrabold text-night">{i + 1}</span>
-                <span className="mt-1.5 block font-semibold leading-snug">{x}</span>
-              </li>
-            ))}
-          </ol>
         </div>
         {t.description && <p className="hidden max-w-prose text-muted md:mt-5 md:block md:text-lg">{t.description}</p>}
 
