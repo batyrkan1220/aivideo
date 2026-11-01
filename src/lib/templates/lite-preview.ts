@@ -13,15 +13,15 @@ import { mediaUrl } from "@/lib/templates/queries";
   videos (often 2–10 MB). The server makes a 480p, silent, ≤10 s, 24 fps H.264 copy (~0.3–0.5 MB)
   with ffmpeg and cards play that; the template page keeps the full video with sound.
   Current files live in previews/lite4/; older copies are remade once and removed.
-  Alongside it an animated WebP cut to the card's own shape (3:4, 324×432, 12 fps, ≤10 s, ~0.4–0.7 MB,
-  re-encoded smaller if it passes 900 KB): cards and the hero show this image, which animates everywhere
-  (iOS Low Power Mode, Telegram WebViews) with no autoplay rules. Lives in previews/anim4/.
+  Alongside it an animated WebP cut to the card's own shape (3:4, 360×480, 15 fps, ≤10 s, ~0.7–1 MB,
+  re-encoded smaller if it passes 1.3 MB): cards and the hero show this image, which animates everywhere
+  (iOS Low Power Mode, Telegram WebViews) with no autoplay rules. Lives in previews/anim5/.
   And a 360×480 WebP of the cover (~20–40 KB, cached for a year) that cards show first: covers/thumb1/.
   One job at a time (the server is small); failures leave the card on the full video.
 */
 const MAX_SOURCE_BYTES = 80 * 1024 * 1024;
 const LITE_DIR = "previews/lite4/";
-const ANIM_DIR = "previews/anim4/";
+const ANIM_DIR = "previews/anim5/";
 const THUMB_DIR = "covers/thumb1/";
 const queue: string[] = [];
 let running = false;
@@ -98,10 +98,10 @@ async function makeOne(templateId: string): Promise<boolean> {
     let animPath: string | null = oldAnim?.startsWith(ANIM_DIR) && !fresh ? oldAnim : null;
     if (!animPath) {
       try {
-        await runFfmpeg(inPath, animOut, webpArgs(52));
+        await runFfmpeg(inPath, animOut, webpArgs(65));
         let anim = await readFile(animOut);
         // Busy footage can come out heavy: one smaller pass keeps cards light.
-        if (anim.length > 900 * 1024) { await runFfmpeg(inPath, animOut, webpArgs(35)); anim = await readFile(animOut); }
+        if (anim.length > 1300 * 1024) { await runFfmpeg(inPath, animOut, webpArgs(50)); anim = await readFile(animOut); }
         if (anim.length > 0) {
           animPath = `${ANIM_DIR}${randomUUID()}.webp`;
           const { error } = await db.storage.from("template-media")
@@ -168,12 +168,12 @@ const mp4Args = (inPath: string, outPath: string) => [
   "-c:v", "libx264", "-preset", "medium", "-crf", "26", "-maxrate", "900k", "-bufsize", "1800k",
   "-profile:v", "main", "-pix_fmt", "yuv420p", "-movflags", "+faststart", outPath,
 ];
-// Animated WebP card preview: centre-cropped to the card's 3:4 and sized for it (324×432, sharp
-// enough at 2× on phones), 12 fps, ≤10 s, endless loop. No pixels are spent on parts the card cuts off.
+// Animated WebP card preview: centre-cropped to the card's 3:4 and sized for it (360×480, sharp
+// at 2× on phones), 15 fps, ≤10 s, endless loop. No pixels are spent on parts the card cuts off.
 const CARD_CROP = "crop='min(iw,ih*3/4)':'min(ih,iw*4/3)'";
 const webpArgs = (q: number) => (inPath: string, outPath: string) => [
   "-hide_banner", "-loglevel", "error", "-y", "-i", inPath, "-t", "10", "-an",
-  "-vf", `fps=12,${CARD_CROP},scale=324:432:flags=lanczos,setsar=1`,
+  "-vf", `fps=15,${CARD_CROP},scale=360:480:flags=lanczos,setsar=1`,
   "-c:v", "libwebp_anim", "-lossless", "0", "-q:v", String(q), "-compression_level", "5", "-loop", "0", outPath,
 ];
 // Static cover for cards: same crop, 360×480 WebP.
