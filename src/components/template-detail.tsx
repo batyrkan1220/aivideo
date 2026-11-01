@@ -51,12 +51,15 @@ export function TemplateDetailView({ t, cta, combo }: { t: TemplateDetail; cta?:
       {/* On phones the sample is capped so the photo step stays close; the title sits on the video. */}
       {/* The sample in its original proportions (vertical, square or horizontal), never cropped. */}
       <figure className="mx-auto w-full md:sticky md:top-24 md:self-start">
-        <div className="relative mx-auto w-fit max-w-full overflow-hidden rounded-[1.75rem] bg-night shadow-[0_24px_60px_-24px_rgba(0,0,0,0.35)] ring-1 ring-black/5">
+        {/* The box is sized from the stored video proportions before anything loads: no jump. */}
+        <div
+          style={{ "--a": String(t.videoAspect ?? 9 / 16), aspectRatio: String(t.videoAspect ?? 9 / 16) } as React.CSSProperties}
+          className="relative mx-auto w-[min(100%,calc(70svh*var(--a)))] overflow-hidden rounded-[1.75rem] bg-night shadow-[0_24px_60px_-24px_rgba(0,0,0,0.35)] ring-1 ring-black/5 md:w-[min(100%,calc(80vh*var(--a)))]">
           {t.previewUrl ? (
-            <AutoVideo src={t.previewUrl} poster={t.coverUrl ?? undefined} soundToggle preferSound className="block h-auto max-h-[70svh] w-auto max-w-full md:max-h-[80vh]" />
+            <AutoVideo src={t.previewUrl} poster={t.coverUrl ?? undefined} soundToggle preferSound className="block h-full w-full object-cover" />
           ) : t.coverUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={t.coverUrl} alt="" className="block h-auto max-h-[70svh] w-auto max-w-full md:max-h-[80vh]" />
+            <img src={t.coverUrl} alt="" className="block h-full w-full object-cover" />
           ) : null}
           <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-night">
             {t.media === "photo" ? kk.photos.sample : kk.catalog.sample}

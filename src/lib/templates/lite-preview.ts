@@ -35,10 +35,10 @@ export function queueLitePreview(templateId: string) {
 /** Server start: every template with a video but no light preview yet. */
 export async function backfillLitePreviews() {
   const { data } = await supabaseAdmin().from("templates")
-    .select("id,cover_asset_path,cover_thumb_path,preview_video_path,preview_lite_path,preview_anim_path").not("preview_video_path", "is", null).is("deleted_at", null).limit(1000);
+    .select("id,cover_asset_path,cover_thumb_path,preview_video_path,preview_lite_path,preview_anim_path,video_aspect").not("preview_video_path", "is", null).is("deleted_at", null).limit(1000);
   // Missing, or still an old v1 copy (an original kept as-is because it was already small counts as done).
   const todo = (data ?? []).filter((r) => !r.preview_lite_path || (!r.preview_lite_path.startsWith(LITE_DIR) && r.preview_lite_path !== r.preview_video_path)
-    || !r.preview_anim_path?.startsWith(ANIM_DIR) || (!!r.cover_asset_path && !r.cover_thumb_path?.startsWith(THUMB_DIR)));
+    || !r.preview_anim_path?.startsWith(ANIM_DIR) || (!!r.cover_asset_path && !r.cover_thumb_path?.startsWith(THUMB_DIR)) || !r.video_aspect);
   for (const r of todo) queueLitePreview(r.id);
   if (!todo.length) void cleanupOrphans();
   return todo.length;
@@ -79,6 +79,8 @@ async function makeOne(templateId: string): Promise<boolean> {
   try {
     const inPath = join(dir, "in"), outPath = join(dir, "out.mp4"), animOut = join(dir, "out.webp");
     await writeFile(inPath, input);
+    // Width ÷ height of the original (rotation applied), so the template page can reserve its box.
+    const aspect = await probeAspect(inPath).catch(() => null);
     const fresh = !oldLite || oldLite === src || !oldLite.startsWith(LITE_DIR);
     let litePath = oldLite ?? src;
     const uploaded: string[] = [];
@@ -136,7 +138,7 @@ async function makeOne(templateId: string): Promise<boolean> {
       }
     }
     // Only if the template still has the same video (the admin may have replaced it meanwhile).
-    const { data: updated } = await db.from("templates").update({ preview_lite_path: litePath, preview_anim_path: animPath, cover_thumb_path: thumbPath })
+    const { data: updated } = await db.from("templates").update({ preview_lite_path: litePath, preview_anim_path: animPath, cover_thumb_path: thumbPath, ...(aspect ? { video_aspect: aspect } : {}) })
       .eq("id", templateId).eq("preview_video_path", src).select("id");
     if (!updated?.length && uploaded.length) await db.storage.from("template-media").remove(uploaded);
     // Replaced light copies (never the original video) are no longer needed.
@@ -181,6 +183,27 @@ const thumbArgs = (inPath: string, outPath: string) => [
   "-hide_banner", "-loglevel", "error", "-y", "-i", inPath, "-frames:v", "1",
   "-vf", `${CARD_CROP},scale=360:480:flags=lanczos,setsar=1`, "-c:v", "libwebp", "-q:v", "78", outPath,
 ];
+
+/** Reads the display aspect (w/h) of a video from ffmpeg's stream info, honouring 90° rotation. */
+async function probeAspect(inPath: string): Promise<number | null> {
+  const bin = await ffmpegPath();
+  const info = await new Promise<string>((resolve) => {
+    const p = spawn(bin, ["-hide_banner", "-i", inPath], { stdio: ["ignore", "ignore", "pipe"] });
+    let out = "";
+    p.stderr.on("data", (d) => { out = (out + d).slice(-8000); });
+    const timer = setTimeout(() => p.kill("SIGKILL"), 20_000);
+    p.on("close", () => { clearTimeout(timer); resolve(out); });
+    p.on("error", () => { clearTimeout(timer); resolve(""); });
+  });
+  const m = /Video:.*?(\d{2,5})x(\d{2,5})/.exec(info);
+  if (!m) return null;
+  let w = Number(m[1]), h = Number(m[2]);
+  const sar = /SAR (\d+):(\d+)/.exec(info.slice(m.index));
+  if (sar && Number(sar[2]) > 0 && Number(sar[1]) > 0) w = (w * Number(sar[1])) / Number(sar[2]);
+  if (/rotat(e|ion of)\s*:?\s*-?(90|270)/i.test(info)) [w, h] = [h, w];
+  const a = w / h;
+  return Number.isFinite(a) && a > 0.2 && a < 5 ? Math.round(a * 10000) / 10000 : null;
+}
 
 /** Deletes light copies / thumbnails in storage that no template points to any more. */
 async function cleanupOrphans() {
