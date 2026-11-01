@@ -16,7 +16,7 @@ export async function pushBotProfile(base = env().NEXT_PUBLIC_APP_URL.replace(/\
 export async function pushBotCommands() {
   await tg("setMyCommands", { commands: [
     { command: "start", description: "Создать видео" },
-    { command: "videos", description: "Мои заказы" },
+    { command: "videos", description: "Мои видео" },
     { command: "help", description: "Помощь" },
   ] });
   for (const id of await botAdminIds()) {
