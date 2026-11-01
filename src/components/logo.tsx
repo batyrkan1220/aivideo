@@ -1,29 +1,35 @@
 import { kk } from "@/lib/i18n/kk";
 
 /**
- * TrendMe mark: obsidian squircle, a chartreuse play triangle (video) and a white AI sparkle.
- * Pure SVG, scales with font-size (1.9em square).
+ * TrendMe mark: a lime rounded play button with speed lines (motion) and AI sparkles.
+ * Pure SVG, scales with font-size.
  */
 export function LogoMark({ className = "" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 64 64" aria-hidden className={`h-[1.9em] w-[1.9em] shrink-0 ${className}`}>
-      <rect width="64" height="64" rx="18" fill="#161616" />
-      <path d="M24 19.5c0-2.3 2.5-3.7 4.5-2.5l17.2 10.5c1.9 1.2 1.9 3.9 0 5.1L28.5 43.1c-2 1.2-4.5-.2-4.5-2.5z" fill="#D7F443" transform="translate(-2 2)" />
-      <path d="M48 9.5c.5 3.6 2.4 5.5 6 6-3.6.5-5.5 2.4-6 6-.5-3.6-2.4-5.5-6-6 3.6-.5 5.5-2.4 6-6z" fill="#fff" />
+    <svg viewBox="2 -1 60 56" fill="none" aria-hidden className={`h-[1.9em] w-auto shrink-0 ${className}`}>
+      <g stroke="#283040" strokeLinecap="round">
+      <path d="M10 26h9M6 32h13M9 38h10M13 44h7" strokeWidth="3.2"/>
+      <circle cx="5" cy="26" r="1.7" fill="#283040" stroke="none"/>
+      </g>
+      <path d="M25.5 14.6c0-3.3 3.6-5.4 6.5-3.7l22.3 13.4c3 1.8 3 6.1 0 7.9L32 45.6c-2.9 1.7-6.5-.4-6.5-3.7z" transform="translate(-4 4)" fill="#d7f443" stroke="#283040" strokeWidth="3.6" strokeLinejoin="round"/>
+      <path d="M31.5 28.3c0-1.3 1.4-2.1 2.6-1.4l7.4 4.4c1.1.7 1.1 2.3 0 3l-7.4 4.4c-1.2.7-2.6-.1-2.6-1.4z" fill="#283040"/>
+      <g fill="#c6e83a">
+      <path d="M51 6.5c.4 2.6 1.6 3.8 4.2 4.2-2.6.4-3.8 1.6-4.2 4.2-.4-2.6-1.6-3.8-4.2-4.2 2.6-.4 3.8-1.6 4.2-4.2z"/>
+      <path d="M58 13.5c.25 1.6 1 2.35 2.6 2.6-1.6.25-2.35 1-2.6 2.6-.25-1.6-1-2.35-2.6-2.6 1.6-.25 2.35-1 2.6-2.6z"/>
+      <path d="M44.5 3c.2 1.2.8 1.8 2 2-1.2.2-1.8.8-2 2-.2-1.2-.8-1.8-2-2 1.2-.2 1.8-.8 2-2z"/>
+      </g>
     </svg>
   );
 }
 
-/** Mark + wordmark: "Trend" in ink, "Me" on a chartreuse pill. Size it with a text-* class. */
+/** Mark + "TrendMe" wordmark. Size it with a text-* class. */
 export function Logo({ className = "", compact = false }: { className?: string; compact?: boolean }) {
   return (
-    <span className={`inline-flex items-center gap-[0.45em] font-extrabold tracking-[-0.03em] ${className}`}>
+    <span className={`inline-flex items-center gap-[0.35em] font-extrabold tracking-[-0.03em] text-[#283040] ${className}`}>
       <LogoMark />
       {!compact && (
-        <span className="inline-flex items-center leading-none text-ink">
-          Trend
-          <span className="ml-[0.08em] rounded-[0.32em] bg-[#d7f443] px-[0.24em] pb-[0.08em] pt-[0.06em] text-[#161616]">Me</span>
-          <span className="sr-only"> — {kk.brand.tagline}</span>
+        <span className="leading-none">
+          TrendMe<span className="sr-only"> — {kk.brand.tagline}</span>
         </span>
       )}
     </span>
