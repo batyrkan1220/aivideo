@@ -130,7 +130,7 @@ export function parseRow(r: Row, seedancePricing: SeedancePricing = DEFAULT_SEED
     durationSec: r.video_duration_sec == null ? null : Number(r.video_duration_sec),
     priced,
     photoFraming: r.photo_framing === "face" || r.photo_framing === "full" ? r.photo_framing : "half",
-    allowWish: (r.provider_key === PHOTO_PROVIDER || ["scene", "kling", "k4", "kd"].includes(parseSeedanceMode(r.seedance_mode))) && r.allow_wish !== "false",
+    allowWish: false, // customer prompts are off: the template rules alone decide the result
     outfit: r.provider_key === PHOTO_PROVIDER || r.provider_key === "combo" ? "photo" : r.outfit === "template" || r.outfit === "choice" ? r.outfit : "photo",
     seedanceMode: parseSeedanceMode(r.seedance_mode),
     media: r.provider_key === PHOTO_PROVIDER || r.provider_key === "combo" ? "photo" : "video",

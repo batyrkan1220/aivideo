@@ -285,10 +285,6 @@ export function TemplateEditor({
               <textarea className={`${inputCls(err("seedance.prompt"))} min-h-24`} value={ph.prompt} maxLength={2000} placeholder={e.photo.promptPlaceholder} onChange={(ev) => setPh({ prompt: ev.target.value })} />
               <span className="mt-1 block text-xs text-muted">{e.photo.promptHint}</span>
             </Field>
-            <label className="flex items-center gap-2 text-sm sm:col-span-2">
-              <input type="checkbox" className="h-4 w-4 accent-brand" checked={ph.allowWish} onChange={(ev) => setPh({ allowWish: ev.target.checked })} />
-              {e.seedance.allowWish}
-            </label>
           </div>
           {slots.length > 0 && <FaceMap slots={slots} mediaBase={mediaBase} />}
         </div>
@@ -352,10 +348,6 @@ export function TemplateEditor({
               <textarea className={`${inputCls(err("seedance.prompt"))} min-h-24`} value={sd.prompt} maxLength={1500} onChange={(ev) => setSd({ prompt: ev.target.value })} />
               <span className="mt-1 block text-xs text-muted">{e.seedance.promptHint}</span>
             </Field>
-            <label className="flex items-center gap-2 text-sm sm:col-span-2">
-              <input type="checkbox" className="h-4 w-4 accent-brand" checked={sd.allowWish} onChange={(ev) => setSd({ allowWish: ev.target.checked })} />
-              {e.seedance.allowWish}
-            </label>
             <p className={`text-xs sm:col-span-2 ${duration !== null && (duration < 2.5 || duration > 30.5) ? "font-semibold text-danger" : "text-muted"}`}>
               {e.seedance.durationHint}{duration !== null ? ` · ${Math.round(duration * 10) / 10} сек` : ""}
             </p>

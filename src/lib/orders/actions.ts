@@ -266,7 +266,7 @@ export async function createOrder(raw: unknown): Promise<
     const eff = applySeedancePricing(tv.pricing, price);
     pricing = eff.pricing;
     qualities = eff.qualities;
-    const wish = ["scene", "kling", "k4", "kd"].includes(cfg.mode) && cfg.allowWish ? cleanWish(p.data.wish) : "";
+    const wish = custom && cfg.allowWish ? cleanWish(p.data.wish) : ""; // catalog templates take no customer prompt
     snapshotExtra = {
       ...snapshotExtra, pricing_config_json: pricing, video_duration_sec: durationSec, ...(wish ? { customer_wish: wish } : {}),
       ...(cfg.outfit === "choice" ? { customer_outfit: p.data.outfit ?? "template" } : {}),
