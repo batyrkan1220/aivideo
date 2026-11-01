@@ -43,7 +43,7 @@ function Face({ kind }: { kind: "front" | "single" | "covered" | "angle" }) {
 const EXAMPLES: { kind: "front" | "single" | "covered" | "angle"; good: boolean; photo?: string }[] = [
   { kind: "front", good: true, photo: "/photo-tips/front.jpg" },
   { kind: "single", good: true, photo: "/photo-tips/single.jpg" },
-  { kind: "covered", good: false },
+  { kind: "covered", good: false, photo: "/photo-tips/covered.jpg" },
   { kind: "angle", good: false },
 ];
 
