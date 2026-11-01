@@ -33,14 +33,14 @@ export function HeroShowcase({ items, compact = false }: { items: Item[]; compac
           >
             {t.coverUrl && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={t.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+              <img src={t.coverUrl} alt="" fetchPriority="high" loading="eager" className="absolute inset-0 h-full w-full object-cover" />
             )}
             {!front && !t.coverUrl && t.previewUrl && (
               // No cover: show the first video frame on the side phones.
               <video src={`${t.previewUrl}#t=0.1`} muted playsInline preload="metadata" aria-hidden className="absolute inset-0 h-full w-full object-cover" />
             )}
             {front && t.previewUrl && (
-              <video src={t.previewUrl} poster={t.coverUrl ?? undefined} autoPlay muted loop playsInline preload="metadata" aria-hidden className="absolute inset-0 h-full w-full object-cover motion-reduce:hidden" />
+              <video src={t.previewUrl} poster={t.coverUrl ?? undefined} data-hero-video="" autoPlay muted loop playsInline preload="auto" aria-hidden className="absolute inset-0 h-full w-full object-cover motion-reduce:hidden" />
             )}
             {front && (
               <span className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent font-display font-semibold text-white ${compact ? "line-clamp-2 p-2.5 pt-7 text-[11px]" : "p-3 pt-8 text-xs sm:p-4 sm:pt-10 sm:text-sm"}`}>

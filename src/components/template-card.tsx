@@ -22,6 +22,23 @@ export type CardData = {
  * Keeps at most MAX_PLAYING previews running at once across the whole page: starting a new
  * one pauses the oldest. Many cards on screen then never decode/stream videos in parallel.
  */
+const heroGates = new WeakMap<HTMLVideoElement, Promise<void>>();
+/** Resolves when the hero video (if this page has one) has buffered enough to play, or after 4 s. */
+function heroReady(): Promise<void> {
+  const v = document.querySelector<HTMLVideoElement>("video[data-hero-video]");
+  if (!v || v.readyState >= 3 || !v.offsetParent) return Promise.resolve();
+  const known = heroGates.get(v);
+  if (known) return known;
+  const gate = new Promise<void>((resolve) => {
+    const done = () => resolve();
+    v.addEventListener("canplay", done, { once: true });
+    v.addEventListener("error", done, { once: true });
+    setTimeout(done, 4000);
+  });
+  heroGates.set(v, gate);
+  return gate;
+}
+
 const MAX_PLAYING = 6; // every card on screen plays (light 360p previews keep this cheap)
 const playingNow: HTMLVideoElement[] = [];
 function claimPlayback(v: HTMLVideoElement) {
@@ -50,9 +67,15 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
   useEffect(() => {
     const el = cardRef.current;
     if (!el || !t.previewUrl) return;
-    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setNear(true); io.disconnect(); } }, { rootMargin: "200px 0px" });
+    let alive = true;
+    const io = new IntersectionObserver(([e]) => {
+      if (!e.isIntersecting) return;
+      io.disconnect();
+      // The hero video downloads first; grid videos start once it can play.
+      heroReady().then(() => alive && setNear(true));
+    }, { rootMargin: "200px 0px" });
     io.observe(el);
-    return () => io.disconnect();
+    return () => { alive = false; io.disconnect(); };
   }, [t.previewUrl]);
 
   const play = () => {
