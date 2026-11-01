@@ -54,11 +54,6 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
           </Suspense>
         </PhoneOnly>
         <p className="mt-0.5 text-center text-[12px] font-medium text-muted">{kk.home.heroMiniHint}</p>
-        <p className="mt-1 flex items-center justify-center gap-1.5 text-[13px] font-semibold text-muted">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/kaspi.png" alt="" width={18} height={18} className="h-[18px] w-[18px] rounded-[5px]" />
-          {kk.home.heroMiniSub}
-        </p>
       </section>
 
       <Suspense fallback={<div className="mx-auto mt-4 max-w-6xl px-4"><CachedFeedFallback /></div>}>
