@@ -13,14 +13,16 @@ import { mediaUrl } from "@/lib/templates/queries";
   videos (often 2–10 MB). The server makes a 480p, silent, ≤10 s, 24 fps H.264 copy (~0.3–0.5 MB)
   with ffmpeg and cards play that; the template page keeps the full video with sound.
   Current files live in previews/lite4/; older copies are remade once and removed.
-  Alongside it an animated WebP cut to the card's own shape (3:4, 360×480, 15 fps, ≤10 s): cards and
-  the hero show this image, which animates everywhere (iOS Low Power Mode, Telegram WebViews) with no
-  autoplay rules. Lives in previews/anim3/.
+  Alongside it an animated WebP cut to the card's own shape (3:4, 324×432, 12 fps, ≤10 s, ~0.4–0.7 MB,
+  re-encoded smaller if it passes 900 KB): cards and the hero show this image, which animates everywhere
+  (iOS Low Power Mode, Telegram WebViews) with no autoplay rules. Lives in previews/anim4/.
+  And a 360×480 WebP of the cover (~20–40 KB, cached for a year) that cards show first: covers/thumb1/.
   One job at a time (the server is small); failures leave the card on the full video.
 */
 const MAX_SOURCE_BYTES = 80 * 1024 * 1024;
 const LITE_DIR = "previews/lite4/";
-const ANIM_DIR = "previews/anim3/";
+const ANIM_DIR = "previews/anim4/";
+const THUMB_DIR = "covers/thumb1/";
 const queue: string[] = [];
 let running = false;
 
@@ -33,11 +35,12 @@ export function queueLitePreview(templateId: string) {
 /** Server start: every template with a video but no light preview yet. */
 export async function backfillLitePreviews() {
   const { data } = await supabaseAdmin().from("templates")
-    .select("id,preview_video_path,preview_lite_path,preview_anim_path").not("preview_video_path", "is", null).is("deleted_at", null).limit(1000);
+    .select("id,cover_asset_path,cover_thumb_path,preview_video_path,preview_lite_path,preview_anim_path").not("preview_video_path", "is", null).is("deleted_at", null).limit(1000);
   // Missing, or still an old v1 copy (an original kept as-is because it was already small counts as done).
   const todo = (data ?? []).filter((r) => !r.preview_lite_path || (!r.preview_lite_path.startsWith(LITE_DIR) && r.preview_lite_path !== r.preview_video_path)
-    || !r.preview_anim_path?.startsWith(ANIM_DIR));
+    || !r.preview_anim_path?.startsWith(ANIM_DIR) || (!!r.cover_asset_path && !r.cover_thumb_path?.startsWith(THUMB_DIR)));
   for (const r of todo) queueLitePreview(r.id);
+  if (!todo.length) void cleanupOrphans();
   return todo.length;
 }
 
@@ -54,13 +57,13 @@ async function drain() {
     }
   } finally {
     running = false;
-    if (ok || failed) { clearMemo("cat:"); console.log(`[lite-preview] done ok=${ok} failed=${failed}`); }
+    if (ok || failed) { clearMemo("cat:"); console.log(`[lite-preview] done ok=${ok} failed=${failed}`); void cleanupOrphans(); }
   }
 }
 
 async function makeOne(templateId: string): Promise<boolean> {
   const db = supabaseAdmin();
-  const { data: t } = await db.from("templates").select("preview_video_path,preview_lite_path,preview_anim_path").eq("id", templateId).maybeSingle();
+  const { data: t } = await db.from("templates").select("cover_asset_path,cover_thumb_path,preview_video_path,preview_lite_path,preview_anim_path").eq("id", templateId).maybeSingle();
   const oldLite = t?.preview_lite_path ?? null;
   const oldAnim = t?.preview_anim_path ?? null;
   const src = t?.preview_video_path;
@@ -95,8 +98,10 @@ async function makeOne(templateId: string): Promise<boolean> {
     let animPath: string | null = oldAnim?.startsWith(ANIM_DIR) && !fresh ? oldAnim : null;
     if (!animPath) {
       try {
-        await runFfmpeg(inPath, animOut, webpArgs);
-        const anim = await readFile(animOut);
+        await runFfmpeg(inPath, animOut, webpArgs(52));
+        let anim = await readFile(animOut);
+        // Busy footage can come out heavy: one smaller pass keeps cards light.
+        if (anim.length > 900 * 1024) { await runFfmpeg(inPath, animOut, webpArgs(35)); anim = await readFile(animOut); }
         if (anim.length > 0) {
           animPath = `${ANIM_DIR}${randomUUID()}.webp`;
           const { error } = await db.storage.from("template-media")
@@ -107,8 +112,31 @@ async function makeOne(templateId: string): Promise<boolean> {
         console.error("[lite-preview] anim failed", err instanceof Error ? err.message.slice(0, 200) : "error");
       }
     }
+    // Cover thumbnail for cards.
+    const cover = t?.cover_asset_path ?? null;
+    let thumbPath: string | null = t?.cover_thumb_path?.startsWith(THUMB_DIR) ? t.cover_thumb_path : null;
+    const coverUrl = mediaUrl(cover);
+    if (!thumbPath && cover && coverUrl) {
+      try {
+        const cr = await fetch(coverUrl, { signal: AbortSignal.timeout(30_000), cache: "no-store" });
+        if (cr.ok) {
+          const coverIn = join(dir, "cover"), thumbOut = join(dir, "thumb.webp");
+          await writeFile(coverIn, Buffer.from(await cr.arrayBuffer()));
+          await runFfmpeg(coverIn, thumbOut, thumbArgs);
+          const thumb = await readFile(thumbOut);
+          if (thumb.length > 0) {
+            const p = `${THUMB_DIR}${randomUUID()}.webp`;
+            const { error } = await db.storage.from("template-media")
+              .upload(p, thumb, { contentType: "image/webp", cacheControl: "31536000", upsert: false });
+            if (!error) { thumbPath = p; uploaded.push(p); }
+          }
+        }
+      } catch (err) {
+        console.error("[lite-preview] thumb failed", err instanceof Error ? err.message.slice(0, 200) : "error");
+      }
+    }
     // Only if the template still has the same video (the admin may have replaced it meanwhile).
-    const { data: updated } = await db.from("templates").update({ preview_lite_path: litePath, preview_anim_path: animPath })
+    const { data: updated } = await db.from("templates").update({ preview_lite_path: litePath, preview_anim_path: animPath, cover_thumb_path: thumbPath })
       .eq("id", templateId).eq("preview_video_path", src).select("id");
     if (!updated?.length && uploaded.length) await db.storage.from("template-media").remove(uploaded);
     // Replaced light copies (never the original video) are no longer needed.
@@ -116,6 +144,7 @@ async function makeOne(templateId: string): Promise<boolean> {
       const stale = [
         oldLite && oldLite !== src && oldLite !== litePath && oldLite.startsWith("previews/lite") ? oldLite : null,
         oldAnim && oldAnim !== animPath && oldAnim.startsWith("previews/anim") ? oldAnim : null,
+        t?.cover_thumb_path && t.cover_thumb_path !== thumbPath && t.cover_thumb_path.startsWith("covers/thumb") ? t.cover_thumb_path : null,
       ].filter((x): x is string => !!x);
       if (stale.length) await db.storage.from("template-media").remove(stale);
     }
@@ -139,13 +168,45 @@ const mp4Args = (inPath: string, outPath: string) => [
   "-c:v", "libx264", "-preset", "medium", "-crf", "26", "-maxrate", "900k", "-bufsize", "1800k",
   "-profile:v", "main", "-pix_fmt", "yuv420p", "-movflags", "+faststart", outPath,
 ];
-// Animated WebP card preview: centre-cropped to the card's 3:4 and sized for it (360×480 = sharp at
-// 2× on phones), 15 fps, ≤10 s, endless loop. No pixels are spent on parts the card would cut off.
-const webpArgs = (inPath: string, outPath: string) => [
+// Animated WebP card preview: centre-cropped to the card's 3:4 and sized for it (324×432, sharp
+// enough at 2× on phones), 12 fps, ≤10 s, endless loop. No pixels are spent on parts the card cuts off.
+const CARD_CROP = "crop='min(iw,ih*3/4)':'min(ih,iw*4/3)'";
+const webpArgs = (q: number) => (inPath: string, outPath: string) => [
   "-hide_banner", "-loglevel", "error", "-y", "-i", inPath, "-t", "10", "-an",
-  "-vf", "fps=15,crop='min(iw,ih*3/4)':'min(ih,iw*4/3)',scale=360:480:flags=lanczos,setsar=1",
-  "-c:v", "libwebp_anim", "-lossless", "0", "-q:v", "65", "-compression_level", "4", "-loop", "0", outPath,
+  "-vf", `fps=12,${CARD_CROP},scale=324:432:flags=lanczos,setsar=1`,
+  "-c:v", "libwebp_anim", "-lossless", "0", "-q:v", String(q), "-compression_level", "5", "-loop", "0", outPath,
 ];
+// Static cover for cards: same crop, 360×480 WebP.
+const thumbArgs = (inPath: string, outPath: string) => [
+  "-hide_banner", "-loglevel", "error", "-y", "-i", inPath, "-frames:v", "1",
+  "-vf", `${CARD_CROP},scale=360:480:flags=lanczos,setsar=1`, "-c:v", "libwebp", "-q:v", "78", outPath,
+];
+
+/** Deletes light copies / thumbnails in storage that no template points to any more. */
+async function cleanupOrphans() {
+  try {
+    const db = supabaseAdmin();
+    const { data: rows } = await db.from("templates").select("cover_thumb_path,preview_lite_path,preview_anim_path");
+    const keep = new Set((rows ?? []).flatMap((r) => [r.cover_thumb_path, r.preview_lite_path, r.preview_anim_path]).filter(Boolean) as string[]);
+    const dirs: string[] = [];
+    for (const root of ["previews", "covers"]) {
+      const { data } = await db.storage.from("template-media").list(root, { limit: 1000 });
+      for (const e of data ?? []) if (!e.id && /^(lite\d*|anim\d+|thumb\d+)$/.test(e.name)) dirs.push(`${root}/${e.name}`);
+    }
+    let removed = 0;
+    for (const d of dirs) {
+      const { data } = await db.storage.from("template-media").list(d, { limit: 1000 });
+      const stale = (data ?? []).filter((f) => f.id).map((f) => `${d}/${f.name}`).filter((p) => !keep.has(p));
+      for (let i = 0; i < stale.length; i += 100) {
+        const { error } = await db.storage.from("template-media").remove(stale.slice(i, i + 100));
+        if (!error) removed += Math.min(100, stale.length - i);
+      }
+    }
+    if (removed) console.log(`[lite-preview] removed ${removed} unused files`);
+  } catch (err) {
+    console.error("[lite-preview] cleanup failed", err instanceof Error ? err.message.slice(0, 200) : "error");
+  }
+}
 
 async function runFfmpeg(inPath: string, outPath: string, build: (i: string, o: string) => string[]) {
   const bin = await ffmpegPath();

@@ -49,7 +49,7 @@ export async function saveTemplate(raw: unknown, id: string | null): Promise<Sav
 
   if (!z.string().uuid().safeParse(id).success) return { ok: false, error: "generic" };
   const { data: before } = await db.from("templates")
-    .select("pricing_config_json, supported_qualities_json, status, preview_video_path, preview_lite_path, preview_anim_path, video_duration_sec").eq("id", id).single();
+    .select("pricing_config_json, supported_qualities_json, status, preview_video_path, preview_lite_path, preview_anim_path, cover_asset_path, cover_thumb_path, video_duration_sec").eq("id", id).single();
   if (!before) return { ok: false, error: "generic" };
 
   const { error } = await db.from("templates").update(row).eq("id", id);
@@ -61,6 +61,12 @@ export async function saveTemplate(raw: unknown, id: string | null): Promise<Sav
     await db.from("templates").update({ preview_lite_path: null, preview_anim_path: null }).eq("id", id);
     if (before.preview_anim_path?.startsWith("previews/anim")) await db.storage.from("template-media").remove([before.preview_anim_path]);
     if (old && old !== before.preview_video_path && old.startsWith("previews/lite/")) await db.storage.from("template-media").remove([old]);
+    if (row.preview_video_path) queueLitePreview(id);
+  }
+  // New cover: drop the old card thumbnail and make a new one.
+  if (row.cover_asset_path !== before.cover_asset_path) {
+    await db.from("templates").update({ cover_thumb_path: null }).eq("id", id);
+    if (before.cover_thumb_path?.startsWith("covers/thumb")) await db.storage.from("template-media").remove([before.cover_thumb_path]);
     if (row.preview_video_path) queueLitePreview(id);
   }
   // Video length drives automatic prices: re-read it whenever the video changes.
@@ -152,7 +158,7 @@ export async function deleteTemplate(id: string): Promise<DeleteResult> {
   if (!user) return { ok: false, error: "forbidden" };
   if (!z.string().uuid().safeParse(id).success) return { ok: false, error: "generic" };
   const db = supabaseAdmin();
-  const { data: t } = await db.from("templates").select("id,kind,cover_asset_path,preview_video_path,preview_lite_path,preview_anim_path").eq("id", id).maybeSingle();
+  const { data: t } = await db.from("templates").select("id,kind,cover_asset_path,cover_thumb_path,preview_video_path,preview_lite_path,preview_anim_path").eq("id", id).maybeSingle();
   if (!t || t.kind !== "catalog") return { ok: false, error: "generic" };
 
   const [{ count: orders }, { count: assets }] = await Promise.all([
@@ -169,7 +175,7 @@ export async function deleteTemplate(id: string): Promise<DeleteResult> {
     const { error: e1 } = await db.from("templates").update({ current_version_id: null }).eq("id", id);
     const { error: e2 } = e1 ? { error: e1 } : await db.from("templates").delete().eq("id", id);
     if (e2) return { ok: false, error: "generic" };
-    const files = [...new Set([t.cover_asset_path, t.preview_video_path, t.preview_lite_path, t.preview_anim_path])].filter((p): p is string => !!p && !/^https?:/.test(p));
+    const files = [...new Set([t.cover_asset_path, t.cover_thumb_path, t.preview_video_path, t.preview_lite_path, t.preview_anim_path])].filter((p): p is string => !!p && !/^https?:/.test(p));
     if (files.length) await db.storage.from("template-media").remove(files);
     mode = "deleted";
   }

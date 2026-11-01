@@ -31,6 +31,8 @@ export type TemplateCard = {
   qualityLabels: string[];
   startingPriceKzt: number | null;
   coverUrl: string | null;
+  /** 360×480 WebP of the cover for cards (falls back to coverUrl). */
+  coverThumbUrl: string | null;
   previewUrl: string | null;
   /** Light 480p silent copy for cards (falls back to previewUrl). */
   previewLiteUrl: string | null;
@@ -64,11 +66,11 @@ export type TemplateDetail = TemplateCard & {
 };
 
 const CARD_COLUMNS =
-  "id,title_kk,description_kk,required_face_count,cover_asset_path,preview_video_path,preview_lite_path,preview_anim_path,supported_qualities_json,pricing_config_json,face_slots_json,max_upload_bytes,is_trending,provider_key,video_duration_sec,photo_framing:provider_config_json->>framing,allow_wish:provider_config_json->>allowWish,outfit:provider_config_json->>outfit,seedance_mode:provider_config_json->>mode,seedance_prepare:provider_config_json->>prepare,seedance_faceswap:provider_config_json->>faceSwap,combo_ids:provider_config_json->templateIds,categories(id,title_kk,slug)";
+  "id,title_kk,description_kk,required_face_count,cover_asset_path,cover_thumb_path,preview_video_path,preview_lite_path,preview_anim_path,supported_qualities_json,pricing_config_json,face_slots_json,max_upload_bytes,is_trending,provider_key,video_duration_sec,photo_framing:provider_config_json->>framing,allow_wish:provider_config_json->>allowWish,outfit:provider_config_json->>outfit,seedance_mode:provider_config_json->>mode,seedance_prepare:provider_config_json->>prepare,seedance_faceswap:provider_config_json->>faceSwap,combo_ids:provider_config_json->templateIds,categories(id,title_kk,slug)";
 
 type Row = {
   id: string; title_kk: string; description_kk: string; required_face_count: number;
-  cover_asset_path: string | null; preview_video_path: string | null; preview_lite_path?: string | null; preview_anim_path?: string | null;
+  cover_asset_path: string | null; cover_thumb_path?: string | null; preview_video_path: string | null; preview_lite_path?: string | null; preview_anim_path?: string | null;
   supported_qualities_json: unknown; pricing_config_json: unknown; face_slots_json: unknown;
   max_upload_bytes: number; is_trending: boolean;
   provider_key?: string | null; video_duration_sec?: number | string | null; photo_framing?: string | null; allow_wish?: string | null; outfit?: string | null; seedance_mode?: string | null; seedance_prepare?: string | null; seedance_faceswap?: string | null; combo_ids?: unknown[] | null;
@@ -120,6 +122,7 @@ export function parseRow(r: Row, seedancePricing: SeedancePricing = DEFAULT_SEED
     qualityLabels: available.map((q) => q.labelKk),
     startingPriceKzt: priced ? startingPrice(pricing.data, qualities.data, r.required_face_count) : null,
     coverUrl: mediaUrl(r.cover_asset_path),
+    coverThumbUrl: mediaUrl(r.cover_thumb_path ?? null),
     previewUrl: mediaUrl(r.preview_video_path),
     previewLiteUrl: mediaUrl(r.preview_lite_path ?? null),
     previewAnimUrl: mediaUrl(r.preview_anim_path ?? null),
