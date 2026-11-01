@@ -93,15 +93,15 @@ export async function OrderList({ limit = 50, day }: { limit?: number; day?: str
   };
   const groups = (active ? [active] : days).map((k) => ({ k, items: orders.filter((o) => keyOf(o) === k) })).filter((g) => g.items.length);
 
-  const chipCls = { ok: "bg-brand text-night", work: "bg-white/90 text-night", pay: "bg-cobalt text-white", bad: "bg-rose text-night", muted: "bg-white/80 text-night" };
+  const chipCls = { ok: "bg-brand-soft text-night", work: "bg-peach text-night", pay: "bg-cobalt text-white", bad: "bg-rose text-night", muted: "bg-line text-night" };
 
   return (
     <>
       {groups.map((g) => (
         <section key={g.k} className="mb-5">
-          <h2 className="mb-2.5 text-[15px] font-extrabold first-letter:uppercase">{head.format(noon(g.k))}</h2>
-          {/* Phone-first gallery: 2 tiles per row, the whole tile is the button */}
-          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          <h2 className="mb-2 px-1 text-[13px] font-bold text-muted first-letter:uppercase">{head.format(noon(g.k))}</h2>
+          {/* Phone-first list: one row per work, the whole row is the button */}
+          <ul className="divide-y divide-line overflow-hidden rounded-[20px] bg-surface ring-1 ring-line">
             {g.items.map((o) => {
               const st = state(o);
               const t = Array.isArray(o.templates) ? o.templates[0] : o.templates;
@@ -111,27 +111,27 @@ export async function OrderList({ limit = 50, day }: { limit?: number; day?: str
               const combo = comboInfo.get(o.id);
               return (
                 <li key={o.id}>
-                  <Link href={`/orders/${o.id}`} className="relative block aspect-[3/4] overflow-hidden rounded-[18px] bg-night ring-1 ring-black/5 transition-transform active:scale-[0.98]">
-                    {thumb ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={thumb} alt="" loading="lazy" className={`absolute inset-0 h-full w-full object-cover ${st.tone === "ok" ? "" : "opacity-55"}`} />
-                    ) : (
-                      <span className="absolute inset-0 flex items-center justify-center text-3xl" aria-hidden>{photo ? "📸" : "🎬"}</span>
-                    )}
-                    <span className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
-                    {/* Status */}
-                    <span className={`absolute left-2 top-2 inline-flex max-w-[calc(100%-3rem)] items-center gap-1 truncate rounded-full px-2 py-1 text-[11px] font-extrabold ${chipCls[st.tone]}`}>
-                      {st.tone === "work" && <span className="h-2.5 w-2.5 shrink-0 animate-spin rounded-full border-2 border-black/20 border-t-black" aria-hidden />}
-                      {st.tone === "pay" ? st.action : st.text}
+                  <Link href={`/orders/${o.id}`} className="flex items-center gap-3 px-3 py-2.5 transition-colors active:bg-paper">
+                    <span className="relative block h-[64px] w-[48px] shrink-0 overflow-hidden rounded-[12px] bg-night">
+                      {thumb ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={thumb} alt="" loading="lazy" className={`h-full w-full object-cover ${st.tone === "ok" ? "" : "opacity-60"}`} />
+                      ) : (
+                        <span className="flex h-full w-full items-center justify-center text-xl" aria-hidden>{photo ? "📸" : "🎬"}</span>
+                      )}
+                      <span className="absolute bottom-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/55 text-[8px] text-white" aria-hidden>{photo ? "📸" : "▶"}</span>
                     </span>
-                    <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/45 text-[12px] text-white backdrop-blur" aria-hidden>{photo ? "📸" : "▶"}</span>
-                    {/* Title + meta */}
-                    <span className="absolute inset-x-2.5 bottom-2.5 text-white">
-                      <span className="block truncate text-[14px] font-bold leading-tight">{title}</span>
-                      <span className="mt-0.5 block truncate text-[11px] text-white/75">
-                        {combo ? `${kk.combo.ready(combo.ok, combo.all)} · ` : ""}{time.format(new Date(o.created_at))} · {formatKzt(o.amount_kzt)}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[15px] font-bold leading-tight">{title}</span>
+                      <span className="mt-0.5 block truncate text-[12px] text-muted">
+                        {time.format(new Date(o.created_at))} · {formatKzt(o.amount_kzt)}{combo ? ` · ${kk.combo.ready(combo.ok, combo.all)}` : ""}
+                      </span>
+                      <span className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${chipCls[st.tone]}`}>
+                        {st.tone === "work" && <span className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-black/20 border-t-black" aria-hidden />}
+                        {st.tone === "pay" ? st.action : st.text}
                       </span>
                     </span>
+                    <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 text-muted" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden><path d="m9 6 6 6-6 6" /></svg>
                   </Link>
                 </li>
               );
