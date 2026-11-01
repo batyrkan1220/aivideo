@@ -13,6 +13,9 @@ export function HeroVideo({ src, poster, anim }: { src: string; poster?: string;
     const tryPlay = () => v.play().catch((err) => { autoplayRefused(err); });
     if (v.readyState >= 2) tryPlay(); else v.addEventListener("loadeddata", tryPlay, { once: true });
     tryPlay();
+    // Neither playing nor refused after a few seconds (some iOS WebViews): use the animated image.
+    const t = window.setTimeout(() => { if (v.paused && v.readyState >= 1) autoplayRefused({ name: "NotAllowedError" }); }, 3500);
+    return () => window.clearTimeout(t);
   }, []);
   if (imgMode && anim) {
     // eslint-disable-next-line @next/next/no-img-element

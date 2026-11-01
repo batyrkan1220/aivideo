@@ -80,6 +80,7 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
   const [near, setNear] = useState(false); // card is within ~1 screen: attach the video src
   const imgMode = useImgPreviews(); // iOS refused autoplay: the MP4 plays through <img> instead
   const imgModeRef = useRef(imgMode);
+  const wantRef = useRef(false); // the card is on screen and should be playing
   useEffect(() => { imgModeRef.current = imgMode; }, [imgMode]);
 
   // Attach the video only when the card approaches the viewport.
@@ -104,6 +105,14 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
     v.muted = true; // Telegram WebView: the property must be set before play()
     v.defaultMuted = true;
     claimPlayback(v);
+    wantRef.current = true;
+    // Some WebViews (Telegram on iPad/iPhone) neither play nor reject: if the video still sits
+    // paused a few seconds after we asked, treat autoplay as refused and use animated images.
+    window.setTimeout(() => {
+      if (wantRef.current && videoRef.current === v && v.paused && v.readyState >= 1 && playingNow.includes(v)) {
+        if (autoplayRefused({ name: "NotAllowedError" })) { releasePlayback(v); setPlaying(true); }
+      }
+    }, 3500);
     const onScreen = () => { const r = v.getBoundingClientRect(); return r.bottom > 0 && r.top < window.innerHeight; };
     const again = () => {
       if (videoRef.current !== v || !v.isConnected) { waitingForGesture.delete(again); return; }
@@ -117,6 +126,7 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
     });
   };
   const stop = () => {
+    wantRef.current = false;
     if (imgModeRef.current) { setPlaying(false); return; }
     const v = videoRef.current;
     if (!v) return;
