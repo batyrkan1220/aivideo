@@ -48,8 +48,8 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
         </div>
         {/* Same hero as the website: three trend templates fanned like phones, the front one playing (lite preview). */}
         <p className="text-center text-[17px] font-extrabold leading-tight tracking-tight">{kk.home.heroMini} <span className="rounded-md bg-brand px-1.5 text-night">{kk.home.heroMiniAccent}</span></p>
-        <PhoneOnly fallback={<div className="h-[13.5rem]" />}>
-          <Suspense fallback={<div className="h-[13.5rem]" />}>
+        <PhoneOnly fallback={<div className="h-[15.5rem]" />}>
+          <Suspense fallback={<div className="h-[15.5rem]" />}>
             <Showcase compact />
           </Suspense>
         </PhoneOnly>

@@ -21,15 +21,15 @@ export function HeroShowcase({ items, compact = false }: { items: Item[]; compac
   };
 
   return (
-    <div className={`relative mx-auto flex w-full max-w-md items-center justify-center overflow-hidden ${compact ? "h-[13.5rem]" : "h-[21rem] sm:h-[26rem] sm:overflow-visible md:h-[30rem]"}`} aria-label={kk.home.trendingTitle}>
-      <div className={`absolute -z-0 bg-brand-soft ${compact ? "inset-x-6 bottom-2 top-6 rounded-[2rem]" : "inset-x-4 bottom-4 top-8 rounded-[2.5rem] sm:inset-x-6 sm:bottom-6 sm:top-10 sm:rounded-[3rem]"}`} aria-hidden />
+    <div className={`relative mx-auto flex w-full max-w-md items-center justify-center overflow-hidden ${compact ? "h-[15.5rem]" : "h-[21rem] sm:h-[26rem] sm:overflow-visible md:h-[30rem]"}`} aria-label={kk.home.trendingTitle}>
+      <div className={`absolute -z-0 bg-brand-soft ${compact ? "inset-x-5 bottom-2 top-7 rounded-[2rem]" : "inset-x-4 bottom-4 top-8 rounded-[2.5rem] sm:inset-x-6 sm:bottom-6 sm:top-10 sm:rounded-[3rem]"}`} aria-hidden />
       {order.map((t, i) => {
         const front = i === order.length - 1;
         return (
           <Link
             key={t.id}
             href={`/templates/${t.id}`}
-            className={`absolute aspect-[9/16] overflow-hidden ${compact ? "h-[11.5rem] rounded-[1rem] border-[3px]" : "h-[18rem] rounded-[1.4rem] border-[5px] sm:h-[22rem] sm:rounded-[1.75rem] sm:border-[6px] md:h-[26rem]"} border-surface bg-night shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)] transition-transform duration-300 hover:-translate-y-1 ${pose(i, order.length)}`}
+            className={`absolute aspect-[9/16] overflow-hidden ${compact ? "h-[13.25rem] rounded-[1.1rem] border-[3px]" : "h-[18rem] rounded-[1.4rem] border-[5px] sm:h-[22rem] sm:rounded-[1.75rem] sm:border-[6px] md:h-[26rem]"} border-surface bg-night shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)] transition-transform duration-300 hover:-translate-y-1 ${pose(i, order.length)}`}
           >
             {t.coverUrl && (
               // eslint-disable-next-line @next/next/no-img-element
@@ -43,7 +43,7 @@ export function HeroShowcase({ items, compact = false }: { items: Item[]; compac
               <video src={t.previewUrl} poster={t.coverUrl ?? undefined} autoPlay muted loop playsInline preload="metadata" aria-hidden className="absolute inset-0 h-full w-full object-cover motion-reduce:hidden" />
             )}
             {front && (
-              <span className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent font-display font-semibold text-white ${compact ? "line-clamp-2 p-2 pt-6 text-[10px]" : "p-3 pt-8 text-xs sm:p-4 sm:pt-10 sm:text-sm"}`}>
+              <span className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent font-display font-semibold text-white ${compact ? "line-clamp-2 p-2.5 pt-7 text-[11px]" : "p-3 pt-8 text-xs sm:p-4 sm:pt-10 sm:text-sm"}`}>
                 {t.title}
               </span>
             )}
