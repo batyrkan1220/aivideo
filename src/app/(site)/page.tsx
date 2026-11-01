@@ -121,6 +121,6 @@ async function Notice({ searchParams }: { searchParams: Promise<SP> }) {
 }
 
 async function Showcase({ compact = false }: { compact?: boolean }) {
-  const items = (await resolveShowcase()).map(({ id, title, coverUrl, previewUrl, previewLiteUrl }) => ({ id, title, coverUrl, previewUrl: previewLiteUrl ?? previewUrl }));
+  const items = (await resolveShowcase()).map(({ id, title, coverUrl, previewUrl, previewLiteUrl, previewAnimUrl }) => ({ id, title, coverUrl, previewUrl: previewLiteUrl ?? previewUrl, animUrl: previewAnimUrl }));
   return <HeroShowcase items={items} compact={compact} />;
 }

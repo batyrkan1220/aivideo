@@ -18,8 +18,8 @@ export function TemplateGrid({ items, priorityCount = 0, mobileLimit }: { items:
 
 /** Send only what the card needs to the client bundle. */
 export function pickCard(t: CardData): CardData {
-  const { id, title, description, faceCount, qualityLabels, startingPriceKzt, coverUrl, previewUrl, previewLiteUrl, isTrending } = t;
-  return { id, title, description, faceCount, qualityLabels, startingPriceKzt, coverUrl, previewUrl, previewLiteUrl, isTrending };
+  const { id, title, description, faceCount, qualityLabels, startingPriceKzt, coverUrl, previewUrl, previewLiteUrl, previewAnimUrl, isTrending } = t;
+  return { id, title, description, faceCount, qualityLabels, startingPriceKzt, coverUrl, previewUrl, previewLiteUrl, previewAnimUrl, isTrending };
 }
 
 export function SearchForm({ defaultValue = "", category }: { defaultValue?: string; category?: string }) {

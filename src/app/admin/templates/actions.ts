@@ -151,7 +151,7 @@ export async function deleteTemplate(id: string): Promise<DeleteResult> {
   if (!user) return { ok: false, error: "forbidden" };
   if (!z.string().uuid().safeParse(id).success) return { ok: false, error: "generic" };
   const db = supabaseAdmin();
-  const { data: t } = await db.from("templates").select("id,kind,cover_asset_path,preview_video_path,preview_lite_path").eq("id", id).maybeSingle();
+  const { data: t } = await db.from("templates").select("id,kind,cover_asset_path,preview_video_path,preview_lite_path,preview_anim_path").eq("id", id).maybeSingle();
   if (!t || t.kind !== "catalog") return { ok: false, error: "generic" };
 
   const [{ count: orders }, { count: assets }] = await Promise.all([
@@ -168,7 +168,7 @@ export async function deleteTemplate(id: string): Promise<DeleteResult> {
     const { error: e1 } = await db.from("templates").update({ current_version_id: null }).eq("id", id);
     const { error: e2 } = e1 ? { error: e1 } : await db.from("templates").delete().eq("id", id);
     if (e2) return { ok: false, error: "generic" };
-    const files = [...new Set([t.cover_asset_path, t.preview_video_path, t.preview_lite_path])].filter((p): p is string => !!p && !/^https?:/.test(p));
+    const files = [...new Set([t.cover_asset_path, t.preview_video_path, t.preview_lite_path, t.preview_anim_path])].filter((p): p is string => !!p && !/^https?:/.test(p));
     if (files.length) await db.storage.from("template-media").remove(files);
     mode = "deleted";
   }

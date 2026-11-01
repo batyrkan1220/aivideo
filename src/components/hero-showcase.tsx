@@ -2,7 +2,7 @@ import Link from "next/link";
 import { kk } from "@/lib/i18n/kk";
 import { HeroVideo } from "./hero-video";
 
-type Item = { id: string; title: string; coverUrl: string | null; previewUrl: string | null };
+type Item = { id: string; title: string; coverUrl: string | null; previewUrl: string | null; animUrl?: string | null };
 
 /**
  * The hero's one moment of motion: up to three real trend templates fanned like phones,
@@ -41,7 +41,7 @@ export function HeroShowcase({ items, compact = false }: { items: Item[]; compac
               <video src={`${t.previewUrl}#t=0.1`} muted playsInline preload="metadata" aria-hidden className="absolute inset-0 h-full w-full object-cover" />
             )}
             {front && t.previewUrl && (
-              <HeroVideo src={t.previewUrl} poster={t.coverUrl ?? undefined} />
+              <HeroVideo src={t.previewUrl} poster={t.coverUrl ?? undefined} anim={t.animUrl ?? undefined} />
             )}
             {front && (
               <span className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent font-display font-semibold text-white ${compact ? "line-clamp-2 p-2.5 pt-7 text-[11px]" : "p-3 pt-8 text-xs sm:p-4 sm:pt-10 sm:text-sm"}`}>
