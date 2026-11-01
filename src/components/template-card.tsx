@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { kk } from "@/lib/i18n/kk";
 import { formatKzt } from "@/lib/pricing";
-import { autoplayRefused, useImgPreviews } from "@/lib/video-autoplay";
+import { autoplayRefused, imgPreviewFailed, useImgPreviews } from "@/lib/video-autoplay";
 
 export type CardData = {
   id: string;
@@ -169,7 +169,7 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
         )}
         {t.previewUrl && near && imgMode && playing && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={t.previewLiteUrl ?? t.previewUrl} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover" />
+          <img src={t.previewLiteUrl ?? t.previewUrl} alt="" aria-hidden onError={imgPreviewFailed} className="absolute inset-0 h-full w-full object-cover" />
         )}
         {t.previewUrl && near && !imgMode && (
           <video
