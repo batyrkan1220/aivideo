@@ -114,19 +114,21 @@ export function useIsTelegram() {
 }
 
 /**
- * Inside the Mini App: makes sure the bot may message this user ("your video is ready"), even if
- * they never pressed /start. Telegram shows its own one-tap "Allow" dialog; asked once per session.
- * Resolves quickly in every case and never blocks the order.
+ * Inside the Mini App: may the bot message this user ("your video is ready")? Telegram shows its own
+ * one-tap "Allow" dialog when needed. true = allowed (or not in Telegram / old client: no dialog to ask).
  */
-export function ensureBotCanWrite(): Promise<void> {
+export function ensureBotCanWrite(): Promise<boolean> {
   return new Promise((resolve) => {
     try {
       const wa = telegramApp();
-      if (!wa?.requestWriteAccess || wa.initDataUnsafe?.user?.allows_write_to_pm) return resolve();
-      if (sessionStorage.getItem("trendme.writeAsked")) return resolve();
-      sessionStorage.setItem("trendme.writeAsked", "1");
-      const t = setTimeout(resolve, 15_000);
-      wa.requestWriteAccess(() => { clearTimeout(t); resolve(); });
-    } catch { resolve(); }
+      if (!wa?.requestWriteAccess || wa.initDataUnsafe?.user?.allows_write_to_pm) return resolve(true);
+      if (sessionStorage.getItem("trendme.writeOk")) return resolve(true);
+      const t = setTimeout(() => resolve(false), 60_000);
+      wa.requestWriteAccess((granted) => {
+        clearTimeout(t);
+        if (granted) { try { sessionStorage.setItem("trendme.writeOk", "1"); } catch { /* ignore */ } }
+        resolve(!!granted);
+      });
+    } catch { resolve(true); }
   });
 }

@@ -127,6 +127,7 @@ export function CreateFlow({
   const needPhone = askPhone && !freeOrders;
   const phoneOk = !needPhone || !!normalizeKzPhone(phone);
   const [formError, setFormError] = useState<string | null>(null);
+  const [needWrite, setNeedWrite] = useState(false);
   const [pending, start] = useTransition();
   const previews = useRef<string[]>([]);
   const pickSeq = useRef<Record<string, number>>({}); // latest pick per slot (older results are dropped)
@@ -304,7 +305,8 @@ export function CreateFlow({
     }
     if (!Object.keys(assets).length) { setFormError(c.errors.photos_missing); return; }
     if (customVideo && video.phase !== "ready") { setFormError(cv.errors.missing); return; }
-    await ensureBotCanWrite(); // Mini App: let the bot send "video is ready" without /start
+    // Mini App: the bot must be allowed to send the finished video — no permission, no order.
+    if (!(await ensureBotCanWrite())) { haptic("error"); setNeedWrite(true); return; }
     const r = await createOrder({ templateId, quality, assets, consent: true, ...(allowWish && wish.trim() ? { wish: wish.trim() } : {}), ...(outfit === "choice" ? { outfit: outfitPick } : {}), ...(customVideo && video.phase === "ready" ? { videoId: video.videoId } : {}) });
     if (!r.ok) {
       if (r.error === "unauthorized") { router.push(customVideo ? "/login?next=/create" : `/login?next=/templates/${templateId}`); return; }
@@ -330,6 +332,22 @@ export function CreateFlow({
 
   return (
     <div className="space-y-4">
+      {/* Mini App: the customer declined "allow the bot to message you" — explain why it is needed and ask again. */}
+      {needWrite && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50 sm:items-center" role="dialog" aria-modal aria-label={c.writeAccess.title}>
+          <div className="w-full max-w-md rounded-t-[28px] bg-surface p-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] text-center shadow-2xl sm:rounded-[28px]">
+            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand text-2xl" aria-hidden>🔔</span>
+            <h2 className="mt-3 text-xl font-extrabold tracking-tight">{c.writeAccess.title}</h2>
+            <p className="mt-1.5 text-sm text-muted">{c.writeAccess.text}</p>
+            <ul className="mt-4 space-y-1.5 text-left text-sm">
+              {c.writeAccess.points.map((x) => <li key={x} className="flex gap-2"><span className="text-emerald-600" aria-hidden>✓</span>{x}</li>)}
+            </ul>
+            <button type="button" onClick={() => { setNeedWrite(false); submit(); }}
+              className="btn-glow mt-5 h-12 w-full rounded-full text-[15px] font-extrabold">{c.writeAccess.allow}</button>
+            <button type="button" onClick={() => setNeedWrite(false)} className="mt-2 h-10 w-full text-sm font-semibold text-muted">{c.writeAccess.later}</button>
+          </div>
+        </div>
+      )}
       {/* Step: the customer's own video */}
       {customVideo && (
         <section ref={videoRef} className={`rounded-card border bg-surface p-4 transition-shadow sm:p-5 ${nudge === "video" ? "border-ink ring-4 ring-lavender" : "border-line"}`}>
