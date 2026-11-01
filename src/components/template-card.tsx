@@ -22,7 +22,7 @@ export type CardData = {
  * Keeps at most MAX_PLAYING previews running at once across the whole page: starting a new
  * one pauses the oldest. Many cards on screen then never decode/stream videos in parallel.
  */
-const MAX_PLAYING = 2; // phones: the cards in view; fewer parallel downloads keep taps responsive
+const MAX_PLAYING = 6; // every card on screen plays (light 360p previews keep this cheap)
 const playingNow: HTMLVideoElement[] = [];
 function claimPlayback(v: HTMLVideoElement) {
   const i = playingNow.indexOf(v);
