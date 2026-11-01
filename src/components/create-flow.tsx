@@ -422,22 +422,27 @@ export function CreateFlow({
         );
       })()}
 
-      {/* Quality: one tier (720p); the picker only appears when there is a real choice. */}
+      {/* Quality: 720p by default; Full HD on request — the total updates right away. */}
       {effQualities.length > 1 && <section className="rounded-card border border-line bg-surface p-4 sm:p-5">
-        <StepTitle n={++step} done>{c.qualityTitle}</StepTitle>
-        <div role="radiogroup" className="mt-3 divide-y divide-line overflow-hidden rounded-2xl border border-line">
+        <p className="text-[16px] font-extrabold tracking-tight">{c.qualityTitle}</p>
+        <div role="radiogroup" aria-label={c.qualityTitle} className="mt-3 grid grid-cols-2 gap-2">
           {effQualities.map((q) => {
-            const p = waitingForVideo ? null : calculatePrice(effPricing, q, faceCount).totalKzt;
-            const specs = [q.resolution && !q.labelKk.includes(q.resolution) ? q.resolution : null, q.fps ? `${q.fps} ${kk.template.fps}` : null].filter(Boolean).join(", ");
+            const on = quality === q.key;
+            const base = effQualities[0];
+            const extra = waitingForVideo ? null : calculatePrice(effPricing, q, faceCount).totalKzt - calculatePrice(effPricing, base, faceCount).totalKzt;
+            const hd = q.key === "1080p";
             return (
-              <label key={q.key} className="flex cursor-pointer items-center gap-4 px-4 py-3 has-[:checked]:bg-brand-soft">
-                <input type="radio" name="quality" value={q.key} checked={quality === q.key} onChange={() => setQuality(q.key)} className="h-4 w-4 accent-[#161616]" />
-                <span className="flex-1">
-                  <span className="block font-medium">{q.labelKk}</span>
-                  {specs && <span className="block text-sm text-muted">{specs}</span>}
+              <button key={q.key} type="button" role="radio" aria-checked={on} onClick={() => setQuality(q.key)}
+                className={`rounded-2xl border-2 px-3 py-3 text-left transition-colors ${on ? "border-night bg-night text-white" : "border-line bg-paper text-ink active:border-ink"}`}>
+                <span className="flex items-center justify-between gap-2">
+                  <span className="text-[17px] font-extrabold">{q.resolution ?? q.key}</span>
+                  <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-black ${on ? "bg-brand text-night" : "ring-2 ring-line"}`} aria-hidden>{on ? "✓" : ""}</span>
                 </span>
-                <span className="font-display font-semibold">{p === null ? "" : formatKzt(p)}</span>
-              </label>
+                <span className={`mt-0.5 block text-[12px] ${on ? "text-white/70" : "text-muted"}`}>{hd ? c.qualityHd : c.qualityStd}</span>
+                <span className={`mt-1.5 block text-[13px] font-bold ${on ? "text-[#d7f443]" : hd ? "text-ink" : "text-muted"}`}>
+                  {extra === null ? "" : extra > 0 ? `+${formatKzt(extra)}` : c.qualityIncluded}
+                </span>
+              </button>
             );
           })}
         </div>

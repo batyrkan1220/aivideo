@@ -28,6 +28,13 @@ export const DEFAULT_SEEDANCE_PRICING: SeedancePricing = seedancePricingSchema.p
 export const SEEDANCE_QUALITY: Quality = {
   key: "720p", labelKk: "Высокое качество · 720p", resolution: "720p", providerQuality: "720p", surchargeKzt: 0, available: true,
 };
+/** Full HD costs Kling ~1.5× of 720p (same per-second billing), so the customer pays +50%. */
+export const HD1080_FACTOR = 1.5;
+export const SEEDANCE_QUALITY_1080: Quality = {
+  key: "1080p", labelKk: "Full HD · 1080p", resolution: "1080p", providerQuality: "1080p", surchargeKzt: 0, available: true,
+};
+/** Kling cost multiplier for a provider quality. */
+export const qualityCostFactor = (providerQuality?: string | null) => (providerQuality === "1080p" ? HD1080_FACTOR : 1);
 
 /** Kept for call sites; every template is Kling 4.0 now. */
 export type CostOpts = { mode?: string; people?: number };
@@ -38,8 +45,8 @@ export function klingUnits(durationSec: number, s: SeedancePricing): number {
   return Math.round(counted * s.klingUnitsPerSec * 100) / 100;
 }
 
-export function seedanceCostUsd(durationSec: number, s: SeedancePricing, _o: CostOpts = {}): number {
-  return Math.round(klingUnits(durationSec, s) * s.klingUnitUsd * 10_000) / 10_000;
+export function seedanceCostUsd(durationSec: number, s: SeedancePricing, _o: CostOpts = {}, providerQuality?: string | null): number {
+  return Math.round(klingUnits(durationSec, s) * s.klingUnitUsd * qualityCostFactor(providerQuality) * 10_000) / 10_000;
 }
 
 export function seedanceCostKzt(durationSec: number, s: SeedancePricing, o: CostOpts = {}): number {
@@ -60,5 +67,10 @@ export function seedancePriceKzt(durationSec: number | null, manualKzt: number, 
 
 /** Turns the price into the generic pricing model, so the calculator and checkout work unchanged. */
 export function applySeedancePricing(pricing: PricingConfig, priceKzt: number): { pricing: PricingConfig; qualities: Quality[] } {
-  return { pricing: { ...pricing, basePriceKzt: priceKzt, chargeExtraFaces: false }, qualities: [SEEDANCE_QUALITY] };
+  // 720p is the default; 1080p adds half of the price (rounded up to 10 ₸).
+  const hd = Math.ceil((priceKzt * (HD1080_FACTOR - 1)) / 10) * 10;
+  return {
+    pricing: { ...pricing, basePriceKzt: priceKzt, chargeExtraFaces: false },
+    qualities: [SEEDANCE_QUALITY, { ...SEEDANCE_QUALITY_1080, surchargeKzt: hd }],
+  };
 }

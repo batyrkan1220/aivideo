@@ -76,7 +76,7 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   return parts.join(" ");
 }
 
-export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: string[]; mode: KlingMode; prompt: string; durationSec: number; aspectRatio: string }): Promise<string> {
+export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: string[]; mode: KlingMode; prompt: string; durationSec: number; aspectRatio: string; resolution?: "720p" | "1080p" }): Promise<string> {
   const duration = Math.min(30, Math.max(3, Math.round(opts.durationSec)));
   const d = await call<{ data?: { id?: string } }>("/omni-video/kling-4.0", {
     method: "POST",
@@ -86,8 +86,8 @@ export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: strin
         { type: opts.mode === "edit" ? "base_video" : "feature_video", url: opts.videoUrl, id: "video_1" },
         ...opts.photoUrls.slice(0, 5).map((url, i) => ({ type: "refer_image", url, id: `image_${i + 1}` })),
       ],
-      // Vertical 720p for phones unless the template asks for another format.
-      settings: { resolution: "720p", duration, aspect_ratio: ["16:9", "1:1", "21:9"].includes(opts.aspectRatio) ? opts.aspectRatio : "9:16" },
+      // Vertical 720p for phones (1080p when the customer paid for Full HD) unless the template asks for another format.
+      settings: { resolution: opts.resolution === "1080p" ? "1080p" : "720p", duration, aspect_ratio: ["16:9", "1:1", "21:9"].includes(opts.aspectRatio) ? opts.aspectRatio : "9:16" },
     }),
   });
   const id = d.data?.id;

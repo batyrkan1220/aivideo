@@ -27,7 +27,7 @@ export const seedanceProvider: GenerationProvider = {
     return {
       videoFaceSwap: true,
       maxFaces: SEEDANCE_MAX_PEOPLE,
-      qualities: ["720p"],
+      qualities: ["720p", "1080p"],
       supportsCancel: false,
       reportsProgress: false,
       reportsCost: true,
@@ -58,8 +58,9 @@ export const seedanceProvider: GenerationProvider = {
     const durationSec = Number(extra.durationSec);
     const photos = input.faces.map((f) => f.imageUrl).slice(0, SEEDANCE_MAX_PEOPLE);
     const prompt = buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : "", photos.length, cfg.positions);
-    const id = await submitKlingOmni({ videoUrl: input.templateVideoUrl, photoUrls: photos, mode: cfg.klingMode, prompt, durationSec, aspectRatio: cfg.aspectRatio });
-    return { providerJobId: id, cost: seedanceCostUsd(durationSec, await seedancePricingSettings()), state: { stage: "klingd" } };
+    const resolution = input.quality === "1080p" ? "1080p" : "720p";
+    const id = await submitKlingOmni({ videoUrl: input.templateVideoUrl, photoUrls: photos, mode: cfg.klingMode, prompt, durationSec, aspectRatio: cfg.aspectRatio, resolution });
+    return { providerJobId: id, cost: seedanceCostUsd(durationSec, await seedancePricingSettings(), {}, resolution), state: { stage: "klingd" } };
   },
 
   async getStatus(providerJobId) {

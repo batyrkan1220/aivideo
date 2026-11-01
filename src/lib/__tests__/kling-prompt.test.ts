@@ -31,3 +31,20 @@ describe("Kaspi phone mask", () => {
     expect(normalizeKzPhone(`+7 ${maskKzNational("7015551234")}`)).toBe("+77015551234");
   });
 });
+
+import { applySeedancePricing, seedanceCostUsd, seedancePricingSchema } from "@/lib/pricing-seedance";
+import { calculatePrice } from "@/lib/pricing";
+import type { PricingConfig } from "@/lib/templates/schema";
+describe("1080p option", () => {
+  it("adds half of the price for Full HD; 720p stays the default", () => {
+    const base = { basePriceKzt: 0, chargeExtraFaces: false, includedFaces: 1, extraFacePriceKzt: 0, platformFeeKzt: 0, minPriceKzt: 0 } as PricingConfig;
+    const { pricing, qualities } = applySeedancePricing(base, 2280);
+    expect(qualities.map((q) => q.key)).toEqual(["720p", "1080p"]);
+    expect(calculatePrice(pricing, qualities[0], 1).totalKzt).toBe(2280);
+    expect(calculatePrice(pricing, qualities[1], 1).totalKzt).toBe(3420);
+  });
+  it("counts Kling cost ×1.5 for 1080p", () => {
+    const s = seedancePricingSchema.parse({});
+    expect(seedanceCostUsd(10, s, {}, "1080p")).toBeCloseTo(seedanceCostUsd(10, s) * 1.5, 4);
+  });
+});
