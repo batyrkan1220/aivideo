@@ -16,6 +16,9 @@ export type TelegramWebApp = {
   /** Bot API 8.0+: native "save file" dialog. */
   downloadFile?(params: { url: string; file_name: string }, cb?: (accepted: boolean) => void): void;
   isVersionAtLeast?(version: string): boolean;
+  /** Bot API 6.9+: asks the user to let the bot message them (works without /start). */
+  requestWriteAccess?(cb?: (granted: boolean) => void): void;
+  initDataUnsafe?: { user?: { allows_write_to_pm?: boolean } };
   HapticFeedback?: { impactOccurred(style: "light" | "medium" | "heavy" | "rigid" | "soft"): void; notificationOccurred(type: "error" | "success" | "warning"): void; selectionChanged(): void };
 };
 
@@ -108,4 +111,22 @@ const subscribe = (cb: () => void) => {
 /** True inside the Telegram Mini App (from the first render on the client). */
 export function useIsTelegram() {
   return useSyncExternalStore(subscribe, () => !!launchInitData(), () => false);
+}
+
+/**
+ * Inside the Mini App: makes sure the bot may message this user ("your video is ready"), even if
+ * they never pressed /start. Telegram shows its own one-tap "Allow" dialog; asked once per session.
+ * Resolves quickly in every case and never blocks the order.
+ */
+export function ensureBotCanWrite(): Promise<void> {
+  return new Promise((resolve) => {
+    try {
+      const wa = telegramApp();
+      if (!wa?.requestWriteAccess || wa.initDataUnsafe?.user?.allows_write_to_pm) return resolve();
+      if (sessionStorage.getItem("trendme.writeAsked")) return resolve();
+      sessionStorage.setItem("trendme.writeAsked", "1");
+      const t = setTimeout(resolve, 15_000);
+      wa.requestWriteAccess(() => { clearTimeout(t); resolve(); });
+    } catch { resolve(); }
+  });
 }

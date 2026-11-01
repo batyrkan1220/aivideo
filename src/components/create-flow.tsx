@@ -15,7 +15,7 @@ import type { Framing } from "@/lib/uploads/photo-quality";
 import { PhotoTips } from "./photo-tips";
 import { KzPhoneInput } from "./kz-phone-input";
 import { seedanceSlots, SEEDANCE_MAX_PEOPLE } from "@/lib/templates/seedance-config";
-import { haptic } from "@/lib/telegram/client";
+import { haptic, ensureBotCanWrite } from "@/lib/telegram/client";
 import { requestVideoUpload, confirmVideoUpload, removeVideoUpload, type VideoError } from "@/lib/custom-video/actions";
 
 type SlotState =
@@ -304,6 +304,7 @@ export function CreateFlow({
     }
     if (!Object.keys(assets).length) { setFormError(c.errors.photos_missing); return; }
     if (customVideo && video.phase !== "ready") { setFormError(cv.errors.missing); return; }
+    await ensureBotCanWrite(); // Mini App: let the bot send "video is ready" without /start
     const r = await createOrder({ templateId, quality, assets, consent: true, ...(allowWish && wish.trim() ? { wish: wish.trim() } : {}), ...(outfit === "choice" ? { outfit: outfitPick } : {}), ...(customVideo && video.phase === "ready" ? { videoId: video.videoId } : {}) });
     if (!r.ok) {
       if (r.error === "unauthorized") { router.push(customVideo ? "/login?next=/create" : `/login?next=/templates/${templateId}`); return; }
