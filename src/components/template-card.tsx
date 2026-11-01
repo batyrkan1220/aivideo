@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { kk } from "@/lib/i18n/kk";
 import { formatKzt } from "@/lib/pricing";
+import { autoplayRefused, useImgPreviews } from "@/lib/video-autoplay";
 
 export type CardData = {
   id: string;
@@ -76,6 +77,9 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
   const cardRef = useRef<HTMLAnchorElement>(null);
   const [playing, setPlaying] = useState(false);
   const [near, setNear] = useState(false); // card is within ~1 screen: attach the video src
+  const imgMode = useImgPreviews(); // iOS refused autoplay: the MP4 plays through <img> instead
+  const imgModeRef = useRef(imgMode);
+  useEffect(() => { imgModeRef.current = imgMode; }, [imgMode]);
 
   // Attach the video only when the card approaches the viewport.
   useEffect(() => {
@@ -93,6 +97,7 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
   }, [t.previewUrl]);
 
   const play = () => {
+    if (imgModeRef.current) { setPlaying(true); return; }
     const v = videoRef.current;
     if (!v) return;
     v.muted = true; // Telegram WebView: the property must be set before play()
@@ -103,13 +108,15 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
       if (videoRef.current !== v || !v.isConnected) { waitingForGesture.delete(again); return; }
       if (onScreen()) v.play().then(() => { waitingForGesture.delete(again); setPlaying(true); }).catch(() => {});
     };
-    v.play().then(() => setPlaying(true)).catch(() => {
+    v.play().then(() => setPlaying(true)).catch((err) => {
+      if (autoplayRefused(err)) { releasePlayback(v); setPlaying(true); return; }
       // Not enough data yet: retry once the first frame is loaded; autoplay blocked: retry on first touch.
       if (v.readyState < 2) v.addEventListener("loadeddata", () => { v.play().then(() => setPlaying(true)).catch(() => retryOnGesture(again)); }, { once: true });
       else retryOnGesture(again);
     });
   };
   const stop = () => {
+    if (imgModeRef.current) { setPlaying(false); return; }
     const v = videoRef.current;
     if (!v) return;
     v.pause();
@@ -157,10 +164,14 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
             src={t.coverUrl}
             alt=""
             loading={priority ? "eager" : "lazy"}
-            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${playing ? "opacity-0" : "opacity-100"}`}
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${playing && !imgMode ? "opacity-0" : "opacity-100"}`}
           />
         )}
-        {t.previewUrl && near && (
+        {t.previewUrl && near && imgMode && playing && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={t.previewLiteUrl ?? t.previewUrl} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover" />
+        )}
+        {t.previewUrl && near && !imgMode && (
           <video
             ref={videoRef}
             // Without a cover image the first video frame acts as the poster.
