@@ -444,16 +444,22 @@ export function CreateFlow({
 
       {/* Step: Kaspi phone */}
       {needPhone && (
-        <section className={`rounded-card border bg-surface p-4 transition-shadow sm:p-5 ${nudge === "phone" ? "border-ink ring-4 ring-lavender" : "border-line"}`}>
-          <StepTitle n={++step} done={phoneOk && !!phone}>{c.stepPhone}</StepTitle>
+        <section className={`rounded-card bg-[#f14635] p-4 text-white transition-shadow sm:p-5 ${nudge === "phone" ? "ring-4 ring-[#f14635]/35" : ""}`}>
+          {/* Kaspi step: Kaspi red with the Kaspi mark, so the customer instantly sees where the bill goes. */}
+          <h2 className="flex items-center gap-2.5 text-[16px] font-extrabold tracking-tight sm:text-lg">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/kaspi.png" alt="Kaspi" width={32} height={32} className="h-8 w-8 shrink-0 rounded-[9px] ring-2 ring-white/70" />
+            {(++step, c.stepPhone)}
+            {phoneOk && !!phone && <span className="ml-auto flex h-6 w-6 items-center justify-center rounded-full bg-white text-[12px] font-extrabold text-[#f14635]" aria-hidden>✓</span>}
+          </h2>
           <input
             ref={phoneRef}
             type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
             placeholder={kk.tole.phonePlaceholder} aria-label={kk.tole.phoneLabel}
-            className={`mt-3 h-13 w-full rounded-2xl border-2 bg-paper px-4 text-lg tracking-wide text-ink outline-none transition-colors focus:border-ink focus:bg-surface ${phone && !phoneOk ? "border-danger" : "border-line"}`}
+            className={`mt-3 h-13 w-full rounded-2xl border-2 bg-white px-4 text-lg tracking-wide text-ink outline-none transition-colors placeholder:text-muted/70 ${phone && !phoneOk ? "border-night" : "border-white focus:border-night"}`}
           />
-          <p className={`mt-1.5 text-xs ${phone && !phoneOk ? "text-danger" : "text-muted"}`}>
-            {phone && !phoneOk ? kk.order.payErrors.phone_invalid : kk.tole.phoneHint}
+          <p className="mt-1.5 text-xs font-medium text-white/90">
+            {phone && !phoneOk ? `⚠️ ${kk.order.payErrors.phone_invalid}` : kk.tole.phoneHint}
           </p>
         </section>
       )}

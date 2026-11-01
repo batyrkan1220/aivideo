@@ -16,15 +16,19 @@ function WebPay({ orderId, label, sandbox, askPhone = false }: { orderId: string
     <form action={action} className="mt-5" onSubmit={() => savePhone(phone)}>
       <input type="hidden" name="orderId" value={orderId} />
       {askPhone && (
-        <label className="mb-3 block">
-          <span className="mb-1 block text-sm font-medium">{kk.tole.phoneLabel}</span>
+        <label className="mb-3 block rounded-2xl bg-[#f14635] p-3.5 text-white">
+          <span className="mb-2 flex items-center gap-2 text-sm font-extrabold">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/kaspi.png" alt="Kaspi" width={28} height={28} className="h-7 w-7 rounded-[8px] ring-2 ring-white/70" />
+            {kk.tole.phoneLabel}
+          </span>
           <input
             name="phone" type="tel" inputMode="tel" autoComplete="tel" required value={phone} onChange={(e) => setPhone(e.target.value)}
             placeholder={kk.tole.phonePlaceholder}
             aria-invalid={state.error === "phone_invalid"}
-            className={`h-12 w-full rounded-xl border bg-surface px-4 text-base text-ink outline-none focus:border-brand ${state.error === "phone_invalid" ? "border-danger" : "border-line"}`}
+            className={`h-12 w-full rounded-xl border-2 bg-white px-4 text-base text-ink outline-none focus:border-night ${state.error === "phone_invalid" ? "border-night" : "border-white"}`}
           />
-          <span className="mt-1 block text-xs opacity-80">{kk.tole.phoneHint}</span>
+          <span className="mt-1.5 block text-xs font-medium text-white/90">{kk.tole.phoneHint}</span>
         </label>
       )}
       <button
