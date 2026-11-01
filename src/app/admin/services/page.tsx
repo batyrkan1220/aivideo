@@ -7,6 +7,7 @@ import { can } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { formatKzt } from "@/lib/pricing";
 import { klingStatus } from "@/lib/generation/kling";
+import { klingBalanceSignal } from "@/lib/generation/kling-balance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { customVideoSettings } from "@/lib/custom-video/settings";
 import { SeedancePricingForm } from "../seedance-pricing/form";
@@ -42,12 +43,14 @@ async function Body() {
   const d7 = new Date(now - 7 * 86400_000).toISOString();
   const today = new Date(`${new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Almaty" }).format(new Date())}T00:00:00+05:00`).toISOString();
 
-  const [kling, ap, cv, { data: jobs30 }, { data: recent }] = await Promise.all([
+  const [kling, ap, cv, { data: jobs30 }, { data: recent }, bal] = await Promise.all([
     klingStatus(), seedancePricingSettings(), customVideoSettings(),
     db.from("generation_jobs").select("provider,status,provider_cost,created_at").gte("created_at", d30).neq("provider", "combo"),
     db.from("generation_jobs").select("id,order_id,provider,status,provider_cost,error_code,created_at,completed_at,started_at,orders(public_order_number,amount_kzt,template_snapshot_json)")
       .neq("provider", "combo").order("created_at", { ascending: false }).limit(25),
+    klingBalanceSignal(),
   ]);
+  const packLeft = (kling.packs ?? []).filter((p) => p.for40).reduce((n, p) => n + p.remaining, 0);
   const rate = ap.tengePerUsd;
   const j = jobs30 ?? [];
   const sumUsd = (xs: typeof j) => xs.reduce((n, x) => n + (Number(x.provider_cost) || 0), 0);
@@ -65,6 +68,11 @@ async function Body() {
     <div className="space-y-6">
       <Card title={<>Kling AI {kling.state === "ok" ? <Badge color="green">подключено</Badge> : kling.state === "none" ? <Badge color="red">нет ключа</Badge> : <Badge color="red">{kling.state === "auth" ? "ключ отклонён" : "нет связи"}</Badge>}</>}
 >
+        {bal.noBalance && (
+          <p className="mb-3 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700 ring-1 ring-red-200">
+            ⛔ Баланса Kling не хватает: последняя генерация ({fmtDate.format(new Date(bal.at!))}) отклонена. Kling не берёт видео, если осталось меньше юнитов, чем ему нужно{bal.avgUnits ? ` (в среднем ${bal.avgUnits} юн. на видео)` : ""}. Пополните пакет — заказы сейчас не выполняются.
+          </p>
+        )}
         {kling.state === "none" && <p className="text-sm text-muted">Добавьте KLING_API_KEY в Render → Environment.</p>}
         {kling.state === "auth" && <p className="text-sm text-red-700">Ключ отклонён. Проверьте KLING_API_KEY в Render.</p>}
         {kling.state === "error" && <p className="text-sm text-muted">Kling не ответил. Обновите страницу позже.</p>}
@@ -90,7 +98,12 @@ async function Body() {
         {kling.state === "ok" && !(kling.packs ?? []).some((p) => p.for40 && p.remaining > 0) && (kling.packs ?? []).length > 0 && (
           <p className="mt-3 text-sm text-amber-800">Для видео (Kling 4.0) нужен Flagship-пакет.</p>
         )}
-        <p className="mt-3 text-xs text-muted">Kling обновляет остаток с задержкой до 12 часов.</p>
+        {kling.state === "ok" && bal.avgUnits && packLeft > 0 && (
+          <p className={`mt-3 text-sm font-semibold ${packLeft < bal.avgUnits ? "text-red-700" : packLeft < bal.avgUnits * 5 ? "text-amber-800" : "text-ink"}`}>
+            Хватит примерно на {Math.floor(packLeft / bal.avgUnits)} видео (≈ {bal.avgUnits} юн. на видео)
+          </p>
+        )}
+        <p className="mt-2 text-xs text-muted">Kling обновляет остаток с задержкой до 12 часов — реальный баланс может быть меньше.</p>
       </Card>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

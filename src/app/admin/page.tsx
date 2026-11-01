@@ -11,6 +11,7 @@ import { env } from "@/lib/env";
 import { isTestPaymentProvider } from "@/lib/payments/types";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { klingStatus } from "@/lib/generation/kling";
+import { klingBalanceSignal } from "@/lib/generation/kling-balance";
 import { Badge, Card, PageHead, REASONS, Stat, fmtDate, usd } from "./ui";
 
 type SP = { from?: string; to?: string; p?: string };
@@ -228,12 +229,13 @@ function Daily({ rows, rate }: { rows: Dash["daily"]; rate: number }) {
 
 /** Kling resource packs, compact (details on the AI page). */
 async function KlingMini() {
-  const k = await klingStatus();
+  const [k, bal] = await Promise.all([klingStatus(), klingBalanceSignal()]);
   if (k.state === "none") return null;
   const packs = k.packs ?? [];
   return (
     <Link href="/admin/services" className="mt-4 block rounded-xl bg-paper p-3 text-sm ring-1 ring-line hover:ring-ink">
-      <p className="font-semibold">🤖 Kling {k.state === "ok" ? <Badge color="green">подключено</Badge> : <Badge color="red">{k.state === "auth" ? "ключ отклонён" : "нет связи"}</Badge>}</p>
+      <p className="font-semibold">🤖 Kling {bal.noBalance ? <Badge color="red">баланса не хватает</Badge> : k.state === "ok" ? <Badge color="green">подключено</Badge> : <Badge color="red">{k.state === "auth" ? "ключ отклонён" : "нет связи"}</Badge>}</p>
+      {bal.noBalance && <p className="mt-1 text-xs font-semibold text-red-700">Последняя генерация отклонена — пополните пакет Kling</p>}
       {k.state === "ok" && (packs.length ? packs.slice(0, 3).map((p) => (
         <div key={p.name} className="mt-2">
           <div className="flex justify-between text-xs"><span className="truncate">{p.name}</span><b>{p.remaining} / {p.total}</b></div>
