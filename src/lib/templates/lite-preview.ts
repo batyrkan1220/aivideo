@@ -13,13 +13,14 @@ import { mediaUrl } from "@/lib/templates/queries";
   videos (often 2–10 MB). The server makes a 480p, silent, ≤10 s, 24 fps H.264 copy (~0.3–0.5 MB)
   with ffmpeg and cards play that; the template page keeps the full video with sound.
   Current files live in previews/lite4/; older copies are remade once and removed.
-  Alongside it an animated WebP (360p, 15 fps, ≤10 s): cards and the hero show this image, which
-  animates everywhere (iOS Low Power Mode, Telegram WebViews) with no autoplay rules. previews/anim2/.
+  Alongside it an animated WebP cut to the card's own shape (3:4, 360×480, 15 fps, ≤10 s): cards and
+  the hero show this image, which animates everywhere (iOS Low Power Mode, Telegram WebViews) with no
+  autoplay rules. Lives in previews/anim3/.
   One job at a time (the server is small); failures leave the card on the full video.
 */
 const MAX_SOURCE_BYTES = 80 * 1024 * 1024;
 const LITE_DIR = "previews/lite4/";
-const ANIM_DIR = "previews/anim2/";
+const ANIM_DIR = "previews/anim3/";
 const queue: string[] = [];
 let running = false;
 
@@ -138,11 +139,12 @@ const mp4Args = (inPath: string, outPath: string) => [
   "-c:v", "libx264", "-preset", "medium", "-crf", "26", "-maxrate", "900k", "-bufsize", "1800k",
   "-profile:v", "main", "-pix_fmt", "yuv420p", "-movflags", "+faststart", outPath,
 ];
-// Animated WebP card preview: short side 360 px, 15 fps, ≤10 s, endless loop.
+// Animated WebP card preview: centre-cropped to the card's 3:4 and sized for it (360×480 = sharp at
+// 2× on phones), 15 fps, ≤10 s, endless loop. No pixels are spent on parts the card would cut off.
 const webpArgs = (inPath: string, outPath: string) => [
   "-hide_banner", "-loglevel", "error", "-y", "-i", inPath, "-t", "10", "-an",
-  "-vf", "fps=15,scale=w='if(gt(iw,ih),-2,trunc(min(360,iw)/2)*2)':h='if(gt(iw,ih),trunc(min(360,ih)/2)*2,-2)'",
-  "-c:v", "libwebp_anim", "-lossless", "0", "-q:v", "55", "-compression_level", "4", "-loop", "0", outPath,
+  "-vf", "fps=15,crop='min(iw,ih*3/4)':'min(ih,iw*4/3)',scale=360:480:flags=lanczos,setsar=1",
+  "-c:v", "libwebp_anim", "-lossless", "0", "-q:v", "65", "-compression_level", "4", "-loop", "0", outPath,
 ];
 
 async function runFfmpeg(inPath: string, outPath: string, build: (i: string, o: string) => string[]) {
