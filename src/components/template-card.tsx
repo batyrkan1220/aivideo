@@ -107,7 +107,7 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
       onFocus={start}
       onBlur={stop}
     >
-      <div className="relative aspect-square overflow-hidden rounded-[14px] bg-night sm:rounded-[18px] ring-1 ring-black/5 transition-transform duration-200 group-active:scale-[0.97]">
+      <div className="relative aspect-[4/5] overflow-hidden rounded-[14px] bg-night sm:rounded-[18px] ring-1 ring-black/5 transition-transform duration-200 group-active:scale-[0.97]">
         {t.coverUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
