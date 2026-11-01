@@ -1,11 +1,19 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { autoplayRefused, useImgPreviews } from "@/lib/video-autoplay";
 
 /** Hero's front phone: muted autoplay loop; where autoplay is refused, an animated WebP. */
 export function HeroVideo({ src, poster, anim }: { src: string; poster?: string; anim?: string }) {
   const ref = useRef<HTMLVideoElement>(null);
   const imgMode = useImgPreviews() || !!anim; // animated WebP whenever it exists
+  // The animated image (0.5–1 MB) waits until the page has loaded: the cover underneath paints first.
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    const go = () => setLoaded(true);
+    if (document.readyState === "complete") { const t = setTimeout(go, 0); return () => clearTimeout(t); }
+    window.addEventListener("load", go, { once: true });
+    return () => window.removeEventListener("load", go);
+  }, []);
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
@@ -18,6 +26,7 @@ export function HeroVideo({ src, poster, anim }: { src: string; poster?: string;
     return () => window.clearTimeout(t);
   }, []);
   if (imgMode && anim) {
+    if (!loaded) return null;
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={anim} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover motion-reduce:hidden" />;
   }
