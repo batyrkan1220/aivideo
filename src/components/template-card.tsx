@@ -131,9 +131,9 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
           />
         )}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
-        <div className="absolute left-1.5 top-1.5 flex flex-col items-start gap-1 sm:left-2.5 sm:top-2.5">
+        <div className="absolute left-2 top-2 flex flex-col items-start gap-1 sm:left-2.5 sm:top-2.5">
           {t.isTrending && (
-            <span className="rounded-full bg-brand px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-night sm:px-2.5 sm:py-1 sm:text-[11px]">{kk.catalog2.trendBadge}</span>
+            <span className="rounded-full bg-brand px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-night sm:px-2.5 sm:py-1 sm:text-[11px]">{kk.catalog2.trendBadge}</span>
           )}
           {/* People in the template (only worth showing for 2+). */}
           {t.faceCount > 1 && (
@@ -148,10 +148,10 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
             </span>
           )}
         </div>
-        <div className="absolute inset-x-2 bottom-2 text-white sm:inset-x-3 sm:bottom-3">
-          <h3 className="line-clamp-2 text-[12px] font-bold leading-tight tracking-tight sm:text-[15px]">{t.title}</h3>
+        <div className="absolute inset-x-2.5 bottom-2.5 text-white sm:inset-x-3 sm:bottom-3">
+          <h3 className="line-clamp-2 text-[14px] font-bold leading-tight tracking-tight sm:text-[15px]">{t.title}</h3>
           {t.startingPriceKzt !== null && (
-            <p className="mt-0.5 text-[11px] font-semibold text-lime sm:mt-1 sm:text-sm">
+            <p className="mt-0.5 text-[12px] font-semibold text-lime sm:mt-1 sm:text-sm">
               {formatKzt(t.startingPriceKzt)}<span className="hidden sm:inline"> {kk.catalog.from}</span>
             </p>
           )}

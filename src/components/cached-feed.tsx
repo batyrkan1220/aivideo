@@ -41,7 +41,7 @@ export function CachedFeedFallback() {
   const items = useMemo(() => parse(raw), [raw]);
   if (!items) return <GridSkeleton />;
   return (
-    <ul className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 sm:gap-3 lg:grid-cols-6">
+    <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 lg:grid-cols-6">
       {items.map((t, i) => <li key={t.id}><TemplateCard t={t} priority={i < 4} /></li>)}
     </ul>
   );

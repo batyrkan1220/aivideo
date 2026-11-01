@@ -37,7 +37,7 @@ export function MobileNav() {
   return (
     <nav
       aria-label={kk.nav.home}
-      className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] z-40 rounded-[2rem] border border-line bg-white shadow-[0_16px_40px_-18px_rgba(60,40,20,0.35)] sm:hidden"
+      className="tg-dock fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] z-40 rounded-[2rem] border border-line bg-white shadow-[0_16px_40px_-18px_rgba(60,40,20,0.35)] sm:hidden"
     >
       <ul className="grid h-[4.25rem] grid-cols-5 items-center px-1">
         {items.map((it) => {

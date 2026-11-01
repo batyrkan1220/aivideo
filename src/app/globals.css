@@ -1,5 +1,20 @@
 @import "tailwindcss";
 
+/* Inside the Telegram Mini App the layout is always the phone layout, even in a wide
+   Telegram Desktop / Web window: the sm/md/lg/xl breakpoints only apply outside Telegram. */
+@custom-variant sm {
+  @media (width >= 40rem) { &:where(html:not([data-tg]) *) { @slot; } }
+}
+@custom-variant md {
+  @media (width >= 48rem) { &:where(html:not([data-tg]) *) { @slot; } }
+}
+@custom-variant lg {
+  @media (width >= 64rem) { &:where(html:not([data-tg]) *) { @slot; } }
+}
+@custom-variant xl {
+  @media (width >= 80rem) { &:where(html:not([data-tg]) *) { @slot; } }
+}
+
 /* TrendMe design tokens
    paper   — cool white canvas
    ink     — deep violet ink for text
@@ -56,6 +71,10 @@ body {
 html[data-tg] .tg-hide { display: none; }
 .tg-only { display: none; }
 html[data-tg] .tg-only { display: block; }
+/* Wide Telegram windows: keep the app phone-width and centered. */
+html[data-tg] body { max-width: 30rem; margin-inline: auto; width: 100%; }
+html[data-tg] .tg-dock { max-width: calc(30rem - 1.5rem); margin-inline: auto; }
+html[data-tg] .max-sm\:hidden { display: none; }
 
 /* Sticky bars that sit right under the (sticky) site header; flush to the top inside Telegram. */
 .under-header { top: calc(4rem + env(safe-area-inset-top)); }

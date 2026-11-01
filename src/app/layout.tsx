@@ -28,7 +28,11 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, view
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ru" className="h-full antialiased">
+    <html lang="ru" className="h-full antialiased" suppressHydrationWarning>
+      <head>
+        {/* Mark the Telegram Mini App before the first paint, so it opens straight in the phone layout. */}
+        <script dangerouslySetInnerHTML={{ __html: `try{if(location.hash.indexOf("tgWebAppData")>-1||sessionStorage.getItem("trendme.tgInitData"))document.documentElement.dataset.tg="1"}catch(e){}` }} />
+      </head>
       <body className="flex min-h-full flex-col">
         {children}
         <Suspense fallback={null}>
