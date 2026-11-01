@@ -1,6 +1,7 @@
 "use server";
 import { queueLitePreview } from "@/lib/templates/lite-preview";
 import { ensureTemplateDuration } from "@/lib/templates/duration";
+import { trimTemplateIfTooLong } from "@/lib/templates/trim";
 import { clearMemo } from "@/lib/cache/memo";
 import { mediaUrl } from "@/lib/templates/queries";
 import { randomUUID } from "node:crypto";
@@ -13,7 +14,7 @@ import {
 } from "@/lib/templates/admin-schema";
 
 export type SaveResult =
-  | { ok: true; id: string }
+  | { ok: true; id: string; /** Set when the video was cut to 30 s: the editor switches to it. */ videoPath?: string }
   | { ok: false; error: "invalid" | "forbidden" | "generic"; fields?: string[] };
 
 async function guard(perm: Parameters<typeof requirePermission>[0]) {
@@ -40,11 +41,12 @@ export async function saveTemplate(raw: unknown, id: string | null): Promise<Sav
     const { data, error } = await db.from("templates")
       .insert({ ...row, status: "draft", created_by: user.id }).select("id").single();
     if (error) { console.error("[admin.template.create]", error.code, error.message); return { ok: false, error: "generic" }; }
-    if (row.preview_video_path) { await ensureTemplateDuration(data.id, mediaUrl(row.preview_video_path)); queueLitePreview(data.id); }
+    let trimmed: string | null = null;
+    if (row.preview_video_path) { trimmed = await trimTemplateIfTooLong(data.id, await ensureTemplateDuration(data.id, mediaUrl(row.preview_video_path))); queueLitePreview(data.id); }
     await audit(user.id, "template.create", "template", data.id, { title: row.title_kk });
     clearMemo();
     revalidatePath("/admin/templates");
-    return { ok: true, id: data.id };
+    return { ok: true, id: data.id, ...(trimmed ? { videoPath: trimmed } : {}) };
   }
 
   if (!z.string().uuid().safeParse(id).success) return { ok: false, error: "generic" };
@@ -70,8 +72,10 @@ export async function saveTemplate(raw: unknown, id: string | null): Promise<Sav
     if (row.preview_video_path) queueLitePreview(id);
   }
   // Video length drives automatic prices: re-read it whenever the video changes.
+  let trimmed: string | null = null;
   if (row.preview_video_path && (row.preview_video_path !== before.preview_video_path || before.video_duration_sec == null)) {
-    await ensureTemplateDuration(id, mediaUrl(row.preview_video_path));
+    // Longer than Kling allows: cut to the first 30 s (the save waits for it).
+    trimmed = await trimTemplateIfTooLong(id, await ensureTemplateDuration(id, mediaUrl(row.preview_video_path)));
   }
   await audit(user.id, "template.update", "template", id, { title: row.title_kk });
   const pricingChanged =
@@ -90,7 +94,7 @@ export async function saveTemplate(raw: unknown, id: string | null): Promise<Sav
 
   revalidatePath("/admin/templates");
   revalidatePath(`/templates/${id}`);
-  return { ok: true, id };
+  return { ok: true, id, ...(trimmed ? { videoPath: trimmed } : {}) };
 }
 
 /** Immutable configuration snapshot; orders reference the version that was current when created. */

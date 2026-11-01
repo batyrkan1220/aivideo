@@ -3,7 +3,7 @@ import { clearMemo } from "@/lib/cache/memo";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { mp4DurationSec } from "@/lib/custom-video/mp4";
 
-const MAX_BYTES = 60 * 1024 * 1024;
+const MAX_BYTES = 200 * 1024 * 1024; // long uploads are read too, so they can be cut to 30 s
 
 /** Downloads a (public) video and reads its duration from the MP4/MOV header. */
 export async function fetchVideoDuration(url: string): Promise<number | null> {

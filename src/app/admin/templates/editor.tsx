@@ -165,6 +165,7 @@ export function TemplateEditor({
       setMsg({ kind: "err", text: r.error === "forbidden" ? ru.admin.forbidden : r.error === "invalid" ? e.invalid : ru.errors.generic });
       return null;
     }
+    if (r.videoPath) { setT((p) => ({ ...p, previewVideoPath: r.videoPath! })); setMsg({ kind: "ok", text: e.trimmed }); }
     setDirty(false);
     return r.id;
   };
@@ -173,7 +174,7 @@ export function TemplateEditor({
     const savedId = await persist(false);
     if (!savedId) return;
     setMode(null);
-    setMsg({ kind: "ok", text: e.saved });
+    setMsg((m) => (m?.kind === "ok" && m.text === e.trimmed ? m : { kind: "ok", text: e.saved }));
     if (!id) router.replace(`/admin/templates/${savedId}`);
     else router.refresh();
   });
