@@ -10,13 +10,13 @@ import { mediaUrl } from "@/lib/templates/queries";
 
 /*
   Light card previews. Catalog cards are small, muted loops, yet the admin uploads full template
-  videos (often 2–10 MB). The server makes a 360p, silent, ≤6 s, 24 fps H.264 copy (~0.1–0.25 MB)
+  videos (often 2–10 MB). The server makes a 360p, silent, ≤10 s, 24 fps H.264 copy (~0.15–0.35 MB)
   with ffmpeg and cards play that; the template page keeps the full video with sound.
-  v2 files live in previews/lite2/; older (480p) copies are remade once and removed.
+  Current files live in previews/lite3/; older copies are remade once and removed.
   One job at a time (the server is small); failures leave the card on the full video.
 */
 const MAX_SOURCE_BYTES = 80 * 1024 * 1024;
-const LITE_DIR = "previews/lite2/";
+const LITE_DIR = "previews/lite3/";
 const queue: string[] = [];
 let running = false;
 
@@ -104,10 +104,10 @@ async function ffmpegPath(): Promise<string> {
 
 async function runFfmpeg(inPath: string, outPath: string) {
   const bin = await ffmpegPath();
-  // Short side 360 px (never upscaled), ≤24 fps, ≤6 s, no audio, fast start: cards are ~170 px wide.
+  // Short side 360 px (never upscaled), ≤24 fps, ≤10 s, no audio, fast start: cards are ~170 px wide.
   const scale = "scale=w='if(gt(iw,ih),-2,trunc(min(360,iw)/2)*2)':h='if(gt(iw,ih),trunc(min(360,ih)/2)*2,-2)'";
   const args = [
-    "-hide_banner", "-loglevel", "error", "-y", "-i", inPath, "-t", "6", "-an",
+    "-hide_banner", "-loglevel", "error", "-y", "-i", inPath, "-t", "10", "-an",
     "-vf", scale, "-fpsmax", "24",
     "-c:v", "libx264", "-preset", "medium", "-crf", "32", "-maxrate", "450k", "-bufsize", "900k",
     "-profile:v", "main", "-pix_fmt", "yuv420p", "-movflags", "+faststart", outPath,
