@@ -21,7 +21,7 @@ export function HeroShowcase({ items, compact = false }: { items: Item[]; compac
   };
 
   return (
-    <div className={`relative mx-auto flex w-full max-w-md items-center justify-center overflow-hidden ${compact ? "h-[15.5rem]" : "h-[21rem] sm:h-[26rem] sm:overflow-visible md:h-[30rem]"}`} aria-label={kk.home.trendingTitle}>
+    <div className={`relative mx-auto flex w-full max-w-md items-center justify-center overflow-hidden ${compact ? "h-[16.25rem]" : "h-[21rem] sm:h-[26rem] sm:overflow-visible md:h-[30rem]"}`} aria-label={kk.home.trendingTitle}>
       <div className={`absolute -z-0 bg-brand-soft ${compact ? "inset-x-5 bottom-2 top-7 rounded-[2rem]" : "inset-x-4 bottom-4 top-8 rounded-[2.5rem] sm:inset-x-6 sm:bottom-6 sm:top-10 sm:rounded-[3rem]"}`} aria-hidden />
       {order.map((t, i) => {
         const front = i === order.length - 1;
@@ -29,7 +29,7 @@ export function HeroShowcase({ items, compact = false }: { items: Item[]; compac
           <Link
             key={t.id}
             href={`/templates/${t.id}`}
-            className={`absolute aspect-[9/16] overflow-hidden ${compact ? "h-[13.25rem] rounded-[1.1rem] border-[3px]" : "h-[18rem] rounded-[1.4rem] border-[5px] sm:h-[22rem] sm:rounded-[1.75rem] sm:border-[6px] md:h-[26rem]"} border-surface bg-night shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)] transition-transform duration-300 hover:-translate-y-1 ${pose(i, order.length)}`}
+            className={`absolute aspect-[9/16] overflow-hidden ${compact ? "h-[14rem] rounded-[1.1rem] border-[3px]" : "h-[18rem] rounded-[1.4rem] border-[5px] sm:h-[22rem] sm:rounded-[1.75rem] sm:border-[6px] md:h-[26rem]"} border-surface bg-night shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)] transition-transform duration-300 hover:-translate-y-1 ${pose(i, order.length)}`}
           >
             {t.coverUrl && (
               // eslint-disable-next-line @next/next/no-img-element

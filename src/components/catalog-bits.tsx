@@ -85,7 +85,7 @@ export function GridSkeleton({ count = 8 }: { count?: number }) {
   return (
     <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 lg:grid-cols-6" aria-busy="true" aria-label={kk.common.loading}>
       {Array.from({ length: count }).map((_, i) => (
-        <li key={i} className="aspect-[4/5] animate-pulse rounded-[14px] bg-surface" />
+        <li key={i} className="aspect-[3/4] animate-pulse rounded-[14px] bg-surface" />
       ))}
     </ul>
   );
