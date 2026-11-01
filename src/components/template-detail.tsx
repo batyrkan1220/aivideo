@@ -49,13 +49,14 @@ export function TemplateDetailView({ t, cta, combo }: { t: TemplateDetail; cta?:
       {combo ? <ComboGrid parts={combo} /> : (
       <>
       {/* On phones the sample is capped so the photo step stays close; the title sits on the video. */}
-      <figure className="mx-auto w-full max-w-[min(100%,calc(60svh*9/16))] md:sticky md:top-24 md:max-w-none md:self-start">
-        <div className="relative aspect-[9/16] overflow-hidden rounded-[1.75rem] bg-night shadow-[0_24px_60px_-24px_rgba(0,0,0,0.35)] ring-1 ring-black/5">
+      {/* The sample in its original proportions (vertical, square or horizontal), never cropped. */}
+      <figure className="mx-auto w-full md:sticky md:top-24 md:self-start">
+        <div className="relative mx-auto w-fit max-w-full overflow-hidden rounded-[1.75rem] bg-night shadow-[0_24px_60px_-24px_rgba(0,0,0,0.35)] ring-1 ring-black/5">
           {t.previewUrl ? (
-            <AutoVideo src={t.previewUrl} poster={t.coverUrl ?? undefined} soundToggle preferSound className="h-full w-full object-cover" />
+            <AutoVideo src={t.previewUrl} poster={t.coverUrl ?? undefined} soundToggle preferSound className="block h-auto max-h-[70svh] w-auto max-w-full md:max-h-[80vh]" />
           ) : t.coverUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={t.coverUrl} alt="" className="h-full w-full object-cover" />
+            <img src={t.coverUrl} alt="" className="block h-auto max-h-[70svh] w-auto max-w-full md:max-h-[80vh]" />
           ) : null}
           <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-night">
             {t.media === "photo" ? kk.photos.sample : kk.catalog.sample}
