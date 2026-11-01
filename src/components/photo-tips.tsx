@@ -42,7 +42,7 @@ function Face({ kind }: { kind: "front" | "single" | "covered" | "angle" }) {
 /** Real example photos (AI-generated people) where we have them; a drawing otherwise. */
 const EXAMPLES: { kind: "front" | "single" | "covered" | "angle"; good: boolean; photo?: string }[] = [
   { kind: "front", good: true, photo: "/photo-tips/front.jpg" },
-  { kind: "single", good: true },
+  { kind: "single", good: true, photo: "/photo-tips/single.jpg" },
   { kind: "covered", good: false },
   { kind: "angle", good: false },
 ];
