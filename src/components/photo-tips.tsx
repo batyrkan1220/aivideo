@@ -44,7 +44,7 @@ const EXAMPLES: { kind: "front" | "single" | "covered" | "angle"; good: boolean;
   { kind: "front", good: true, photo: "/photo-tips/front.jpg" },
   { kind: "single", good: true, photo: "/photo-tips/single.jpg" },
   { kind: "covered", good: false, photo: "/photo-tips/covered.jpg" },
-  { kind: "angle", good: false },
+  { kind: "angle", good: false, photo: "/photo-tips/angle.jpg" },
 ];
 
 /** "How to get the perfect photo" banner + bottom sheet with good/bad examples and tips. */
