@@ -343,7 +343,7 @@ export function CreateFlow({
       {/* Step: photos */}
       <section ref={photosRef} className={`rounded-card border bg-surface p-4 transition-shadow sm:p-5 ${nudge === "photo" ? "border-ink ring-4 ring-lavender" : "border-line"}`}>
         <StepTitle n={++step} done={missing === 0}>{refPhoto ? c.stepRefPhotos : slots.length > 1 ? c.stepPhotos(slots.length) : c.stepPhoto}</StepTitle>
-        {slots.length > 1 && <p className="mt-1 text-sm text-muted">{refPhoto ? c.refPhotosHint : c.photosHint}</p>}
+        {slots.length > 1 && refPhoto && <p className="mt-1 text-sm text-muted">{c.refPhotosHint}</p>}
         {!refPhoto && <PhotoTips />}
         {customVideo && readyVideoId && !["kling", "wan", "k4", "kd"].includes(seedanceMode) && (
           <div className="mt-3">
