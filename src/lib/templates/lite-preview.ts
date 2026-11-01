@@ -10,11 +10,13 @@ import { mediaUrl } from "@/lib/templates/queries";
 
 /*
   Light card previews. Catalog cards are small, muted loops, yet the admin uploads full template
-  videos (often 2–10 MB). The server makes a 480p, silent, ≤10 s H.264 copy (~0.3–0.6 MB) with
-  ffmpeg and cards play that; the template page keeps the full video with sound.
+  videos (often 2–10 MB). The server makes a 360p, silent, ≤6 s, 24 fps H.264 copy (~0.1–0.25 MB)
+  with ffmpeg and cards play that; the template page keeps the full video with sound.
+  v2 files live in previews/lite2/; older (480p) copies are remade once and removed.
   One job at a time (the server is small); failures leave the card on the full video.
 */
 const MAX_SOURCE_BYTES = 80 * 1024 * 1024;
+const LITE_DIR = "previews/lite2/";
 const queue: string[] = [];
 let running = false;
 
@@ -27,9 +29,11 @@ export function queueLitePreview(templateId: string) {
 /** Server start: every template with a video but no light preview yet. */
 export async function backfillLitePreviews() {
   const { data } = await supabaseAdmin().from("templates")
-    .select("id").not("preview_video_path", "is", null).is("preview_lite_path", null).is("deleted_at", null).limit(500);
-  for (const r of data ?? []) queueLitePreview(r.id);
-  return data?.length ?? 0;
+    .select("id,preview_video_path,preview_lite_path").not("preview_video_path", "is", null).is("deleted_at", null).limit(1000);
+  // Missing, or still an old v1 copy (an original kept as-is because it was already small counts as done).
+  const todo = (data ?? []).filter((r) => !r.preview_lite_path || (!r.preview_lite_path.startsWith(LITE_DIR) && r.preview_lite_path !== r.preview_video_path));
+  for (const r of todo) queueLitePreview(r.id);
+  return todo.length;
 }
 
 async function drain() {
@@ -51,7 +55,8 @@ async function drain() {
 
 async function makeOne(templateId: string): Promise<boolean> {
   const db = supabaseAdmin();
-  const { data: t } = await db.from("templates").select("preview_video_path").eq("id", templateId).maybeSingle();
+  const { data: t } = await db.from("templates").select("preview_video_path,preview_lite_path").eq("id", templateId).maybeSingle();
+  const oldLite = t?.preview_lite_path ?? null;
   const src = t?.preview_video_path;
   const url = mediaUrl(src ?? null);
   if (!src || !url) return false;
@@ -71,7 +76,7 @@ async function makeOne(templateId: string): Promise<boolean> {
     // Already small (or the copy came out bigger): cards keep the original file.
     let litePath = src;
     if (out.length > 0 && out.length < input.length * 0.85) {
-      litePath = `previews/lite/${randomUUID()}.mp4`;
+      litePath = `${LITE_DIR}${randomUUID()}.mp4`;
       const { error } = await db.storage.from("template-media")
         .upload(litePath, out, { contentType: "video/mp4", cacheControl: "31536000", upsert: false });
       if (error) throw new Error(`upload ${error.message}`);
@@ -80,6 +85,10 @@ async function makeOne(templateId: string): Promise<boolean> {
     const { data: updated } = await db.from("templates").update({ preview_lite_path: litePath })
       .eq("id", templateId).eq("preview_video_path", src).select("id");
     if (!updated?.length && litePath !== src) await db.storage.from("template-media").remove([litePath]);
+    // The replaced light copy (never the original video) is no longer needed.
+    if (updated?.length && oldLite && oldLite !== src && oldLite !== litePath && oldLite.startsWith("previews/lite")) {
+      await db.storage.from("template-media").remove([oldLite]);
+    }
     return true;
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {});
@@ -95,12 +104,12 @@ async function ffmpegPath(): Promise<string> {
 
 async function runFfmpeg(inPath: string, outPath: string) {
   const bin = await ffmpegPath();
-  // Short side 480 px (never upscaled), ≤30 fps, ≤10 s, no audio, fast start for instant playback.
-  const scale = "scale=w='if(gt(iw,ih),-2,trunc(min(480,iw)/2)*2)':h='if(gt(iw,ih),trunc(min(480,ih)/2)*2,-2)'";
+  // Short side 360 px (never upscaled), ≤24 fps, ≤6 s, no audio, fast start: cards are ~170 px wide.
+  const scale = "scale=w='if(gt(iw,ih),-2,trunc(min(360,iw)/2)*2)':h='if(gt(iw,ih),trunc(min(360,ih)/2)*2,-2)'";
   const args = [
-    "-hide_banner", "-loglevel", "error", "-y", "-i", inPath, "-t", "10", "-an",
-    "-vf", scale, "-fpsmax", "30",
-    "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-maxrate", "1000k", "-bufsize", "2000k",
+    "-hide_banner", "-loglevel", "error", "-y", "-i", inPath, "-t", "6", "-an",
+    "-vf", scale, "-fpsmax", "24",
+    "-c:v", "libx264", "-preset", "medium", "-crf", "32", "-maxrate", "450k", "-bufsize", "900k",
     "-profile:v", "main", "-pix_fmt", "yuv420p", "-movflags", "+faststart", outPath,
   ];
   await new Promise<void>((resolve, reject) => {
