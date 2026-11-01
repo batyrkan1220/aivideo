@@ -9,8 +9,8 @@ export const metadata = { title: kk.gallery.title };
 export default function GalleryPage({ searchParams }: { searchParams: Promise<{ day?: string }> }) {
   return (
     <main className="mx-auto max-w-6xl px-4 pb-6 pt-4 md:pt-10">
-      <h1 className="mb-4 text-[28px] font-extrabold leading-none tracking-tight">{kk.gallery.title}</h1>
-      <Suspense fallback={<ul className="space-y-3">{Array.from({ length: 4 }, (_, i) => <li key={i} className="h-24 animate-pulse rounded-[24px] bg-surface" />)}</ul>}>
+      <h1 className="mb-3 text-[26px] font-extrabold leading-none tracking-tight">{kk.gallery.title}</h1>
+      <Suspense fallback={<ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">{Array.from({ length: 4 }, (_, i) => <li key={i} className="aspect-[3/4] animate-pulse rounded-[18px] bg-surface" />)}</ul>}>
         <List searchParams={searchParams} />
       </Suspense>
     </main>

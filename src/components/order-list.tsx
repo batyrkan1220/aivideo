@@ -88,61 +88,55 @@ export async function OrderList({ limit = 50, day }: { limit?: number; day?: str
     if (o.payment_status !== "succeeded") return { text: kk.status.awaiting_payment, tone: "pay", action: kk.myVideos.pay };
     const g = o.generation_status as keyof typeof kk.order.generation;
     if (g === "completed") return { text: kk.gallery.ready, tone: "ok", action: kk.myVideos.watch };
-    if (g === "failed") return { text: kk.order.generation.failed, tone: "bad", action: kk.order.open };
+    if (g === "failed") return { text: kk.gallery.error, tone: "bad", action: kk.order.open };
     return { text: kk.myVideos.progress, tone: "work", action: kk.order.open };
   };
-  const toneCls = { ok: "bg-brand-soft", work: "bg-peach", pay: "bg-lavender", bad: "bg-rose", muted: "bg-line" };
   const groups = (active ? [active] : days).map((k) => ({ k, items: orders.filter((o) => keyOf(o) === k) })).filter((g) => g.items.length);
+
+  const chipCls = { ok: "bg-brand text-night", work: "bg-white/90 text-night", pay: "bg-cobalt text-white", bad: "bg-rose text-night", muted: "bg-white/80 text-night" };
 
   return (
     <>
       {groups.map((g) => (
-        <section key={g.k} className="mb-6">
-          <h2 className="mb-3 text-[15px] font-extrabold first-letter:uppercase">{head.format(noon(g.k))}</h2>
-          {/* Timeline: time on the left, dashed connector, white work cards */}
-          <ol className="relative">
-            {g.items.map((o, i) => {
+        <section key={g.k} className="mb-5">
+          <h2 className="mb-2.5 text-[15px] font-extrabold first-letter:uppercase">{head.format(noon(g.k))}</h2>
+          {/* Phone-first gallery: 2 tiles per row, the whole tile is the button */}
+          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+            {g.items.map((o) => {
               const st = state(o);
               const t = Array.isArray(o.templates) ? o.templates[0] : o.templates;
               const photo = isPhoto(o);
               const thumb = photoUrl.get(o.id) ?? mediaUrl(t?.cover_asset_path ?? null);
               const title = (o.template_snapshot_json as { title_kk?: string }).title_kk ?? "TrendMe";
               const combo = comboInfo.get(o.id);
-              const last = i === g.items.length - 1;
               return (
-                <li key={o.id} className="relative grid grid-cols-[44px_1fr] gap-3 pb-3">
-                  <div className="relative flex flex-col items-center pt-4">
-                    <span className="text-[11px] font-semibold text-muted">{time.format(new Date(o.created_at))}</span>
-                    <span className={`mt-2 h-2.5 w-2.5 rounded-full ring-4 ring-paper ${st.tone === "ok" ? "bg-[#9cbf12]" : st.tone === "bad" ? "bg-danger" : "bg-night"}`} aria-hidden />
-                    {!last && <span className="mt-1 w-0 flex-1 border-l-2 border-dashed border-line" aria-hidden />}
-                  </div>
-                  <Link href={`/orders/${o.id}`} className="flex items-center gap-3 rounded-[24px] bg-surface p-2.5 pr-3.5 ring-1 ring-line transition-transform active:scale-[0.99]">
-                    <span className="relative block h-[76px] w-[60px] shrink-0 overflow-hidden rounded-[16px] bg-night">
-                      {thumb ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={thumb} alt="" loading="lazy" className={`h-full w-full object-cover ${st.tone === "ok" ? "" : "opacity-60"}`} />
-                      ) : (
-                        <span className="flex h-full w-full items-center justify-center text-2xl" aria-hidden>{photo ? "📸" : "🎬"}</span>
-                      )}
-                      <span className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/55 text-[10px] text-white" aria-hidden>{photo ? "📸" : "▶"}</span>
+                <li key={o.id}>
+                  <Link href={`/orders/${o.id}`} className="relative block aspect-[3/4] overflow-hidden rounded-[18px] bg-night ring-1 ring-black/5 transition-transform active:scale-[0.98]">
+                    {thumb ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={thumb} alt="" loading="lazy" className={`absolute inset-0 h-full w-full object-cover ${st.tone === "ok" ? "" : "opacity-55"}`} />
+                    ) : (
+                      <span className="absolute inset-0 flex items-center justify-center text-3xl" aria-hidden>{photo ? "📸" : "🎬"}</span>
+                    )}
+                    <span className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
+                    {/* Status */}
+                    <span className={`absolute left-2 top-2 inline-flex max-w-[calc(100%-3rem)] items-center gap-1 truncate rounded-full px-2 py-1 text-[11px] font-extrabold ${chipCls[st.tone]}`}>
+                      {st.tone === "work" && <span className="h-2.5 w-2.5 shrink-0 animate-spin rounded-full border-2 border-black/20 border-t-black" aria-hidden />}
+                      {st.tone === "pay" ? st.action : st.text}
                     </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[15px] font-bold leading-tight">{title}</span>
-                      <span className="mt-0.5 block text-[12px] text-muted">{o.public_order_number} · {formatKzt(o.amount_kzt)}</span>
-                      <span className="mt-2 flex flex-wrap items-center gap-1.5">
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold text-night ${toneCls[st.tone]}`}>
-                          {st.tone === "work" && <span className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-black/20 border-t-black" aria-hidden />}
-                          {st.text}
-                        </span>
-                        <span className="rounded-full bg-lavender px-2.5 py-1 text-[11px] font-bold text-night">{combo ? `${kk.combo.section} · ${kk.combo.ready(combo.ok, combo.all)}` : photo ? kk.nav.tabPhoto : kk.nav.tabHome}</span>
+                    <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/45 text-[12px] text-white backdrop-blur" aria-hidden>{photo ? "📸" : "▶"}</span>
+                    {/* Title + meta */}
+                    <span className="absolute inset-x-2.5 bottom-2.5 text-white">
+                      <span className="block truncate text-[14px] font-bold leading-tight">{title}</span>
+                      <span className="mt-0.5 block truncate text-[11px] text-white/75">
+                        {combo ? `${kk.combo.ready(combo.ok, combo.all)} · ` : ""}{time.format(new Date(o.created_at))} · {formatKzt(o.amount_kzt)}
                       </span>
                     </span>
-                    <span className={`shrink-0 rounded-full px-3 py-2 text-[12px] font-bold ${st.tone === "ok" ? "bg-night text-white" : st.tone === "pay" ? "bg-cobalt text-white" : "bg-paper text-ink"}`}>{st.action}</span>
                   </Link>
                 </li>
               );
             })}
-          </ol>
+          </ul>
         </section>
       ))}
     </>
