@@ -5,7 +5,7 @@ import { autoplayRefused, useImgPreviews } from "@/lib/video-autoplay";
 /** Hero's front phone: muted autoplay loop; where autoplay is refused, an animated WebP. */
 export function HeroVideo({ src, poster, anim }: { src: string; poster?: string; anim?: string }) {
   const ref = useRef<HTMLVideoElement>(null);
-  const imgMode = useImgPreviews();
+  const imgMode = useImgPreviews() || !!anim; // animated WebP whenever it exists
   useEffect(() => {
     const v = ref.current;
     if (!v) return;

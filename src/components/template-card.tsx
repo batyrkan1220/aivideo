@@ -78,7 +78,8 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
   const cardRef = useRef<HTMLAnchorElement>(null);
   const [playing, setPlaying] = useState(false);
   const [near, setNear] = useState(false); // card is within ~1 screen: attach the video src
-  const imgMode = useImgPreviews(); // iOS refused autoplay: the MP4 plays through <img> instead
+  // Cards show the animated WebP preview; the light MP4 only until the WebP is ready.
+  const imgMode = useImgPreviews() || !!t.previewAnimUrl;
   const imgModeRef = useRef(imgMode);
   const wantRef = useRef(false); // the card is on screen and should be playing
   useEffect(() => { imgModeRef.current = imgMode; }, [imgMode]);

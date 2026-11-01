@@ -13,13 +13,13 @@ import { mediaUrl } from "@/lib/templates/queries";
   videos (often 2–10 MB). The server makes a 480p, silent, ≤10 s, 24 fps H.264 copy (~0.3–0.5 MB)
   with ffmpeg and cards play that; the template page keeps the full video with sound.
   Current files live in previews/lite4/; older copies are remade once and removed.
-  Alongside it an animated WebP (320p, 12 fps, ≤10 s) for iPhones that refuse to autoplay video
-  (Low Power Mode, low battery): images still animate there. Lives in previews/anim1/.
+  Alongside it an animated WebP (360p, 15 fps, ≤10 s): cards and the hero show this image, which
+  animates everywhere (iOS Low Power Mode, Telegram WebViews) with no autoplay rules. previews/anim2/.
   One job at a time (the server is small); failures leave the card on the full video.
 */
 const MAX_SOURCE_BYTES = 80 * 1024 * 1024;
 const LITE_DIR = "previews/lite4/";
-const ANIM_DIR = "previews/anim1/";
+const ANIM_DIR = "previews/anim2/";
 const queue: string[] = [];
 let running = false;
 
@@ -138,11 +138,11 @@ const mp4Args = (inPath: string, outPath: string) => [
   "-c:v", "libx264", "-preset", "medium", "-crf", "26", "-maxrate", "900k", "-bufsize", "1800k",
   "-profile:v", "main", "-pix_fmt", "yuv420p", "-movflags", "+faststart", outPath,
 ];
-// Animated WebP fallback: short side 320 px, 12 fps, ≤10 s, endless loop.
+// Animated WebP card preview: short side 360 px, 15 fps, ≤10 s, endless loop.
 const webpArgs = (inPath: string, outPath: string) => [
   "-hide_banner", "-loglevel", "error", "-y", "-i", inPath, "-t", "10", "-an",
-  "-vf", "fps=12,scale=w='if(gt(iw,ih),-2,trunc(min(320,iw)/2)*2)':h='if(gt(iw,ih),trunc(min(320,ih)/2)*2,-2)'",
-  "-c:v", "libwebp_anim", "-lossless", "0", "-q:v", "50", "-compression_level", "4", "-loop", "0", outPath,
+  "-vf", "fps=15,scale=w='if(gt(iw,ih),-2,trunc(min(360,iw)/2)*2)':h='if(gt(iw,ih),trunc(min(360,ih)/2)*2,-2)'",
+  "-c:v", "libwebp_anim", "-lossless", "0", "-q:v", "55", "-compression_level", "4", "-loop", "0", outPath,
 ];
 
 async function runFfmpeg(inPath: string, outPath: string, build: (i: string, o: string) => string[]) {

@@ -49,7 +49,7 @@ export async function saveTemplate(raw: unknown, id: string | null): Promise<Sav
 
   if (!z.string().uuid().safeParse(id).success) return { ok: false, error: "generic" };
   const { data: before } = await db.from("templates")
-    .select("pricing_config_json, supported_qualities_json, status, preview_video_path, preview_lite_path, video_duration_sec").eq("id", id).single();
+    .select("pricing_config_json, supported_qualities_json, status, preview_video_path, preview_lite_path, preview_anim_path, video_duration_sec").eq("id", id).single();
   if (!before) return { ok: false, error: "generic" };
 
   const { error } = await db.from("templates").update(row).eq("id", id);
@@ -58,7 +58,8 @@ export async function saveTemplate(raw: unknown, id: string | null): Promise<Sav
   // New video: the old light card copy no longer matches — drop it and make a new one.
   if (row.preview_video_path !== before.preview_video_path) {
     const old = before.preview_lite_path;
-    await db.from("templates").update({ preview_lite_path: null }).eq("id", id);
+    await db.from("templates").update({ preview_lite_path: null, preview_anim_path: null }).eq("id", id);
+    if (before.preview_anim_path?.startsWith("previews/anim")) await db.storage.from("template-media").remove([before.preview_anim_path]);
     if (old && old !== before.preview_video_path && old.startsWith("previews/lite/")) await db.storage.from("template-media").remove([old]);
     if (row.preview_video_path) queueLitePreview(id);
   }

@@ -48,7 +48,7 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
 
   const [{ data }, { data: stats }, { data: cats }] = await Promise.all([
     db.from("templates")
-      .select("id,title_kk,status,required_face_count,updated_at,is_trending,provider_key,cover_asset_path,preview_video_path,preview_lite_path,pricing_config_json,category_id,video_duration_sec")
+      .select("id,title_kk,status,required_face_count,updated_at,is_trending,provider_key,cover_asset_path,preview_video_path,preview_lite_path,preview_anim_path,pricing_config_json,category_id,video_duration_sec")
       .eq("kind", "catalog").is("deleted_at", null).order("updated_at", { ascending: false }),
     db.rpc("admin_template_stats", { p_from: new Date(nowMs() - 30 * 86400_000).toISOString() }),
     db.from("categories").select("id,title_kk"),
@@ -109,7 +109,7 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
                     {t.category_id && catName.get(t.category_id) && <Badge>{catName.get(t.category_id)}</Badge>}
                     <span className="text-xs text-muted">{t.required_face_count} чел.{t.video_duration_sec ? ` · ${Math.round(Number(t.video_duration_sec))} с` : ""}{price ? ` · ${formatKzt(price)}` : " · авто-цена"}</span>
                     {!t.preview_video_path && <Badge color="red">нет видео</Badge>}
-                    {t.preview_video_path && !t.preview_lite_path && <Badge color="amber">превью сжимается</Badge>}
+                    {t.preview_video_path && (!t.preview_lite_path || !t.preview_anim_path) && <Badge color="amber">превью сжимается</Badge>}
                   </div>
                 </div>
                 <dl className="grid grid-cols-4 gap-x-4 text-center text-xs sm:w-[22rem]">
