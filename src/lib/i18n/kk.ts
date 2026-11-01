@@ -193,6 +193,7 @@ export const kk = {
     heroBadge: "Трендовые AI-видео",
     heroMini: "Стань героем",
     heroMiniAccent: "тренда",
+    heroMiniHint: "Выбери видео ниже · готово за 3–5 минут",
     heroMiniSub: "Оплата через Kaspi",
     heroLine1: "Одно фото — и ты",
     heroLine2: "в трендовом видео",
