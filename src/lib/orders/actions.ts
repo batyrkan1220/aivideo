@@ -11,6 +11,7 @@ import { faceSlotSchema, qualitySchema, pricingConfigSchema } from "@/lib/templa
 import { PHOTO_EXT, sniffImageType, validatePhotoMeta, type PhotoError, type PhotoType } from "@/lib/uploads/validate";
 import { track } from "@/lib/analytics";
 import { allow } from "@/lib/security/rate-limit";
+import { nearestOutputAspect } from "@/lib/custom-video/aspect";
 import { customVideoSettings } from "@/lib/custom-video/settings";
 import { attributeFromCookie } from "@/lib/partners";
 import { seedancePriceKzt, applySeedancePricing } from "@/lib/pricing-seedance";
@@ -195,7 +196,7 @@ export async function createOrder(raw: unknown): Promise<
     if (!cs.enabled) return { ok: false, error: "template_unavailable" };
     if (!p.data.videoId) return { ok: false, error: "video_missing" };
     const { data: v } = await db.from("order_videos")
-      .select("id,storage_path,verified_at,expires_at,duration_sec")
+      .select("id,storage_path,verified_at,expires_at,duration_sec,aspect")
       .eq("id", p.data.videoId).eq("user_id", user.id).is("order_id", null).maybeSingle();
     if (!v?.verified_at || new Date(v.expires_at).getTime() < now) return { ok: false, error: "video_missing" };
     durationSec = Number(v.duration_sec);
@@ -208,7 +209,8 @@ export async function createOrder(raw: unknown): Promise<
     snapshotExtra = {
       user_video_path: v.storage_path, user_video_duration_sec: durationSec,
       face_slots_json: slots, required_face_count: n,
-      provider_config_json: { ...parseSeedanceConfig(tv.snapshot.provider_config_json), people: n },
+      // Output follows the customer's video: vertical, square or horizontal (nothing cropped away).
+      provider_config_json: { ...parseSeedanceConfig(tv.snapshot.provider_config_json), people: n, aspectRatio: nearestOutputAspect(v.aspect == null ? null : Number(v.aspect)) },
     };
   } else if (p.data.videoId) {
     return { ok: false, error: "generic" };

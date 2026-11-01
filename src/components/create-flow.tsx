@@ -14,9 +14,11 @@ import { compressPhoto } from "@/lib/uploads/compress";
 import type { Framing } from "@/lib/uploads/photo-quality";
 import { PhotoTips } from "./photo-tips";
 import { KzPhoneInput } from "./kz-phone-input";
-import { seedanceSlots, SEEDANCE_MAX_PEOPLE } from "@/lib/templates/seedance-config";
+import { seedanceSlots, SEEDANCE_MAX_PEOPLE, SEEDANCE_MIN_SEC as MIN_VIDEO_SECONDS } from "@/lib/templates/seedance-config";
 import { haptic, ensureBotCanWrite } from "@/lib/telegram/client";
 import { requestVideoUpload, confirmVideoUpload, removeVideoUpload, type VideoError } from "@/lib/custom-video/actions";
+import { aspectAllowed, nearestOutputAspect } from "@/lib/custom-video/aspect";
+
 
 type SlotState =
   | { phase: "empty" }
@@ -30,7 +32,7 @@ const EMPTY: SlotState = { phase: "empty" };
 const cv = kk.customVideo;
 const videoErr = (e: VideoError, l: { maxSeconds: number; maxMb: number }) =>
   e === "too_long" ? cv.errors.too_long(l.maxSeconds) : e === "too_large" ? cv.errors.too_large(l.maxMb)
-  : e === "too_short" ? cv.errors.too_short : e === "bad_type" ? cv.errors.bad_type : e === "unreadable" ? cv.errors.unreadable
+  : e === "too_short" ? cv.errors.too_short : e === "bad_aspect" ? cv.errors.bad_aspect : e === "bad_type" ? cv.errors.bad_type : e === "unreadable" ? cv.errors.unreadable
   : e === "disabled" ? cv.errors.disabled : e === "rate_limited" ? c.errors.rate_limited : kk.errors.generic;
 const errText = (e: string) => (c.errors as Record<string, string>)[e] ?? kk.errors.generic;
 
@@ -67,17 +69,19 @@ type VideoState =
   | { phase: "empty" }
   | { phase: "uploading"; preview: string; progress: number }
   | { phase: "verifying"; preview: string }
-  | { phase: "ready"; preview: string; videoId: string; durationSec: number }
+  | { phase: "ready"; preview: string; videoId: string; durationSec: number; aspect: number | null }
   | { phase: "error"; message: string };
 
-/** Duration from the browser's own decoder (the server re-checks it from the file). */
-function readVideoDuration(url: string): Promise<number | null> {
+/** Duration and shape from the browser's own decoder (the server re-checks both from the file). */
+function readVideoMeta(url: string): Promise<{ durationSec: number; aspect: number | null } | null> {
   return new Promise((resolve) => {
     const v = document.createElement("video");
     v.preload = "metadata";
     v.muted = true;
-    const done = (d: number | null) => { v.removeAttribute("src"); v.load(); resolve(d); };
-    v.onloadedmetadata = () => done(Number.isFinite(v.duration) ? v.duration : null);
+    let settled = false;
+    const done = (d: { durationSec: number; aspect: number | null } | null) => { if (settled) return; settled = true; v.removeAttribute("src"); v.load(); resolve(d); };
+    v.onloadedmetadata = () => done(Number.isFinite(v.duration)
+      ? { durationSec: v.duration, aspect: v.videoWidth && v.videoHeight ? v.videoWidth / v.videoHeight : null } : null);
     v.onerror = () => done(null);
     setTimeout(() => done(null), 15_000);
     v.src = url;
@@ -148,10 +152,14 @@ export function CreateFlow({
     const preview = URL.createObjectURL(file);
     previews.current.push(preview);
     setVideo({ phase: "uploading", preview, progress: 0 });
-    const durationSec = await readVideoDuration(preview);
-    if (durationSec === null) { setVideo({ phase: "error", message: cv.errors.unreadable }); return; }
+    // Checked before uploading, so nothing is sent that Kling would refuse later.
+    const meta = await readVideoMeta(preview);
+    if (meta === null) { setVideo({ phase: "error", message: cv.errors.unreadable }); return; }
+    const { durationSec, aspect } = meta;
     if (durationSec > customVideo.maxSeconds + 0.5) { setVideo({ phase: "error", message: cv.errors.too_long(customVideo.maxSeconds) }); return; }
-    const req = await requestVideoUpload({ contentType: type, size: file.size, durationSec });
+    if (durationSec < MIN_VIDEO_SECONDS) { setVideo({ phase: "error", message: cv.errors.too_short }); return; }
+    if (aspect && !aspectAllowed(aspect)) { setVideo({ phase: "error", message: cv.errors.bad_aspect }); return; }
+    const req = await requestVideoUpload({ contentType: type, size: file.size, durationSec, ...(aspect ? { aspect } : {}) });
     if (!req.ok) {
       if (req.error === "unauthorized") { router.push("/login?next=/create"); return; }
       setVideo({ phase: "error", message: videoErr(req.error, customVideo) });
@@ -168,7 +176,7 @@ export function CreateFlow({
     setVideo({ phase: "verifying", preview });
     const conf = await confirmVideoUpload(req.videoId);
     if (!conf.ok) { setVideo({ phase: "error", message: videoErr(conf.error, customVideo) }); return; }
-    setVideo({ phase: "ready", preview, videoId: req.videoId, durationSec: conf.durationSec });
+    setVideo({ phase: "ready", preview, videoId: req.videoId, durationSec: conf.durationSec, aspect: conf.aspect ?? aspect });
   };
   const onRemoveVideo = () => {
     if (video.phase === "ready") void removeVideoUpload(video.videoId);
@@ -352,7 +360,7 @@ export function CreateFlow({
       {customVideo && (
         <section ref={videoRef} className={`rounded-card border bg-surface p-4 transition-shadow sm:p-5 ${nudge === "video" ? "border-ink ring-4 ring-lavender" : "border-line"}`}>
           <StepTitle n={++step} done={video.phase === "ready"}>{cv.stepVideo}</StepTitle>
-          <p className="mt-1 text-sm text-muted">{cv.videoHint(customVideo.maxSeconds)}</p>
+          <p className="mt-1 text-sm text-muted">{cv.videoHint}</p>
           <div className="mt-3">
             <VideoPicker st={video} limits={customVideo} onPick={onPickVideo} onRemove={onRemoveVideo} />
           </div>
@@ -536,16 +544,26 @@ function StepTitle({ n, done, children }: { n: number; done: boolean; children: 
   );
 }
 
-/** "Өз видеом": pick a video, see it immediately, upload with progress. */
+/** "Өз видеом": requirements up front, then the video in its real shape with upload progress and the output format. */
 function VideoPicker({ st, limits, onPick, onRemove }: { st: VideoState; limits: { maxSeconds: number; maxMb: number }; onPick: (f: File | undefined) => void; onRemove: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const busy = st.phase === "uploading" || st.phase === "verifying";
   const preview = "preview" in st ? st.preview : undefined;
+  const aspect = st.phase === "ready" && st.aspect ? st.aspect : 9 / 16;
+  const out = st.phase === "ready" ? nearestOutputAspect(st.aspect) : null;
+  const R = cv.rules;
+  const rules: { icon: React.ReactNode; v: string; sub: string }[] = [
+    { icon: <path d="M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />, v: R.length(limits.maxSeconds), sub: R.lengthSub },
+    { icon: <path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14" />, v: R.size(limits.maxMb), sub: R.sizeSub },
+    { icon: <><rect x="3" y="5" width="13" height="14" rx="2" /><path d="m16 10 5-3v10l-5-3" /></>, v: R.format, sub: R.formatSub },
+    { icon: <><rect x="3" y="7" width="7" height="12" rx="1.5" /><rect x="13" y="10" width="8" height="6" rx="1.5" /></>, v: R.shape, sub: R.shapeSub },
+  ];
   return (
     <div>
       {preview ? (
         <div className="flex items-start gap-4">
-          <div className="relative aspect-[9/16] w-32 shrink-0 overflow-hidden rounded-2xl bg-night">
+          <div className="relative w-32 shrink-0 overflow-hidden rounded-2xl bg-night shadow-[0_10px_24px_-12px_rgba(0,0,0,0.45)] ring-1 ring-black/5"
+            style={{ aspectRatio: String(Math.min(1.6, Math.max(0.5, aspect))) }}>
             <video src={preview} muted loop playsInline autoPlay className="h-full w-full object-cover" />
             {busy && (
               <span className="absolute inset-0 flex items-center justify-center bg-black/40">
@@ -557,11 +575,27 @@ function VideoPicker({ st, limits, onPick, onRemove }: { st: VideoState; limits:
             <p className="font-semibold">
               {st.phase === "ready" ? `✓ ${cv.videoReady}` : st.phase === "uploading" && st.progress > 0 ? `${kk.upload.uploading} ${st.progress}%` : c.verifying}
             </p>
-            {st.phase === "ready" && <p className="mt-0.5 text-sm text-muted">{cv.seconds(Math.round(st.durationSec))}</p>}
             {st.phase === "uploading" && (
               <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-black/10">
                 <span className="block h-full rounded-full bg-brand transition-[width]" style={{ width: `${Math.max(6, st.progress)}%` }} />
               </span>
+            )}
+            {st.phase === "ready" && (
+              <dl className="mt-2 grid gap-1.5 text-[13px]">
+                <div className="flex items-center gap-2">
+                  <dt className="w-[4.5rem] shrink-0 text-muted">{R.lengthSub[0].toUpperCase() + R.lengthSub.slice(1)}</dt>
+                  <dd className="font-semibold">{cv.seconds(Math.round(st.durationSec))}</dd>
+                </div>
+                {out && (
+                  <div className="flex items-center gap-2">
+                    <dt className="w-[4.5rem] shrink-0 text-muted">{cv.outputLabel}</dt>
+                    <dd className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-2 py-0.5 font-semibold text-night">
+                      <span className={`inline-block rounded-[3px] border-[1.5px] border-current ${out === "9:16" ? "h-3 w-[7px]" : out === "1:1" ? "h-2.5 w-2.5" : "h-[7px] w-3"}`} aria-hidden />
+                      {cv.outputs[out]}
+                    </dd>
+                  </div>
+                )}
+              </dl>
             )}
             {!busy && (
               <div className="mt-3 flex gap-4 text-sm">
@@ -572,25 +606,52 @@ function VideoPicker({ st, limits, onPick, onRemove }: { st: VideoState; limits:
           </div>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className={`flex w-full items-center gap-4 rounded-2xl border-2 border-dashed p-4 text-left transition-colors hover:border-ink ${st.phase === "error" ? "border-danger bg-danger/10" : "border-[#c9cdf5] bg-lavender/60"}`}
-        >
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-surface text-night">
-            <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <rect x="3" y="5" width="13" height="14" rx="2" /><path d="m16 10 5-3v10l-5-3" />
-            </svg>
-          </span>
-          <span className="min-w-0">
-            <span className="block font-semibold">{cv.pickTitle}</span>
-            <span className="mt-0.5 block text-sm text-muted">{cv.pickText(limits.maxSeconds, limits.maxMb)}</span>
-          </span>
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className={`group flex w-full items-center gap-4 rounded-2xl border-2 border-dashed p-4 text-left transition-[colors,transform] active:scale-[0.99] ${st.phase === "error" ? "border-danger bg-danger/10" : "border-[#c9cdf5] bg-lavender/60 hover:border-ink"}`}
+          >
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-surface text-night shadow-sm transition-transform group-hover:scale-105">
+              <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M12 16V4m0 0-4.5 4.5M12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+              </svg>
+            </span>
+            <span className="min-w-0">
+              <span className="block font-bold">{cv.pickTitle}</span>
+              <span className="mt-0.5 block text-sm text-muted">{cv.pickText(limits.maxSeconds, limits.maxMb)}</span>
+            </span>
+          </button>
+
+          {/* What Kling accepts, shown before picking: no surprises after paying. */}
+          <div className="mt-3 rounded-2xl bg-paper p-3 ring-1 ring-line">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-muted">{R.title}</p>
+            <ul className="mt-2 grid grid-cols-2 gap-2">
+              {rules.map((r) => (
+                <li key={r.sub} className="flex items-center gap-2.5 rounded-xl bg-surface px-2.5 py-2 ring-1 ring-line">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-night">
+                    <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden>{r.icon}</svg>
+                  </span>
+                  <span className="min-w-0 leading-tight">
+                    <span className="block text-[13px] font-extrabold">{r.v}</span>
+                    <span className="block truncate text-[11px] text-muted">{r.sub}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <ul className="mt-2.5 space-y-1 text-[12.5px] text-muted">
+              {R.tips.map((t) => (
+                <li key={t} className="flex gap-2"><span className="mt-[1px] text-emerald-600" aria-hidden>✓</span>{t}</li>
+              ))}
+            </ul>
+          </div>
+        </>
       )}
       <input ref={inputRef} type="file" accept="video/mp4,video/quicktime,.mp4,.mov" className="sr-only" tabIndex={-1}
         onChange={(e) => { onPick(e.target.files?.[0]); e.target.value = ""; }} />
-      {st.phase === "error" && <p className="mt-2 text-sm text-danger" role="alert">{st.message}</p>}
+      {st.phase === "error" && (
+        <p className="mt-2 flex gap-2 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger" role="alert"><span aria-hidden>⚠️</span>{st.message}</p>
+      )}
     </div>
   );
 }

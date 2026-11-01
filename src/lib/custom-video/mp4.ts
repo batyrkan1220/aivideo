@@ -1,7 +1,8 @@
 /**
  * Minimal ISO-BMFF (MP4 / MOV) checks, no dependencies:
  *  - `sniffVideoType`: real container type from the first bytes ("ftyp" box);
- *  - `mp4DurationSec`: duration from moov → mvhd (works whether moov is at the start or the end).
+ *  - `mp4DurationSec`: duration from moov → mvhd (works whether moov is at the start or the end);
+ *  - `mp4VideoAspect`: display width ÷ height of the video track (tkhd size + 90°/270° rotation).
  */
 export type VideoType = "video/mp4" | "video/quicktime";
 
@@ -44,4 +45,31 @@ export function mp4DurationSec(b: Uint8Array): number | null {
   const dur = version === 1 ? u64(b, p + 24) : u32(b, p + 16);
   if (!scale) return null;
   return Math.round((dur / scale) * 100) / 100;
+}
+
+/** Width ÷ height as shown (video track's tkhd, rotation applied), or null when unknown. */
+export function mp4VideoAspect(b: Uint8Array): number | null {
+  const moov = findBox(b, 0, b.length, "moov");
+  if (!moov) return null;
+  let o = moov[0];
+  while (o + 8 <= moov[1]) {
+    const trak = findBox(b, o, moov[1], "trak");
+    if (!trak) return null;
+    const mdia = findBox(b, trak[0], trak[1], "mdia");
+    const hdlr = mdia && findBox(b, mdia[0], mdia[1], "hdlr");
+    if (hdlr && type4(b, hdlr[0] + 8) === "vide") {
+      const tkhd = findBox(b, trak[0], trak[1], "tkhd");
+      if (!tkhd) return null;
+      const p = tkhd[0];
+      const m = p + (b[p] === 1 ? 52 : 40); // transformation matrix
+      if (m + 44 > tkhd[1]) return null;
+      let w = u32(b, m + 36) / 65536, h = u32(b, m + 40) / 65536;
+      const a = u32(b, m) | 0, c = u32(b, m + 4) | 0;
+      if (a === 0 && c !== 0) [w, h] = [h, w]; // rotated 90° / 270°
+      if (!(w > 0 && h > 0)) return null;
+      return Math.round((w / h) * 10000) / 10000;
+    }
+    o = trak[1];
+  }
+  return null;
 }
