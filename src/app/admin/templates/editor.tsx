@@ -615,3 +615,13 @@ function VideoField({
     </div>
   );
 }
+
+/**
+ * "New template": Next keeps visited pages alive (React Activity), so without this the form
+ * would reopen with the previous template's fields, video and cover. A fresh key per navigation
+ * starts every "+ New template" visit empty (browser back/forward still restores the draft).
+ */
+export function NewTemplateEditor(props: Omit<Parameters<typeof TemplateEditor>[0], "id">) {
+  const { bfcacheId } = useRouter();
+  return <TemplateEditor key={bfcacheId} id={null} {...props} />;
+}

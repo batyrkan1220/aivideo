@@ -6,7 +6,7 @@ import { can } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { env } from "@/lib/env";
 import { emptyTemplate, rowToInput } from "@/lib/templates/admin-schema";
-import { TemplateEditor } from "./editor";
+import { NewTemplateEditor, TemplateEditor } from "./editor";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 
 /** Server part of the editor: permission check + data loading. `id` null = new template. */
@@ -25,7 +25,7 @@ export async function EditorLoader({ id }: { id: string | null }) {
     return (
       <>
         <h1 className="mb-6 text-2xl font-extrabold tracking-tight">{ru.admin.editor.createTitle}</h1>
-        <TemplateEditor id={null} initial={emptyTemplate()} status="draft" categories={categories} mediaBase={mediaBase} seedancePricing={seedancePricing} />
+        <NewTemplateEditor initial={emptyTemplate()} status="draft" categories={categories} mediaBase={mediaBase} seedancePricing={seedancePricing} />
       </>
     );
   }
