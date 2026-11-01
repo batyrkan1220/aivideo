@@ -33,7 +33,7 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
   const combo = t.comboIds ? await comboItems(t.comboIds) : undefined;
   return (
     <>
-    <Link href={photo ? "/photos" : "/"} className="-my-2 inline-block py-2 text-sm font-medium text-muted hover:text-ink">← {photo ? kk.template.backPhotos : kk.template.back}</Link>
+    <Link href={photo ? "/photos" : "/"} className="tg-hide -my-2 inline-block py-2 text-sm font-medium text-muted hover:text-ink">← {photo ? kk.template.backPhotos : kk.template.back}</Link>
     <TemplateDetailView
       t={t}
       combo={combo}

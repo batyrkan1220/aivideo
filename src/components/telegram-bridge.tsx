@@ -7,6 +7,18 @@ import { TG_READY_EVENT, launchInitData, noAutoLogin, setNoAutoLogin, telegramAp
 const SCRIPT = "https://telegram.org/js/telegram-web-app.js";
 const AUTH_PAGES = ["/login", "/signup"];
 let signInRef: (() => void) | null = null;
+let navDepth = -1; // in-app page changes since launch (first render = 0)
+let lastPath = "";
+const TAB_ROOTS = ["/", "/photos", "/create", "/orders", "/account", ...AUTH_PAGES];
+
+/** Where Back goes when there is no in-app history (e.g. opened from a direct link). Null on tab roots. */
+function backTarget(path: string): string | null {
+  if (TAB_ROOTS.includes(path)) return null;
+  if (path.startsWith("/orders/")) return "/orders";
+  if (path.startsWith("/account/")) return "/account";
+  if (path.startsWith("/photos/")) return "/photos";
+  return "/";
+}
 
 /**
  * Inside the Telegram Mini App:
@@ -29,6 +41,8 @@ export function TelegramBridge() {
   // After an explicit logout in Telegram: no auto sign-in; show a one-tap button on login pages.
   const manual = useSyncExternalStore(() => () => {}, () => !!launchInitData() && noAutoLogin(), () => false);
   const setSigningIn = (v: boolean) => setPending(v);
+  // Re-run the Back button effect once Telegram's script has loaded.
+  const [tgUi, setTgUi] = useState(0);
 
   useEffect(() => {
     const initData = launchInitData();
@@ -43,7 +57,7 @@ export function TelegramBridge() {
       try {
         if (sessionStorage.getItem("trendme.tgStartDone") !== start) {
           sessionStorage.setItem("trendme.tgStartDone", start);
-          if (window.location.pathname === "/") router.replace(`/templates/${tpl}`);
+          if (window.location.pathname === "/") { navDepth = -1; lastPath = ""; router.replace(`/templates/${tpl}`); }
         }
       } catch { /* storage unavailable: skip the jump */ }
     }
@@ -86,6 +100,7 @@ export function TelegramBridge() {
       wa.ready(); wa.expand();
       wa.setHeaderColor?.("#faf5f1"); wa.setBackgroundColor?.("#faf5f1"); wa.setBottomBarColor?.("#faf5f1");
       window.dispatchEvent(new Event(TG_READY_EVENT));
+      setTgUi((n) => n + 1);
     };
     if (window.Telegram?.WebApp) ui();
     else {
@@ -95,12 +110,23 @@ export function TelegramBridge() {
     }
   }, [router]);
 
-  // Never show Telegram's native Back button: it takes the place of the Close (×) button, and
-  // people want to close the Mini App from any page in one tap. In-app navigation uses the
-  // bottom tabs and on-page back links.
+  // Telegram's native Back button (it replaces the × in the header) on inner pages;
+  // tab roots keep the × so the Mini App closes in one tap. On-page "←" links are hidden in Telegram.
   useEffect(() => {
-    telegramApp()?.BackButton.hide();
-  }, [pathname, search]);
+    if (pathname !== lastPath) { lastPath = pathname; navDepth++; }
+    const bb = telegramApp()?.BackButton;
+    if (!bb) return;
+    const parent = backTarget(pathname);
+    if (!parent) { bb.hide(); return; }
+    const onBack = () => {
+      // Go back only through pages opened inside the app; otherwise jump to the parent page.
+      if (navDepth > 0) { navDepth = Math.max(0, navDepth - 2); router.back(); }
+      else router.replace(parent);
+    };
+    bb.onClick(onBack);
+    bb.show();
+    return () => { bb.offClick(onBack); };
+  }, [pathname, search, router, tgUi]);
 
   if (manual && tgOnAuthPage && !pending) {
     return (

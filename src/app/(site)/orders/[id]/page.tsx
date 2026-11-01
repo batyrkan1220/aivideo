@@ -109,7 +109,7 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
   return (
     <div className="space-y-4">
       <div>
-        <Link href="/orders" className="-my-2 inline-block py-2 text-sm font-medium text-muted hover:text-ink">← {kk.gallery.title}</Link>
+        <Link href="/orders" className="tg-hide -my-2 inline-block py-2 text-sm font-medium text-muted hover:text-ink">← {kk.gallery.title}</Link>
         <h1 className="mt-2 text-[26px] font-extrabold leading-tight tracking-tight sm:text-3xl">{snap.title_kk}</h1>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
           <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${chip.c}`}>{chip.t}</span>
