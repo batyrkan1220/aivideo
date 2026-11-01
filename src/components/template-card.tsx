@@ -39,7 +39,23 @@ function heroReady(): Promise<void> {
   return gate;
 }
 
-const MAX_PLAYING = 6; // every card on screen plays (light 360p previews keep this cheap)
+const MAX_PLAYING = 16; // every card on screen plays, tablets and desktops included
+
+// Some browsers (iOS Low Power Mode, data saver, some Android tablets) refuse autoplay until the
+// person touches the page. Failed cards wait here and start on the first touch, scroll or click.
+const waitingForGesture = new Set<() => void>();
+let gestureHooked = false;
+function retryOnGesture(fn: () => void) {
+  waitingForGesture.add(fn);
+  if (gestureHooked) return;
+  gestureHooked = true;
+  const go = () => {
+    const fns = [...waitingForGesture];
+    waitingForGesture.clear();
+    fns.forEach((f) => f());
+  };
+  for (const ev of ["touchstart", "pointerdown", "scroll", "keydown"]) window.addEventListener(ev, go, { passive: true });
+}
 const playingNow: HTMLVideoElement[] = [];
 function claimPlayback(v: HTMLVideoElement) {
   const i = playingNow.indexOf(v);
@@ -55,7 +71,7 @@ function releasePlayback(v: HTMLVideoElement) {
 /**
  * 9:16 template card, built for long grids of video:
  *  - the cover image is lazy-loaded; the video has NO src until the card is near the screen;
- *  - visible cards autoplay (muted, inline), up to six at once; off-screen videos are paused.
+ *  - visible cards autoplay (muted, inline); off-screen videos are paused.
  */
 export function TemplateCard({ t, priority = false }: { t: CardData; priority?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -84,9 +100,12 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
     v.muted = true; // Telegram WebView: the property must be set before play()
     v.defaultMuted = true;
     claimPlayback(v);
+    const onScreen = () => { const r = v.getBoundingClientRect(); return r.bottom > 0 && r.top < window.innerHeight; };
+    const again = () => { if (videoRef.current === v && onScreen()) v.play().then(() => setPlaying(true)).catch(() => {}); };
     v.play().then(() => setPlaying(true)).catch(() => {
-      // Not enough data yet (or WebView refused): retry once the first frame is loaded.
-      v.addEventListener("loadeddata", () => { v.play().then(() => setPlaying(true)).catch(() => releasePlayback(v)); }, { once: true });
+      // Not enough data yet: retry once the first frame is loaded; autoplay blocked: retry on first touch.
+      if (v.readyState < 2) v.addEventListener("loadeddata", () => { v.play().then(() => setPlaying(true)).catch(() => retryOnGesture(again)); }, { once: true });
+      else retryOnGesture(again);
     });
   };
   const stop = () => {
@@ -150,6 +169,11 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
             playsInline
             preload="metadata"
             aria-hidden
+            // The light copy is missing (e.g. replaced during a re-encode): fall back to the original.
+            onError={(e) => {
+              const v = e.currentTarget;
+              if (t.previewLiteUrl && t.previewUrl && !v.src.startsWith(t.previewUrl)) { v.src = t.previewUrl; play(); }
+            }}
             className="absolute inset-0 h-full w-full object-cover"
           />
         )}
