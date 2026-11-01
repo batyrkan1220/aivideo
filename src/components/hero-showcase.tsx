@@ -7,7 +7,7 @@ type Item = { id: string; title: string; coverUrl: string | null; previewUrl: st
  * The hero's one moment of motion: up to three real trend templates fanned like phones,
  * the front one playing muted. Reduced-motion users get the still covers.
  */
-export function HeroShowcase({ items, compact = false }: { items: Item[]; compact?: boolean }) {
+export function HeroShowcase({ items, compact = false, onDark = false }: { items: Item[]; compact?: boolean; onDark?: boolean }) {
   if (!items.length) return null;
 
   // back-left, back-right, front-centre
@@ -22,7 +22,7 @@ export function HeroShowcase({ items, compact = false }: { items: Item[]; compac
 
   return (
     <div className={`relative mx-auto flex w-full max-w-md items-center justify-center overflow-hidden ${compact ? "h-[13.5rem]" : "h-[21rem] sm:h-[26rem] sm:overflow-visible md:h-[30rem]"}`} aria-label={kk.home.trendingTitle}>
-      <div className={`absolute -z-0 bg-brand-soft ${compact ? "inset-x-6 bottom-2 top-6 rounded-[2rem]" : "inset-x-4 bottom-4 top-8 rounded-[2.5rem] sm:inset-x-6 sm:bottom-6 sm:top-10 sm:rounded-[3rem]"}`} aria-hidden />
+      <div className={`absolute -z-0 ${onDark ? "bg-white/[0.07]" : "bg-brand-soft"} ${compact ? "inset-x-6 bottom-2 top-6 rounded-[2rem]" : "inset-x-4 bottom-4 top-8 rounded-[2.5rem] sm:inset-x-6 sm:bottom-6 sm:top-10 sm:rounded-[3rem]"}`} aria-hidden />
       {order.map((t, i) => {
         const front = i === order.length - 1;
         return (
