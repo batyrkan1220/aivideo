@@ -422,29 +422,22 @@ export function CreateFlow({
         );
       })()}
 
-      {/* Quality: 720p by default; Full HD on request — the total updates right away. */}
+      {/* Quality: a dropdown, 720p by default; picking Full HD updates the total right away. */}
       {effQualities.length > 1 && <section className="rounded-card border border-line bg-surface p-4 sm:p-5">
-        <p className="text-[16px] font-extrabold tracking-tight">{c.qualityTitle}</p>
-        <div role="radiogroup" aria-label={c.qualityTitle} className="mt-3 grid grid-cols-2 gap-2">
-          {effQualities.map((q) => {
-            const on = quality === q.key;
-            const base = effQualities[0];
-            const extra = waitingForVideo ? null : calculatePrice(effPricing, q, faceCount).totalKzt - calculatePrice(effPricing, base, faceCount).totalKzt;
-            const hd = q.key === "1080p";
-            return (
-              <button key={q.key} type="button" role="radio" aria-checked={on} onClick={() => setQuality(q.key)}
-                className={`rounded-2xl border-2 px-3 py-3 text-left transition-colors ${on ? "border-night bg-night text-white" : "border-line bg-paper text-ink active:border-ink"}`}>
-                <span className="flex items-center justify-between gap-2">
-                  <span className="text-[17px] font-extrabold">{q.resolution ?? q.key}</span>
-                  <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-black ${on ? "bg-brand text-night" : "ring-2 ring-line"}`} aria-hidden>{on ? "✓" : ""}</span>
-                </span>
-                <span className={`mt-0.5 block text-[12px] ${on ? "text-white/70" : "text-muted"}`}>{hd ? c.qualityHd : c.qualityStd}</span>
-                <span className={`mt-1.5 block text-[13px] font-bold ${on ? "text-[#d7f443]" : hd ? "text-ink" : "text-muted"}`}>
-                  {extra === null ? "" : extra > 0 ? `+${formatKzt(extra)}` : c.qualityIncluded}
-                </span>
-              </button>
-            );
-          })}
+        <label htmlFor="quality" className="text-[16px] font-extrabold tracking-tight">{c.qualityTitle}</label>
+        <div className="relative mt-3">
+          <select id="quality" value={quality} onChange={(e) => setQuality(e.target.value)}
+            className="h-13 w-full appearance-none rounded-2xl border-2 border-line bg-paper pl-4 pr-11 text-[16px] font-semibold text-ink outline-none focus:border-ink">
+            {effQualities.map((q) => {
+              const extra = waitingForVideo ? null : calculatePrice(effPricing, q, faceCount).totalKzt - calculatePrice(effPricing, effQualities[0], faceCount).totalKzt;
+              return (
+                <option key={q.key} value={q.key}>
+                  {q.key === "1080p" ? `1080p · Full HD${extra ? ` · +${formatKzt(extra)}` : ""}` : `720p · HD${extra === null ? "" : ` · ${c.qualityIncluded.toLowerCase()}`}`}
+                </option>
+              );
+            })}
+          </select>
+          <svg viewBox="0 0 24 24" className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="m8 10 4-4 4 4M8 14l4 4 4-4" /></svg>
         </div>
       </section>}
 
