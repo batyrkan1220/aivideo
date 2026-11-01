@@ -47,9 +47,9 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
           </div>
         </div>
         {/* Same hero as the website: three trend templates fanned like phones, the front one playing (lite preview). */}
-        <PhoneOnly fallback={<div className="h-[21rem]" />}>
-          <Suspense fallback={<div className="h-[21rem]" />}>
-            <Showcase />
+        <PhoneOnly fallback={<div className="h-[13.5rem]" />}>
+          <Suspense fallback={<div className="h-[13.5rem]" />}>
+            <Showcase compact />
           </Suspense>
         </PhoneOnly>
       </section>
@@ -118,7 +118,7 @@ async function Notice({ searchParams }: { searchParams: Promise<SP> }) {
   );
 }
 
-async function Showcase() {
+async function Showcase({ compact = false }: { compact?: boolean }) {
   const items = (await resolveShowcase()).map(({ id, title, coverUrl, previewUrl, previewLiteUrl }) => ({ id, title, coverUrl, previewUrl: previewLiteUrl ?? previewUrl }));
-  return <HeroShowcase items={items} />;
+  return <HeroShowcase items={items} compact={compact} />;
 }
