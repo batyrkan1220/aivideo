@@ -46,31 +46,12 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
             <Logo className="text-base" />
           </div>
         </div>
-        {/* Conversion hero: promise → proof (3 real trend videos, the front one playing) → reassurance → one button. */}
-        <div className="relative overflow-hidden rounded-[26px] bg-night px-4 pb-4 pt-4 text-white shadow-[0_20px_40px_-26px_rgba(22,22,22,0.7)]">
-          <span aria-hidden className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(215,244,67,0.3),transparent_65%)]" />
-          <span aria-hidden className="pointer-events-none absolute -bottom-20 -left-16 h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(47,101,246,0.22),transparent_65%)]" />
-          <div className="relative text-center">
-            <span className="inline-flex items-center rounded-full bg-[#d7f443]/15 px-2.5 py-1 text-[11px] font-bold text-[#d7f443]">{kk.home.heroKicker}</span>
-            <h1 className="mt-2 text-[23px] font-extrabold leading-[1.08] tracking-tight">
-              {kk.home.heroTitleA} <span className="text-[#d7f443]">{kk.home.heroTitleB}</span>
-            </h1>
-            <p className="mx-auto mt-1.5 max-w-[17rem] text-[13px] leading-snug text-white/70">{kk.home.heroSubline}</p>
-          </div>
-          <div className="relative -mx-2 mt-1">
-            <PhoneOnly fallback={<div className="h-[13.5rem]" />}>
-              <Suspense fallback={<div className="h-[13.5rem]" />}>
-                <Showcase compact onDark />
-              </Suspense>
-            </PhoneOnly>
-          </div>
-          <ul className="relative mt-1 flex justify-center gap-1.5 text-[12px] font-semibold">
-            {kk.home.heroProof.map((x) => <li key={x} className="rounded-full bg-white/[0.08] px-2.5 py-1 text-white/85">{x}</li>)}
-          </ul>
-          <a href="#templates" className="btn-lime relative mt-3 flex h-12 items-center justify-center gap-1.5 rounded-full text-[15px] font-extrabold">
-            {kk.home.heroCta} <span aria-hidden>↓</span>
-          </a>
-        </div>
+        {/* Same hero as the website: three trend templates fanned like phones, the front one playing (lite preview). */}
+        <PhoneOnly fallback={<div className="h-[13.5rem]" />}>
+          <Suspense fallback={<div className="h-[13.5rem]" />}>
+            <Showcase compact />
+          </Suspense>
+        </PhoneOnly>
       </section>
 
       <Suspense fallback={<div className="mx-auto mt-4 max-w-6xl px-4"><CachedFeedFallback /></div>}>
@@ -137,7 +118,7 @@ async function Notice({ searchParams }: { searchParams: Promise<SP> }) {
   );
 }
 
-async function Showcase({ compact = false, onDark = false }: { compact?: boolean; onDark?: boolean }) {
+async function Showcase({ compact = false }: { compact?: boolean }) {
   const items = (await resolveShowcase()).map(({ id, title, coverUrl, previewUrl, previewLiteUrl }) => ({ id, title, coverUrl, previewUrl: previewLiteUrl ?? previewUrl }));
-  return <HeroShowcase items={items} compact={compact} onDark={onDark} />;
+  return <HeroShowcase items={items} compact={compact} />;
 }
