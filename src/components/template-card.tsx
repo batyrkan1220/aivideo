@@ -42,20 +42,18 @@ function heroReady(): Promise<void> {
 const MAX_PLAYING = 16; // every card on screen plays, tablets and desktops included
 
 // Some browsers (iOS Low Power Mode, data saver, some Android tablets) refuse autoplay until the
-// person touches the page. Failed cards wait here and start on the first touch, scroll or click.
+// person taps the page. iOS counts only taps (touchend / click) as a gesture, not scrolling, so
+// blocked cards retry on every tap until they start.
 const waitingForGesture = new Set<() => void>();
 let gestureHooked = false;
 function retryOnGesture(fn: () => void) {
   waitingForGesture.add(fn);
   if (gestureHooked) return;
   gestureHooked = true;
-  const go = () => {
-    const fns = [...waitingForGesture];
-    waitingForGesture.clear();
-    fns.forEach((f) => f());
-  };
-  for (const ev of ["touchstart", "pointerdown", "scroll", "keydown"]) window.addEventListener(ev, go, { passive: true });
+  const go = () => [...waitingForGesture].forEach((f) => f());
+  for (const ev of ["touchend", "click", "keydown"]) window.addEventListener(ev, go, { passive: true, capture: true });
 }
+
 const playingNow: HTMLVideoElement[] = [];
 function claimPlayback(v: HTMLVideoElement) {
   const i = playingNow.indexOf(v);
@@ -101,7 +99,10 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
     v.defaultMuted = true;
     claimPlayback(v);
     const onScreen = () => { const r = v.getBoundingClientRect(); return r.bottom > 0 && r.top < window.innerHeight; };
-    const again = () => { if (videoRef.current === v && onScreen()) v.play().then(() => setPlaying(true)).catch(() => {}); };
+    const again = () => {
+      if (videoRef.current !== v || !v.isConnected) { waitingForGesture.delete(again); return; }
+      if (onScreen()) v.play().then(() => { waitingForGesture.delete(again); setPlaying(true); }).catch(() => {});
+    };
     v.play().then(() => setPlaying(true)).catch(() => {
       // Not enough data yet: retry once the first frame is loaded; autoplay blocked: retry on first touch.
       if (v.readyState < 2) v.addEventListener("loadeddata", () => { v.play().then(() => setPlaying(true)).catch(() => retryOnGesture(again)); }, { once: true });
