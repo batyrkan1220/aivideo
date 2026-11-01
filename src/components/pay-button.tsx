@@ -1,6 +1,7 @@
 "use client";
 import { useActionState } from "react";
 import { useSavedPhone, savePhone } from "@/lib/payments/saved-phone";
+import { KzPhoneInput } from "./kz-phone-input";
 import { kk } from "@/lib/i18n/kk";
 import { startCheckout, type CheckoutState } from "@/lib/payments/actions";
 
@@ -22,11 +23,9 @@ function WebPay({ orderId, label, sandbox, askPhone = false }: { orderId: string
             <img src="/kaspi.png" alt="Kaspi" width={28} height={28} className="h-7 w-7 rounded-[8px] ring-2 ring-white/70" />
             {kk.tole.phoneLabel}
           </span>
-          <input
-            name="phone" type="tel" inputMode="tel" autoComplete="tel" required value={phone} onChange={(e) => setPhone(e.target.value)}
-            placeholder={kk.tole.phonePlaceholder}
-            aria-invalid={state.error === "phone_invalid"}
-            className={`h-12 w-full rounded-xl border-2 bg-white px-4 text-base text-ink outline-none focus:border-night ${state.error === "phone_invalid" ? "border-night" : "border-white"}`}
+          <KzPhoneInput
+            name="phone" required value={phone} onChange={setPhone} ariaLabel={kk.tole.phoneLabel} invalid={state.error === "phone_invalid"}
+            className={`h-12 w-full rounded-xl border-2 bg-white text-base focus-within:border-night ${state.error === "phone_invalid" ? "border-night" : "border-white"}`}
           />
           <span className="mt-1.5 block text-xs font-medium text-white/90">{kk.tole.phoneHint}</span>
         </label>

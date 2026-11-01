@@ -13,6 +13,7 @@ import { useSavedPhone, savePhone } from "@/lib/payments/saved-phone";
 import { compressPhoto } from "@/lib/uploads/compress";
 import type { Framing } from "@/lib/uploads/photo-quality";
 import { PhotoTips } from "./photo-tips";
+import { KzPhoneInput } from "./kz-phone-input";
 import { seedanceSlots, SEEDANCE_MAX_PEOPLE } from "@/lib/templates/seedance-config";
 import { haptic } from "@/lib/telegram/client";
 import { requestVideoUpload, confirmVideoUpload, removeVideoUpload, type VideoError } from "@/lib/custom-video/actions";
@@ -452,11 +453,9 @@ export function CreateFlow({
             {(++step, c.stepPhone)}
             {phoneOk && !!phone && <span className="ml-auto flex h-6 w-6 items-center justify-center rounded-full bg-white text-[12px] font-extrabold text-[#f14635]" aria-hidden>✓</span>}
           </h2>
-          <input
-            ref={phoneRef}
-            type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
-            placeholder={kk.tole.phonePlaceholder} aria-label={kk.tole.phoneLabel}
-            className={`mt-3 h-13 w-full rounded-2xl border-2 bg-white px-4 text-lg tracking-wide text-ink outline-none transition-colors placeholder:text-muted/70 ${phone && !phoneOk ? "border-night" : "border-white focus:border-night"}`}
+          <KzPhoneInput
+            ref={phoneRef} value={phone} onChange={setPhone} ariaLabel={kk.tole.phoneLabel} invalid={!!phone && !phoneOk}
+            className={`mt-3 h-13 w-full rounded-2xl border-2 bg-white text-lg transition-colors ${phone && !phoneOk ? "border-night" : "border-white focus-within:border-night"}`}
           />
           <p className="mt-1.5 text-xs font-medium text-white/90">
             {phone && !phoneOk ? `⚠️ ${kk.order.payErrors.phone_invalid}` : kk.tole.phoneHint}

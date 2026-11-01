@@ -20,3 +20,14 @@ describe("Kling prompt priorities", () => {
     expect(parseSeedanceConfig({ outfit: "weird" }).outfit).toBe("photo");
   });
 });
+
+import { kzNationalDigits, maskKzNational, normalizeKzPhone } from "@/lib/payments/phone";
+describe("Kaspi phone mask", () => {
+  it("accepts any way of typing or pasting", () => {
+    for (const raw of ["+7 701 555 12 34", "87015551234", "77015551234", "7015551234", "+7 (701) 555-12-34"]) {
+      expect(kzNationalDigits(raw)).toBe("7015551234");
+    }
+    expect(maskKzNational("70155512")).toBe("701 555 12");
+    expect(normalizeKzPhone(`+7 ${maskKzNational("7015551234")}`)).toBe("+77015551234");
+  });
+});
