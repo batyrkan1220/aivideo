@@ -17,3 +17,16 @@ export function DesktopOnly({ children, minWidth = 768 }: { children: ReactNode;
   }, [minWidth]);
   return wide ? <>{children}</> : null;
 }
+
+/** The opposite: phones and the Telegram Mini App (any width) — keeps the phone hero's videos off desktops. */
+export function PhoneOnly({ children, maxWidth = 767, fallback = null }: { children: ReactNode; maxWidth?: number; fallback?: ReactNode }) {
+  const [phone, setPhone] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${maxWidth}px)`);
+    const update = () => setPhone(mq.matches || document.documentElement.dataset.tg === "1");
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, [maxWidth]);
+  return phone ? <>{children}</> : <>{fallback}</>;
+}

@@ -1,13 +1,12 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
 import { kk } from "@/lib/i18n/kk";
-import { listCategories, listTemplates, listTrending } from "@/lib/templates/queries";
+import { listCategories, listTemplates } from "@/lib/templates/queries";
 import { CategoryChips, pickCard } from "@/components/catalog-bits";
 import { VideoFeed } from "@/components/video-feed";
 import { HeroShowcase } from "@/components/hero-showcase";
 import { Logo } from "@/components/logo";
-import { DesktopOnly } from "@/components/desktop-only";
-import { formatKzt } from "@/lib/pricing";
+import { DesktopOnly, PhoneOnly } from "@/components/desktop-only";
 import { CachedFeedFallback } from "@/components/cached-feed";
 import { resolveShowcase } from "@/lib/templates/showcase";
 
@@ -40,72 +39,25 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
         </div>
       </section>
 
-      {/* Phones / Mini App: brand bar (Telegram hides the site header) + a light, text-only hero (no videos) */}
+      {/* Phones / Mini App: brand bar (Telegram hides the site header) + the 3-video hero */}
       <section className="mx-auto max-w-6xl px-4 pt-3 md:hidden">
         <div className="tg-only">
           <div className="mb-3 flex items-center">
             <Logo className="text-base" />
           </div>
         </div>
-        <Suspense fallback={<HeroView covers={[]} minPrice={null} />}>
-          <TextHero />
-        </Suspense>
+        {/* Same hero as the website: three trend templates fanned like phones, the front one playing (lite preview). */}
+        <PhoneOnly fallback={<div className="h-[21rem]" />}>
+          <Suspense fallback={<div className="h-[21rem]" />}>
+            <Showcase />
+          </Suspense>
+        </PhoneOnly>
       </section>
 
       <Suspense fallback={<div className="mx-auto mt-4 max-w-6xl px-4"><CachedFeedFallback /></div>}>
         <Feed searchParams={searchParams} />
       </Suspense>
     </main>
-  );
-}
-
-/** Phone hero (conversion): one promise, visual proof (real template covers, images only),
-    the 3-step path, one primary button with the real starting price, short trust line. */
-async function TextHero() {
-  const [show, trending] = await Promise.all([resolveShowcase(), listTrending(12)]);
-  const covers = [...show, ...trending].map((t) => t.coverUrl).filter((u): u is string => !!u);
-  const prices = [...show, ...trending].map((t) => t.startingPriceKzt).filter((p): p is number => p !== null && p > 0);
-  return <HeroView covers={[...new Set(covers)].slice(0, 3)} minPrice={prices.length ? Math.min(...prices) : null} />;
-}
-
-function HeroView({ covers, minPrice }: { covers: string[]; minPrice: number | null }) {
-  const H = kk.home;
-  const fan = ["-rotate-[10deg] -translate-x-[38%] translate-y-1 scale-[0.84]", "rotate-[10deg] translate-x-[38%] translate-y-1 scale-[0.84]", "rotate-0"];
-  const off = fan.length - covers.length;
-  return (
-    <div className="relative overflow-hidden rounded-[24px] bg-night p-4 text-white shadow-[0_20px_40px_-26px_rgba(22,22,22,0.7)]">
-      <span aria-hidden className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(215,244,67,0.28),transparent_65%)]" />
-      <div className="relative flex items-center gap-3">
-        <div className="min-w-0 flex-1">
-          <span className="inline-flex items-center gap-1 rounded-full bg-[#d7f443]/15 px-2 py-0.5 text-[11px] font-bold text-[#d7f443]">🔥 {H.heroBadge}</span>
-          <h1 className="mt-2 text-[22px] font-extrabold leading-[1.1] tracking-tight">
-            {H.heroLine1} <span className="text-[#d7f443]">{H.heroLine2}</span>
-          </h1>
-        </div>
-        {/* Visual proof: three real template covers fanned like phones */}
-        <div className="relative h-[112px] w-[96px] shrink-0" aria-hidden>
-          {covers.length ? covers.map((src, i) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={src} src={src} alt="" className={`absolute inset-x-[18px] top-0 h-[104px] w-[60px] rounded-[12px] object-cover ring-2 ring-white/90 shadow-[0_10px_20px_-8px_rgba(0,0,0,0.6)] ${fan[off + i]}`} />
-          )) : <span className="absolute inset-x-[18px] top-0 h-[104px] w-[60px] rounded-[12px] bg-white/10" />}
-          <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 rounded-full bg-[#d7f443] px-2 py-0.5 text-[10px] font-extrabold text-night">AI</span>
-        </div>
-      </div>
-
-      {/* The path: 1 photo → AI → video */}
-      <ol className="relative mt-3 flex items-center gap-1.5 text-[12px] font-semibold">
-        {H.heroPath.map((step, i) => (
-          <li key={step} className="flex items-center gap-1.5">
-            {i > 0 && <span className="text-white/35" aria-hidden>→</span>}
-            <span className="rounded-full bg-white/[0.08] px-2.5 py-1 text-white/85">{step}</span>
-          </li>
-        ))}
-      </ol>
-
-      <a href="#templates" className="btn-lime relative mt-3.5 flex h-12 items-center justify-center gap-1.5 rounded-full text-[15px] font-extrabold">
-        {H.heroPick}{minPrice ? <span className="font-bold opacity-70">· {H.heroFrom(formatKzt(minPrice))}</span> : null} ↓
-      </a>
-    </div>
   );
 }
 
@@ -167,6 +119,6 @@ async function Notice({ searchParams }: { searchParams: Promise<SP> }) {
 }
 
 async function Showcase() {
-  const items = (await resolveShowcase()).map(({ id, title, coverUrl, previewUrl }) => ({ id, title, coverUrl, previewUrl }));
+  const items = (await resolveShowcase()).map(({ id, title, coverUrl, previewUrl, previewLiteUrl }) => ({ id, title, coverUrl, previewUrl: previewLiteUrl ?? previewUrl }));
   return <HeroShowcase items={items} />;
 }
