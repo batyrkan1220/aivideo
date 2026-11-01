@@ -28,10 +28,10 @@ export function HeroVideo({ src, poster, anim }: { src: string; poster?: string;
   if (imgMode && anim) {
     if (!loaded) return null;
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={anim} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover motion-reduce:hidden" />;
+    return <img src={anim} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover" />;
   }
   return (
     <video ref={ref} src={src} poster={poster} data-hero-video="" autoPlay muted loop playsInline preload="auto" aria-hidden
-      className="absolute inset-0 h-full w-full object-cover motion-reduce:hidden" />
+      className="absolute inset-0 h-full w-full object-cover" />
   );
 }

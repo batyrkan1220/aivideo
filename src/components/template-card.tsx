@@ -135,11 +135,10 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
   };
 
   // Every card plays while it is on screen (phones, Telegram and desktop alike).
-  // Skipped for reduced-motion and data-saver users.
+  // Plays even with iOS "Reduce Motion" on: the preview is the product, people expect to see it move.
   useEffect(() => {
     const el = cardRef.current;
     if (!el || !near) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     if ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return;
     const io = new IntersectionObserver(([e]) => (e.isIntersecting ? play() : stop()), { threshold: 0.6 });
     io.observe(el);
