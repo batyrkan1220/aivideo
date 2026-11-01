@@ -39,12 +39,13 @@ function Face({ kind }: { kind: "front" | "single" | "covered" | "angle" }) {
   );
 }
 
-const EXAMPLES = [
-  { kind: "front", good: true },
+/** Real example photos (AI-generated people) where we have them; a drawing otherwise. */
+const EXAMPLES: { kind: "front" | "single" | "covered" | "angle"; good: boolean; photo?: string }[] = [
+  { kind: "front", good: true, photo: "/photo-tips/front.jpg" },
   { kind: "single", good: true },
   { kind: "covered", good: false },
   { kind: "angle", good: false },
-] as const;
+];
 
 /** "How to get the perfect photo" banner + bottom sheet with good/bad examples and tips. */
 export function PhotoTips({ initialOpen = false }: { initialOpen?: boolean }) {
@@ -89,7 +90,10 @@ export function PhotoTips({ initialOpen = false }: { initialOpen?: boolean }) {
               {EXAMPLES.map((x) => (
                 <figure key={x.kind}>
                   <div className={`relative aspect-square overflow-hidden rounded-2xl ring-2 ${x.good ? "ring-emerald-400" : "ring-red-300"}`}>
-                    <Face kind={x.kind} />
+                    {x.photo
+                      // eslint-disable-next-line @next/next/no-img-element
+                      ? <img src={x.photo} alt="" loading="lazy" className="h-full w-full object-cover" />
+                      : <Face kind={x.kind} />}
                     <span className={`absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-black text-white ${x.good ? "bg-emerald-500" : "bg-red-500"}`}>{x.good ? "✓" : "✕"}</span>
                   </div>
                   <figcaption className="mt-1 text-[11px] leading-tight text-muted">{T.examples[x.kind]}</figcaption>
