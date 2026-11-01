@@ -10,6 +10,9 @@ import { mediaUrl } from "@/lib/templates/queries";
 import { formatKzt } from "@/lib/pricing";
 import { pricingConfigSchema } from "@/lib/templates/schema";
 import { DeleteTemplateButton } from "./delete-button";
+import { CopyLink } from "./copy-link";
+import { botUsername } from "@/lib/partners";
+import { env } from "@/lib/env";
 import { Badge, Chips, PageHead, nowMs } from "../ui";
 
 type SP = { s?: string; q?: string; sort?: string };
@@ -51,6 +54,8 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
     db.from("categories").select("id,title_kk"),
   ]);
   const all = data ?? [];
+  const bot = await botUsername().catch(() => null);
+  const site = env().NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
   const byId = new Map(((stats ?? []) as { template_id: string; views: number; orders: number; paid: number; revenue: number }[]).map((r) => [r.template_id, r]));
   const catName = new Map((cats ?? []).map((c) => [c.id, c.title_kk as string]));
   const status = sp.s && STATUS[sp.s] ? sp.s : "";
@@ -113,7 +118,9 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
                   <div><dt className="text-muted">Конв.</dt><dd className="text-base font-extrabold">{conv === null ? "—" : `${conv}%`}</dd></div>
                   <div><dt className="text-muted">Выручка</dt><dd className="text-base font-extrabold">{Number(s.revenue) ? formatKzt(Number(s.revenue)) : "—"}</dd></div>
                 </dl>
-                <div className="flex shrink-0 items-center gap-3 text-sm">
+                <div className="flex shrink-0 flex-wrap items-center gap-2 text-sm">
+                  {bot && <CopyLink url={`https://t.me/${bot}?startapp=t_${t.id}`} label="🔗 Mini App" />}
+                  <CopyLink url={`${site}/templates/${t.id}`} label="🔗 Сайт" />
                   <Link href={`/admin/orders?template=${t.id}`} className="font-semibold text-muted hover:text-ink">Заказы</Link>
                   <Link href={`/admin/templates/${t.id}`} className="rounded-full bg-night px-3.5 py-1.5 font-semibold text-white">Изменить</Link>
                   {can(u.role, "templates.publish") && <DeleteTemplateButton id={t.id} title={t.title_kk} />}

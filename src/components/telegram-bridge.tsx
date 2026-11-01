@@ -36,6 +36,18 @@ export function TelegramBridge() {
     document.documentElement.dataset.tg = "1";
     window.dispatchEvent(new Event(TG_READY_EVENT));
 
+    // Direct link to a template: t.me/<bot>?startapp=t_<template id> opens that card (once per launch).
+    const start = new URLSearchParams(initData).get("start_param") ?? "";
+    const tpl = /^t_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(start)?.[1];
+    if (tpl) {
+      try {
+        if (sessionStorage.getItem("trendme.tgStartDone") !== start) {
+          sessionStorage.setItem("trendme.tgStartDone", start);
+          if (window.location.pathname === "/") router.replace(`/templates/${tpl}`);
+        }
+      } catch { /* storage unavailable: skip the jump */ }
+    }
+
     // Sign in (cheap no-op on the server when this Telegram user is already signed in).
     let tries = 0;
     if (noAutoLogin()) { setTimeout(() => setSigningIn(false), 0); }
