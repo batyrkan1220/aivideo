@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { MobileNav } from "@/components/mobile-nav";
+import { PendingTelegramLogin } from "@/components/pending-telegram-login";
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -9,6 +10,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
       <SiteHeader />
       <div className="flex-1">{children}</div>
       <SiteFooter />
+      <PendingTelegramLogin />
       <Suspense fallback={null}>
         <MobileNav />
       </Suspense>

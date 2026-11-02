@@ -7,6 +7,25 @@ import { TelegramIcon } from "./telegram-icon";
 const T = kk.auth;
 
 /**
+ * The waiting sign-in is remembered in this browser: in-app browsers (TikTok, Instagram) often
+ * reload or replace the page while the person is in Telegram. PendingTelegramLogin picks it up
+ * again on any page and finishes it.
+ */
+export const PENDING_KEY = "trendme.tgLogin";
+export type Pending = { id: string; next: string; at: number };
+export const readPending = (): Pending | null => {
+  try {
+    const p = JSON.parse(localStorage.getItem(PENDING_KEY) ?? "null") as Pending | null;
+    return p && typeof p.id === "string" && Date.now() - p.at < 20 * 60_000 ? p : null;
+  } catch { return null; }
+};
+const savePending = (p: Pending | null) => {
+  try { if (p) localStorage.setItem(PENDING_KEY, JSON.stringify(p)); else localStorage.removeItem(PENDING_KEY); } catch { /* storage off */ }
+};
+/** Widgets on screen right now (the background resumer stays quiet while one is visible). */
+export const activeWidgets = { n: 0 };
+
+/**
  * "Log in with Telegram" without email, password or phone number: opens our bot, the person taps
  * Start, and this page signs in by itself (it polls). The request is made before the click so the
  * Telegram link opens directly from the tap (no pop-up blockers).
@@ -24,6 +43,7 @@ export function TelegramBotLogin({ next, onDone, compact = false }: { next: stri
   }, [next]);
 
   useEffect(() => { const t = setTimeout(() => void prepare(), 0); return () => clearTimeout(t); }, [prepare]);
+  useEffect(() => { activeWidgets.n++; return () => { activeWidgets.n--; }; }, []);
 
   /** One poll; returns true while still waiting. */
   const check = useCallback(async (): Promise<boolean> => {
@@ -32,6 +52,7 @@ export function TelegramBotLogin({ next, onDone, compact = false }: { next: stri
     try {
       const r = await pollTelegramLogin(req.id);
       if (r.state === "done") {
+        savePending(null);
         setState("done");
         if (onDone) onDone(r.next ?? next); else window.location.replace(r.next ?? next);
         return false;
@@ -89,7 +110,7 @@ export function TelegramBotLogin({ next, onDone, compact = false }: { next: stri
         <button type="button" onClick={() => void prepare()} className={btn}><TelegramIcon />{T.tgRetry}</button>
       ) : (
         <a href={req?.botUrl ?? "#"} target="_blank" rel="noopener" aria-disabled={!req}
-          onClick={(e) => { if (!req) { e.preventDefault(); return; } setState("waiting"); }}
+          onClick={(e) => { if (!req) { e.preventDefault(); return; } savePending({ id: req.id, next, at: Date.now() }); setState("waiting"); }}
           className={`${btn} ${!req ? "pointer-events-none opacity-70" : ""}`}>
           <TelegramIcon />{T.telegram}
         </a>

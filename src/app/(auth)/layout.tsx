@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Logo } from "@/components/logo";
 import { kk } from "@/lib/i18n/kk";
+import { PendingTelegramLogin } from "@/components/pending-telegram-login";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -22,6 +23,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-brand/40 blur-3xl" aria-hidden />
       </section>
 
+      <PendingTelegramLogin />
       <section className="flex items-center justify-center bg-paper px-4 py-10">
         <div className="w-full max-w-sm">
           <Link href="/" aria-label={kk.brand.name} className="mb-8 flex justify-center md:hidden"><Logo className="text-2xl" /></Link>
