@@ -1,5 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { track } from "@/lib/analytics";
 
 /** "Second video −20% until tomorrow": offered the day after the first video. */
 export const FOLLOWUP_DISCOUNT_PCT = 20;
@@ -25,8 +26,9 @@ export async function markDiscountUsed(orderId: string | null | undefined) {
     const { data: o } = await db.from("orders").select("user_id,pricing_breakdown_json").eq("id", orderId).maybeSingle();
     const id = (o?.pricing_breakdown_json as { discount?: { id?: string } } | null)?.discount?.id;
     if (!o || !id) return;
-    await db.from("user_discounts").update({ used_order_id: orderId, used_at: new Date().toISOString() })
-      .eq("id", id).eq("user_id", o.user_id).is("used_at", null);
+    const { data: used } = await db.from("user_discounts").update({ used_order_id: orderId, used_at: new Date().toISOString() })
+      .eq("id", id).eq("user_id", o.user_id).is("used_at", null).select("percent").maybeSingle();
+    if (used) await track("discount_used", { userId: o.user_id, orderId, props: { percent: used.percent } });
   } catch {
     console.error(JSON.stringify({ src: "engage", event: "discount_mark_failed" }));
   }

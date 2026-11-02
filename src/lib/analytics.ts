@@ -4,7 +4,9 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 export type AnalyticsEvent =
   | "template_viewed" | "preview_played" | "upload_started" | "upload_completed" | "quality_selected"
   | "checkout_initiated" | "payment_succeeded" | "payment_failed"
-  | "generation_started" | "generation_succeeded" | "generation_failed" | "video_downloaded";
+  | "generation_started" | "generation_succeeded" | "generation_failed" | "video_downloaded"
+  // Accounts and messages (journal history)
+  | "guest_created" | "telegram_login" | "telegram_linked" | "reminder_sent" | "offer_sent" | "discount_used" | "photos_kept";
 
 /**
  * Who / where from, for the funnel: an anonymous visitor id and the ad source (utm_source /

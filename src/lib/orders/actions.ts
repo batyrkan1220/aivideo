@@ -205,6 +205,7 @@ export async function keepOrderPhotos(fd: FormData): Promise<void> {
   const now = new Date();
   await db.from("order_assets").update({ saved_at: now.toISOString(), expires_at: new Date(now.getTime() + 30 * 86400_000).toISOString() })
     .eq("order_id", o.id).eq("user_id", user.id);
+  await track("photos_kept", { userId: user.id, orderId: o.id });
   revalidatePath(`/orders/${o.id}`);
 }
 

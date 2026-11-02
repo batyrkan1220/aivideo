@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { botConfigured, sendMessage, tg, appUrl } from "@/lib/telegram/bot";
 import { listTemplates } from "@/lib/templates/queries";
 import { formatKzt } from "@/lib/pricing";
+import { track } from "@/lib/analytics";
 import { FOLLOWUP_DISCOUNT_HOURS, FOLLOWUP_DISCOUNT_PCT, discounted } from "./discount";
 
 /*
@@ -47,6 +48,7 @@ async function reminders(now: number): Promise<number> {
     await sendMessage(chat,
       `⏳ <b>Ваше видео ждёт оплаты</b>\n\n«${esc(title)}» — ${formatKzt(o.amount_kzt)}. Фото уже загружены: оплатите, и через 3–5 минут видео будет готово.`,
       { text: "💳 Оплатить", path: `/orders/${o.id}` });
+    await track("reminder_sent", { userId: o.user_id, orderId: o.id, templateId: o.template_id });
     sent++;
   }
   return sent;
@@ -89,6 +91,7 @@ async function offers(now: number): Promise<number> {
       text: `🎁 <b>Второе видео −${FOLLOWUP_DISCOUNT_PCT}%</b>\n\nСкидка только для вас и действует 24 часа. Ваше фото уже у нас — новое видео можно сделать в один тап.\n\nВыберите тренд:`,
       reply_markup: { inline_keyboard: keyboard },
     });
+    await track("offer_sent", { userId: o.user_id, orderId: o.id, props: { percent: FOLLOWUP_DISCOUNT_PCT } });
     sent++;
   }
   return sent;

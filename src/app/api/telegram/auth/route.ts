@@ -6,6 +6,7 @@ import { allow, clientIp } from "@/lib/security/rate-limit";
 import { verifyInitData } from "@/lib/telegram/init-data";
 import { signInTelegramUser } from "@/lib/telegram/session";
 import { attributeTelegramUser } from "@/lib/partners";
+import { track } from "@/lib/analytics";
 
 /**
  * Mini App sign-in: the client posts Telegram's signed `initData`; we verify it with the bot
@@ -38,6 +39,7 @@ export async function POST(req: NextRequest) {
   try {
     const userId = await signInTelegramUser(v.user);
     await attributeTelegramUser(userId, v.user.id, startParam);
+    await track("telegram_login", { userId, props: { via: "mini_app" } });
     return NextResponse.json({ ok: true, signedIn: true });
   } catch (err) {
     console.error(JSON.stringify({ src: "telegram", event: "sign_in_failed", reason: err instanceof Error ? err.message : "error" }));

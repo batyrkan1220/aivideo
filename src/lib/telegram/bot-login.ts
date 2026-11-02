@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { forgetProfile } from "@/lib/auth/session";
 import { attributeTelegramUser } from "@/lib/partners";
 import { notifyOrderOwner } from "./bot";
+import { track } from "@/lib/analytics";
 import { isGuestEmail, signInByEmail, signInTelegramUser, telegramEmail } from "./session";
 import type { TelegramUser } from "./init-data";
 
@@ -94,6 +95,7 @@ export async function finishLogin(row: Row): Promise<string> {
     userId = await signInTelegramUser(tu);
   }
   await attributeTelegramUser(userId, tu.id, null);
+  await track(guestId ? "telegram_linked" : "telegram_login", { userId, props: { via: "site", merged: !!(guestId && existing) } });
   // A guest who linked Telegram gets the promised bonus: −20% on the next video for 7 days.
   if (guestId) {
     const { count } = await admin.from("user_discounts").select("id", { count: "exact", head: true })
