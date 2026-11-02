@@ -82,7 +82,7 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
       <form className="mb-4 flex flex-wrap items-center gap-2">
         {status && <input type="hidden" name="s" value={status} />}
         <input name="q" defaultValue={sp.q} placeholder="Поиск по названию" className="h-10 w-full rounded-full border border-line bg-white px-4 text-base sm:w-64 sm:text-sm" />
-        <select name="sort" defaultValue={sort} className="h-10 rounded-full border border-line bg-white px-4 text-sm">
+        <select name="sort" defaultValue={sort} className="h-10 flex-1 rounded-full border border-line bg-white px-4 text-sm sm:flex-none">
           {Object.entries(SORTS).map(([k, v]) => <option key={k} value={k}>Сортировка: {v}</option>)}
         </select>
         <button className="h-10 rounded-full bg-night px-5 text-sm font-semibold text-white">Показать</button>
@@ -96,35 +96,44 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
             const st = STATUS[t.status] ?? { label: t.status, color: "gray" as const };
             const conv = Number(s.views) ? Math.round((Number(s.orders) / Number(s.views)) * 1000) / 10 : null;
             return (
-              <li key={t.id} className="flex flex-wrap items-center gap-4 rounded-2xl border border-line bg-white p-3 sm:flex-nowrap">
-                <Link href={`/admin/templates/${t.id}`} className="relative h-20 w-12 shrink-0 overflow-hidden rounded-lg bg-paper ring-1 ring-line">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {cover ? <img src={cover} alt="" className="h-full w-full object-cover" loading="lazy" /> : <span className="flex h-full items-center justify-center text-lg">🎬</span>}
-                </Link>
-                <div className="min-w-0 flex-1">
-                  <Link href={`/admin/templates/${t.id}`} className="font-bold hover:underline">{t.title_kk}</Link>
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                    <Badge color={st.color}>{st.label}</Badge>
-                    {t.is_trending && <Badge color="lime">🔥 тренд</Badge>}
-                    {t.category_id && catName.get(t.category_id) && <Badge>{catName.get(t.category_id)}</Badge>}
-                    <span className="text-xs text-muted">{t.required_face_count} чел.{t.video_duration_sec ? ` · ${Math.round(Number(t.video_duration_sec))} с` : ""}{price ? ` · ${formatKzt(price)}` : " · авто-цена"}</span>
-                    {!t.preview_video_path && <Badge color="red">нет видео</Badge>}
-                    {t.preview_video_path && (!t.preview_lite_path || !t.preview_anim_path) && <Badge color="amber">превью сжимается</Badge>}
+              <li key={t.id} className="rounded-2xl border border-line bg-white p-3 lg:flex lg:items-center lg:gap-4">
+                {/* Cover + title + badges */}
+                <div className="flex min-w-0 gap-3 lg:flex-1 lg:items-center">
+                  <Link href={`/admin/templates/${t.id}`} className="relative h-24 w-16 shrink-0 overflow-hidden rounded-xl bg-paper ring-1 ring-line lg:h-20 lg:w-12 lg:rounded-lg">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {cover ? <img src={cover} alt="" className="h-full w-full object-cover" loading="lazy" /> : <span className="flex h-full items-center justify-center text-lg">🎬</span>}
+                  </Link>
+                  <div className="min-w-0 flex-1">
+                    <Link href={`/admin/templates/${t.id}`} className="line-clamp-2 font-bold leading-snug hover:underline">{t.title_kk}</Link>
+                    <p className="mt-0.5 text-xs text-muted">{t.required_face_count} чел.{t.video_duration_sec ? ` · ${Math.round(Number(t.video_duration_sec))} с` : ""}{price ? ` · ${formatKzt(price)}` : " · авто-цена"}</p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                      <Badge color={st.color}>{st.label}</Badge>
+                      {t.is_trending && <Badge color="lime">🔥 тренд</Badge>}
+                      {t.category_id && catName.get(t.category_id) && <Badge>{catName.get(t.category_id)}</Badge>}
+                      {!t.preview_video_path && <Badge color="red">нет видео</Badge>}
+                      {t.preview_video_path && (!t.preview_lite_path || !t.preview_anim_path) && <Badge color="amber">превью сжимается</Badge>}
+                    </div>
                   </div>
                 </div>
-                <dl className="grid grid-cols-4 gap-x-4 text-center text-xs sm:w-[22rem]">
-                  <div><dt className="text-muted">Просмотры</dt><dd className="text-base font-extrabold">{s.views}</dd></div>
-                  <div><dt className="text-muted">Заказы</dt><dd className="text-base font-extrabold">{s.orders}</dd></div>
-                  <div><dt className="text-muted">Конв.</dt><dd className="text-base font-extrabold">{conv === null ? "—" : `${conv}%`}</dd></div>
-                  <div><dt className="text-muted">Выручка</dt><dd className="text-base font-extrabold">{Number(s.revenue) ? formatKzt(Number(s.revenue)) : "—"}</dd></div>
+                {/* Stats: a tidy strip on phones */}
+                <dl className="mt-3 grid grid-cols-4 gap-1 rounded-xl bg-paper px-1 py-2 text-center text-[11px] lg:mt-0 lg:w-[22rem] lg:shrink-0 lg:bg-transparent lg:p-0 lg:text-xs">
+                  <div><dt className="text-muted">Просм.</dt><dd className="text-[15px] font-extrabold leading-tight lg:text-base">{s.views}</dd></div>
+                  <div><dt className="text-muted">Заказы</dt><dd className="text-[15px] font-extrabold leading-tight lg:text-base">{s.orders}</dd></div>
+                  <div><dt className="text-muted">Конв.</dt><dd className="text-[15px] font-extrabold leading-tight lg:text-base">{conv === null ? "—" : `${conv}%`}</dd></div>
+                  <div><dt className="text-muted">Выручка</dt><dd className="truncate text-[15px] font-extrabold leading-tight lg:text-base">{Number(s.revenue) ? formatKzt(Number(s.revenue)) : "—"}</dd></div>
                 </dl>
-                <div className="flex shrink-0 flex-wrap items-center gap-2 text-sm">
-                  {bot && <CopyLink url={`https://t.me/${bot}?startapp=t_${t.id}`} label="🔗 Mini App" />}
-                  <CopyLink url={`${site}/templates/${t.id}`} label="🔗 Сайт" />
-                  <CopyLink url={`${site}/go/${t.id}`} label="🎯 Реклама" />
-                  <Link href={`/admin/orders?template=${t.id}`} className="font-semibold text-muted hover:text-ink">Заказы</Link>
-                  <Link href={`/admin/templates/${t.id}`} className="rounded-full bg-night px-3.5 py-1.5 font-semibold text-white">Изменить</Link>
-                  {can(u.role, "templates.publish") && <DeleteTemplateButton id={t.id} title={t.title_kk} />}
+                {/* Actions: links in one row, then edit / orders / delete */}
+                <div className="mt-3 space-y-2 text-sm lg:mt-0 lg:w-[19rem] lg:shrink-0">
+                  <div className="grid grid-cols-3 gap-1.5 [&>button]:w-full [&>button]:px-1">
+                    {bot ? <CopyLink url={`https://t.me/${bot}?startapp=t_${t.id}`} label="🔗 Mini App" /> : <span />}
+                    <CopyLink url={`${site}/templates/${t.id}`} label="🔗 Сайт" />
+                    <CopyLink url={`${site}/go/${t.id}`} label="🎯 Реклама" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Link href={`/admin/templates/${t.id}`} className="flex h-10 flex-1 items-center justify-center rounded-full bg-night font-semibold text-white">Изменить</Link>
+                    <Link href={`/admin/orders?template=${t.id}`} className="flex h-10 items-center justify-center rounded-full border border-line px-4 font-semibold text-ink hover:border-ink">Заказы</Link>
+                    {can(u.role, "templates.publish") && <span className="px-1"><DeleteTemplateButton id={t.id} title={t.title_kk} /></span>}
+                  </div>
                 </div>
               </li>
             );
