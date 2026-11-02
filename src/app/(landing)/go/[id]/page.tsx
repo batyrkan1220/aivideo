@@ -46,6 +46,7 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
   void track("template_viewed", { templateId: t.id, props: { landing: true } });
   const a = t.videoAspect ?? 9 / 16;
   const photo = t.media === "photo";
+  const n = Math.max(1, t.faceSlots.length); // photos the customer uploads
 
   return (
     <>
@@ -78,11 +79,12 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
       <h1 className="mt-5 text-center text-[26px] font-extrabold leading-[1.1] tracking-tight">
         {L.title1} <span className="rounded-lg bg-brand px-1.5">{L.titleAccent}</span>
       </h1>
-      <p className="mt-2 text-center text-[15px] text-muted">{photo ? L.leadPhoto(t.title) : L.lead(t.title)}</p>
+      <p className="mt-2 text-center text-[15px] text-muted">{photo ? L.leadPhoto(t.title, n) : L.lead(t.title, n)}</p>
+      {t.description && <p className="mx-auto mt-3 max-w-sm whitespace-pre-line rounded-2xl bg-surface px-4 py-3 text-center text-sm leading-relaxed ring-1 ring-line">{t.description}</p>}
 
       {/* Three trust points */}
       <ul className="mt-4 grid grid-cols-3 gap-2 text-center">
-        {L.points.map((p) => (
+        {L.points(n).map((p) => (
           <li key={p.t} className="rounded-2xl bg-surface px-1.5 py-2.5 ring-1 ring-line">
             {p.i === "kaspi"
               // eslint-disable-next-line @next/next/no-img-element
