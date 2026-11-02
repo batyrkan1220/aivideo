@@ -15,6 +15,8 @@ import type { TelegramUser } from "./init-data";
   Telegram user already has one — its photos, videos and orders move there.
 */
 export const LOGIN_PREFIX = "l_";
+/** Bonus for guests who link Telegram (shown on the order page). */
+export const TELEGRAM_BONUS_PCT = 20;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const loginIdFromStart = (payload: string | null | undefined) => {
@@ -92,6 +94,14 @@ export async function finishLogin(row: Row): Promise<string> {
     userId = await signInTelegramUser(tu);
   }
   await attributeTelegramUser(userId, tu.id, null);
+  // A guest who linked Telegram gets the promised bonus: −20% on the next video for 7 days.
+  if (guestId) {
+    const { count } = await admin.from("user_discounts").select("id", { count: "exact", head: true })
+      .eq("user_id", userId).eq("reason", "telegram_link");
+    if (!count) {
+      await admin.from("user_discounts").insert({ user_id: userId, percent: TELEGRAM_BONUS_PCT, reason: "telegram_link", expires_at: new Date(Date.now() + 7 * 86400_000).toISOString() });
+    }
+  }
   // Signed in to get a finished video (paid as a guest): the "video is ready" message goes to the chat now.
   const orderId = /^\/orders\/([0-9a-f-]{36})/.exec(row.next_path)?.[1];
   if (orderId) {

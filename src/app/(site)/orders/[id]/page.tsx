@@ -18,6 +18,7 @@ import { keepOrderPhotos } from "@/lib/orders/actions";
 import { listTemplates } from "@/lib/templates/queries";
 import { TrackPurchase } from "@/components/pixel-events";
 import { TelegramBotLogin } from "@/components/telegram-bot-login";
+import { TelegramNudge } from "@/components/telegram-nudge";
 import { isGuestEmail } from "@/lib/telegram/session";
 import { orderAccessLink } from "@/lib/orders/access";
 import { CopyLink } from "@/app/admin/templates/copy-link";
@@ -206,9 +207,12 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
 
       {/* Guests (paid without signing in): one tap links Telegram — the video is sent there and the order is never lost. */}
       {guest && (
-        <section className="rounded-[24px] bg-[#2AABEE]/10 p-4 ring-1 ring-[#2AABEE]/30 sm:p-6">
-          <p className="text-[16px] font-extrabold">{kk.order.tgTitle}</p>
-          <p className="mb-3 mt-0.5 text-sm text-muted">{kk.order.tgText}</p>
+        <section className="relative overflow-hidden rounded-[24px] bg-[#2AABEE]/10 p-4 ring-1 ring-[#2AABEE]/30 sm:p-6">
+          <span className="absolute right-3 top-3 rounded-full bg-brand px-2.5 py-1 text-xs font-extrabold text-night">🎁 −20%</span>
+          <p className="pr-16 text-[16px] font-extrabold">{kk.order.tgTitle}</p>
+          <ul className="mb-3 mt-2 space-y-1 text-sm">
+            {kk.order.tgPoints.map((t) => <li key={t} className="flex gap-2"><span className="text-[#229ED9]" aria-hidden>✓</span>{t}</li>)}
+          </ul>
           <TelegramBotLogin next={`/orders/${o.id}`} compact />
           {accessLink && (
             <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-white/70 px-3 py-2.5 text-xs">
@@ -218,6 +222,8 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
           )}
         </section>
       )}
+
+      {guest && (busy || done) && <TelegramNudge orderId={o.id} ready={done} />}
 
       {/* Ad pixels: Purchase once, right after paying (the server reports it too, same event id). */}
       {o.payment_status === "succeeded" && o.amount_kzt > 0 && Date.parse(o.created_at) > nowMinus2d() && (
