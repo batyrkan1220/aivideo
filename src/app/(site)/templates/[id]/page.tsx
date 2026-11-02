@@ -5,13 +5,12 @@ import { kk } from "@/lib/i18n/kk";
 import { getTemplate } from "@/lib/templates/queries";
 import { TemplateDetailView } from "@/components/template-detail";
 import { comboItems } from "@/lib/combos/catalog";
-import { formatKzt } from "@/lib/pricing";
 import { track } from "@/lib/analytics";
 import { CreateFlow } from "@/components/create-flow";
 import { isFreeOrderUser } from "@/lib/orders/free";
 import { getSessionUser } from "@/lib/auth/session";
+import { isGuestEmail } from "@/lib/telegram/session";
 import { env } from "@/lib/env";
-import { ButtonLink } from "@/components/ui/button";
 import type { TemplateDetail } from "@/lib/templates/queries";
 
 export default function TemplatePage({ params }: { params: Promise<{ id: string }> }) {
@@ -49,35 +48,6 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
 
 async function CreateSection({ t }: { t: TemplateDetail }) {
   const user = await getSessionUser();
-  if (!user) {
-    const price = t.startingPriceKzt;
-    const next = encodeURIComponent(`/templates/${t.id}`);
-    return (
-      <>
-        <div className="hidden rounded-card border border-line bg-surface p-5 sm:block">
-          <div className="flex items-baseline justify-between gap-4">
-            <h2 className="font-semibold">{kk.template.priceTitle}</h2>
-            {price !== null && <p className="font-display text-2xl font-bold">{formatKzt(price)}</p>}
-          </div>
-          <p className="mt-2 text-sm text-muted">{kk.create.loginText}</p>
-          <div className="mt-4 flex gap-3">
-            <ButtonLink href={`/login?next=${next}`} size="lg">{kk.auth.login}</ButtonLink>
-            <ButtonLink href={`/signup?next=${next}`} size="lg" variant="secondary">{kk.auth.signup}</ButtonLink>
-          </div>
-        </div>
-        {/* Phones: one big action always in reach, above the bottom tab bar. */}
-        <div className="fixed inset-x-3 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-30 rounded-[1.5rem] border border-black/5 px-3 py-3 shadow-[0_14px_36px_-14px_rgba(0,0,0,0.25)] glass sm:hidden">
-          <ButtonLink href={`/signup?next=${next}`} size="lg" className="w-full">
-            {kk.create.loginCta}{price !== null ? ` · ${formatKzt(price)}` : ""}
-          </ButtonLink>
-          <p className="mt-1.5 text-center text-xs text-muted">
-            {kk.create.haveAccount} <a href={`/login?next=${next}`} className="font-semibold text-brand">{kk.auth.login}</a>
-          </p>
-        </div>
-        <div className="h-28 sm:hidden" aria-hidden />
-      </>
-    );
-  }
   if (!t.priced) {
     return <p className="rounded-card border border-line bg-surface p-5 text-sm text-muted">{kk.template.pricePending}</p>;
   }
@@ -94,7 +64,9 @@ async function CreateSection({ t }: { t: TemplateDetail }) {
       supabaseUrl={e.NEXT_PUBLIC_SUPABASE_URL}
       anonKey={e.NEXT_PUBLIC_SUPABASE_ANON_KEY}
       askPhone={e.PAYMENT_PROVIDER === "tole" || e.PAYMENT_PROVIDER === "tole_sandbox"}
-      freeOrders={await isFreeOrderUser(user.id)}
+      freeOrders={user ? await isFreeOrderUser(user.id) : false}
+      signedIn={!!user}
+      needTelegram={!user || isGuestEmail(user.email)}
       framing={t.photoFraming}
       allowWish={t.allowWish}
       outfit={t.outfit}

@@ -29,7 +29,6 @@ async function AccountNav() {
     return (
       <>
         <Link href="/login" className="rounded-full px-3 py-2 text-sm font-medium hover:bg-brand-soft">{kk.nav.login}</Link>
-        <span className="hidden sm:block"><ButtonLink href="/signup">{kk.auth.signup}</ButtonLink></span>
       </>
     );
   }

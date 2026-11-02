@@ -13,6 +13,8 @@ export const LIMITS = {
   tole_simulate: [10, 60 * 60],
   telegram_auth: [30, 10 * 60],
   handoff: [10, 10 * 60],
+  guest: [20, 60 * 60],          // guest accounts per IP
+  tg_login: [30, 10 * 60],       // Telegram sign-in requests per IP
 } as const satisfies Record<string, readonly [number, number]>;
 
 /** Client IP as seen by Render's proxy (first X-Forwarded-For hop). */

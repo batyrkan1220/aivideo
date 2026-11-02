@@ -3,15 +3,13 @@ import { connection } from "next/server";
 import { kk } from "@/lib/i18n/kk";
 import { env } from "@/lib/env";
 import { getSessionUser } from "@/lib/auth/session";
+import { isGuestEmail } from "@/lib/telegram/session";
 import { customFlowTemplate, customVideoSettings } from "@/lib/custom-video/settings";
 import { CreateFlow } from "@/components/create-flow";
 import { CreateTabs, TabsView } from "@/components/create-tabs";
 import { isFreeOrderUser } from "@/lib/orders/free";
 import { ButtonLink } from "@/components/ui/button";
-import { formatKzt } from "@/lib/pricing";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
-import { seedanceAutoPriceKzt } from "@/lib/pricing-seedance";
-import { SEEDANCE_MIN_SEC } from "@/lib/templates/seedance-config";
 import { PHOTOS_SOON } from "@/lib/features";
 
 export const metadata = { title: kk.createHub.title };
@@ -77,20 +75,6 @@ function Disabled() {
   );
 }
 
-function Login({ next, price }: { next: string; price: string }) {
-  return (
-    <div className="rounded-[24px] bg-surface p-5 ring-1 ring-line">
-      <h2 className="text-lg font-bold">{kk.create.loginTitle}</h2>
-      <p className="mt-1 text-sm text-muted">{kk.create.loginText}</p>
-      <p className="mt-3 inline-flex rounded-full bg-lavender px-3 py-1 text-sm font-semibold">{price}</p>
-      <div className="mt-4 flex flex-wrap gap-3">
-        <ButtonLink href={`/login?next=${encodeURIComponent(next)}`} size="lg">{kk.auth.login}</ButtonLink>
-        <ButtonLink href={`/signup?next=${encodeURIComponent(next)}`} size="lg" variant="secondary">{kk.auth.signup}</ButtonLink>
-      </div>
-    </div>
-  );
-}
-
 function common() {
   const e = env();
   return {
@@ -106,7 +90,6 @@ function common() {
 async function VideoFlow() {
   const [user, s, t, ap] = await Promise.all([getSessionUser(), customVideoSettings(), customFlowTemplate("custom"), seedancePricingSettings()]);
   if (!s.enabled || !t) return <Disabled />;
-  if (!user) return <Login next="/create" price={kk.customVideo.priceFrom(formatKzt(seedanceAutoPriceKzt(SEEDANCE_MIN_SEC, ap)))} />;
   const c = common();
   return (
     <CreateFlow
@@ -114,7 +97,8 @@ async function VideoFlow() {
       seedancePricing={ap} allowWish={t.allowWish} seedanceMode={t.seedanceMode}
       maxUploadBytes={Math.min(t.maxUploadBytes, c.uploadMax)} minDimension={c.minDimension} maxDimension={c.maxDimension}
       supabaseUrl={c.supabaseUrl} anonKey={c.anonKey} askPhone={c.askPhone}
-      freeOrders={await isFreeOrderUser(user.id)}
+      freeOrders={user ? await isFreeOrderUser(user.id) : false}
+      signedIn={!!user} needTelegram={!user || isGuestEmail(user.email)}
       customVideo={{ maxSeconds: s.maxSeconds, maxMb: s.maxMb }}
     />
   );
@@ -123,8 +107,6 @@ async function VideoFlow() {
 async function PhotoFlow() {
   const [user, s, t] = await Promise.all([getSessionUser(), customVideoSettings(), customFlowTemplate("custom_photo")]);
   if (!t) return <Disabled />;
-  const price = formatKzt(s.photoPriceKzt);
-  if (!user) return <Login next="/create?type=photo" price={H.photo.price(price)} />;
   const c = common();
   return (
     <CreateFlow
@@ -132,7 +114,8 @@ async function PhotoFlow() {
       allowWish media="photo"
       maxUploadBytes={Math.min(t.maxUploadBytes, c.uploadMax)} minDimension={c.minDimension} maxDimension={c.maxDimension}
       supabaseUrl={c.supabaseUrl} anonKey={c.anonKey} askPhone={c.askPhone}
-      freeOrders={await isFreeOrderUser(user.id)}
+      freeOrders={user ? await isFreeOrderUser(user.id) : false}
+      signedIn={!!user} needTelegram={!user || isGuestEmail(user.email)}
     />
   );
 }

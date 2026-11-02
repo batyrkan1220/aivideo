@@ -18,6 +18,8 @@ import { seedanceSlots, SEEDANCE_MAX_PEOPLE, SEEDANCE_MIN_SEC as MIN_VIDEO_SECON
 import { haptic, ensureBotCanWrite } from "@/lib/telegram/client";
 import { requestVideoUpload, confirmVideoUpload, removeVideoUpload, type VideoError } from "@/lib/custom-video/actions";
 import { aspectAllowed, nearestOutputAspect } from "@/lib/custom-video/aspect";
+import { ensureGuestSession } from "@/lib/auth/guest";
+import { TelegramBotLogin } from "./telegram-bot-login";
 
 
 type SlotState =
@@ -89,7 +91,7 @@ function readVideoMeta(url: string): Promise<{ durationSec: number; aspect: numb
 }
 
 export function CreateFlow({
-  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, freeOrders = false, customVideo, seedancePricing, allowWish = false, seedanceMode = "wan", media = "video", wishRequired = false, outfit = "photo",
+  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, freeOrders = false, signedIn = true, needTelegram = false, customVideo, seedancePricing, allowWish = false, seedanceMode = "wan", media = "video", wishRequired = false, outfit = "photo",
 }: {
   templateId: string;
   slots: FaceSlot[];
@@ -104,6 +106,10 @@ export function CreateFlow({
   askPhone?: boolean;
   /** Admin-approved test/gift user: no payment step, the video is made right away. */
   freeOrders?: boolean;
+  /** false: a visitor (e.g. from an ad) — the first upload quietly creates a guest account. */
+  signedIn?: boolean;
+  /** Guest or visitor: before paying, a one-tap Telegram confirmation (the account + where the video is sent). */
+  needTelegram?: boolean;
   /** "Өз видеом": the customer uploads their own video first. */
   customVideo?: { maxSeconds: number; maxMb: number };
   /** With customVideo: the price is computed from the uploaded video's length and the quality. */
@@ -139,6 +145,13 @@ export function CreateFlow({
   useEffect(() => () => previews.current.forEach((u) => URL.revokeObjectURL(u)), []);
 
   const setSlot = (key: string, s: SlotState) => setState((prev) => ({ ...prev, [key]: s }));
+  // Visitors: one guest account for this page (created on the first upload, shared by all slots).
+  const session = useRef<Promise<boolean> | null>(signedIn ? Promise.resolve(true) : null);
+  const ensureSession = () => (session.current ??= ensureGuestSession().then((r) => r.ok, () => false)
+    .then((ok) => { if (!ok) session.current = null; return ok; }));
+  // Guest at payment: the order is saved, then Telegram confirms who it is for.
+  const [tgOrder, setTgOrder] = useState<string | null>(null);
+  const [needTg, setNeedTg] = useState(needTelegram);
   const [video, setVideo] = useState<VideoState>({ phase: "empty" });
   const videoRef = useRef<HTMLElement>(null);
 
@@ -159,6 +172,7 @@ export function CreateFlow({
     if (durationSec > customVideo.maxSeconds + 0.5) { setVideo({ phase: "error", message: cv.errors.too_long(customVideo.maxSeconds) }); return; }
     if (durationSec < MIN_VIDEO_SECONDS) { setVideo({ phase: "error", message: cv.errors.too_short }); return; }
     if (aspect && !aspectAllowed(aspect)) { setVideo({ phase: "error", message: cv.errors.bad_aspect }); return; }
+    if (!(await ensureSession())) { setVideo({ phase: "error", message: kk.errors.generic }); return; }
     const req = await requestVideoUpload({ contentType: type, size: file.size, durationSec, ...(aspect ? { aspect } : {}) });
     if (!req.ok) {
       if (req.error === "unauthorized") { router.push("/login?next=/create"); return; }
@@ -211,6 +225,7 @@ export function CreateFlow({
     if (localErr) { haptic("error"); setSlot(slot.key, { phase: "error", preview, message: errText(localErr) }); return; }
     const seq = (pickSeq.current[slot.key] ?? 0) + 1;
     pickSeq.current[slot.key] = seq;
+    if (!(await ensureSession())) { setSlot(slot.key, { phase: "error", preview, message: kk.errors.generic }); return; }
     const assetId = await upload(slot, file, preview);
     if (!assetId) return;
     if (pickSeq.current[slot.key] !== seq) { void removePhotoUpload(assetId); return; } // replaced meanwhile
@@ -323,15 +338,24 @@ export function CreateFlow({
       setFormError(errText(r.error));
       return;
     }
-    if (r.free) { router.push(`/orders/${r.orderId}`); return; }
-    // One click: the order is created and payment starts right away (the action redirects to it).
     if (needPhone) savePhone(phone);
+    if (needTg) { setTgOrder(r.orderId); return; } // confirm with Telegram first, then pay
+    if (r.free) { router.push(`/orders/${r.orderId}`); return; }
+    await pay(r.orderId);
+  });
+
+  // One click: payment starts right away (the action redirects to it).
+  const pay = async (orderId: string) => {
     const fd = new FormData();
-    fd.set("orderId", r.orderId);
+    fd.set("orderId", orderId);
     if (needPhone) fd.set("phone", phone);
-    const pay = await startCheckout({}, fd);
+    const res = await startCheckout({}, fd);
     // Only reached when payment could not start: the order is saved, pay from its page.
-    router.push(`/orders/${r.orderId}${pay?.error ? `?pay_error=${pay.error}` : ""}`);
+    router.push(`/orders/${orderId}${res?.error ? `?pay_error=${res.error}` : ""}`);
+  };
+  const afterTelegram = (orderId: string) => start(async () => {
+    setNeedTg(false);
+    await pay(orderId);
   });
 
   const gridCols = slots.length === 2 ? "grid-cols-2" : "grid-cols-3";
@@ -340,6 +364,29 @@ export function CreateFlow({
 
   return (
     <div className="space-y-4">
+      {/* Visitor at payment: one tap in Telegram confirms the account (and where the video will be sent). */}
+      {tgOrder && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50 sm:items-center" role="dialog" aria-modal aria-label={c.tgConfirm.title}>
+          <div className="w-full max-w-md rounded-t-[28px] bg-surface p-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] shadow-2xl sm:rounded-[28px]">
+            <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-line sm:hidden" />
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-extrabold tracking-tight">{c.tgConfirm.title}</h2>
+                <p className="mt-1 text-sm text-muted">{c.tgConfirm.text}</p>
+              </div>
+              <button type="button" onClick={() => setTgOrder(null)} aria-label={kk.common.close} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-paper text-muted">✕</button>
+            </div>
+            <ul className="my-4 space-y-1.5 text-sm">
+              {c.tgConfirm.points.map((p) => <li key={p} className="flex gap-2"><span className="text-emerald-600" aria-hidden>✓</span>{p}</li>)}
+            </ul>
+            {pending ? (
+              <p className="py-3 text-center text-sm font-semibold" role="status">{c.tgConfirm.paying}</p>
+            ) : (
+              <TelegramBotLogin next={`/orders/${tgOrder}`} onDone={() => afterTelegram(tgOrder)} />
+            )}
+          </div>
+        </div>
+      )}
       {/* Mini App: the customer declined "allow the bot to message you" — explain why it is needed and ask again. */}
       {needWrite && (
         <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50 sm:items-center" role="dialog" aria-modal aria-label={c.writeAccess.title}>

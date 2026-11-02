@@ -40,6 +40,8 @@ export async function loginAction(_: AuthState, fd: FormData): Promise<AuthState
 }
 
 export async function signupAction(_: AuthState, fd: FormData): Promise<AuthState> {
+  // Customers sign up with Telegram only; email sign-up is closed.
+  if (process.env.EMAIL_SIGNUP !== "on") return { error: kk.errors.generic };
   const email = emailSchema.safeParse(fd.get("email"));
   const password = passwordSchema.safeParse(fd.get("password"));
   const name = z.string().trim().max(80).safeParse(fd.get("displayName") ?? "");

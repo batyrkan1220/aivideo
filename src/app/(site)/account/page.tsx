@@ -4,10 +4,11 @@ import { requireUser } from "@/lib/auth/session";
 import { isStaff } from "@/lib/auth/permissions";
 import { logoutAction } from "@/app/(auth)/actions";
 import { kk } from "@/lib/i18n/kk";
-import { isTelegramEmail } from "@/lib/telegram/session";
+import { isGuestEmail, isTelegramEmail } from "@/lib/telegram/session";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { DisplayNameForm, DeleteAllPhotosForm, DeleteAccountForm, LogoutButton, TelegramDeleteNote } from "@/components/account-forms";
 import { PHOTOS_SOON } from "@/lib/features";
+import { TelegramBotLogin } from "@/components/telegram-bot-login";
 
 export const metadata = { title: kk.account.title };
 
@@ -61,7 +62,8 @@ async function Profile() {
   const photos = (done ?? []).filter((o) => (o as { provider_key?: string }).provider_key === "kling_photo").length;
   const videos = (done ?? []).length - photos;
   const tg = isTelegramEmail(user.email);
-  const name = user.displayName?.trim() || (prof?.telegram_username ? `@${prof.telegram_username}` : tg ? P.guest : (user.email ?? "").split("@")[0] || P.guest);
+  const guest = isGuestEmail(user.email);
+  const name = user.displayName?.trim() || (prof?.telegram_username ? `@${prof.telegram_username}` : tg || guest ? P.guest : (user.email ?? "").split("@")[0] || P.guest);
   const since = prof?.created_at ? new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric", timeZone: "Asia/Almaty" }).format(new Date(prof.created_at)) : null;
 
   return (
@@ -75,7 +77,7 @@ async function Profile() {
           </span>
           <div className="min-w-0">
             <p className="truncate text-xl font-extrabold tracking-tight">{name}</p>
-            <p className="mt-0.5 truncate text-sm text-white/65">{tg ? kk.account.viaTelegram : user.email ?? ""}</p>
+            <p className="mt-0.5 truncate text-sm text-white/65">{tg ? kk.account.viaTelegram : guest ? kk.account.guestNote : user.email ?? ""}</p>
             {since && <p className="mt-0.5 text-xs text-white/45">{P.since(since)}</p>}
           </div>
         </div>
@@ -96,6 +98,15 @@ async function Profile() {
           <Link href="/orders" className="flex h-11 items-center justify-center rounded-full bg-white/10 text-sm font-bold text-white">{kk.gallery.title}</Link>
         </div>
       </section>
+
+      {/* Guest (photos uploaded from an ad, not confirmed yet): keep them by signing in with Telegram. */}
+      {guest && (
+        <section className="mt-4 rounded-[24px] bg-surface p-4 ring-1 ring-line">
+          <p className="font-bold">{kk.account.guestTitle}</p>
+          <p className="mb-3 mt-0.5 text-sm text-muted">{kk.account.guestText}</p>
+          <TelegramBotLogin next="/account" compact />
+        </section>
+      )}
 
       <Group title={P.creative}>
         <Row href="/" icon="🎬" label={P.videoTemplates} hint={P.videoTemplatesHint} />

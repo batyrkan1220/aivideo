@@ -7,9 +7,12 @@ import type { TelegramUser } from "./init-data";
 export const TELEGRAM_EMAIL_DOMAIN = "telegram.trendme.kz";
 export const telegramEmail = (id: number) => `tg${id}@${TELEGRAM_EMAIL_DOMAIN}`;
 export const isTelegramEmail = (email: string | null | undefined) => !!email && email.endsWith(`@${TELEGRAM_EMAIL_DOMAIN}`);
+/** Guests (photo uploaded, not yet confirmed with Telegram) get a placeholder email too. */
+export const GUEST_EMAIL_DOMAIN = "guest.trendme.kz";
+export const isGuestEmail = (email: string | null | undefined) => !!email && email.endsWith(`@${GUEST_EMAIL_DOMAIN}`);
 
 /** Signs the current request in as `email` (sets the normal Supabase session cookies). */
-async function signInByEmail(email: string) {
+export async function signInByEmail(email: string) {
   const admin = supabaseAdmin();
   const { data, error } = await admin.auth.admin.generateLink({ type: "magiclink", email });
   if (error || !data.properties?.hashed_token) throw new Error("link_failed");

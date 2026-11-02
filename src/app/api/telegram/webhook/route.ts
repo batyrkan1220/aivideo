@@ -3,6 +3,8 @@ import { checkWebhookSecret, sendMessage, tg } from "@/lib/telegram/bot";
 import { handleAdminCallback, handleAdminMessage, isBotAdmin } from "@/lib/telegram/admin";
 import { botMessage } from "@/lib/telegram/messages";
 import { codeFromPayload, linkPartnerTelegram, partnerSelfReport, touchFromBot } from "@/lib/partners";
+import { confirmLoginFromBot, loginIdFromStart } from "@/lib/telegram/bot-login";
+import { env } from "@/lib/env";
 
 /**
  * Telegram bot updates. Authentic only with our X-Telegram-Bot-Api-Secret-Token (set via setWebhook).
@@ -14,7 +16,7 @@ export async function POST(req: NextRequest) {
   }
   const update = (await req.json().catch(() => null)) as
     | {
-        message?: { chat?: { id?: number; type?: string }; text?: string; from?: { id?: number; first_name?: string; username?: string } };
+        message?: { chat?: { id?: number; type?: string }; text?: string; from?: { id?: number; first_name?: string; last_name?: string; username?: string } };
         callback_query?: { id: string; data?: string; from?: { id?: number }; message?: { chat?: { id?: number; type?: string } } };
       }
     | null;
@@ -33,6 +35,22 @@ export async function POST(req: NextRequest) {
   const msg = update?.message;
   const chatId = msg?.chat?.id;
   if (!chatId || msg?.chat?.type !== "private") return NextResponse.json({ ok: true });
+
+  // Website sign-in: /start l_<request id> confirms the waiting browser and sends a one-time link.
+  const loginId = loginIdFromStart(msg.text?.startsWith("/start ") ? msg.text.slice(7).trim() : null);
+  if (loginId && msg.from?.id) {
+    const ok = await confirmLoginFromBot(loginId, { id: msg.from.id, first_name: msg.from.first_name, last_name: msg.from.last_name, username: msg.from.username });
+    const site = env().NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
+    await tg("sendMessage", ok ? {
+      chat_id: chatId,
+      text: "✅ Готово, вы вошли в TrendMe!\n\nВернитесь в браузер — заказ уже ждёт оплаты. Если страница закрылась, нажмите кнопку ниже.",
+      reply_markup: { inline_keyboard: [[{ text: "Вернуться на сайт", url: `${site}/auth/tg/${loginId}` }]] },
+    } : {
+      chat_id: chatId,
+      text: "Ссылка для входа устарела. Вернитесь на сайт и нажмите «Войти через Telegram» ещё раз.",
+    });
+    return NextResponse.json({ ok: true });
+  }
 
   // Admin commands (/admin, /stats, /orders, /problems, /order TM-…) — only for listed Telegram ids.
   if (msg.text && (await isBotAdmin(msg.from?.id)) && (await handleAdminMessage(chatId, msg.text))) {
