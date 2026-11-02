@@ -76,7 +76,7 @@ async function stats(days: number) {
     `🧾 Заказов: <b>${st.orders_total ?? 0}</b> · оплачено: <b>${st.orders_paid ?? 0}</b>`,
     `💰 Выручка: <b>${formatKzt(Number(st.revenue_kzt ?? 0))}</b>${st.refunds_count ? ` · возвраты: ${formatKzt(Number(st.refunds_kzt ?? 0))} (${st.refunds_count})` : ""}`,
     `🎬 Готовых видео: <b>${st.generations_completed ?? 0}</b> · не создано: <b>${st.generations_failed ?? 0}</b>`,
-    `🤖 AI (Kling): <b>$${usd.toFixed(2)}</b> ≈ ${formatKzt(cost)}`,
+    `🤖 ИИ (Kling): <b>$${usd.toFixed(2)}</b> ≈ ${formatKzt(cost)}`,
     `📈 Чистая прибыль ≈ <b>${formatKzt(revenue - cost)}</b>`,
     `👤 Новых пользователей: <b>${users ?? 0}</b>`,
     ...(Number(st.duplicate_charges ?? 0) > 0 ? ["", `🚨 Повторных списаний: <b>${st.duplicate_charges}</b> — проверьте в админке на сайте`] : []),
@@ -141,7 +141,7 @@ async function orderDetails(raw: string) {
     `💰 ${formatKzt(o.amount_kzt)} · ${escapeHtml(o.quality ?? "")} · ${o.face_count} чел.`,
     `💳 ${PAY[o.payment_status] ?? o.payment_status}${pays[0] ? ` · ${escapeHtml(pays[0].provider)}${pays[0].provider_phone_last4 ? ` · ••${escapeHtml(pays[0].provider_phone_last4)}` : ""}${pays[0].failure_reason ? ` · ${escapeHtml(pays[0].failure_reason)}` : ""}` : ""}`,
     `🎬 ${GEN[o.generation_status] || "ожидает оплаты"}${jobs.find((j) => j.error_code) ? ` · ${escapeHtml(jobs.find((j) => j.error_code)!.error_code!)}` : ""}${jobs.length ? ` · попыток: ${Math.max(...jobs.map((j) => j.attempt_count))}` : ""}`,
-    ...(usd ? [`🤖 AI: $${usd.toFixed(2)} ≈ ${formatKzt(cost)} · прибыль ≈ ${formatKzt(o.amount_kzt - cost)}`] : []),
+    ...(usd ? [`🤖 ИИ: $${usd.toFixed(2)} ≈ ${formatKzt(cost)} · прибыль ≈ ${formatKzt(o.amount_kzt - cost)}`] : []),
   ];
   return { text: lines.join("\n"), markup: { inline_keyboard: [[siteButton(`/admin/orders/${o.id}`)]] } };
 }

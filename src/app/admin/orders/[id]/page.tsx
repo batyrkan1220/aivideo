@@ -69,7 +69,7 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat tone="dark" label="Сумма" value={formatKzt(o.amount_kzt)} sub={providers.includes("free") ? "бесплатный заказ" : real ? "оплачено" : providers.length ? "тест" : "не оплачено"} />
-        <Stat label="Расход AI" value={costUsd ? formatKzt(costKzt) : "—"} sub={costUsd ? usd(costUsd) : undefined} />
+        <Stat label="Расход ИИ" value={costUsd ? formatKzt(costKzt) : "—"} sub={costUsd ? usd(costUsd) : undefined} />
         <Stat tone={!real ? "default" : o.amount_kzt - costKzt >= 0 ? "good" : "bad"} label="Прибыль" value={real ? formatKzt(o.amount_kzt - costKzt) : "—"} />
         <Stat label="Время генерации" value={(() => { const j = (jobs ?? []).find((x) => x.started_at && x.completed_at); return j ? `${Math.round((Date.parse(j.completed_at) - Date.parse(j.started_at)) / 6000) / 10} мин` : "—"; })()} />
       </div>

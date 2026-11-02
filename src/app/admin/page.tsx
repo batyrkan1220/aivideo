@@ -113,8 +113,8 @@ async function Overview({ searchParams }: { searchParams: Promise<SP> }) {
       {/* Money */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat tone="dark" label="Выручка" value={formatKzt(s.revenue_kzt)} sub={`${s.pay_succeeded} оплат · ${s.buyers} покупателей`} />
-        <Stat label="Расход на AI" value={formatKzt(costKzt)} sub={`${usd(Number(s.cost_usd))}${Number(s.cost_free_usd) > 0 ? ` · из них бесплатные/тест ${usd(Number(s.cost_free_usd))}` : ""}`} href="/admin/services" />
-        <Stat tone={profit >= 0 ? "good" : "bad"} label="Прибыль (выручка − AI)" value={formatKzt(profit)} sub={s.revenue_kzt > 0 ? `маржа ${pct(profit, s.revenue_kzt)}` : "оплат пока нет"} />
+        <Stat label="Расход на ИИ" value={formatKzt(costKzt)} sub={`${usd(Number(s.cost_usd))}${Number(s.cost_free_usd) > 0 ? ` · из них бесплатные/тест ${usd(Number(s.cost_free_usd))}` : ""}`} href="/admin/services" />
+        <Stat tone={profit >= 0 ? "good" : "bad"} label="Прибыль (выручка − ИИ)" value={formatKzt(profit)} sub={s.revenue_kzt > 0 ? `маржа ${pct(profit, s.revenue_kzt)}` : "оплат пока нет"} />
         <Stat label="Средний чек" value={s.pay_succeeded ? formatKzt(Math.round(s.revenue_kzt / s.pay_succeeded)) : "—"} sub={s.refunds_count ? `возвраты: ${s.refunds_count} · ${formatKzt(s.refunds_kzt)}` : "возвратов нет"} />
       </div>
 
@@ -129,7 +129,7 @@ async function Overview({ searchParams }: { searchParams: Promise<SP> }) {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <Card title="По дням" action={<span className="flex gap-3 text-xs text-muted"><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-[#b5d420]" />выручка</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-[#f08f8f]" />AI</span></span>}>
+        <Card title="По дням" action={<span className="flex gap-3 text-xs text-muted"><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-[#b5d420]" />выручка</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-[#f08f8f]" />ИИ</span></span>}>
           <Daily rows={s.daily} rate={rate} />
         </Card>
 
@@ -167,7 +167,7 @@ async function Overview({ searchParams }: { searchParams: Promise<SP> }) {
           {!s.top_templates.length ? <p className="text-sm text-muted">Нет заказов за период</p> : (
             <div className="-mx-5 overflow-x-auto px-5">
               <table className="w-full min-w-[28rem] text-sm">
-                <thead className="text-left text-xs text-muted"><tr><th className="py-1.5 font-medium">Шаблон</th><th className="py-1.5 text-right font-medium">Заказы</th><th className="py-1.5 text-right font-medium">Оплачено</th><th className="py-1.5 text-right font-medium">Выручка</th><th className="py-1.5 text-right font-medium">AI</th></tr></thead>
+                <thead className="text-left text-xs text-muted"><tr><th className="py-1.5 font-medium">Шаблон</th><th className="py-1.5 text-right font-medium">Заказы</th><th className="py-1.5 text-right font-medium">Оплачено</th><th className="py-1.5 text-right font-medium">Выручка</th><th className="py-1.5 text-right font-medium">ИИ</th></tr></thead>
                 <tbody className="divide-y divide-line">
                   {s.top_templates.map((t) => (
                     <tr key={t.id}>
@@ -214,7 +214,7 @@ function Daily({ rows, rate }: { rows: Dash["daily"]; rate: number }) {
             <span className="w-1/2 rounded-t bg-[#b5d420]" style={{ height: `${(r.revenue / max) * 100}%`, minHeight: r.revenue ? 2 : 0 }} />
             <span className="w-1/2 rounded-t bg-[#f08f8f]" style={{ height: `${(r.cost / max) * 100}%`, minHeight: r.cost ? 2 : 0 }} />
             <span className="pointer-events-none absolute bottom-full z-10 mb-1 hidden whitespace-nowrap rounded-lg bg-night px-2 py-1 text-[11px] text-white group-hover:block">
-              {r.day.slice(8, 10)}.{r.day.slice(5, 7)} · заказов {r.orders} · оплат {r.paid} · {formatKzt(r.revenue)} · AI {formatKzt(r.cost)}
+              {r.day.slice(8, 10)}.{r.day.slice(5, 7)} · заказов {r.orders} · оплат {r.paid} · {formatKzt(r.revenue)} · ИИ {formatKzt(r.cost)}
             </span>
           </div>
         ))}

@@ -139,7 +139,7 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
             <thead className="border-b border-line text-xs text-muted">
               <tr>
                 <th className="px-4 py-3 font-medium">Заказ</th><th className="px-4 py-3 font-medium">Клиент</th><th className="px-4 py-3 font-medium">Шаблон</th>
-                <th className="px-4 py-3 text-right font-medium">Сумма</th><th className="px-4 py-3 text-right font-medium">AI · прибыль</th><th className="px-4 py-3 font-medium">Статус</th>
+                <th className="px-4 py-3 text-right font-medium">Сумма</th><th className="px-4 py-3 text-right font-medium">ИИ · прибыль</th><th className="px-4 py-3 font-medium">Статус</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">

@@ -14,12 +14,12 @@ import { SeedancePricingForm } from "../seedance-pricing/form";
 import { CustomVideoForm } from "../custom-video/form";
 import { Badge, Card, PageHead, Stat, fmtDate, usd, nowMs } from "../ui";
 
-export const metadata = { title: "AI и расходы" };
+export const metadata = { title: "ИИ и расходы" };
 
 export default function ServicesPage() {
   return (
     <div>
-      <PageHead title="AI-сервисы и расходы" lead="Баланс Kling, сколько уходит на генерацию, цены и себестоимость." />
+      <PageHead title="ИИ-сервисы и расходы" lead="Баланс Kling, сколько уходит на генерацию, цены и себестоимость." />
       <Suspense fallback={<p className="text-muted">{ru.common.loading}</p>}>
         <Body />
       </Suspense>

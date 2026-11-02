@@ -49,7 +49,7 @@ async function Body({ searchParams }: { searchParams: Promise<{ state?: string }
         <div className="relative mx-auto aspect-[9/16] w-full max-w-[min(100%,calc(56svh*9/16))] overflow-hidden rounded-[20px] bg-night">
           {ready && t?.previewUrl
             ? <video src={t.previewUrl} controls playsInline muted autoPlay loop className="h-full w-full object-cover" />
-            : <span className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white"><span className="h-10 w-10 animate-spin rounded-full border-4 border-white/20 border-t-white" /><span className="text-sm">AI делает видео… 3–5 минут</span></span>}
+            : <span className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white"><span className="h-10 w-10 animate-spin rounded-full border-4 border-white/20 border-t-white" /><span className="text-sm">ИИ делает видео… 3–5 минут</span></span>}
         </div>
         {ready && <span className="mx-auto mt-4 flex h-12 max-w-sm items-center justify-center rounded-full bg-ink text-sm font-bold text-paper">⬇ {kk.result.download}</span>}
       </section>
