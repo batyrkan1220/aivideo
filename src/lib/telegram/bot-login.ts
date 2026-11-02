@@ -2,6 +2,7 @@ import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { forgetProfile } from "@/lib/auth/session";
 import { attributeTelegramUser } from "@/lib/partners";
+import { notifyOrderOwner } from "./bot";
 import { isGuestEmail, signInByEmail, signInTelegramUser, telegramEmail } from "./session";
 import type { TelegramUser } from "./init-data";
 
@@ -91,5 +92,11 @@ export async function finishLogin(row: Row): Promise<string> {
     userId = await signInTelegramUser(tu);
   }
   await attributeTelegramUser(userId, tu.id, null);
+  // Signed in to get a finished video (paid as a guest): the "video is ready" message goes to the chat now.
+  const orderId = /^\/orders\/([0-9a-f-]{36})/.exec(row.next_path)?.[1];
+  if (orderId) {
+    const { data: o } = await admin.from("orders").select("generation_status,user_id").eq("id", orderId).maybeSingle();
+    if (o?.generation_status === "completed" && o.user_id === userId) await notifyOrderOwner(orderId, "ready");
+  }
   return row.next_path;
 }
