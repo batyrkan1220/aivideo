@@ -9,11 +9,12 @@ const BATCH = 200;
  *  - photos past expires_at (never while their order is being generated) → file + row removed
  *  - generated videos past expires_at → file removed (row kept so the UI can say "expired")
  *  - limiter rows older than a day, processed webhook ids older than 90 days → removed
+ *  - files in the private buckets that no row points to any more (older than a day) → removed
  */
 export async function runRetention() {
   const db = supabaseAdmin();
   const now = new Date().toISOString();
-  const out = { photos: 0, videos: 0 };
+  const out = { photos: 0, videos: 0, orphans: 0 };
 
   for (let round = 0; round < 20; round++) {
     const { data: assets } = await db.from("order_assets")
@@ -52,8 +53,46 @@ export async function runRetention() {
     out.videos = videos.length;
   }
 
+  out.orphans = await sweepOrphans();
+
   await db.from("rate_limits").delete().lt("window_start", new Date(Date.now() - 86400_000).toISOString());
   await db.from("webhook_events").delete()
     .lt("created_at", new Date(Date.now() - 90 * 86400_000).toISOString()).not("processed_at", "is", null);
   return out;
+}
+
+/** Private files with no database row (e.g. after a data reset or a failed upload), older than a day. */
+async function sweepOrphans(): Promise<number> {
+  const db = supabaseAdmin();
+  const cutoff = Date.now() - 86400_000;
+  const buckets: { bucket: string; table: "order_assets" | "order_videos" | "generated_videos"; col: string }[] = [
+    { bucket: "user-uploads", table: "order_assets", col: "private_storage_path" },
+    { bucket: "user-videos", table: "order_videos", col: "storage_path" },
+    { bucket: "generated-videos", table: "generated_videos", col: "private_storage_path" },
+  ];
+  let removed = 0;
+  for (const b of buckets) {
+    const files: string[] = [];
+    const walk = async (prefix: string, depth: number) => {
+      const { data } = await db.storage.from(b.bucket).list(prefix, { limit: 1000 });
+      for (const e of data ?? []) {
+        const path = prefix ? `${prefix}/${e.name}` : e.name;
+        if (!e.id) { if (depth < 3) await walk(path, depth + 1); continue; }
+        const at = Date.parse((e.created_at as string | undefined) ?? "");
+        if (Number.isFinite(at) && at < cutoff) files.push(path);
+      }
+    };
+    try { await walk("", 0); } catch { continue; }
+    for (let i = 0; i < files.length; i += 100) {
+      const chunk = files.slice(i, i + 100);
+      const { data: rows } = await db.from(b.table).select(b.col).in(b.col, chunk);
+      const known = new Set(((rows ?? []) as unknown as Record<string, string>[]).map((r) => r[b.col]));
+      const stale = chunk.filter((f) => !known.has(f));
+      if (stale.length) {
+        const { error } = await db.storage.from(b.bucket).remove(stale);
+        if (!error) removed += stale.length;
+      }
+    }
+  }
+  return removed;
 }
