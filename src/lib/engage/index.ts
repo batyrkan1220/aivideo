@@ -88,7 +88,7 @@ async function offers(now: number): Promise<number> {
     ];
     await tg("sendMessage", {
       chat_id: chat, parse_mode: "HTML", link_preview_options: { is_disabled: true },
-      text: `🎁 <b>Второе видео −${FOLLOWUP_DISCOUNT_PCT}%</b>\n\nСкидка только для вас и действует 24 часа. Ваше фото уже у нас — новое видео можно сделать в один тап.\n\nВыберите тренд:`,
+      text: `🎁 <b>Второе видео −${FOLLOWUP_DISCOUNT_PCT}%</b>\n\nСкидка только для вас и действует 24 часа. Ваше фото уже у нас — новое видео можно сделать одним нажатием.\n\nВыберите тренд:`,
       reply_markup: { inline_keyboard: keyboard },
     });
     await track("offer_sent", { userId: o.user_id, orderId: o.id, props: { percent: FOLLOWUP_DISCOUNT_PCT } });
