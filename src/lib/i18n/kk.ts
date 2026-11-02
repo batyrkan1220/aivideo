@@ -21,6 +21,10 @@ export const kk = {
     ],
     terms: "Условия",
     privacy: "Конфиденциальность",
+    moreTitle: "Ещё тренды",
+    moreCount: (n: number) => `${n}+ видео`,
+    tgTitle: "Все тренды — в Telegram",
+    tgText: "Открой приложение TrendMe в Telegram: все шаблоны, а готовые видео приходят прямо в чат.",
   },
   brand: {
     name: "TrendMe",

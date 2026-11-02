@@ -2,7 +2,9 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { kk } from "@/lib/i18n/kk";
 import { env } from "@/lib/env";
-import { getTemplate, type TemplateDetail } from "@/lib/templates/queries";
+import { getTemplate, listTemplates, type TemplateDetail } from "@/lib/templates/queries";
+import { botUsername } from "@/lib/partners";
+import { TelegramIcon } from "@/components/telegram-icon";
 import { getSessionUser } from "@/lib/auth/session";
 import { isGuestEmail } from "@/lib/telegram/session";
 import { isFreeOrderUser } from "@/lib/orders/free";
@@ -91,6 +93,11 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
         </Suspense>
       </div>
 
+      {/* Second chance: other trends here, or all of them in the Telegram app */}
+      <Suspense fallback={null}>
+        <More currentId={t.id} />
+      </Suspense>
+
       {/* Short answers to what stops people */}
       <section className="mt-6 space-y-2">
         {L.faq.map((f) => (
@@ -132,5 +139,56 @@ async function Order({ t }: { t: TemplateDetail }) {
       media={t.media}
       noTabBar
     />
+  );
+}
+
+/** Other trending templates (each opens its own landing) + an invitation to the Telegram app. */
+async function More({ currentId }: { currentId: string }) {
+  const [{ items, total }, bot] = await Promise.all([
+    listTemplates({ page: 1, sort: "trending", media: "video" }),
+    botUsername().catch(() => null),
+  ]);
+  const others = items.filter((x) => x.id !== currentId).slice(0, 8);
+  if (!others.length && !bot) return null;
+  return (
+    <section className="mt-7">
+      {others.length > 0 && (
+        <>
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-[17px] font-extrabold tracking-tight">{L.moreTitle}</h2>
+            <span className="text-xs font-semibold text-muted">{L.moreCount(total)}</span>
+          </div>
+          <ul className="no-scrollbar -mx-4 mt-2.5 flex snap-x gap-2.5 overflow-x-auto px-4 pb-1">
+            {others.map((x) => (
+              <li key={x.id} className="w-[8.5rem] shrink-0 snap-start">
+                <a href={`/go/${x.id}`} className="block">
+                  <span className="relative block aspect-[3/4] overflow-hidden rounded-[14px] bg-night ring-1 ring-black/5">
+                    {(x.coverThumbUrl ?? x.coverUrl) && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={x.coverThumbUrl ?? x.coverUrl ?? ""} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                    )}
+                    <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 pt-6 text-white">
+                      <span className="line-clamp-2 block text-[12px] font-bold leading-tight">{x.title}</span>
+                      {x.startingPriceKzt !== null && <span className="mt-0.5 block text-[11px] font-extrabold text-brand">{formatKzt(x.startingPriceKzt)}</span>}
+                    </span>
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {bot && (
+        <a href={`https://t.me/${bot}?startapp=home`} rel="noopener"
+          className="mt-4 flex items-center gap-3 rounded-[22px] bg-[#2AABEE] p-4 text-white shadow-[0_14px_32px_-16px_rgba(42,171,238,0.9)] transition-transform active:scale-[0.99]">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/20"><TelegramIcon className="h-6 w-6" /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-extrabold leading-tight">{L.tgTitle}</span>
+            <span className="mt-0.5 block text-[12px] leading-snug text-white/85">{L.tgText}</span>
+          </span>
+          <span className="text-xl" aria-hidden>›</span>
+        </a>
+      )}
+    </section>
   );
 }
