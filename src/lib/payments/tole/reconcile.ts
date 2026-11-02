@@ -1,3 +1,4 @@
+import { markDiscountUsed } from "@/lib/engage/discount";
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { track } from "@/lib/analytics";
@@ -56,7 +57,7 @@ export async function reconcileTolePayment(paymentId: string): Promise<TolePayme
           p_amount_kzt: intent.amount, p_currency: intent.currency, p_reason: mapped.reason ?? null,
         });
         toleLog("reconcile_intent", { paymentId: p.id, paymentIntentId: intent.id, status: intent.status, result: String(result), ...(intent.status === "failed" ? { failure: JSON.stringify(intent.failureInfo) } : {}) });
-        if (result === "applied" && mapped.status === "succeeded") await track("payment_succeeded", { orderId: p.order_id });
+        if (result === "applied" && mapped.status === "succeeded") { await track("payment_succeeded", { orderId: p.order_id }); await markDiscountUsed(p.order_id); }
         return { status: result === "applied" ? mapped.status : "pending", ready: true, outcome: null };
       }
     }

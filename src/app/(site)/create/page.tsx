@@ -8,6 +8,8 @@ import { customFlowTemplate, customVideoSettings } from "@/lib/custom-video/sett
 import { CreateFlow } from "@/components/create-flow";
 import { CreateTabs, TabsView } from "@/components/create-tabs";
 import { isFreeOrderUser } from "@/lib/orders/free";
+import { activeDiscount } from "@/lib/engage/discount";
+import { reusablePhotos } from "@/lib/orders/reusable";
 import { ButtonLink } from "@/components/ui/button";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { PHOTOS_SOON } from "@/lib/features";
@@ -98,6 +100,8 @@ async function VideoFlow() {
       maxUploadBytes={Math.min(t.maxUploadBytes, c.uploadMax)} minDimension={c.minDimension} maxDimension={c.maxDimension}
       supabaseUrl={c.supabaseUrl} anonKey={c.anonKey} askPhone={c.askPhone}
       freeOrders={user ? await isFreeOrderUser(user.id) : false}
+      discount={user ? await activeDiscount(user.id) : null}
+      savedPhotos={user ? await reusablePhotos(user.id) : []}
       signedIn={!!user} needTelegram={!user || isGuestEmail(user.email)}
       customVideo={{ maxSeconds: s.maxSeconds, maxMb: s.maxMb }}
     />
@@ -115,6 +119,8 @@ async function PhotoFlow() {
       maxUploadBytes={Math.min(t.maxUploadBytes, c.uploadMax)} minDimension={c.minDimension} maxDimension={c.maxDimension}
       supabaseUrl={c.supabaseUrl} anonKey={c.anonKey} askPhone={c.askPhone}
       freeOrders={user ? await isFreeOrderUser(user.id) : false}
+      discount={user ? await activeDiscount(user.id) : null}
+      savedPhotos={user ? await reusablePhotos(user.id) : []}
       signedIn={!!user} needTelegram={!user || isGuestEmail(user.email)}
     />
   );

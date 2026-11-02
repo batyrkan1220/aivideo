@@ -8,6 +8,8 @@ import { comboItems } from "@/lib/combos/catalog";
 import { track } from "@/lib/analytics";
 import { CreateFlow } from "@/components/create-flow";
 import { isFreeOrderUser } from "@/lib/orders/free";
+import { activeDiscount } from "@/lib/engage/discount";
+import { reusablePhotos } from "@/lib/orders/reusable";
 import { getSessionUser } from "@/lib/auth/session";
 import { isGuestEmail } from "@/lib/telegram/session";
 import { env } from "@/lib/env";
@@ -65,6 +67,8 @@ async function CreateSection({ t }: { t: TemplateDetail }) {
       anonKey={e.NEXT_PUBLIC_SUPABASE_ANON_KEY}
       askPhone={e.PAYMENT_PROVIDER === "tole" || e.PAYMENT_PROVIDER === "tole_sandbox"}
       freeOrders={user ? await isFreeOrderUser(user.id) : false}
+      discount={user ? await activeDiscount(user.id) : null}
+      savedPhotos={user ? await reusablePhotos(user.id) : []}
       signedIn={!!user}
       needTelegram={!user || isGuestEmail(user.email)}
       framing={t.photoFraming}

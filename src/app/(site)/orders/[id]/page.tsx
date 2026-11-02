@@ -14,6 +14,8 @@ import { PayButton } from "@/components/pay-button";
 import { GenerationStatus } from "@/components/generation-status";
 import { ConfirmSubmit } from "@/components/account-forms";
 import { deleteVideo, deleteOrderPhotos } from "@/lib/account/actions";
+import { keepOrderPhotos } from "@/lib/orders/actions";
+import { listTemplates } from "@/lib/templates/queries";
 
 export const metadata = { title: kk.order.title };
 
@@ -44,7 +46,7 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
   // Photos: ownership already proven above; short-lived signed URLs for thumbnails.
   const db = supabaseAdmin();
   const { data: assets } = await db.from("order_assets")
-    .select("face_slot_key,private_storage_path").eq("order_id", o.id).eq("user_id", user.id);
+    .select("face_slot_key,private_storage_path,saved_at").eq("order_id", o.id).eq("user_id", user.id);
   const [{ data: job }, { data: video }] = await Promise.all([
     db.from("generation_jobs").select("status,progress,safe_error_message")
       .eq("order_id", o.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
@@ -194,6 +196,13 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
         </section>
       )}
 
+      {/* Next video with the same photo: fresh trends + keep the photo for 30 days. */}
+      {done && !isPhoto && photos.length > 0 && (
+        <Suspense fallback={null}>
+          <NextVideo orderId={o.id} templateId={o.template_id} saved={(assets ?? []).some((a) => a.saved_at)} />
+        </Suspense>
+      )}
+
       {/* Details: price, photos and housekeeping — tucked away once the work is done. */}
       <details className="group rounded-[20px] bg-surface ring-1 ring-line" open={!done && !awaitingPayment}>
         <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3.5 text-[15px] font-semibold">
@@ -255,4 +264,42 @@ function Line({ label, value }: { label: string; value: string }) {
 /** Server-side expiry check (request time). */
 function notExpired(iso: string) {
   return new Date(iso).getTime() > Date.now();
+}
+
+async function NextVideo({ orderId, templateId, saved }: { orderId: string; templateId: string | null; saved: boolean }) {
+  const { items } = await listTemplates({ page: 1, sort: "trending", media: "video" });
+  const picks = items.filter((t) => t.id !== templateId).slice(0, 4);
+  if (!picks.length) return null;
+  const N = kk.nextVideo;
+  return (
+    <section className="rounded-[24px] bg-surface p-4 ring-1 ring-line sm:p-6">
+      <h2 className="text-[17px] font-extrabold tracking-tight">{N.title}</h2>
+      <p className="mt-0.5 text-sm text-muted">{N.text}</p>
+      <ul className="mt-3 grid grid-cols-2 gap-2.5">
+        {picks.map((t) => (
+          <li key={t.id}>
+            <Link href={`/templates/${t.id}`} className="relative block aspect-[3/4] overflow-hidden rounded-[16px] bg-night ring-1 ring-black/5">
+              {(t.coverThumbUrl ?? t.coverUrl) && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={t.coverThumbUrl ?? t.coverUrl ?? ""} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+              )}
+              <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2.5 pt-8 text-white">
+                <span className="line-clamp-2 block text-[13px] font-bold leading-tight">{t.title}</span>
+                {t.startingPriceKzt !== null && <span className="mt-0.5 block text-[12px] font-extrabold text-brand">{formatKzt(t.startingPriceKzt)}</span>}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      {saved ? (
+        <p className="mt-3 text-center text-xs text-muted">✓ {N.saved}</p>
+      ) : (
+        <form action={keepOrderPhotos} className="mt-3">
+          <input type="hidden" name="orderId" value={orderId} />
+          <button className="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-paper text-sm font-bold ring-1 ring-line hover:ring-ink">📌 {N.keep}</button>
+          <p className="mt-1.5 text-center text-[11px] text-muted">{N.keepHint}</p>
+        </form>
+      )}
+    </section>
+  );
 }

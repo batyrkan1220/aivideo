@@ -1,6 +1,13 @@
 // Centralized dictionary of all user-visible site and Mini App text — in Russian.
 // (The name `kk` is kept so existing imports keep working; the admin panel uses ru.ts.)
 export const kk = {
+  nextVideo: {
+    title: "Ещё видео с этим фото",
+    text: "Фото уже загружено — выберите тренд, и оно подставится само.",
+    keep: "Сохранить фото на 30 дней",
+    keepHint: "Чтобы делать новые видео в один тап. Удалить можно в любой момент.",
+    saved: "Фото сохранено на 30 дней — новые видео в один тап",
+  },
   landing: {
     metaTitle: (t: string) => `${t} — сделай видео с собой`,
     speed: "готово за 3–5 мин",
@@ -442,6 +449,11 @@ export const kk = {
     },
     needWish: "Опишите фото",
     promptToggle: "Добавить промпт (необязательно)",
+    reuseTitle: "Ваше прошлое фото — в один тап",
+    reuseUse: "Использовать это фото",
+    reuseHint: "Нажмите на фото",
+    discountTitle: (p: number) => `Ваша скидка −${p}% на это видео`,
+    discountUntil: (d: string) => `Действует до ${d}`,
     tgConfirm: {
       title: "Последний шаг — Telegram",
       text: "Подтвердите вход в один тап, и сразу перейдём к оплате.",

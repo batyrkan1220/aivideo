@@ -43,7 +43,7 @@ export function checkWebhookSecret(header: string | null): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-const appUrl = (path = "/") => `${env().NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}${path}`;
+export const appUrl = (path = "/") => `${env().NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}${path}`;
 
 /** Inline button that opens a page of the Mini App inside Telegram. */
 export const openAppButton = (text: string, path = "/") => ({ inline_keyboard: [[{ text, web_app: { url: appUrl(path) } }]] });
