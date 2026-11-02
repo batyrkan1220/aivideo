@@ -560,7 +560,7 @@ export function CreateFlow({
               const extra = waitingForVideo ? null : calculatePrice(effPricing, q, faceCount).totalKzt - calculatePrice(effPricing, effQualities[0], faceCount).totalKzt;
               return (
                 <option key={q.key} value={q.key}>
-                  {q.key === "1080p" ? `1080p · Full HD${extra ? ` · +${formatKzt(extra)}` : ""}` : `720p · HD${extra === null ? "" : ` · ${c.qualityIncluded.toLowerCase()}`}`}
+                  {q.key === "1080p" ? `Высокое (1080p)${extra ? ` · +${formatKzt(extra)}` : ""}` : `Обычное (720p)${extra === null ? "" : ` · ${c.qualityIncluded.toLowerCase()}`}`}
                 </option>
               );
             })}
