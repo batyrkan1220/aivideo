@@ -14,6 +14,7 @@ import { formatKzt } from "@/lib/pricing";
 import { track } from "@/lib/analytics";
 import { AutoVideo } from "@/components/auto-video";
 import { CreateFlow } from "@/components/create-flow";
+import { TrackView } from "@/components/pixel-events";
 import { LogoMark } from "@/components/logo";
 
 const L = kk.landing;
@@ -47,6 +48,7 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
 
   return (
     <>
+      <TrackView item={{ id: t.id, name: t.title, price: t.startingPriceKzt ?? 0 }} />
       {/* Brand + speed promise, one line */}
       <header className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 text-[15px] font-extrabold tracking-tight text-[#283040]"><LogoMark className="!h-[1.6em]" />TrendMe</span>
@@ -142,6 +144,7 @@ async function Order({ t }: { t: TemplateDetail }) {
       outfit={t.outfit}
       media={t.media}
       noTabBar
+      item={{ id: t.id, name: t.title, price: t.startingPriceKzt ?? 0 }}
     />
   );
 }

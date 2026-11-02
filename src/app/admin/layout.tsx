@@ -52,6 +52,7 @@ async function Gate({ children }: { children: React.ReactNode }) {
       { href: "/admin/users", label: "Пользователи", icon: "👤" },
       { href: "/admin/partners", label: "Партнёры", icon: "🤝" },
       { href: "/admin/bot", label: "Telegram-бот", icon: "✈️" },
+      { href: "/admin/pixels", label: "Пиксели и аналитика", icon: "📈" },
     ] : [] },
     { title: "Система", items: can(r, "audit.view") ? [{ href: "/admin/audit", label: "Журнал", icon: "📜" }] : [] },
   ].filter((g) => g.items.length);

@@ -4,13 +4,22 @@ const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://*.supabase.co"
 
 // Content-Security-Policy: scripts only from our origin (Next needs inline bootstrap),
 // media/images/API only from our origin and the project's Supabase.
+// Ad pixels and analytics (TikTok, Meta, Google Analytics 4, Yandex Metrica) — loaded only when
+// their IDs are set in Admin → Пиксели.
+const ads = {
+  script: "https://analytics.tiktok.com https://connect.facebook.net https://www.googletagmanager.com https://mc.yandex.ru https://mc.yandex.com https://yastatic.net",
+  img: "https://*.tiktok.com https://www.facebook.com https://*.google-analytics.com https://*.googletagmanager.com https://mc.yandex.ru https://mc.yandex.com",
+  connect: "https://*.tiktok.com https://www.facebook.com https://connect.facebook.net https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://mc.yandex.ru https://mc.yandex.com wss://mc.yandex.ru wss://mc.yandex.com",
+  frame: "https://mc.yandex.ru https://mc.yandex.com",
+};
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://telegram.org",
+  `script-src 'self' 'unsafe-inline' https://telegram.org ${ads.script}`,
   "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: blob: ${supabase}`,
+  `img-src 'self' data: blob: ${supabase} ${ads.img}`,
   `media-src 'self' blob: ${supabase}`,
-  `connect-src 'self' ${supabase}`,
+  `connect-src 'self' ${supabase} ${ads.connect}`,
+  `frame-src 'self' https://oauth.telegram.org ${ads.frame}`,
   "font-src 'self' data:",
   // Telegram Web/Desktop embeds Mini Apps in a frame; nobody else may.
   "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org",

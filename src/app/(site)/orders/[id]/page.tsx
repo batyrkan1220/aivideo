@@ -16,6 +16,7 @@ import { ConfirmSubmit } from "@/components/account-forms";
 import { deleteVideo, deleteOrderPhotos } from "@/lib/account/actions";
 import { keepOrderPhotos } from "@/lib/orders/actions";
 import { listTemplates } from "@/lib/templates/queries";
+import { TrackPurchase } from "@/components/pixel-events";
 
 export const metadata = { title: kk.order.title };
 
@@ -196,6 +197,11 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
         </section>
       )}
 
+      {/* Ad pixels: Purchase once, right after paying (the server reports it too, same event id). */}
+      {o.payment_status === "succeeded" && o.amount_kzt > 0 && Date.parse(o.created_at) > nowMinus2d() && (
+        <TrackPurchase orderId={o.id} value={o.amount_kzt} item={{ id: o.template_id ?? "custom", name: snap.title_kk ?? "TrendMe", price: o.amount_kzt }} />
+      )}
+
       {/* Next video with the same photo: fresh trends + keep the photo for 30 days. */}
       {done && !isPhoto && photos.length > 0 && (
         <Suspense fallback={null}>
@@ -303,3 +309,6 @@ async function NextVideo({ orderId, templateId, saved }: { orderId: string; temp
     </section>
   );
 }
+
+// Request time (this page is dynamic); kept out of render helpers for the purity lint.
+function nowMinus2d() { return Date.now() - 2 * 86400_000; }

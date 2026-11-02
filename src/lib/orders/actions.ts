@@ -14,6 +14,7 @@ import { track } from "@/lib/analytics";
 import { allow } from "@/lib/security/rate-limit";
 import { nearestOutputAspect } from "@/lib/custom-video/aspect";
 import { activeDiscount, discounted } from "@/lib/engage/discount";
+import { captureAdContext } from "@/lib/pixels/context";
 import { customVideoSettings } from "@/lib/custom-video/settings";
 import { attributeFromCookie } from "@/lib/partners";
 import { seedancePriceKzt, applySeedancePricing } from "@/lib/pricing-seedance";
@@ -349,6 +350,7 @@ export async function createOrder(raw: unknown): Promise<
     amount_kzt: breakdown.totalKzt,
     currency: "KZT",
     consent_accepted_at: new Date().toISOString(),
+    ad_ctx: await captureAdContext(),
   }).select("id").single();
   if (error || !order) { console.error("[order.create]", error?.code, error?.message); return { ok: false, error: "generic" }; }
 

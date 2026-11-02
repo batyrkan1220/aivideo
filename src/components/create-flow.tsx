@@ -20,6 +20,7 @@ import { requestVideoUpload, confirmVideoUpload, removeVideoUpload, type VideoEr
 import { aspectAllowed, nearestOutputAspect } from "@/lib/custom-video/aspect";
 import { ensureGuestSession } from "@/lib/auth/guest";
 import { discounted } from "@/lib/engage/price";
+import { pixelEvent, pixelEventOnce } from "@/lib/pixels/client";
 import { TelegramBotLogin } from "./telegram-bot-login";
 
 
@@ -92,7 +93,7 @@ function readVideoMeta(url: string): Promise<{ durationSec: number; aspect: numb
 }
 
 export function CreateFlow({
-  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, freeOrders = false, signedIn = true, needTelegram = false, noTabBar = false, discount = null, savedPhotos = [], customVideo, seedancePricing, allowWish = false, seedanceMode = "wan", media = "video", wishRequired = false, outfit = "photo",
+  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, freeOrders = false, signedIn = true, needTelegram = false, noTabBar = false, discount = null, savedPhotos = [], item, customVideo, seedancePricing, allowWish = false, seedanceMode = "wan", media = "video", wishRequired = false, outfit = "photo",
 }: {
   templateId: string;
   slots: FaceSlot[];
@@ -117,6 +118,8 @@ export function CreateFlow({
   discount?: { percent: number; expiresAt: string } | null;
   /** The customer's earlier photos still kept: one tap fills a slot ("another video with this photo"). */
   savedPhotos?: { assetId: string; url: string }[];
+  /** For ad pixels: what this form sells (template id, name, starting price). */
+  item?: { id: string; name: string; price: number };
   /** "Өз видеом": the customer uploads their own video first. */
   customVideo?: { maxSeconds: number; maxMb: number };
   /** With customVideo: the price is computed from the uploaded video's length and the quality. */
@@ -238,6 +241,7 @@ export function CreateFlow({
     if (pickSeq.current[slot.key] !== seq) { void removePhotoUpload(assetId); return; } // replaced meanwhile
     setSlot(slot.key, { phase: "ready", preview, assetId });
     haptic("success");
+    if (item) pixelEventOnce(`add.${templateId}.${assetId}`, { type: "add", item });
   };
 
   /** "Use this photo again": fills the first empty slot with a copy of an earlier photo. */
@@ -360,6 +364,7 @@ export function CreateFlow({
       return;
     }
     if (needPhone) savePhone(phone);
+    if (item) pixelEvent({ type: "checkout", item, orderId: r.orderId, value: finalKzt ?? item.price });
     if (needTg) { setTgOrder(r.orderId); return; } // confirm with Telegram first, then pay
     if (r.free) { router.push(`/orders/${r.orderId}`); return; }
     await pay(r.orderId);

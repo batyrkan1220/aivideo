@@ -7,6 +7,7 @@ import { TemplateDetailView } from "@/components/template-detail";
 import { comboItems } from "@/lib/combos/catalog";
 import { track } from "@/lib/analytics";
 import { CreateFlow } from "@/components/create-flow";
+import { TrackView } from "@/components/pixel-events";
 import { isFreeOrderUser } from "@/lib/orders/free";
 import { activeDiscount } from "@/lib/engage/discount";
 import { reusablePhotos } from "@/lib/orders/reusable";
@@ -34,6 +35,7 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
   const combo = t.comboIds ? await comboItems(t.comboIds) : undefined;
   return (
     <>
+    <TrackView item={{ id: t.id, name: t.title, price: t.startingPriceKzt ?? 0 }} />
     <Link href={photo ? "/photos" : "/"} className="tg-hide -my-2 inline-block py-2 text-sm font-medium text-muted hover:text-ink">← {photo ? kk.template.backPhotos : kk.template.back}</Link>
     <TemplateDetailView
       t={t}
@@ -75,6 +77,7 @@ async function CreateSection({ t }: { t: TemplateDetail }) {
       allowWish={t.allowWish}
       outfit={t.outfit}
       media={t.media}
+      item={{ id: t.id, name: t.title, price: t.startingPriceKzt ?? 0 }}
     />
   );
 }

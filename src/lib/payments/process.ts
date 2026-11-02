@@ -1,4 +1,5 @@
 import { markDiscountUsed } from "@/lib/engage/discount";
+import { sendServerPurchase } from "@/lib/pixels/server";
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { track } from "@/lib/analytics";
@@ -71,6 +72,7 @@ export async function handlePaymentWebhook(providerKey: string, rawBody: string,
       await track("payment_succeeded", { orderId: pay?.order_id });
       if (pay?.order_id) {
         await markDiscountUsed(pay.order_id);
+        await sendServerPurchase(pay.order_id);
         await notifyOrderOwner(pay.order_id, "paid");
         await notifyAdmins(pay.order_id, "paid");
         await notifyPartnerCommission(pay.order_id);

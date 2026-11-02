@@ -57,6 +57,15 @@ export async function proxy(request: NextRequest) {
       }).catch(() => {});
     }
   }
+  // Ad click ids (TikTok ttclid, Meta fbclid): kept so the purchase can be attributed server-side.
+  const ttclid = request.nextUrl.searchParams.get("ttclid");
+  if (ttclid && /^[A-Za-z0-9._-]{8,300}$/.test(ttclid)) {
+    response.cookies.set("tm_ttclid", ttclid, { maxAge: 7 * 86400, path: "/", httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production" });
+  }
+  const fbclid = request.nextUrl.searchParams.get("fbclid");
+  if (fbclid && /^[A-Za-z0-9._-]{8,300}$/.test(fbclid) && !request.cookies.get("_fbc")) {
+    response.cookies.set("_fbc", `fb.1.${Date.now()}.${fbclid}`, { maxAge: 90 * 86400, path: "/", sameSite: "lax", secure: process.env.NODE_ENV === "production" });
+  }
   return response;
 }
 
