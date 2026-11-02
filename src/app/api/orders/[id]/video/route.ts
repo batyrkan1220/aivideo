@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseServer, supabaseAdmin } from "@/lib/supabase/server";
 import { track } from "@/lib/analytics";
-import { isGuestEmail } from "@/lib/telegram/session";
 
 /** Owner-only download: redirects to a 5-minute signed URL of the private video. */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -12,16 +11,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return new NextResponse(null, { status: 401 });
   // Guests (paid without an account): the video opens after the Telegram sign-in.
-  // Blurred preview on the order page is allowed; watching in full or downloading is not.
-  const preview = new URL(req.url).searchParams.has("preview");
-  if (isGuestEmail(user.email) && !preview) return new NextResponse(null, { status: 403 });
   const { data: o } = await sb.from("orders").select("id,public_order_number,generation_status").eq("id", id).maybeSingle();
   if (!o || o.generation_status !== "completed") return new NextResponse(null, { status: 404 });
 
   const db = supabaseAdmin();
   const { data: v } = await db.from("generated_videos").select("private_storage_path,expires_at").eq("order_id", id).maybeSingle();
   if (!v || new Date(v.expires_at).getTime() < Date.now()) return new NextResponse(null, { status: 410 });
-  const download = !preview && new URL(req.url).searchParams.has("download");
+  const download = new URL(req.url).searchParams.has("download");
   const ext = (/\.([a-z0-9]{3,4})$/i.exec(v.private_storage_path)?.[1] ?? "mp4").toLowerCase();
   const { data: signed } = await db.storage.from("generated-videos").createSignedUrl(v.private_storage_path, 300,
     download ? { download: `${o.public_order_number}.${ext}` } : undefined);

@@ -180,23 +180,7 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
 
       {done && !isCombo && (
         <section className="rounded-[24px] bg-surface p-4 ring-1 ring-line sm:p-6">
-          {video && notExpired(video.expires_at) && guest ? (
-            // Paid as a guest: a blurred preview; the video opens after a one-tap Telegram sign-in.
-            <div className="relative mx-auto aspect-[9/16] w-full max-w-[min(100%,calc(56svh*9/16))] overflow-hidden rounded-[20px] bg-night sm:max-w-sm">
-              {isPhoto ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={`/api/orders/${o.id}/video?preview=1`} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover blur-xl" />
-              ) : (
-                <video src={`/api/orders/${o.id}/video?preview=1`} muted autoPlay loop playsInline preload="metadata" aria-hidden className="absolute inset-0 h-full w-full scale-110 object-cover blur-xl" />
-              )}
-              <div className="absolute inset-0 flex flex-col items-center justify-end bg-gradient-to-t from-black/85 via-black/40 to-black/10 p-4 text-center text-white">
-                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15 text-2xl backdrop-blur" aria-hidden>🔒</span>
-                <p className="mt-2 text-lg font-extrabold">{isPhoto ? kk.order.lockedTitlePhoto : kk.order.lockedTitle}</p>
-                <p className="mb-4 mt-1 text-sm text-white/80">{kk.order.lockedText}</p>
-                <div className="w-full"><TelegramBotLogin next={`/orders/${o.id}`} compact /></div>
-              </div>
-            </div>
-          ) : video && notExpired(video.expires_at) ? (
+          {video && notExpired(video.expires_at) ? (
             <>
               {isPhoto ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -221,7 +205,7 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
       )}
 
       {/* Guests (paid without signing in): one tap links Telegram — the video is sent there and the order is never lost. */}
-      {guest && !done && (
+      {guest && (
         <section className="rounded-[24px] bg-[#2AABEE]/10 p-4 ring-1 ring-[#2AABEE]/30 sm:p-6">
           <p className="text-[16px] font-extrabold">{kk.order.tgTitle}</p>
           <p className="mb-3 mt-0.5 text-sm text-muted">{kk.order.tgText}</p>
