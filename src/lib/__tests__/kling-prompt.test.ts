@@ -48,3 +48,24 @@ describe("1080p option", () => {
     expect(seedanceCostUsd(10, s, {}, "1080p")).toBeCloseTo(seedanceCostUsd(10, s) * 1.5, 4);
   });
 });
+
+describe("Kling prompt with things to swap", () => {
+  it("adds the car after the person and keeps identity rules for people only", async () => {
+    const { buildKlingDirectPrompt } = await import("@/lib/generation/kling");
+    const p = buildKlingDirectPrompt("edit", "photo", "", "", 1, [], [{ what: "car" }]);
+    expect(p).toContain("@image_2 is a photo of a car, not a person");
+    expect(p).toContain("Replace the car in @video_1 with the car from @image_2");
+    expect(p).toContain("reference image (@image_1)");
+  });
+  it("an outfit photo dresses the person", async () => {
+    const { buildKlingDirectPrompt } = await import("@/lib/generation/kling");
+    const p = buildKlingDirectPrompt("edit", "template", "", "", 1, [], [{ what: "outfit" }]);
+    expect(p).toContain("Dress the person in the outfit shown in @image_2");
+    expect(p).not.toContain("Keep the clothing of the original people");
+  });
+  it("slots: people first, then objects", async () => {
+    const { seedanceSlots } = await import("@/lib/templates/seedance-config");
+    const s = seedanceSlots(1, "face_", [], [{ what: "horse", label: "Фото лошади" }]);
+    expect(s.map((x) => [x.key, x.providerInput, x.kind ?? "person"])).toEqual([["face_1", "img_1", "person"], ["obj_1", "img_2", "object"]]);
+  });
+});

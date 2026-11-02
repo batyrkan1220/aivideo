@@ -248,7 +248,9 @@ export function CreateFlow({
 
   /** "Use this photo again": fills the first empty slot with a copy of an earlier photo. */
   const onReuse = async (sp: { assetId: string; url: string }) => {
-    const slot = slots.find((x) => (state[x.key] ?? EMPTY).phase !== "ready") ?? slots[0];
+    // Earlier photos are faces: never put one into a "car / horse / outfit" box.
+    const people = slots.filter((x) => x.kind !== "object");
+    const slot = people.find((x) => (state[x.key] ?? EMPTY).phase !== "ready") ?? people[0];
     if (!slot) return;
     setFormError(null);
     setSlot(slot.key, { phase: "verifying", preview: sp.url });

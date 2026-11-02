@@ -7,7 +7,7 @@ import { supabaseBrowser } from "@/lib/supabase/client";
 import type { TemplateInput, PublishProblem } from "@/lib/templates/admin-schema";
 import { autoFaceSlots } from "@/lib/templates/schema";
 import { validateTemplateForm, firstErrorKey, type FieldErrors } from "@/lib/templates/editor-validation";
-import { parseSeedanceConfig, seedanceSlots, SEEDANCE_MAX_PEOPLE, type SeedanceConfig } from "@/lib/templates/seedance-config";
+import { OBJECT_PRESETS, parseSeedanceConfig, seedanceSlots, SEEDANCE_MAX_OBJECTS, SEEDANCE_MAX_PEOPLE, type SeedanceConfig } from "@/lib/templates/seedance-config";
 import { calculatePrice, formatKzt } from "@/lib/pricing";
 import { seedancePriceKzt, seedanceCostKzt, SEEDANCE_QUALITY, type SeedancePricing } from "@/lib/pricing-seedance";
 import { FaceMap } from "@/components/face-map";
@@ -138,7 +138,7 @@ export function TemplateEditor({
   };
 
   // Customer photo slots = the number of people to replace, left → right (the server derives them too).
-  const slots = isPhoto ? photoSlots(ph.people, ph.labels) : seedanceSlots(sd.people, "face_", sd.labels);
+  const slots = isPhoto ? photoSlots(ph.people, ph.labels) : seedanceSlots(sd.people, "face_", sd.labels, sd.objects);
 
   /** Client check first (shows red fields), then the authoritative server save. */
   const persist = async (forPublish: boolean): Promise<string | null> => {
@@ -340,6 +340,37 @@ export function TemplateEditor({
                 ))}
               </div>
             )}
+            {/* Things to swap besides people (car, horse, outfit…): one customer photo each. */}
+            <div className="grid gap-2 rounded-xl bg-paper p-3 ring-1 ring-line sm:col-span-2">
+              <span className="text-sm font-medium">Что ещё заменить в видео (кроме людей)</span>
+              <span className="text-xs text-muted">Клиент загрузит фото этой вещи — ИИ поставит её вместо той, что в видео. Например, свою машину или лошадь.</span>
+              {sd.objects.map((o, j) => (
+                <div key={j} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                  <select className={inputCls()} value={(Object.entries(OBJECT_PRESETS).find(([, p]) => p.en === o.what)?.[0]) ?? "custom"}
+                    onChange={(ev) => {
+                      const p = OBJECT_PRESETS[ev.target.value as keyof typeof OBJECT_PRESETS];
+                      const list = [...sd.objects];
+                      list[j] = p ? { what: p.en, label: p.ru } : { what: "", label: "Фото предмета" };
+                      setSd({ objects: list });
+                    }}>
+                    {Object.entries(OBJECT_PRESETS).map(([k, p]) => <option key={k} value={k}>{p.ru.replace("Фото ", "")}</option>)}
+                    <option value="custom">Другое…</option>
+                  </select>
+                  <input className={inputCls()} maxLength={40} placeholder="Подпись для клиента" value={o.label}
+                    onChange={(ev) => { const list = [...sd.objects]; list[j] = { ...o, label: ev.target.value }; setSd({ objects: list }); }} />
+                  <button type="button" onClick={() => setSd({ objects: sd.objects.filter((_, k) => k !== j) })}
+                    className="rounded-full px-3 text-sm font-medium text-muted hover:text-danger">Убрать</button>
+                  {!Object.values(OBJECT_PRESETS).some((p) => p.en === o.what) && (
+                    <input className={`${inputCls()} sm:col-span-3`} maxLength={40} placeholder="Что это по-английски (для ИИ), например: boat, guitar" value={o.what}
+                      onChange={(ev) => { const list = [...sd.objects]; list[j] = { ...o, what: ev.target.value }; setSd({ objects: list }); }} />
+                  )}
+                </div>
+              ))}
+              {sd.objects.length < SEEDANCE_MAX_OBJECTS && (
+                <button type="button" onClick={() => setSd({ objects: [...sd.objects, { what: OBJECT_PRESETS.car.en, label: OBJECT_PRESETS.car.ru }] })}
+                  className="justify-self-start rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold hover:border-ink">+ Добавить вещь (машина, лошадь, одежда…)</button>
+              )}
+            </div>
             <Field label={e.seedance.framing} className="sm:col-span-2">
               <select className={inputCls()} value={sd.framing} onChange={(ev) => setSd({ framing: ev.target.value as SeedanceConfig["framing"] })}>
                 {(["face", "half", "full"] as const).map((k) => <option key={k} value={k}>{e.seedance.framingOptions[k]}</option>)}

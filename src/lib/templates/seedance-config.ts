@@ -8,6 +8,27 @@ import type { FaceSlot } from "./schema";
  * (The provider key stays "seedance" for existing rows.)
  */
 export const SEEDANCE_MAX_PEOPLE = 5;
+/** Besides people: up to 2 things to swap (car, horse, outfit…), one customer photo each. */
+export const SEEDANCE_MAX_OBJECTS = 2;
+/** Kling 4.0 takes up to 10 reference images; we send people + objects. */
+export const SEEDANCE_MAX_REFS = SEEDANCE_MAX_PEOPLE + SEEDANCE_MAX_OBJECTS;
+
+/** Ready-made things to swap: Russian label for the customer, English word for the model. */
+export const OBJECT_PRESETS = {
+  car: { ru: "Фото машины", en: "car" },
+  horse: { ru: "Фото лошади", en: "horse" },
+  motorcycle: { ru: "Фото мотоцикла", en: "motorcycle" },
+  dog: { ru: "Фото собаки", en: "dog" },
+  cat: { ru: "Фото кошки", en: "cat" },
+  outfit: { ru: "Фото одежды", en: "outfit" },
+} as const;
+export const objectSchema = z.object({
+  /** What it is, in English for the model ("car", "horse", "outfit", …). */
+  what: z.string().trim().min(1).max(40),
+  /** What the customer sees above the upload box. */
+  label: z.string().trim().min(1).max(40),
+});
+export type SwapObject = z.infer<typeof objectSchema>;
 export const SEEDANCE_MIN_SEC = 3;
 export const SEEDANCE_MAX_SEC = 30; // Kling 4.0: input video 3–30 s
 
@@ -30,6 +51,8 @@ export const seedanceConfigSchema = z.object({
   outfit: z.enum(["photo", "template", "choice"]).catch("photo").default("photo"),
   /** Where each person is in the frame (English for the model), e.g. "on the left". */
   positions: z.array(z.string().trim().max(60)).max(5).default([]),
+  /** Things in the video to replace with the customer's photos (after the people). */
+  objects: z.array(objectSchema).max(SEEDANCE_MAX_OBJECTS).catch([]).default([]),
 });
 export type SeedanceConfig = z.infer<typeof seedanceConfigSchema>;
 export type SeedanceMode = "kd";
@@ -47,15 +70,24 @@ export function seedanceSlotLabel(i: number, n: number) {
   return n === 1 ? "Ваше фото" : `${i + 1}-й человек (слева)`;
 }
 
-/** Customer upload slots. providerInput = `img_<n>` (= @image_<n> in the prompt). */
-export function seedanceSlots(n: number, keyPrefix = "face_", labels: string[] = []): FaceSlot[] {
-  return Array.from({ length: n }, (_, i) => ({
+/** Customer upload slots. providerInput = `img_<n>` (= @image_<n> in the prompt). People first, then objects. */
+export function seedanceSlots(n: number, keyPrefix = "face_", labels: string[] = [], objects: SwapObject[] = []): FaceSlot[] {
+  const people: FaceSlot[] = Array.from({ length: n }, (_, i) => ({
     key: `${keyPrefix}${i + 1}`,
     labelKk: labels[i]?.trim() || seedanceSlotLabel(i, n),
     position: { x: (i + 1) / (n + 1), y: 0.42 },
     providerInput: `img_${i + 1}`,
     order: i,
   }));
+  const things: FaceSlot[] = objects.slice(0, SEEDANCE_MAX_OBJECTS).map((o, j) => ({
+    key: `obj_${j + 1}`,
+    labelKk: o.label,
+    position: { x: 0.5, y: 0.7 },
+    providerInput: `img_${n + j + 1}`,
+    order: n + j,
+    kind: "object" as const,
+  }));
+  return [...people, ...things];
 }
 
 /** Seconds of output for a template video of this length (whole seconds, 3–30). */

@@ -42,10 +42,15 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
 export type KlingMode = "edit" | "reference";
 
 /** Edit = the template video itself is edited (scene 1:1); reference = a new video following its motion. */
-export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "template", adminPrompt: string, wish: string, people = 1, positions: string[] = []): string {
+export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "template", adminPrompt: string, wish: string, people = 1, positions: string[] = [], objects: { what: string }[] = []): string {
   // Priority: the template rules (identity, clothing, admin instruction) are mandatory; the customer's wish is applied only where it does not contradict them.
   const refs = Array.from({ length: people }, (_, i) => `@image_${i + 1}`);
-  const look = outfit === "template"
+  // Things to swap (car, horse, outfit…): their photos come right after the people's.
+  const things = objects.map((o, j) => ({ what: o.what.trim().toLowerCase(), ref: `@image_${people + j + 1}` }));
+  const outfitRef = things.find((t) => ["outfit", "clothes", "clothing"].includes(t.what))?.ref;
+  const look = outfitRef
+    ? `Dress the ${people === 1 ? "person" : "people"} in the outfit shown in ${outfitRef}: the same garments, colors, fabric and details, fitted naturally to the body. ${outfitRef} is a photo of clothing, not a person.`
+    : outfit === "template"
     ? "Keep the clothing of the original people in @video_1."
     : `Use the clothing of the people in ${refs.join(", ")}.`;
   const who = people === 1
@@ -70,6 +75,10 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
         same,
         look,
       ];
+  for (const t of things) {
+    if (t.ref === outfitRef) continue;
+    parts.push(`${t.ref} is a photo of a ${t.what}, not a person. Replace the ${t.what} in @video_1 with the ${t.what} from ${t.ref}: the same type, model or breed, color, shape, markings and details. Keep it exactly where the original ${t.what} is, with the same size, angle, perspective and movement, matching the scene's lighting, reflections and shadows, consistent in every frame.`);
+  }
   parts.push("Photorealistic, natural, sharp face, no text, no watermark.");
   if (adminPrompt) parts.push(`Mandatory template instruction: ${adminPrompt}`);
   if (wish) {
@@ -89,7 +98,7 @@ export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: strin
       contents: [
         { type: "prompt", text: opts.prompt },
         { type: opts.mode === "edit" ? "base_video" : "feature_video", url: opts.videoUrl, id: "video_1" },
-        ...opts.photoUrls.slice(0, 5).map((url, i) => ({ type: "refer_image", url, id: `image_${i + 1}` })),
+        ...opts.photoUrls.slice(0, 7).map((url, i) => ({ type: "refer_image", url, id: `image_${i + 1}` })),
       ],
       // Vertical 720p for phones (1080p when the customer paid for Full HD) unless the template asks for another format.
       settings: { resolution: opts.resolution === "1080p" ? "1080p" : "720p", duration, aspect_ratio: ["16:9", "1:1", "21:9"].includes(opts.aspectRatio) ? opts.aspectRatio : "9:16" },

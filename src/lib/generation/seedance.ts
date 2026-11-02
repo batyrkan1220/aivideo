@@ -1,5 +1,5 @@
 import "server-only";
-import { seedanceConfigSchema, SEEDANCE_MAX_PEOPLE, SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC } from "@/lib/templates/seedance-config";
+import { seedanceConfigSchema, SEEDANCE_MAX_PEOPLE, SEEDANCE_MAX_REFS, SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC } from "@/lib/templates/seedance-config";
 import { seedanceCostUsd } from "@/lib/pricing-seedance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { type GenerationProvider } from "./types";
@@ -26,7 +26,7 @@ export const seedanceProvider: GenerationProvider = {
   capabilities() {
     return {
       videoFaceSwap: true,
-      maxFaces: SEEDANCE_MAX_PEOPLE,
+      maxFaces: SEEDANCE_MAX_REFS,
       qualities: ["720p", "1080p"],
       supportsCancel: false,
       reportsProgress: false,
@@ -41,7 +41,7 @@ export const seedanceProvider: GenerationProvider = {
     if (!cfg.success) return ["invalid_provider_config"];
     if (!input.templateVideoUrl) problems.push("missing_video");
     if (!input.faces.length) problems.push("missing_faces");
-    if (input.faces.length > SEEDANCE_MAX_PEOPLE) problems.push("too_many_faces");
+    if (input.faces.length > SEEDANCE_MAX_REFS) problems.push("too_many_faces");
     const idx = input.faces.map((f) => imgIndex(f.providerInput));
     if (idx.some((x, i) => x !== i + 1)) problems.push("unmapped_slot");
     const d = Number((input.config as { durationSec?: unknown }).durationSec);
@@ -56,8 +56,11 @@ export const seedanceProvider: GenerationProvider = {
     // "choice": the customer picked the outfit on the order page (default: as in the template).
     const outfit = cfg.outfit === "choice" ? (extra.customerOutfit === "photo" ? "photo" : "template") : cfg.outfit;
     const durationSec = Number(extra.durationSec);
-    const photos = input.faces.map((f) => f.imageUrl).slice(0, SEEDANCE_MAX_PEOPLE);
-    const prompt = buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : "", photos.length, cfg.positions);
+    const photos = input.faces.map((f) => f.imageUrl).slice(0, SEEDANCE_MAX_REFS);
+    // People first (img_1…img_n), then the things to swap (car, horse, outfit…).
+    const objects = cfg.objects.slice(0, Math.max(0, photos.length - 1));
+    const people = Math.min(SEEDANCE_MAX_PEOPLE, Math.max(1, photos.length - objects.length));
+    const prompt = buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : "", people, cfg.positions, objects);
     const resolution = input.quality === "1080p" ? "1080p" : "720p";
     const id = await submitKlingOmni({ videoUrl: input.templateVideoUrl, photoUrls: photos, mode: cfg.klingMode, prompt, durationSec, aspectRatio: cfg.aspectRatio, resolution });
     return { providerJobId: id, cost: seedanceCostUsd(durationSec, await seedancePricingSettings(), {}, resolution), state: { stage: "klingd" } };

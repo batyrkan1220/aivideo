@@ -10,6 +10,8 @@ export const faceSlotSchema = z.object({
   /** Optional preview of the person in the video this photo replaces (template-media path). */
   previewImagePath: z.string().max(300).optional(),
   order: z.number().int().min(0),
+  /** "object": not a person — a car, horse, outfit… the customer sends a photo of it. */
+  kind: z.enum(["person", "object"]).optional(),
 });
 
 export const qualitySchema = z.object({
