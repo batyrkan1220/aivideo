@@ -1,4 +1,5 @@
 "use server";
+import { orderAccessLink } from "@/lib/orders/access";
 import { notifyOrderOwner } from "@/lib/telegram/bot";
 import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
@@ -81,7 +82,8 @@ export async function startCheckout(_: CheckoutState, fd: FormData): Promise<Che
   try {
     created = await provider.createPayment({
       paymentId, orderId: o.id, orderNumber: o.public_order_number, amountKzt: o.amount_kzt,
-      description: `TrendMe ${o.public_order_number}`,
+      // The order link in the Kaspi comment: customers without Telegram can always come back to it.
+      description: await invoiceComment(o.id, o.public_order_number),
       returnUrl: `${env().NEXT_PUBLIC_APP_URL}/orders/${o.id}`,
       idempotencyKey,
       customerPhone: phone ?? undefined,
@@ -170,4 +172,9 @@ export async function cancelToleInvoiceAction(fd: FormData) {
     }
   }
   redirect(`/orders/${pay.order_id}`);
+}
+
+async function invoiceComment(orderId: string, number: string): Promise<string> {
+  const link = await orderAccessLink(orderId).catch(() => null);
+  return link ? `TrendMe ${number} · ваше видео: ${link.replace(/^https?:\/\//, "")}` : `TrendMe ${number}`;
 }

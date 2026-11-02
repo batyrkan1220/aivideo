@@ -19,6 +19,8 @@ import { listTemplates } from "@/lib/templates/queries";
 import { TrackPurchase } from "@/components/pixel-events";
 import { TelegramBotLogin } from "@/components/telegram-bot-login";
 import { isGuestEmail } from "@/lib/telegram/session";
+import { orderAccessLink } from "@/lib/orders/access";
+import { CopyLink } from "@/app/admin/templates/copy-link";
 
 export const metadata = { title: kk.order.title };
 
@@ -46,6 +48,8 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
     .select("id,public_order_number,created_at,completed_at,quality,face_count,amount_kzt,payment_status,generation_status,pricing_breakdown_json,template_snapshot_json,template_id,photos_deleted_at")
     .eq("id", id).maybeSingle();
   if (!o) notFound();
+  // Only after ownership is proven (RLS read above): the private link to this order.
+  const accessLink = guest ? await orderAccessLink(o.id).catch(() => null) : null;
 
   // Photos: ownership already proven above; short-lived signed URLs for thumbnails.
   const db = supabaseAdmin();
@@ -206,6 +210,12 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
           <p className="text-[16px] font-extrabold">{kk.order.tgTitle}</p>
           <p className="mb-3 mt-0.5 text-sm text-muted">{kk.order.tgText}</p>
           <TelegramBotLogin next={`/orders/${o.id}`} compact />
+          {accessLink && (
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-white/70 px-3 py-2.5 text-xs">
+              <span className="min-w-0 text-muted">{kk.order.linkNote}</span>
+              <CopyLink url={accessLink} label={kk.order.copyLink} />
+            </div>
+          )}
         </section>
       )}
 
