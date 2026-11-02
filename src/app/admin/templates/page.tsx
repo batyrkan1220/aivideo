@@ -121,6 +121,7 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
                 <div className="flex shrink-0 flex-wrap items-center gap-2 text-sm">
                   {bot && <CopyLink url={`https://t.me/${bot}?startapp=t_${t.id}`} label="🔗 Mini App" />}
                   <CopyLink url={`${site}/templates/${t.id}`} label="🔗 Сайт" />
+                  <CopyLink url={`${site}/go/${t.id}`} label="🎯 Реклама" />
                   <Link href={`/admin/orders?template=${t.id}`} className="font-semibold text-muted hover:text-ink">Заказы</Link>
                   <Link href={`/admin/templates/${t.id}`} className="rounded-full bg-night px-3.5 py-1.5 font-semibold text-white">Изменить</Link>
                   {can(u.role, "templates.publish") && <DeleteTemplateButton id={t.id} title={t.title_kk} />}

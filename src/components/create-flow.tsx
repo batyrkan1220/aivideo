@@ -91,7 +91,7 @@ function readVideoMeta(url: string): Promise<{ durationSec: number; aspect: numb
 }
 
 export function CreateFlow({
-  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, freeOrders = false, signedIn = true, needTelegram = false, customVideo, seedancePricing, allowWish = false, seedanceMode = "wan", media = "video", wishRequired = false, outfit = "photo",
+  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, freeOrders = false, signedIn = true, needTelegram = false, noTabBar = false, customVideo, seedancePricing, allowWish = false, seedanceMode = "wan", media = "video", wishRequired = false, outfit = "photo",
 }: {
   templateId: string;
   slots: FaceSlot[];
@@ -110,6 +110,8 @@ export function CreateFlow({
   signedIn?: boolean;
   /** Guest or visitor: before paying, a one-tap Telegram confirmation (the account + where the video is sent). */
   needTelegram?: boolean;
+  /** Ad landing: no bottom tab bar, so the pay bar sits at the very bottom. */
+  noTabBar?: boolean;
   /** "Өз видеом": the customer uploads their own video first. */
   customVideo?: { maxSeconds: number; maxMb: number };
   /** With customVideo: the price is computed from the uploaded video's length and the quality. */
@@ -548,7 +550,7 @@ export function CreateFlow({
       )}
 
       {(price || waitingForVideo) && (
-        <div className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 -mx-1 rounded-[28px] border border-line bg-white px-4 pb-2.5 pt-2.5 shadow-[0_16px_40px_-18px_rgba(60,40,20,0.35)] sm:static sm:mx-0 sm:rounded-card sm:p-4">
+        <div className={`sticky ${noTabBar ? "bottom-[calc(0.75rem+env(safe-area-inset-bottom))]" : "bottom-[calc(5.25rem+env(safe-area-inset-bottom))]"} z-20 -mx-1 rounded-[28px] border border-line bg-white px-4 pb-2.5 pt-2.5 shadow-[0_16px_40px_-18px_rgba(60,40,20,0.35)] sm:static sm:mx-0 sm:rounded-card sm:p-4`}>
           <label ref={consentRef} className={`-mx-1 mb-2 flex cursor-pointer items-start gap-2.5 rounded-lg px-1 py-1 text-xs leading-snug transition-colors ${nudge === "consent" ? "bg-peach ring-2 ring-peach" : ""}`}>
             <input type="checkbox" className="mt-px h-[18px] w-[18px] shrink-0 accent-[#161616]" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
             <span className="text-muted">{customVideo ? cv.consent : kk.consent.combined}</span>
