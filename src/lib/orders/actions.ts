@@ -14,6 +14,7 @@ import { track } from "@/lib/analytics";
 import { allow } from "@/lib/security/rate-limit";
 import { nearestOutputAspect } from "@/lib/custom-video/aspect";
 import { activeDiscount, discounted } from "@/lib/engage/discount";
+import { adOffer } from "@/lib/engage/offer";
 import { captureAdContext } from "@/lib/pixels/context";
 import { customVideoSettings } from "@/lib/custom-video/settings";
 import { attributeFromCookie } from "@/lib/partners";
@@ -335,9 +336,14 @@ export async function createOrder(raw: unknown): Promise<
   // Price is computed here, from the version snapshot — never taken from the browser.
   const base = calculatePrice(pricing, quality, slots.length);
   // Personal discount (e.g. "second video −20%"): applied here, marked used when the order is paid.
-  const disc = base.totalKzt > 0 && !(await isFreeOrderUser(user.id)) ? await activeDiscount(user.id) : null;
+  const eligible = base.totalKzt > 0 && !(await isFreeOrderUser(user.id));
+  const disc = eligible ? await activeDiscount(user.id) : null;
+  // Otherwise: the first-video offer for ad visitors (signed cookie, 24 h, until the first payment).
+  const first = eligible && !disc ? await adOffer(user.id) : null;
   const breakdown = disc
     ? { ...base, totalKzt: discounted(base.totalKzt, disc.percent), discount: { id: disc.id, percent: disc.percent, beforeKzt: base.totalKzt } }
+    : first
+    ? { ...base, totalKzt: discounted(base.totalKzt, first.percent), discount: { kind: "first_ad", percent: first.percent, beforeKzt: base.totalKzt } }
     : base;
   const { data: order, error } = await db.from("orders").insert({
     user_id: user.id,

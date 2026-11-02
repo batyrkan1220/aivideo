@@ -6,6 +6,22 @@ export type AnalyticsEvent =
   | "checkout_initiated" | "payment_succeeded" | "payment_failed"
   | "generation_started" | "generation_succeeded" | "generation_failed" | "video_downloaded";
 
+/**
+ * Who / where from, for the funnel: an anonymous visitor id and the ad source (utm_source /
+ * utm_campaign / ref), both from first-party cookies set in the proxy. Empty outside a request.
+ */
+export async function visitorContext(): Promise<{ vid?: string; src?: string; cmp?: string }> {
+  try {
+    const { cookies } = await import("next/headers");
+    const c = await cookies();
+    const vid = c.get("tm_vid")?.value;
+    const [src, cmp] = (c.get("tm_src")?.value ?? "").split("|");
+    return { ...(vid ? { vid } : {}), ...(src ? { src } : {}), ...(cmp ? { cmp } : {}) };
+  } catch {
+    return {};
+  }
+}
+
 /** Fire-and-forget event log. Stores ids only — no names, emails or photos. Never throws. */
 export async function track(
   event: AnalyticsEvent,
@@ -17,7 +33,7 @@ export async function track(
       user_id: ctx.userId ?? null,
       template_id: ctx.templateId ?? null,
       order_id: ctx.orderId ?? null,
-      properties: ctx.props ?? {},
+      properties: { ...(await visitorContext()), ...(ctx.props ?? {}) },
     });
   } catch (err) {
     console.error("[analytics]", event, err);

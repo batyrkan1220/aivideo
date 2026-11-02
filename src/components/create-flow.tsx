@@ -32,6 +32,8 @@ type SlotState =
   | { phase: "error"; preview?: string; message: string };
 
 const c = kk.create;
+/** true: guests confirm with Telegram before paying; false: after (on the order page). */
+const TELEGRAM_BEFORE_PAY = false;
 const EMPTY: SlotState = { phase: "empty" };
 const cv = kk.customVideo;
 const videoErr = (e: VideoError, l: { maxSeconds: number; maxMb: number }) =>
@@ -365,7 +367,8 @@ export function CreateFlow({
     }
     if (needPhone) savePhone(phone);
     if (item) pixelEvent({ type: "checkout", item, orderId: r.orderId, value: finalKzt ?? item.price });
-    if (needTg) { setTgOrder(r.orderId); return; } // confirm with Telegram first, then pay
+    // Guests pay right away; Telegram is offered on the order page (fewer steps before paying).
+    if (needTg && TELEGRAM_BEFORE_PAY) { setTgOrder(r.orderId); return; }
     if (r.free) { router.push(`/orders/${r.orderId}`); return; }
     await pay(r.orderId);
   });

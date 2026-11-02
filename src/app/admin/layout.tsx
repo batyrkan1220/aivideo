@@ -37,6 +37,7 @@ async function Gate({ children }: { children: React.ReactNode }) {
     { title: "Продажи", items: [
       ...(can(r, "dashboard.view") ? [{ href: "/admin", label: "Обзор", icon: "📊" }] : []),
       ...(can(r, "orders.view") ? [{ href: "/admin/orders", label: "Заказы", icon: "🧾" }] : []),
+      ...(can(r, "dashboard.view") ? [{ href: "/admin/funnel", label: "Воронка по рекламе", icon: "🎯" }] : []),
       ...(can(r, "users.manage") ? [{ href: "/admin/payments", label: "Платежи · Tolepay", icon: "💳" }] : []),
     ] },
     { title: "Каталог", items: can(r, "templates.manage") ? [

@@ -17,6 +17,8 @@ import { deleteVideo, deleteOrderPhotos } from "@/lib/account/actions";
 import { keepOrderPhotos } from "@/lib/orders/actions";
 import { listTemplates } from "@/lib/templates/queries";
 import { TrackPurchase } from "@/components/pixel-events";
+import { TelegramBotLogin } from "@/components/telegram-bot-login";
+import { isGuestEmail } from "@/lib/telegram/session";
 
 export const metadata = { title: kk.order.title };
 
@@ -35,6 +37,7 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
   const { id } = await params;
   const sp = await searchParams;
   const user = await requireUser(`/orders/${id}`);
+  const guest = isGuestEmail(user.email);
   if (!z.string().uuid().safeParse(id).success) notFound();
 
   // RLS: the user's own client can only read their own orders.
@@ -194,6 +197,15 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
             <Link href={regenHref} className="flex h-11 items-center justify-center rounded-full bg-ink text-sm font-bold text-paper">↻ {kk.result.regenerate}</Link>
             <Link href="/support" className="flex h-11 items-center justify-center rounded-full bg-paper text-sm font-bold ring-1 ring-line">{kk.nav.support}</Link>
           </div>
+        </section>
+      )}
+
+      {/* Guests (paid without signing in): one tap links Telegram — the video is sent there and the order is never lost. */}
+      {guest && (
+        <section className="rounded-[24px] bg-[#2AABEE]/10 p-4 ring-1 ring-[#2AABEE]/30 sm:p-6">
+          <p className="text-[16px] font-extrabold">{kk.order.tgTitle}</p>
+          <p className="mb-3 mt-0.5 text-sm text-muted">{kk.order.tgText}</p>
+          <TelegramBotLogin next={`/orders/${o.id}`} compact />
         </section>
       )}
 

@@ -10,6 +10,7 @@ import { CreateFlow } from "@/components/create-flow";
 import { TrackView } from "@/components/pixel-events";
 import { isFreeOrderUser } from "@/lib/orders/free";
 import { activeDiscount } from "@/lib/engage/discount";
+import { adOffer } from "@/lib/engage/offer";
 import { reusablePhotos } from "@/lib/orders/reusable";
 import { getSessionUser } from "@/lib/auth/session";
 import { isGuestEmail } from "@/lib/telegram/session";
@@ -69,7 +70,7 @@ async function CreateSection({ t }: { t: TemplateDetail }) {
       anonKey={e.NEXT_PUBLIC_SUPABASE_ANON_KEY}
       askPhone={e.PAYMENT_PROVIDER === "tole" || e.PAYMENT_PROVIDER === "tole_sandbox"}
       freeOrders={user ? await isFreeOrderUser(user.id) : false}
-      discount={user ? await activeDiscount(user.id) : null}
+      discount={(user ? await activeDiscount(user.id) : null) ?? (await adOffer(user?.id ?? null))}
       savedPhotos={user ? await reusablePhotos(user.id) : []}
       signedIn={!!user}
       needTelegram={!user || isGuestEmail(user.email)}
