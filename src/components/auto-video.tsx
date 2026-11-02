@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { kk } from "@/lib/i18n/kk";
+import { takePrimed } from "@/lib/sound-handoff";
 
 /**
  * Muted, looping, inline video that reliably autoplays — also inside the Telegram WebView,
@@ -18,10 +19,26 @@ const rememberSound = (on: boolean) => { try { sessionStorage.setItem(SOUND_KEY,
  */
 export function AutoVideo(props: { src: string; poster?: string; controls?: boolean; soundToggle?: boolean; preferSound?: boolean; className?: string }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const active = useRef<HTMLVideoElement | null>(null); // the element actually playing
   const [muted, setMuted] = useState(true);
   useEffect(() => {
-    const v = ref.current;
-    if (!v) return;
+    const own = ref.current;
+    if (!own) return;
+    // Opened from a card tap: take over the video that tap already started with sound.
+    const adopted = props.preferSound ? takePrimed(props.src) : null;
+    let v = own;
+    if (adopted) {
+      adopted.className = own.className;
+      if (props.poster) adopted.poster = props.poster;
+      if (props.controls) adopted.controls = true;
+      own.after(adopted);
+      own.pause();
+      own.removeAttribute("src");
+      own.load();
+      own.style.display = "none";
+      v = adopted;
+    }
+    active.current = v;
     let alive = true;
     const wantSound = !!props.preferSound && !soundOff();
     const playMuted = () => {
@@ -70,11 +87,12 @@ export function AutoVideo(props: { src: string; poster?: string; controls?: bool
       alive = false;
       v.muted = true;
       v.pause();
+      if (adopted) { adopted.removeAttribute("src"); adopted.load(); adopted.remove(); }
     };
-  }, [props.src, props.preferSound]);
+  }, [props.src, props.preferSound, props.poster, props.controls]);
 
   const toggle = () => {
-    const v = ref.current;
+    const v = active.current ?? ref.current;
     if (!v) return;
     v.muted = !v.muted;
     setMuted(v.muted);

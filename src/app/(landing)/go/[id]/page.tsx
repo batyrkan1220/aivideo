@@ -59,7 +59,7 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
           style={{ "--a": String(a), aspectRatio: String(a) } as React.CSSProperties}
           className="relative mx-auto w-[min(100%,calc(56svh*var(--a)))] overflow-hidden rounded-[1.75rem] bg-night shadow-[0_24px_60px_-24px_rgba(0,0,0,0.45)] ring-1 ring-black/5">
           {t.previewUrl
-            ? <AutoVideo src={t.previewUrl} poster={t.coverUrl ?? undefined} soundToggle className="block h-full w-full object-cover" />
+            ? <AutoVideo src={t.previewUrl} poster={t.coverUrl ?? undefined} soundToggle preferSound className="block h-full w-full object-cover" />
             // eslint-disable-next-line @next/next/no-img-element
             : t.coverUrl ? <img src={t.coverUrl} alt="" className="block h-full w-full object-cover" /> : null}
           <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-night">{photo ? kk.photos.sample : kk.catalog.sample}</span>

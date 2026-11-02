@@ -4,6 +4,7 @@ import Link from "next/link";
 import { kk } from "@/lib/i18n/kk";
 import { formatKzt } from "@/lib/pricing";
 import { autoplayRefused, useImgPreviews } from "@/lib/video-autoplay";
+import { primeSound } from "@/lib/sound-handoff";
 
 export type CardData = {
   id: string;
@@ -161,6 +162,8 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
       ref={cardRef}
       href={`/templates/${t.id}`}
       className="group block"
+      // The tap itself starts the template's video with sound (see sound-handoff).
+      onClick={(e) => { if (!e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) primeSound(t.previewUrl); }}
       onMouseEnter={start}
       onMouseLeave={stop}
       onFocus={start}
