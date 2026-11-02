@@ -4,6 +4,7 @@ import { kk } from "@/lib/i18n/kk";
 import { safeNext } from "@/lib/auth/redirect";
 import { signupAction } from "../actions";
 import { AuthForm } from "../auth-form";
+import { TelegramLoginButton } from "@/components/telegram-login-button";
 
 export const metadata = { title: kk.auth.signupTitle };
 
@@ -20,6 +21,7 @@ async function Content({ searchParams }: { searchParams: Promise<{ next?: string
   return (
     <>
       <h1 className="mb-6 font-display text-2xl font-bold">{kk.auth.signupTitle}</h1>
+      <TelegramLoginButton next={next} />
       <AuthForm
         action={signupAction}
         next={next}

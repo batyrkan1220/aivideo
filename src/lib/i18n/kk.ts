@@ -198,6 +198,13 @@ export const kk = {
     invalidEmail: "Почта указана неверно.",
     emailNotConfirmed: "Сначала подтвердите почту.",
     linkExpired: "Срок действия ссылки истёк. Запросите новую.",
+    telegram: "Войти через Telegram",
+    telegramHint: "Без пароля — в один тап",
+    or: "или",
+    telegramWorking: "Входим через Telegram…",
+    telegramCancelled: "Вход через Telegram отменён.",
+    telegramFailed: "Не получилось войти через Telegram. Попробуйте ещё раз.",
+    telegramBack: "Вернуться ко входу",
   },
   home: {
     title: "Поставь себя в трендовое видео",
