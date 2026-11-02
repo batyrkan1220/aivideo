@@ -51,7 +51,12 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   const who = people === 1
     ? "replace the main person with the person from @image_1."
     : `replace ${refs.map((r, i) => `the person ${positions[i]?.trim() || `number ${i + 1} from the left`} with the person from ${r}`).join(", and ")}.`;
-  const same = `Each new person must look 100% identical to their reference image (${refs.join(", ")}) in every frame: preserve the facial features, face shape, eyes, eyebrows, nose, mouth, teeth, ears, moles, hairstyle, hair color, skin tone, age and body proportions exactly. Do not beautify, stylize or change the faces.`;
+  const same = [
+    `Each new person must look 100% identical to their reference image (${refs.join(", ")}) in every frame: preserve the facial features, face shape, eyes, eyebrows, nose, mouth, teeth, ears, moles, hairstyle, hair color, skin tone, age and body proportions exactly.`,
+    // Turns of the head are where likeness usually breaks: keep the same 3D face from every angle.
+    "Keep the identity consistent from every angle — front, three-quarter, profile, looking up and looking down: the same skull and face shape, forehead, jawline and chin, cheekbones, nose bridge and nose profile, lip shape and ear shape. When the reference does not show a side of the face, reconstruct it so it matches the reference exactly.",
+    "Natural, realistic skin with real texture and pores, natural facial asymmetry kept. Do not beautify, slim, smooth, stylize or change the faces; no filters.",
+  ].join(" ");
   const parts = mode === "edit"
     ? [
         `Edit @video_1: ${who}`,
@@ -176,8 +181,8 @@ export function buildKlingPhotoPrompt(o: { people: number; useExample: boolean; 
       : `A photorealistic photo of ${who}.`,
     o.adminPrompt ? `Scene and style: ${o.adminPrompt}` : "",
     o.wish ? `Customer wish: ${o.wish}` : "",
-    `Identity: each person must look 100% identical to their reference photo (${refs.join(", ")}): the same face, facial features, face shape, eyes, nose, lips, teeth, skin tone, moles, hairstyle, hair color, age and body proportions. Do not beautify, stylize or change the face.`,
-    "Photorealistic, natural skin texture, sharp focus, high detail.",
+    `Identity: each person must look 100% identical to their reference photo (${refs.join(", ")}): the same face, facial features, face shape, eyes, nose, lips, teeth, skin tone, moles, hairstyle, hair color, age and body proportions. At any head angle (profile, three-quarter, from above or below) keep the same face shape, jawline, nose profile and proportions. Do not beautify, slim, smooth or stylize the face.`,
+    "Photorealistic: authentic skin texture with visible pores, natural facial asymmetry, realistic hair strands, natural light and shadows, sharp focus, high detail, no filters, no plastic or airbrushed skin.",
   ];
   return parts.filter(Boolean).join("\n");
 }
