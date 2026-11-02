@@ -84,7 +84,10 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
       <ul className="mt-4 grid grid-cols-3 gap-2 text-center">
         {L.points.map((p) => (
           <li key={p.t} className="rounded-2xl bg-surface px-1.5 py-2.5 ring-1 ring-line">
-            <span className="block text-xl" aria-hidden>{p.i}</span>
+            {p.i === "kaspi"
+              // eslint-disable-next-line @next/next/no-img-element
+              ? <img src="/kaspi.png" alt="" aria-hidden className="mx-auto block h-7 w-7 rounded-lg object-contain" />
+              : <span className="block text-xl" aria-hidden>{p.i}</span>}
             <span className="mt-0.5 block text-[12px] font-bold leading-tight">{p.t}</span>
             <span className="block text-[11px] leading-tight text-muted">{p.d}</span>
           </li>
