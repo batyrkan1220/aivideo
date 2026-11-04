@@ -131,7 +131,15 @@ function makeProvider(mode: ToleMode): PaymentProvider {
           throw new PaymentRetryLater("intent read failed");
         }
         const mapped = mapIntentStatus(intent.status);
-        if (!mapped) return ignore();
+        if (!mapped) {
+          // "paid" webhook but Tole's own read still says pending (read lag). Ignoring it would mark the event
+          // processed and Tole would never resend — the payment would then wait for a browser poll only.
+          if (fromType === "paid" && intent.status === "pending") {
+            toleLog("webhook_paid_but_intent_pending", { webhookId: sig.webhookId }, "error");
+            throw new PaymentRetryLater("intent not yet paid");
+          }
+          return ignore();
+        }
         return { ...base, providerPaymentId: intent.id, amountKzt: intent.amount, currency: intent.currency, ...mapped };
       }
 

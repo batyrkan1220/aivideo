@@ -1,13 +1,8 @@
-import { markDiscountUsed } from "@/lib/engage/discount";
-import { sendServerPurchase } from "@/lib/pixels/server";
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { track } from "@/lib/analytics";
 import { paymentProvider } from "./index";
 import { PaymentRetryLater } from "./types";
-import { notifyOrderOwner } from "@/lib/telegram/bot";
-import { notifyAdmins } from "@/lib/telegram/admin";
-import { notifyPartnerCommission } from "@/lib/partners";
+import { onPaymentApplied } from "./effects";
 
 export type WebhookOutcome =
   | { http: 200; result: "applied" | "noop" | "duplicate" }
@@ -68,17 +63,7 @@ export async function handlePaymentWebhook(providerKey: string, rawBody: string,
   if (result === "applied") {
     const { data: pay } = await db.from("payments").select("order_id")
       .eq("provider", provider.key).eq("provider_payment_id", event.providerPaymentId).single();
-    if (event.status === "succeeded") {
-      await track("payment_succeeded", { orderId: pay?.order_id });
-      if (pay?.order_id) {
-        await markDiscountUsed(pay.order_id);
-        await sendServerPurchase(pay.order_id);
-        await notifyOrderOwner(pay.order_id, "paid");
-        await notifyAdmins(pay.order_id, "paid");
-        await notifyPartnerCommission(pay.order_id);
-      }
-    }
-    if (event.status === "failed") await track("payment_failed", { orderId: pay?.order_id });
+    await onPaymentApplied(pay?.order_id, event.status);
     return { http: 200, result: "applied" };
   }
   if (result === "noop" || result === "invalid_transition") return { http: 200, result: "noop" };

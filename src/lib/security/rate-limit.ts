@@ -9,7 +9,7 @@ export const LIMITS = {
   reset: [5, 60 * 60],
   order: [20, 60 * 60],
   checkout: [20, 60 * 60],
-  tole_reconcile: [15, 60],   // per payment: status polling reads Tole at most every ~4 s
+  tole_reconcile: [30, 60],   // per payment: polling (≈ every 4 s) plus immediate polls when the tab regains focus
   tole_simulate: [10, 60 * 60],
   telegram_auth: [30, 10 * 60],
   handoff: [10, 10 * 60],
