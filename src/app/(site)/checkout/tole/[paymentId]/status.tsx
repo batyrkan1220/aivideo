@@ -9,24 +9,56 @@ export function ToleStatus({ paymentId, orderId, ready }: { paymentId: string; o
   const [done, setDone] = useState<null | "paid" | "failed">(null);
 
   useEffect(() => {
-    let stop = false;
-    let delay = 3_000;
+    // Kaspi is a different app: the tab is hidden while the customer pays and the browser may freeze its timers.
+    // So we also poll right away when the page becomes visible again, and keep the interval short (≤ 4 s).
+    const FIRST_MS = 2_000, MAX_MS = 4_000;
+    let stop = false, running = false;
+    let delay = FIRST_MS;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const schedule = (ms: number) => {
+      if (stop) return;
+      clearTimeout(timer);
+      timer = setTimeout(tick, ms);
+    };
+
     const tick = async () => {
-      if (stop || document.hidden) { if (!stop) setTimeout(tick, delay); return; }
+      if (stop || running) return;
+      if (document.hidden) { schedule(delay); return; }
+      running = true;
       try {
         const r = await fetch(`/api/payments/tole/${paymentId}`, { cache: "no-store" });
         if (r.ok) {
           const s = (await r.json()) as { status: string; ready: boolean };
-          if (s.status === "succeeded") { setDone("paid"); router.push(`/orders/${orderId}`); return; }
-          if (s.status === "failed" || s.status === "cancelled") { setDone("failed"); router.refresh(); return; }
-          if (s.ready && !ready) { router.refresh(); return; }
+          if (s.status === "succeeded") { stop = true; setDone("paid"); router.push(`/orders/${orderId}`); return; }
+          if (s.status === "failed" || s.status === "cancelled") { stop = true; setDone("failed"); router.refresh(); return; }
+          if (s.ready && !ready) { stop = true; router.refresh(); return; }
         }
       } catch { /* network blip: keep polling */ }
-      delay = Math.min(delay * 1.25, 10_000);
-      if (!stop) setTimeout(tick, delay);
+      finally { running = false; }
+      delay = Math.min(delay * 1.25, MAX_MS);
+      schedule(delay);
     };
-    const t = setTimeout(tick, delay);
-    return () => { stop = true; clearTimeout(t); };
+
+    const wake = () => {
+      if (document.hidden || stop) return;
+      delay = FIRST_MS;
+      schedule(0);
+    };
+
+    schedule(delay);
+    document.addEventListener("visibilitychange", wake);
+    window.addEventListener("pageshow", wake);
+    window.addEventListener("focus", wake);
+    window.addEventListener("online", wake);
+    return () => {
+      stop = true;
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", wake);
+      window.removeEventListener("pageshow", wake);
+      window.removeEventListener("focus", wake);
+      window.removeEventListener("online", wake);
+    };
   }, [paymentId, orderId, ready, router]);
 
   if (done === "failed") {

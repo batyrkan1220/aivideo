@@ -40,7 +40,9 @@ async function Inner({ params }: { params: Promise<{ paymentId: string }> }) {
 
   // Catch up with Tole (pending command / missed webhook) before rendering.
   if (pay.status === "pending") {
-    await reconcileTolePayment(pay.id);
+    // Bounded wait: a slow Tole read must not leave the customer on a blank "loading" screen;
+    // the status poller below keeps reconciling.
+    await Promise.race([reconcileTolePayment(pay.id), new Promise((r) => setTimeout(r, 4_000))]);
     ({ data: pay } = await load());
     if (!pay) notFound();
   }

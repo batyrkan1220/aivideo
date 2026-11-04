@@ -1,8 +1,6 @@
-import { markDiscountUsed } from "@/lib/engage/discount";
-import { sendServerPurchase } from "@/lib/pixels/server";
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { track } from "@/lib/analytics";
+import { onPaymentApplied } from "../effects";
 import { ToleError, invoiceFromCommandResult } from "./client";
 import { mapIntentStatus, toleClient } from "./provider";
 import { toleLog } from "./log";
@@ -58,8 +56,14 @@ export async function reconcileTolePayment(paymentId: string): Promise<TolePayme
           p_amount_kzt: intent.amount, p_currency: intent.currency, p_reason: mapped.reason ?? null,
         });
         toleLog("reconcile_intent", { paymentId: p.id, paymentIntentId: intent.id, status: intent.status, result: String(result), ...(intent.status === "failed" ? { failure: JSON.stringify(intent.failureInfo) } : {}) });
-        if (result === "applied" && mapped.status === "succeeded") { await track("payment_succeeded", { orderId: p.order_id }); await markDiscountUsed(p.order_id); await sendServerPurchase(p.order_id); }
-        return { status: result === "applied" ? mapped.status : "pending", ready: true, outcome: null };
+        if (result === "applied") {
+          await onPaymentApplied(p.order_id, mapped.status);
+          return { status: mapped.status, ready: true, outcome: null };
+        }
+        // Not applied by us (e.g. the webhook won the race): report what the database says now,
+        // so the customer isn't told "pending" for another polling round.
+        const { data: cur } = await db.from("payments").select("status").eq("id", p.id).maybeSingle();
+        return { status: cur?.status ?? p.status, ready: true, outcome: null };
       }
     }
   } catch (err) {
