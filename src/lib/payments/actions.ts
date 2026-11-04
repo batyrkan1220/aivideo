@@ -2,6 +2,7 @@
 import { orderAccessLink } from "@/lib/orders/access";
 import { notifyOrderOwner } from "@/lib/telegram/bot";
 import { randomUUID } from "node:crypto";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getSessionUser } from "@/lib/auth/session";
@@ -13,10 +14,28 @@ import { activePaymentProvider } from "./index";
 import { handlePaymentWebhook } from "./process";
 import { signSandbox } from "./sandbox";
 import { PaymentProviderNotConfigured } from "./types";
+import { ToleError } from "./tole/client";
 import { allow } from "@/lib/security/rate-limit";
 import { normalizeKzPhone } from "./phone";
 
-export type CheckoutState = { error?: "unauthorized" | "not_payable" | "price_changed" | "provider_unavailable" | "rate_limited" | "phone_invalid" | "generic" };
+export type CheckoutState = { error?: "unauthorized" | "not_payable" | "price_changed" | "provider_unavailable" | "rate_limited" | "phone_invalid" | "invoice_rejected" | "generic" };
+
+/** What the customer should be told when the provider refused or failed to issue the invoice. */
+function checkoutErrorFor(err: unknown): NonNullable<CheckoutState["error"]> {
+  if (err instanceof PaymentProviderNotConfigured) return "provider_unavailable";
+  if (err instanceof ToleError) {
+    switch (err.kind) {
+      case "validation": return err.code === "LOCAL_BAD_PHONE" ? "phone_invalid" : "invoice_rejected"; // Tole/Kaspi rejected the request or number
+      case "not_found": return "invoice_rejected";
+      case "rate_limited": return "rate_limited";
+      // Our own key/connection/balance problem or Tole/Kaspi being down: nothing the customer can fix.
+      case "auth": case "forbidden": case "billing":
+      case "upstream": case "unavailable": case "network": case "timeout": return "provider_unavailable";
+      default: return "generic";
+    }
+  }
+  return "generic";
+}
 
 
 /**
@@ -70,6 +89,8 @@ export async function startCheckout(_: CheckoutState, fd: FormData): Promise<Che
 
   const paymentId = replay ? existing!.id : randomUUID();
   const idempotencyKey = replay ? existing!.idempotency_key : `${o.id}:${paymentId}`;
+  // The order link for the Kaspi comment is looked up while the payment row is inserted (never rejects).
+  const commentPromise = invoiceComment(o.id, o.public_order_number);
   if (!replay) {
     const { error: insErr } = await db.from("payments").insert({
       id: paymentId, order_id: o.id, provider: provider.key, amount_kzt: o.amount_kzt,
@@ -83,15 +104,17 @@ export async function startCheckout(_: CheckoutState, fd: FormData): Promise<Che
     created = await provider.createPayment({
       paymentId, orderId: o.id, orderNumber: o.public_order_number, amountKzt: o.amount_kzt,
       // The order link in the Kaspi comment: customers without Telegram can always come back to it.
-      description: await invoiceComment(o.id, o.public_order_number),
+      description: await commentPromise,
       returnUrl: `${env().NEXT_PUBLIC_APP_URL}/orders/${o.id}`,
       idempotencyKey,
       customerPhone: phone ?? undefined,
     });
   } catch (err) {
-    await db.from("payments").update({ status: "failed", failure_reason: "create_failed", provider_outcome: null }).eq("id", paymentId);
+    // The kind (e.g. create_failed:validation) shows admins WHY it failed; the customer gets a matching message.
+    const kind = err instanceof ToleError ? err.kind : "error";
+    await db.from("payments").update({ status: "failed", failure_reason: `create_failed:${kind}`, provider_outcome: null }).eq("id", paymentId);
     console.error("[checkout.provider]", err instanceof Error ? err.message : err);
-    return { error: err instanceof PaymentProviderNotConfigured ? "provider_unavailable" : "generic" };
+    return { error: checkoutErrorFor(err) };
   }
 
   await db.from("payments").update({
@@ -105,7 +128,8 @@ export async function startCheckout(_: CheckoutState, fd: FormData): Promise<Che
   }).eq("id", paymentId);
   await db.from("orders").update({ payment_status: "pending" }).eq("id", o.id);
   // Kaspi invoice: remind the customer in Telegram where to pay (best effort).
-  if (needsPhone && created.providerPaymentId && !replay) await notifyOrderOwner(o.id, "invoice_sent");
+  // After the redirect response: the customer must not wait for a Telegram round trip to see the payment page.
+  if (needsPhone && created.providerPaymentId && !replay) after(() => notifyOrderOwner(o.id, "invoice_sent"));
 
   redirect(created.redirectUrl);
 }

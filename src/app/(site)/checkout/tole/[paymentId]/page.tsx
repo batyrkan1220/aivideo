@@ -32,14 +32,16 @@ async function Inner({ params }: { params: Promise<{ paymentId: string }> }) {
 
   const db = supabaseAdmin();
   const load = () => db.from("payments")
-    .select("id,status,amount_kzt,provider,provider_outcome,provider_payment_id,provider_phone_last4,order_id,orders!inner(user_id,public_order_number)")
+    .select("id,status,amount_kzt,provider,provider_outcome,provider_payment_id,provider_phone_last4,failure_reason,created_at,order_id,orders!inner(user_id,public_order_number)")
     .eq("id", paymentId).maybeSingle();
   let { data: pay } = await load();
   const order = pay && (Array.isArray(pay.orders) ? pay.orders[0] : pay.orders) as { user_id: string; public_order_number: string } | null;
   if (!pay || (pay.provider !== "tole" && pay.provider !== "tole_sandbox") || order?.user_id !== user.id) notFound();
 
-  // Catch up with Tole (pending command / missed webhook) before rendering.
-  if (pay.status === "pending") {
+  // Catch up with Tole (pending command / missed webhook) before rendering. Skipped for an invoice issued a
+  // few seconds ago: the extra Tole round trip cannot change anything yet, and the poller takes over.
+  const justIssued = !!pay.provider_payment_id && !pay.provider_outcome && Date.now() - new Date(pay.created_at).getTime() < 10_000;
+  if (pay.status === "pending" && !justIssued) {
     // Bounded wait: a slow Tole read must not leave the customer on a blank "loading" screen;
     // the status poller below keeps reconciling.
     await Promise.race([reconcileTolePayment(pay.id), new Promise((r) => setTimeout(r, 4_000))]);
@@ -52,9 +54,14 @@ async function Inner({ params }: { params: Promise<{ paymentId: string }> }) {
   const card = "rounded-card border border-line bg-surface p-6";
 
   if (pay.status !== "pending") {
+    const reason = pay.failure_reason ?? "";
+    const message = reason === "expired" ? kk.tole.expired
+      : reason === "customer_cancelled" ? kk.tole.cancelled
+      : reason === "provider_rejected" || reason.startsWith("create_failed") ? kk.tole.rejected
+      : kk.tole.failed;
     return (
       <div className={`${card} text-center`}>
-        <p className="font-medium">{kk.tole.failed}</p>
+        <p className="font-medium">{message}</p>
         <Link href={`/orders/${pay.order_id}`} className="mt-4 inline-block font-semibold text-brand hover:underline">{kk.tole.backToOrder}</Link>
       </div>
     );

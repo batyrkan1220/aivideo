@@ -76,7 +76,8 @@ function makeProvider(mode: ToleMode): PaymentProvider {
       }
 
       if (out.kind === "in_progress") {
-        const st = await client.awaitCommand(out.commandId, out.retryAfterSec, 8_000).catch(() => ({ state: "pending" as const }));
+        // Wait only briefly here; the checkout page shows "sending the invoice…" and its poller finishes the job.
+        const st = await client.awaitCommand(out.commandId, out.retryAfterSec, 4_000).catch(() => ({ state: "pending" as const }));
         if (st.state === "failed") throw new ToleError("upstream", st.responseStatus, "COMMAND_FAILED");
         const inv = st.state === "succeeded" ? invoiceFromCommandResult(st.result) : null;
         if (!inv) {
