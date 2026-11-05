@@ -67,11 +67,12 @@ function loadFaceApi() {
     try {
       const fa = await import("@vladmandic/face-api/dist/face-api.esm.js");
       await fa.nets.tinyFaceDetector.loadFromUri("/models/face");
-      // Warm-up: the first run compiles the GPU shaders for both input sizes (seconds on a
-      // phone). Doing it now means the customer's photo is checked at full speed.
-      const warm = document.createElement("canvas");
-      warm.width = warm.height = 64;
-      for (const inputSize of [416, 608]) await fa.detectAllFaces(warm, new fa.TinyFaceDetectorOptions({ inputSize, scoreThreshold: 0.9 }));
+      // Warm-up compiles the shaders. A failure here must not disable detection.
+      try {
+        const warm = document.createElement("canvas");
+        warm.width = warm.height = 64;
+        for (const inputSize of [416, 608]) await fa.detectAllFaces(warm, new fa.TinyFaceDetectorOptions({ inputSize, scoreThreshold: 0.9 }));
+      } catch { /* the real photo or video frame still runs */ }
       return fa as unknown as typeof import("@vladmandic/face-api");
     } catch { faceApi = null; return null; }
   })();
