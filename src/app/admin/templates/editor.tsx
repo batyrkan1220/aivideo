@@ -84,16 +84,19 @@ export function TemplateEditor({
   const router = useRouter();
   const [duration, setDuration] = useState<number | null>(null);
   const [aspect, setAspect] = useState<number | null>(null);
+  const [frame, setFrame] = useState<{ w: number; h: number } | null>(null);
   // Every template is a Seedance template: one quality (720p), Seedance provider and config.
   const [t, setT] = useState<TemplateInput>(() => ({ ...initial, providerKey: "seedance", qualities: [SEEDANCE_QUALITY] }));
   // Template video length → automatic price preview.
   useEffect(() => {
     if (!t.previewVideoPath) return;
+    setFrame(null);
     const v = document.createElement("video");
     v.preload = "metadata";
     v.onloadedmetadata = () => {
       setDuration(Number.isFinite(v.duration) ? v.duration : null);
       setAspect(v.videoWidth > 0 && v.videoHeight > 0 ? Math.round((v.videoWidth / v.videoHeight) * 10000) / 10000 : null);
+      setFrame(v.videoWidth > 0 && v.videoHeight > 0 ? { w: v.videoWidth, h: v.videoHeight } : null);
     };
     v.src = /^https?:/.test(t.previewVideoPath) ? t.previewVideoPath : `${mediaBase}/${t.previewVideoPath}`;
     return () => { v.onloadedmetadata = null; v.removeAttribute("src"); };
@@ -358,8 +361,8 @@ export function TemplateEditor({
               <textarea className={`${inputCls(err("seedance.prompt"))} min-h-24`} value={sd.prompt} maxLength={1500} onChange={(ev) => setSd({ prompt: ev.target.value })} />
               <span className="mt-1 block text-xs text-muted">{e.seedance.promptHint}</span>
             </Field>
-            <p className={`text-xs sm:col-span-2 ${duration !== null && (duration < 2.5 || duration > 30.5) ? "font-semibold text-danger" : "text-muted"}`}>
-              {e.seedance.durationHint}{duration !== null ? ` · ${Math.round(duration * 10) / 10} сек` : ""}
+            <p className={`text-xs sm:col-span-2 ${(duration !== null && (duration < 2.5 || duration > 30.5)) || (frame && (frame.w < 700 || frame.h < 700)) ? "font-semibold text-danger" : "text-muted"}`}>
+              {e.seedance.durationHint}{duration !== null ? ` · ${Math.round(duration * 10) / 10} сек` : ""}{frame ? ` · ${frame.w}×${frame.h}` : ""}
             </p>
           </div>
           {slots.length > 0 && <FaceMap slots={slots} mediaBase={mediaBase} />}

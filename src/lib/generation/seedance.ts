@@ -65,8 +65,7 @@ export const seedanceProvider: GenerationProvider = {
     const people = Math.min(declaredPeople, Math.max(1, photos.length - objects.length));
     const prompt = buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : "", people, cfg.positions, objects);
     const resolution = input.quality === "1080p" ? "1080p" : "720p";
-    // The photo becomes a character element first. A loose photo reference matches the opening
-    // and then follows the face inside the template video.
+    // The client photo becomes a Kling element first. The video request names that element element_1.
     const elementTaskId = await createKlingFaceElement(photos[0]);
     const state: ProviderState = {
       stage: "element", videoUrl: input.templateVideoUrl, photoUrls: photos, people,

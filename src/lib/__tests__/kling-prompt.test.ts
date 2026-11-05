@@ -5,14 +5,14 @@ import { parseSeedanceConfig } from "@/lib/templates/seedance-config";
 describe("Kling prompt priorities", () => {
   it("keeps the template rules mandatory and the customer's wish lower priority", () => {
     const p = buildKlingDirectPrompt("edit", "template", "national costume", "red dress, smiling");
-    expect(p).toContain("Clothing follows @video_1");
+    expect(p).toContain("Keep the clothing from @video_1");
     expect(p).toContain("Mandatory template instruction: national costume");
     expect(p.indexOf("Mandatory template instruction")).toBeLessThan(p.indexOf("Optional customer wish"));
     expect(p).toMatch(/ignore any part that asks to change the faces or the clothing/);
-    expect(p).toContain("very last millisecond");
-    expect(p).toContain("Use @element_1 as the locked character");
-    expect(p).toContain("@image_1 is that person's photo");
-    expect(p).toContain("motion-only guide");
+    expect(p).toContain("Edit @video_1");
+    expect(p).toContain("the person from @element_1");
+    expect(p).not.toContain("@image_1");
+    expect(p).toContain("Keep the scene, camera, body movement");
   });
 
   it("adds no wish section when the customer wrote nothing", () => {
@@ -61,24 +61,24 @@ describe("Kling prompt with things to swap", () => {
   it("adds the car after the person and keeps identity rules for people only", async () => {
     const { buildKlingDirectPrompt } = await import("@/lib/generation/kling");
     const p = buildKlingDirectPrompt("edit", "photo", "", "", 1, [], [{ what: "car" }]);
-    expect(p).toContain("@image_2 is a photo of a car, not a person");
-    expect(p).toContain("Replace the car in @video_1 with the car from @image_2");
-    expect(p).toContain("identity lock of @element_1");
-    expect(p).toContain("@image_1 is that person's photo");
+    expect(p).toContain("@image_1 is a photo of a car, not a person");
+    expect(p).toContain("Replace the car in @video_1 with the car from @image_1");
+    expect(p).toContain("must match @element_1");
+    expect(p).not.toContain("@image_2");
   });
   it("keeps three people as characters and a horse or outfit as their own photos", () => {
     const p = buildKlingDirectPrompt("edit", "template", "", "", 3, ["on the left", "in the center", "on the right"], [{ what: "horse" }, { what: "outfit" }]);
-    expect(p).toContain("Use @element_1 and @element_2 and @element_3 as the locked characters");
+    expect(p).toContain("Edit @video_1");
     expect(p).toContain("the person on the left with the person from @element_1");
     expect(p).toContain("the person on the right with the person from @element_3");
-    expect(p).toContain("@image_4 is a photo of a horse, not a person");
-    expect(p).toContain("Dress the people in the outfit shown in @image_5");
-    expect(p).not.toContain("Clothing follows @video_1");
+    expect(p).toContain("@image_1 is a photo of a horse, not a person");
+    expect(p).toContain("Dress the people in the outfit shown in @image_2");
+    expect(p).not.toContain("Keep the clothing from @video_1");
   });
   it("an outfit photo dresses the person", async () => {
     const { buildKlingDirectPrompt } = await import("@/lib/generation/kling");
     const p = buildKlingDirectPrompt("edit", "template", "", "", 1, [], [{ what: "outfit" }]);
-    expect(p).toContain("Dress the person in the outfit shown in @image_2");
+    expect(p).toContain("Dress the person in the outfit shown in @image_1");
     expect(p).toContain("Do not take the clothing from @video_1");
     expect(p).not.toContain("Clothing follows @video_1");
   });

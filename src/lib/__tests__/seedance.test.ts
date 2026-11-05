@@ -42,10 +42,10 @@ describe("config", () => {
   });
   it("prompt: edit keeps the scene, maps several people by position", () => {
     const p = buildKlingDirectPrompt("edit", "photo", "", "", 2, ["the biggest one in the frame", "in the background"]);
-    expect(p).toContain("Use @element_1 and @element_2 as the locked characters");
+    expect(p).toContain("Edit @video_1");
     expect(p).toContain("the person the biggest one in the frame with the person from @element_1");
     expect(p).toContain("@element_2");
-    expect(p).toContain("100% facial persistence");
+    expect(p).toContain("Keep the scene, camera, body movement");
   });
 });
 
@@ -82,8 +82,9 @@ describe("provider (Kling official API)", () => {
     expect(advanced).toMatchObject({ state: "processing", next: { providerJobId: "kt-1", state: { stage: "klingd" } } });
     const video = calls.find((c) => c.url.endsWith("/omni-video/kling-4.0"));
     const body = video?.body as { contents: { type: string; url?: string; id?: string; text?: string; element_id?: string }[]; settings: Record<string, unknown> };
-    expect(body.contents.map((c) => c.type)).toEqual(["prompt", "feature_video", "element", "refer_image"]);
-    expect(body.contents[3]).toMatchObject({ type: "refer_image", url: "https://s/1.jpg", id: "image_1" });
+    expect(body.contents.map((c) => c.type)).toEqual(["prompt", "base_video", "element"]);
+    expect(body.contents[2]).toMatchObject({ type: "element", element_id: "308", id: "element_1" });
+    expect(body.contents.some((c) => c.type === "refer_image")).toBe(false);
     expect(body.contents[0].text).toContain("night city");
     expect(body.contents[0].text).toContain("@element_1");
     expect(body.settings).toMatchObject({ resolution: "720p", duration: 8, aspect_ratio: "9:16" });
@@ -141,12 +142,11 @@ describe("provider (Kling official API)", () => {
       expect.objectContaining({ element_id: "22", id: "element_2" }),
     ]);
     expect(body.contents.filter((c) => c.type === "refer_image")).toEqual([
-      expect.objectContaining({ url: "https://s/1.jpg", id: "image_1" }),
-      expect.objectContaining({ url: "https://s/2.jpg", id: "image_2" }),
-      expect.objectContaining({ url: "https://s/car.jpg", id: "image_3" }),
+      expect.objectContaining({ url: "https://s/car.jpg", id: "image_1" }),
     ]);
+    expect(body.contents.find((c) => c.type === "base_video" || c.type === "feature_video")?.type).toBe("base_video");
     expect(body.contents[0].text).toContain("Do not use the clothing from @video_1");
-    expect(body.contents[0].text).toContain("@image_3 is a photo of a car, not a person");
+    expect(body.contents[0].text).toContain("@image_1 is a photo of a car, not a person");
     expect(body.contents[0].text).not.toContain("Clothing follows @video_1");
     vi.unstubAllGlobals();
   });
