@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { kk } from "@/lib/i18n/kk";
 import { formatKzt } from "@/lib/pricing";
 import { autoplayRefused, useImgPreviews } from "@/lib/video-autoplay";
@@ -74,7 +73,6 @@ function releasePlayback(v: HTMLVideoElement) {
  *  - visible cards autoplay (muted, inline); off-screen videos are paused.
  */
 export function TemplateCard({ t, priority = false }: { t: CardData; priority?: boolean }) {
-  const pathname = usePathname();
   const videoRef = useRef<HTMLVideoElement>(null);
   const cardRef = useRef<HTMLAnchorElement>(null);
   const [playing, setPlaying] = useState(false);
@@ -146,7 +144,7 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
     const io = new IntersectionObserver(([e]) => (e.isIntersecting ? play() : stop()), { threshold: 0.6 });
     io.observe(el);
     return () => { io.disconnect(); stop(); };
-  }, [near, pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [near]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep the UI in sync when the playback manager pauses this video.
   useEffect(() => {

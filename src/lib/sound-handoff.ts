@@ -62,7 +62,14 @@ export function videoShown(v: HTMLVideoElement): boolean {
 
 /** Stops previews that are no longer on a visible card (payment page, another route, scrolled away). */
 export function pauseHiddenVideos() {
-  if (primed && !primed.el.isConnected) drop();
+  // A card tap starts an off-screen video so the template page can take it over. Leave that
+  // one alone for a moment; drop it only if the viewer never landed on the template.
+  if (
+    primed &&
+    !primed.el.isConnected &&
+    Date.now() - primed.at > 2000 &&
+    !window.location.pathname.startsWith("/templates/")
+  ) drop();
   document.querySelectorAll("video").forEach((node) => {
     const v = node as HTMLVideoElement;
     if (!videoShown(v)) v.pause();
