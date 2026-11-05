@@ -12,6 +12,8 @@ export const faceSlotSchema = z.object({
   order: z.number().int().min(0),
   /** "object": not a person — a car, horse, outfit… the customer sends a photo of it. */
   kind: z.enum(["person", "object"]).optional(),
+  /** Kling identify-face id of the person in the template video this photo replaces. */
+  klingId: z.string().max(80).optional(),
 });
 
 export const qualitySchema = z.object({

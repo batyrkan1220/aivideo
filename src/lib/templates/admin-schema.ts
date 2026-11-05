@@ -106,7 +106,11 @@ export function inputToRow(t: TemplateInput) {
   if (t.providerKey === "seedance") {
     const cfg = parseSeedanceConfig(t.providerConfig);
     config = cfg;
-    slots = seedanceSlots(cfg.people, "face_", cfg.labels, cfg.objects);
+    slots = seedanceSlots(
+      cfg.people, "face_", cfg.labels, cfg.objects,
+      cfg.klingElements.map((el) => el.previewPath.length <= 300 ? el.previewPath : ""),
+      cfg.klingElements.map((el) => el.id),
+    );
   } else if (t.providerKey === PHOTO_PROVIDER) {
     const cfg = parsePhotoConfig(t.providerConfig);
     config = cfg;

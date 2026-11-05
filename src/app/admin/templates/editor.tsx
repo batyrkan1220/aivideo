@@ -4,15 +4,14 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ru } from "@/lib/i18n/ru";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { autoFaceSlots, slotPreviewSrc } from "@/lib/templates/schema";
 import type { TemplateInput, PublishProblem } from "@/lib/templates/admin-schema";
-import { autoFaceSlots } from "@/lib/templates/schema";
 import { validateTemplateForm, firstErrorKey, type FieldErrors } from "@/lib/templates/editor-validation";
 import { OBJECT_PRESETS, parseSeedanceConfig, seedanceSlots, SEEDANCE_MAX_OBJECTS, SEEDANCE_MAX_PEOPLE, SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC, type SeedanceConfig } from "@/lib/templates/seedance-config";
 import { calculatePrice, formatKzt } from "@/lib/pricing";
 import { seedancePriceKzt, seedanceCostKzt, klingUnitLabel, SEEDANCE_QUALITY, type SeedancePricing } from "@/lib/pricing-seedance";
 import { FaceMap } from "@/components/face-map";
-import { detectVideoPeople } from "@/lib/uploads/photo-quality";
-import { saveTemplate, changeStatus, createUploadUrl } from "./actions";
+import { saveTemplate, changeStatus, createUploadUrl, detectKlingElements } from "./actions";
 import { DeleteTemplateButton } from "./delete-button";
 import { parsePhotoConfig, photoSlots, PHOTO_ASPECTS, PHOTO_MAX_PEOPLE, PHOTO_PROVIDER, PHOTO_QUALITY, type PhotoConfig } from "@/lib/templates/photo-config";
 
@@ -120,29 +119,21 @@ export function TemplateEditor({
   const set = <K extends keyof TemplateInput>(k: K, v: TemplateInput[K]) => { setT((p) => ({ ...p, [k]: v })); setDirty(true); };
   const setPricing = (patch: Partial<TemplateInput["pricing"]>) => set("pricing", { ...t.pricing, ...patch });
   const setSd = (patch: Partial<SeedanceConfig>) => { setSdState((p) => ({ ...p, ...patch })); setDirty(true); };
-  // @element_1, @element_2… — every person found anywhere in the template video, left → right.
+  // @element_1, @element_2… — people Kling found in the template video. Photo 1 binds to the first id.
   const [people, setPeople] = useState<{ busy: boolean; text?: string }>({ busy: false });
-  const detectPeople = async (path: string | null = t.previewVideoPath) => {
+  const detectElements = async (path: string | null = t.previewVideoPath) => {
     if (!path) return;
     setPeople({ busy: true });
-    const found = await detectVideoPeople(/^https?:/.test(path) ? path : `${mediaBase}/${path}`);
-    if (!found) { setPeople({ busy: false, text: e.seedance.detectFailed }); return; }
-    if (!found.length) { setPeople({ busy: false, text: e.seedance.detectNone }); return; }
-    const max = SEEDANCE_MAX_PEOPLE;
-    const n = Math.min(found.length, max);
-    // Kept people: the biggest faces, shown left → right.
-    const kept = [...found].sort((a, b) => b.size - a.size).slice(0, n).sort((a, b) => a.x - b.x);
-    const biggest = Math.max(...kept.map((p) => p.size));
-    const where = (i: number) => (n === 1 ? "" : i === 0 ? "on the left" : i === n - 1 ? "on the right" : "in the center");
-    const patch: Partial<SeedanceConfig> = { people: n };
-    patch.positions = kept.map((_, i) => where(i));
-    setSd(patch);
-    const desc = kept.map((p, i) => e.seedance.detectPerson(i + 1, n === 1 ? "" : e.seedance.positionOptions[where(i) as keyof typeof e.seedance.positionOptions], p.size === biggest && n > 1)).join(" · ");
-    setPeople({ busy: false, text: e.seedance.detectFound(found.length, n, desc) });
+    const found = await detectKlingElements(path);
+    if (!found.ok) { setPeople({ busy: false, text: found.error === "none" ? e.seedance.detectNone : e.seedance.detectFailed }); return; }
+    const n = found.elements.length;
+    const desc = found.elements.map((el, i) => `@element_${i + 1} → ${i + 1}-фото`).join(" · ");
+    setSd({ people: n, klingElements: found.elements, positions: Array.from({ length: n }, () => "") });
+    setPeople({ busy: false, text: e.seedance.detectFound(found.total, n, desc) });
   };
 
   // Customer photo slots = the number of people to replace, left → right (the server derives them too).
-  const slots = isPhoto ? photoSlots(ph.people, ph.labels) : seedanceSlots(sd.people, "face_", sd.labels, sd.objects);
+  const slots = isPhoto ? photoSlots(ph.people, ph.labels) : seedanceSlots(sd.people, "face_", sd.labels, sd.objects, sd.klingElements.map((el) => el.previewPath), sd.klingElements.map((el) => el.id));
 
   /** Client check first (shows red fields), then the authoritative server save. */
   const persist = async (forPublish: boolean): Promise<string | null> => {
@@ -255,7 +246,7 @@ export function TemplateEditor({
       <Section title={e.sections.media}>
         {isPhoto
           ? <PhotoExampleField error={err("cover")} path={t.coverAssetPath} mediaBase={mediaBase} onUploaded={(p) => set("coverAssetPath", p)} />
-          : <VideoField error={err("preview")} path={t.previewVideoPath} mediaBase={mediaBase} onUploaded={(p, meta) => { set("previewVideoPath", p); setDuration(meta?.duration ?? null); setAspect(meta?.aspect ?? null); void detectPeople(p); }} onCover={(p) => set("coverAssetPath", p)} />}
+          : <VideoField error={err("preview")} path={t.previewVideoPath} mediaBase={mediaBase} onUploaded={(p, meta) => { set("previewVideoPath", p); setDuration(meta?.duration ?? null); setAspect(meta?.aspect ?? null); void detectElements(p); }} onCover={(p) => set("coverAssetPath", p)} />}
       </Section>
 
       {isPhoto ? (
@@ -316,11 +307,26 @@ export function TemplateEditor({
               <select className={inputCls()} value={sd.people} onChange={(ev) => setSd({ people: Number(ev.target.value) })}>
                 {Array.from({ length: SEEDANCE_MAX_PEOPLE }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
-              <button type="button" disabled={people.busy || !t.previewVideoPath} onClick={() => void detectPeople()}
+              <button type="button" disabled={people.busy || !t.previewVideoPath} onClick={() => void detectElements()}
                 className="mt-2 rounded-full border border-line px-3 py-1.5 text-xs font-semibold hover:border-ink disabled:opacity-50">
                 {people.busy ? e.seedance.detecting : e.seedance.detect}
               </button>
               {people.text && <span className="mt-1 block text-xs font-medium">{people.text}</span>}
+              {sd.klingElements.length > 0 && (
+                <ol className="mt-3 grid grid-cols-3 gap-2">
+                  {sd.klingElements.slice(0, sd.people).map((el, i) => (
+                    <li key={el.id} className="text-center">
+                      <div className="relative aspect-[3/4] overflow-hidden rounded-xl border border-line bg-paper">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={slotPreviewSrc(el.previewPath, mediaBase) ?? ""} alt="" className="h-full w-full object-cover" />
+                        <span className="absolute left-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-night">{i + 1}</span>
+                      </div>
+                      <span className="mt-1 block text-[11px] font-semibold">@element_{i + 1}</span>
+                      <span className="block text-[11px] text-muted">{i + 1}-фото</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
             </Field>
             <Field label={e.seedance.aspect}>
               <select className={inputCls()} value={sd.aspectRatio} onChange={(ev) => setSd({ aspectRatio: ev.target.value as SeedanceConfig["aspectRatio"] })}>

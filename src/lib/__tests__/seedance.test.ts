@@ -32,6 +32,12 @@ describe("config", () => {
     expect(c.aspectRatio).toBe("9:16");
     expect(c.people).toBe(2);
     expect(seedanceSlots(2).map((s) => s.providerInput)).toEqual(["img_1", "img_2"]);
+    const bound = seedanceSlots(2, "face_", [], [], ["elements/a.jpg", "elements/b.jpg"], ["face-a", "face-b"]);
+    expect(bound.map((s) => [s.providerInput, s.klingId, s.previewImagePath])).toEqual([
+      ["img_1", "face-a", "elements/a.jpg"],
+      ["img_2", "face-b", "elements/b.jpg"],
+    ]);
+    expect(parseSeedanceConfig({ people: 2, klingElements: [{ id: "face-a", previewPath: "elements/a.jpg" }] }).klingElements[0].id).toBe("face-a");
     expect(seedanceOutputSec(2)).toBe(3);
     expect(seedanceOutputSec(40)).toBe(30);
   });
