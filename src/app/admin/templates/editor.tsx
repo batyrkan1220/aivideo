@@ -120,7 +120,7 @@ export function TemplateEditor({
   const set = <K extends keyof TemplateInput>(k: K, v: TemplateInput[K]) => { setT((p) => ({ ...p, [k]: v })); setDirty(true); };
   const setPricing = (patch: Partial<TemplateInput["pricing"]>) => set("pricing", { ...t.pricing, ...patch });
   const setSd = (patch: Partial<SeedanceConfig>) => { setSdState((p) => ({ ...p, ...patch })); setDirty(true); };
-  // Who is in the template video: faces found on a few frames, left → right.
+  // @element_1, @element_2… — every person found anywhere in the template video, left → right.
   const [people, setPeople] = useState<{ busy: boolean; text?: string }>({ busy: false });
   const detectPeople = async (path: string | null = t.previewVideoPath) => {
     if (!path) return;

@@ -174,9 +174,32 @@ export async function checkPhoto(file: File, framing: Framing = "auto"): Promise
 }
 
 export type VideoPerson = { x: number; size: number }; // face centre (0..1 from the left), face width / frame width
+
+/** Evenly spaced times from the start of the video to the end, so a person who appears only later is still found. */
+function videoSampleTimes(duration: number): number[] {
+  const d = Number.isFinite(duration) && duration > 0.3 ? duration : 1;
+  const end = Math.max(0.12, d - 0.12);
+  const count = Math.min(20, Math.max(6, Math.ceil(d)));
+  return Array.from({ length: count }, (_, i) => 0.12 + ((end - 0.12) * i) / Math.max(1, count - 1));
+}
+
+function seekVideo(v: HTMLVideoElement, t: number): Promise<void> {
+  const end = Number.isFinite(v.duration) ? Math.max(0, v.duration - 0.05) : t;
+  const target = Math.min(Math.max(0, t), end);
+  if (Math.abs(v.currentTime - target) < 0.04) return Promise.resolve();
+  return new Promise((res) => {
+    const done = () => { v.onseeked = null; clearTimeout(timer); res(); };
+    const timer = setTimeout(done, 2000);
+    v.onseeked = done;
+    v.currentTime = target;
+  });
+}
+
 /**
- * Template editor: who is in the video. Samples a few frames, detects faces and returns the
- * people of the frame with the most faces, left → right. null = detector unavailable.
+ * Template editor: every person who appears anywhere in the video, as one @element each.
+ * Faces are followed from the first frame to the last. The same person keeps one slot;
+ * someone who shows up only in another part of the video gets the next slot. Left → right.
+ * null = detector unavailable.
  */
 export async function detectVideoPeople(videoUrl: string): Promise<VideoPerson[] | null> {
   const fa = await loadFaceApi();
@@ -185,23 +208,46 @@ export async function detectVideoPeople(videoUrl: string): Promise<VideoPerson[]
   v.muted = true; v.playsInline = true; v.preload = "auto"; v.crossOrigin = "anonymous"; v.src = videoUrl;
   try {
     await new Promise<void>((res, rej) => { v.onloadeddata = () => res(); v.onerror = () => rej(new Error("load")); });
-    const d = v.duration || 1;
     const c = document.createElement("canvas");
     const W = Math.min(960, v.videoWidth || 720);
     c.width = W; c.height = Math.round(W * ((v.videoHeight || 1280) / (v.videoWidth || 720)));
     const ctx = c.getContext("2d");
     if (!ctx) return null;
-    let best: VideoPerson[] = [];
-    for (const t of [0.5, d * 0.25, d * 0.5, d * 0.75]) {
-      v.currentTime = Math.min(t, Math.max(0, d - 0.1));
-      await new Promise<void>((res) => { v.onseeked = () => res(); });
+    const H = c.height;
+    type Track = { x: number; y: number; size: number; n: number };
+    const tracks: Track[] = [];
+    for (const t of videoSampleTimes(v.duration || 1)) {
+      await seekVideo(v, t);
       ctx.drawImage(v, 0, 0, c.width, c.height);
       const boxes: Box[] = (await fa.detectAllFaces(c, new fa.TinyFaceDetectorOptions({ inputSize: 608, scoreThreshold: 0.45 })))
         .map((f) => ({ x: f.box.x, y: f.box.y, w: f.box.width, h: f.box.height }));
-      const merged = mergeBoxes([], boxes).filter((b) => b.w / W > 0.03); // ignore tiny background faces
-      if (merged.length > best.length) best = merged.map((b) => ({ x: (b.x + b.w / 2) / W, size: b.w / W }));
+      const faces = mergeBoxes([], boxes)
+        .filter((b) => b.w / W > 0.03)
+        .map((b) => ({ x: (b.x + b.w / 2) / W, y: (b.y + b.h / 2) / H, size: b.w / W }))
+        .sort((a, b) => b.size - a.size);
+      const used = new Set<number>();
+      for (const face of faces) {
+        let best = -1;
+        let bestDist = 0.35;
+        tracks.forEach((tr, i) => {
+          if (used.has(i)) return;
+          const dist = Math.hypot(tr.x - face.x, tr.y - face.y);
+          if (dist < bestDist) { best = i; bestDist = dist; }
+        });
+        if (best >= 0) {
+          const tr = tracks[best];
+          used.add(best);
+          tr.x = (tr.x * tr.n + face.x) / (tr.n + 1);
+          tr.y = (tr.y * tr.n + face.y) / (tr.n + 1);
+          tr.size = Math.max(tr.size, face.size);
+          tr.n += 1;
+        } else if (tracks.length < 8) {
+          tracks.push({ x: face.x, y: face.y, size: face.size, n: 1 });
+          used.add(tracks.length - 1);
+        }
+      }
     }
-    return best.sort((a, b) => a.x - b.x);
+    return tracks.map((tr) => ({ x: tr.x, size: tr.size })).sort((a, b) => a.x - b.x);
   } catch {
     return null;
   }
