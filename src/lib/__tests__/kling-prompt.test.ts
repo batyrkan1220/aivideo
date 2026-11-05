@@ -10,7 +10,8 @@ describe("Kling prompt priorities", () => {
     expect(p.indexOf("Mandatory template instruction")).toBeLessThan(p.indexOf("Optional customer wish"));
     expect(p).toMatch(/ignore any part that asks to change the faces or the clothing/);
     expect(p).toContain("very last millisecond");
-    expect(p).toContain("Use @element_1 as the only character");
+    expect(p).toContain("Use @element_1 as the locked character");
+    expect(p).toContain("@image_1 is that person's photo");
     expect(p).toContain("motion-only guide");
   });
 
@@ -63,11 +64,11 @@ describe("Kling prompt with things to swap", () => {
     expect(p).toContain("@image_2 is a photo of a car, not a person");
     expect(p).toContain("Replace the car in @video_1 with the car from @image_2");
     expect(p).toContain("identity lock of @element_1");
-    expect(p).not.toContain("@image_1");
+    expect(p).toContain("@image_1 is that person's photo");
   });
   it("keeps three people as characters and a horse or outfit as their own photos", () => {
     const p = buildKlingDirectPrompt("edit", "template", "", "", 3, ["on the left", "in the center", "on the right"], [{ what: "horse" }, { what: "outfit" }]);
-    expect(p).toContain("Use @element_1 and @element_2 and @element_3 as the only characters");
+    expect(p).toContain("Use @element_1 and @element_2 and @element_3 as the locked characters");
     expect(p).toContain("the person on the left with the person from @element_1");
     expect(p).toContain("the person on the right with the person from @element_3");
     expect(p).toContain("@image_4 is a photo of a horse, not a person");

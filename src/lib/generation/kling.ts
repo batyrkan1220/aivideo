@@ -44,8 +44,9 @@ export type KlingMode = "edit" | "reference";
 /** Edit = the template video itself is edited (scene 1:1); reference = a new video following its motion. */
 export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "template", adminPrompt: string, wish: string, people = 1, positions: string[] = [], objects: { what: string }[] = []): string {
   // Priority: the template rules (identity, clothing, admin instruction) are mandatory; the customer's wish is applied only where it does not contradict them.
-  // People are elements only. @image_N is reserved for things (car, horse, outfit), never a face.
+  // @element_N locks the client. @image_N is that same photo, which the video call must include or Kling keeps the template person.
   const faces = Array.from({ length: people }, (_, i) => `@element_${i + 1}`);
+  const photos = Array.from({ length: people }, (_, i) => `@image_${i + 1}`);
   // Things to swap (car, horse, outfit…): their photos come right after the people's.
   const things = objects.map((o, j) => ({ what: o.what.trim().toLowerCase(), ref: `@image_${people + j + 1}` }));
   const outfitRef = things.find((t) => ["outfit", "clothes", "clothing"].includes(t.what))?.ref;
@@ -66,14 +67,14 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   const motion = `@video_1 is strictly a skeleton / motion-only guide with zero facial likeness: camera, body movement, timing, location, background, lighting, framing, cuts and sound. ${faces.join(" and ")} face identity lock must persist 100% until the very last frame.`;
   const parts = mode === "edit"
     ? [
-        `Use ${faces.join(" and ")} as the only ${people === 1 ? "character" : "characters"}. ${who[0].toUpperCase()}${who.slice(1)}`,
+        `Use ${faces.join(" and ")} as the locked ${people === 1 ? "character" : "characters"}. ${photos.join(" and ")} ${people === 1 ? "is that person's photo" : "are those people's photos"}. ${who[0].toUpperCase()}${who.slice(1)}`,
         same,
         look,
         motion,
       ]
     : [
         motion,
-        `In the new video, ${who.replace(/\.$/, "")}.`,
+        `${photos.join(" and ")} ${people === 1 ? "is that person's photo" : "are those people's photos"}. In the new video, ${who.replace(/\.$/, "")}.`,
         same,
         look,
       ];
@@ -133,17 +134,18 @@ export async function getKlingElement(taskId: string): Promise<{ state: "process
 export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: string[]; elementIds?: string[]; peopleCount?: number; mode: KlingMode; prompt: string; durationSec: number; aspectRatio: string; resolution?: "720p" | "1080p" }): Promise<string> {
   const duration = Math.min(30, Math.max(3, Math.round(opts.durationSec)));
   const people = Math.max(0, opts.peopleCount ?? opts.elementIds?.length ?? 1);
-  // People are already locked as elements. refer_image is only for things that come after them.
+  const peoplePhotos = opts.photoUrls.slice(0, people);
   const objectPhotos = opts.photoUrls.slice(people);
   const d = await call<{ data?: { id?: string } }>("/omni-video/kling-4.0", {
     method: "POST",
     body: JSON.stringify({
       contents: [
         { type: "prompt", text: opts.prompt },
-        // feature_video is motion and scene. The element locks the client's face for the whole video.
-        // A person photo sent again as refer_image fights that lock and the template face returns later.
+        // The template video has the original person. The client's photo has to be in this request
+        // as refer_image, or Kling never sees a face to swap in. The element locks that same photo.
         { type: "feature_video", url: opts.videoUrl, id: "video_1" },
         ...(opts.elementIds ?? []).map((elementId, i) => ({ type: "element", element_id: String(elementId), id: `element_${i + 1}` })),
+        ...peoplePhotos.map((url, i) => ({ type: "refer_image", url, id: `image_${i + 1}` })),
         ...objectPhotos.map((url, i) => ({ type: "refer_image", url, id: `image_${people + i + 1}` })),
       ],
       // Vertical 720p for phones (1080p when the customer paid for Full HD) unless the template asks for another format.
@@ -152,7 +154,7 @@ export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: strin
   });
   const id = d.data?.id;
   if (!id) throw new ProviderError("provider_bad_response", false, "kling: missing task id");
-  console.log("[kling] video task", id, `elements=${opts.elementIds?.length ?? 0}`);
+  console.log("[kling] video task", id, `elements=${opts.elementIds?.length ?? 0} people=${peoplePhotos.length} objects=${objectPhotos.length}`);
   return id;
 }
 
