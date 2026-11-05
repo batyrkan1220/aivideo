@@ -59,9 +59,10 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
     : `replace ${faces.map((r, i) => `the person ${positions[i]?.trim() || `number ${i + 1} from the left`} with the person from ${r}`).join(", and ")}`;
   const identity = `Keep ${faces.join(" and ")} a 1:1 match in every frame until the last frame, whether the head looks left, right, into profile, or away from the camera. Same face shape, eyes, nose, lips, jaw, skin, moles, hairstyle and age, and stay sharp. Do not drift and do not return to the original face in @video_1.`;
   const lead = mode === "edit"
-    ? `Edit @video_1. ${who[0].toUpperCase()}${who.slice(1)}. Keep the scene, camera, body movement, timing, location, background, lighting, framing, cuts and sound of @video_1. Change only who the ${people === 1 ? "person is" : "people are"}.`
+    ? `Edit @video_1. ${who[0].toUpperCase()}${who.slice(1)}. Keep the scene, camera, body movement, timing, location, background, lighting, framing and cuts of @video_1. Change only who the ${people === 1 ? "person is" : "people are"}.`
     : `Follow the movement, camera and timing of @video_1. Do not copy the face from @video_1. ${who[0].toUpperCase()}${who.slice(1)}.`;
-  const parts = [lead, identity, look];
+  const sound = "Keep the original music, song, voice and sound effects of @video_1 exactly as they are, from the first moment to the last. Do not replace, remix, or add new music.";
+  const parts = [lead, sound, identity, look];
   for (const t of things) {
     if (t.ref === outfitRef) continue;
     parts.push(`${t.ref} is the ${t.what}, not a person. Replace the ${t.what} in @video_1 with the ${t.what} from ${t.ref}: the same type, model or breed, color, shape, markings and details. Keep it a 1:1 match from the left and from the right until the last frame, exactly where the original ${t.what} is, with the same size, angle, perspective and movement, matching the scene's lighting, reflections and shadows.`);
@@ -144,7 +145,8 @@ export async function submitKlingOmni(opts: { videoUrl: string; elementIds?: str
         { type: videoType, url: opts.videoUrl, id: "video_1" },
         ...(opts.elementIds ?? []).map((elementId, i) => ({ type: "element", element_id: String(elementId), id: `element_${i + 1}` })),
       ],
-      settings: { resolution: opts.resolution === "1080p" ? "1080p" : "720p", duration, aspect_ratio: aspect },
+      // native (the default) writes new music. original keeps the template video's soundtrack.
+      settings: { resolution: opts.resolution === "1080p" ? "1080p" : "720p", duration, aspect_ratio: aspect, audio: "original" },
     }),
   });
   const id = d.data?.id;

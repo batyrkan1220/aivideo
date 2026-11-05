@@ -13,6 +13,7 @@ describe("Kling prompt priorities", () => {
     expect(p).toContain("the person from @element_1");
     expect(p).not.toContain("@image_1");
     expect(p).toContain("Keep the scene, camera, body movement");
+    expect(p).toContain("Keep the original music, song, voice and sound effects of @video_1");
   });
 
   it("adds no wish section when the customer wrote nothing", () => {

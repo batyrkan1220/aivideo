@@ -87,7 +87,7 @@ describe("provider (Kling official API)", () => {
     expect(body.contents.some((c) => c.type === "refer_image")).toBe(false);
     expect(body.contents[0].text).toContain("night city");
     expect(body.contents[0].text).toContain("@element_1");
-    expect(body.settings).toMatchObject({ resolution: "720p", duration: 8, aspect_ratio: "9:16" });
+    expect(body.settings).toMatchObject({ resolution: "720p", duration: 8, aspect_ratio: "9:16", audio: "original" });
     const videoState = advanced.state === "processing" ? advanced.next?.state ?? null : null;
     expect(await seedanceProvider.getStatus("kt-1", { startedAt: null, state: videoState })).toEqual({ state: "succeeded", outputUrl: "https://kling.cdn/out.mp4" });
     expect(await seedanceProvider.getStatus("kt-1", { startedAt: null, state: videoState })).toMatchObject({ state: "failed", errorCode: "provider_content_rejected" });
