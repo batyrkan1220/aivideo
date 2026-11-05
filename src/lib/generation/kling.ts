@@ -50,17 +50,17 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   const things = objects.map((o, j) => ({ what: o.what.trim().toLowerCase(), ref: `@element_${people + j + 1}` }));
   const outfitRef = things.find((t) => ["outfit", "clothes", "clothing"].includes(t.what))?.ref;
   const look = outfitRef
-    ? `Dress the ${people === 1 ? "person" : "people"} in the outfit shown in ${outfitRef}: the same garments, colors, fabric and details, fitted naturally to the body. ${outfitRef} is clothing, not a person. Do not take the clothing from @video_1.`
+    ? `Dress the ${people === 1 ? "person" : "people"} in the outfit shown in ${outfitRef}: the same garments, colors and fabric. ${outfitRef} is clothing, not a person. Do not take the clothing from @video_1.`
     : outfit === "template"
-    ? `Keep the clothing from @video_1: the same garments, costume, colors and details, fitted to the body. The face and head stay ${faces.join(" and ")}, not the original person in @video_1.`
+    ? `Keep only the clothing from @video_1: the same garments, colors and fabric, worn by ${faces.join(" and ")}. Clothing only. Do not keep the original person's face, head, hair, skin or body.`
     : `Clothing follows ${faces.join(" and ")}. Do not use the clothing from @video_1.`;
   const who = people === 1
     ? "replace the main person with the person from @element_1"
     : `replace ${faces.map((r, i) => `the person ${positions[i]?.trim() || `number ${i + 1} from the left`} with the person from ${r}`).join(", and ")}`;
-  const appearance = `The person visible in every frame must be ${faces.join(" and ")}: the same face, head, eyes, nose, lips, jaw, skin, moles, hairstyle and age, from the front, from the left and from the right, until the last frame. Do not keep the original face or head from @video_1.`;
+  const appearance = `The person visible in every frame must be ${faces.join(" and ")}: the same face, head, eyes, nose, lips, jaw, skin, moles, hairstyle and age, from the front, from the left and from the right, until the last frame. Do not keep the original face, head, hair, skin or body from @video_1.`;
   const lead = mode === "edit"
-    ? `Edit @video_1. ${who[0].toUpperCase()}${who.slice(1)}. Keep the scene, camera, body movement, timing, location, background, lighting, framing and cuts of @video_1. Change only who the ${people === 1 ? "person is" : "people are"}.`
-    : `Follow the movement, camera and timing of @video_1. Do not copy the face or head from @video_1. ${who[0].toUpperCase()}${who.slice(1)}.`;
+    ? `Edit @video_1. ${who[0].toUpperCase()}${who.slice(1)}. Keep only the camera, movement, timing, location, background, lighting, framing and cuts of @video_1.`
+    : `Follow only the movement, camera and timing of @video_1. Do not copy the face, head, hair, skin or body from @video_1. ${who[0].toUpperCase()}${who.slice(1)}.`;
   const parts = [appearance, lead, look];
   for (const t of things) {
     if (t.ref === outfitRef) continue;

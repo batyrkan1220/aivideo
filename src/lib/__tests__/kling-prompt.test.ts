@@ -5,16 +5,17 @@ import { parseSeedanceConfig } from "@/lib/templates/seedance-config";
 describe("Kling prompt priorities", () => {
   it("keeps the template rules mandatory and the customer's wish lower priority", () => {
     const p = buildKlingDirectPrompt("edit", "template", "national costume", "red dress, smiling");
-    expect(p).toContain("Keep the clothing from @video_1");
+    expect(p).toContain("Keep only the clothing from @video_1");
+    expect(p).toContain("Clothing only.");
     expect(p).toContain("Mandatory template instruction: national costume");
     expect(p.indexOf("Mandatory template instruction")).toBeLessThan(p.indexOf("Optional customer wish"));
     expect(p).toMatch(/ignore any part that asks to change the faces or the clothing/);
     expect(p).toContain("Edit @video_1");
     expect(p).toContain("the person from @element_1");
     expect(p).not.toContain("@image_1");
-    expect(p).toContain("Keep the scene, camera, body movement");
+    expect(p).toContain("Keep only the camera, movement, timing");
     expect(p).toContain("The person visible in every frame must be @element_1");
-    expect(p).toContain("Do not keep the original face or head from @video_1");
+    expect(p).toContain("Do not keep the original face, head, hair, skin or body from @video_1");
     expect(p.indexOf("The person visible")).toBeLessThan(p.indexOf("Edit @video_1"));
   });
 

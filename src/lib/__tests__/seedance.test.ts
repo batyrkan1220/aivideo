@@ -45,7 +45,7 @@ describe("config", () => {
     expect(p).toContain("Edit @video_1");
     expect(p).toContain("the person the biggest one in the frame with the person from @element_1");
     expect(p).toContain("@element_2");
-    expect(p).toContain("Keep the scene, camera, body movement");
+    expect(p).toContain("Keep only the camera, movement, timing");
   });
 });
 
