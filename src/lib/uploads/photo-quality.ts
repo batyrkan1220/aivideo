@@ -173,7 +173,7 @@ export async function checkPhoto(file: File, framing: Framing = "auto"): Promise
   }
 }
 
-export type VideoPerson = { x: number; size: number }; // face centre (0..1 from the left), face width / frame width
+export type VideoPerson = { x: number; size: number; image: Blob | null }; // face centre (0..1 from the left), face width / frame width
 
 /** Evenly spaced times from the start of the video to the end, so a person who appears only later is still found. */
 function videoSampleTimes(duration: number): number[] {
@@ -181,6 +181,21 @@ function videoSampleTimes(duration: number): number[] {
   const end = Math.max(0.12, d - 0.12);
   const count = Math.min(20, Math.max(6, Math.ceil(d)));
   return Array.from({ length: count }, (_, i) => 0.12 + ((end - 0.12) * i) / Math.max(1, count - 1));
+}
+
+function faceJpeg(source: HTMLCanvasElement, box: Box): Promise<Blob | null> {
+  const pad = Math.max(box.w, box.h) * 0.45;
+  const side = Math.max(box.w, box.h) + pad * 2;
+  const sx = Math.max(0, Math.min(box.x + box.w / 2 - side / 2, source.width - 1));
+  const sy = Math.max(0, Math.min(box.y + box.h / 2 - side / 2, source.height - 1));
+  const sw = Math.min(side, source.width - sx);
+  const sh = Math.min(side, source.height - sy);
+  const out = document.createElement("canvas");
+  out.width = out.height = 512;
+  const ctx = out.getContext("2d");
+  if (!ctx || sw < 2 || sh < 2) return Promise.resolve(null);
+  ctx.drawImage(source, sx, sy, sw, sh, 0, 0, 512, 512);
+  return new Promise((res) => out.toBlob((b) => res(b), "image/jpeg", 0.9));
 }
 
 function seekVideo(v: HTMLVideoElement, t: number): Promise<void> {
@@ -214,16 +229,15 @@ export async function detectVideoPeople(videoUrl: string): Promise<VideoPerson[]
     const ctx = c.getContext("2d");
     if (!ctx) return null;
     const H = c.height;
-    type Track = { x: number; y: number; size: number; n: number };
+    type Track = { x: number; y: number; size: number; n: number; image: Blob | null };
     const tracks: Track[] = [];
     for (const t of videoSampleTimes(v.duration || 1)) {
       await seekVideo(v, t);
       ctx.drawImage(v, 0, 0, c.width, c.height);
-      const boxes: Box[] = (await fa.detectAllFaces(c, new fa.TinyFaceDetectorOptions({ inputSize: 608, scoreThreshold: 0.45 })))
-        .map((f) => ({ x: f.box.x, y: f.box.y, w: f.box.width, h: f.box.height }));
-      const faces = mergeBoxes([], boxes)
-        .filter((b) => b.w / W > 0.03)
-        .map((b) => ({ x: (b.x + b.w / 2) / W, y: (b.y + b.h / 2) / H, size: b.w / W }))
+      const boxes = mergeBoxes([], (await fa.detectAllFaces(c, new fa.TinyFaceDetectorOptions({ inputSize: 608, scoreThreshold: 0.45 })))
+        .map((f) => ({ x: f.box.x, y: f.box.y, w: f.box.width, h: f.box.height }))).filter((b) => b.w / W > 0.03);
+      const faces = boxes
+        .map((b) => ({ box: b, x: (b.x + b.w / 2) / W, y: (b.y + b.h / 2) / H, size: b.w / W }))
         .sort((a, b) => b.size - a.size);
       const used = new Set<number>();
       for (const face of faces) {
@@ -234,20 +248,22 @@ export async function detectVideoPeople(videoUrl: string): Promise<VideoPerson[]
           const dist = Math.hypot(tr.x - face.x, tr.y - face.y);
           if (dist < bestDist) { best = i; bestDist = dist; }
         });
+        const shot = face.size >= (best >= 0 ? tracks[best].size : 0) ? await faceJpeg(c, face.box) : null;
         if (best >= 0) {
           const tr = tracks[best];
           used.add(best);
           tr.x = (tr.x * tr.n + face.x) / (tr.n + 1);
           tr.y = (tr.y * tr.n + face.y) / (tr.n + 1);
+          if (face.size >= tr.size && shot) tr.image = shot;
           tr.size = Math.max(tr.size, face.size);
           tr.n += 1;
         } else if (tracks.length < 8) {
-          tracks.push({ x: face.x, y: face.y, size: face.size, n: 1 });
+          tracks.push({ x: face.x, y: face.y, size: face.size, n: 1, image: shot });
           used.add(tracks.length - 1);
         }
       }
     }
-    return tracks.map((tr) => ({ x: tr.x, size: tr.size })).sort((a, b) => a.x - b.x);
+    return tracks.map((tr) => ({ x: tr.x, size: tr.size, image: tr.image })).sort((a, b) => a.x - b.x);
   } catch {
     return null;
   }

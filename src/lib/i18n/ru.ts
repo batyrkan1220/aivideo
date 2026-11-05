@@ -470,9 +470,11 @@ export const ru = {
         faceSwap: "После Kling уточнить лицо заменой лица (≈ $0.094/сек, до 29 секунд)",
         detect: "🔍 Определить элемент",
         detecting: "Kling ищет элементы в видео…",
-        detectFailed: "Kling не смог определить элементы. Проверьте видео (mp4 или mov, 2–60 секунд, 720p или 1080p) или укажите количество вручную.",
+        detectFailed: "Kling не принял видео. Нужен mp4 или mov, 2–60 секунд, ширина и высота 512–2160, 720p или 1080p.",
+        detectBalance: "Пакет Kling не оплачивает поиск лиц. Юниты на видео есть, этот запрос в пакет не входит.",
         detectNone: "Kling не нашёл людей в этом видео. Укажите количество вручную.",
-        detectFound: (all: number, kept: number, desc: string) => `Kling нашёл элементов: ${all}${kept < all ? ` (взяли ${kept})` : ""}. ${desc}.`,
+        detectFound: (all: number, kept: number, desc: string) => `Kling нашёл: ${all}${kept < all ? ` (взяли ${kept})` : ""}. ${desc}.`,
+        detectLocal: (n: number, desc: string) => `Пакет Kling не оплатил поиск лиц. В видео найдено ${n}. ${desc}.`,
         detectPerson: (i: number, where: string, biggest: boolean) => `@element_${i}${where ? ` — ${where.toLowerCase()}` : ""}${biggest ? " (самое крупное лицо)" : ""}`,
         positionAuto: (n: number) => `Где в кадре: авто (${n}-й слева)`,
         positionOptions: {

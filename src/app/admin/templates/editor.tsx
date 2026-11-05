@@ -11,6 +11,7 @@ import { OBJECT_PRESETS, parseSeedanceConfig, seedanceSlots, SEEDANCE_MAX_OBJECT
 import { calculatePrice, formatKzt } from "@/lib/pricing";
 import { seedancePriceKzt, seedanceCostKzt, klingUnitLabel, SEEDANCE_QUALITY, type SeedancePricing } from "@/lib/pricing-seedance";
 import { FaceMap } from "@/components/face-map";
+import { detectVideoPeople } from "@/lib/uploads/photo-quality";
 import { saveTemplate, changeStatus, createUploadUrl, detectKlingElements } from "./actions";
 import { DeleteTemplateButton } from "./delete-button";
 import { parsePhotoConfig, photoSlots, PHOTO_ASPECTS, PHOTO_MAX_PEOPLE, PHOTO_PROVIDER, PHOTO_QUALITY, type PhotoConfig } from "@/lib/templates/photo-config";
@@ -125,11 +126,31 @@ export function TemplateEditor({
     if (!path) return;
     setPeople({ busy: true });
     const found = await detectKlingElements(path);
-    if (!found.ok) { setPeople({ busy: false, text: found.error === "none" ? e.seedance.detectNone : e.seedance.detectFailed }); return; }
-    const n = found.elements.length;
-    const desc = found.elements.map((el, i) => `@element_${i + 1} → ${i + 1}-фото`).join(" · ");
-    setSd({ people: n, klingElements: found.elements, positions: Array.from({ length: n }, () => "") });
-    setPeople({ busy: false, text: e.seedance.detectFound(found.total, n, desc) });
+    if (found.ok) {
+      const n = found.elements.length;
+      const desc = found.elements.map((_, i) => `@element_${i + 1} → ${i + 1}-фото`).join(" · ");
+      setSd({ people: n, klingElements: found.elements, positions: Array.from({ length: n }, () => "") });
+      setPeople({ busy: false, text: e.seedance.detectFound(found.total, n, desc) });
+      return;
+    }
+    if (found.error === "none") { setPeople({ busy: false, text: e.seedance.detectNone }); return; }
+    const url = /^https?:/.test(path) ? path : `${mediaBase}/${path}`;
+    const local = await detectVideoPeople(url);
+    if (!local?.length) {
+      setPeople({ busy: false, text: found.error === "balance" ? e.seedance.detectBalance : found.error === "video" ? e.seedance.detectFailed : e.seedance.detectFailed });
+      return;
+    }
+    const kept = [...local].sort((a, b) => b.size - a.size).slice(0, SEEDANCE_MAX_PEOPLE).sort((a, b) => a.x - b.x);
+    const elements: SeedanceConfig["klingElements"] = [];
+    for (const person of kept) {
+      const previewPath = person.image ? await uploadCover(person.image) : null;
+      if (!previewPath) continue;
+      elements.push({ id: `p${elements.length + 1}`, previewPath, startMs: 0, endMs: 0 });
+    }
+    if (!elements.length) { setPeople({ busy: false, text: found.error === "balance" ? e.seedance.detectBalance : e.seedance.detectFailed }); return; }
+    const desc = elements.map((_, i) => `@element_${i + 1} → ${i + 1}-фото`).join(" · ");
+    setSd({ people: elements.length, klingElements: elements, positions: Array.from({ length: elements.length }, () => "") });
+    setPeople({ busy: false, text: e.seedance.detectLocal(elements.length, desc) });
   };
 
   // Customer photo slots = the number of people to replace, left → right (the server derives them too).

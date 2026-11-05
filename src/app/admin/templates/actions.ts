@@ -255,20 +255,25 @@ export type KlingElementSlot = { id: string; previewPath: string; startMs: numbe
 
 /** Kling reads the whole template video and returns one id + photo per person. Photo 1 binds to the first id. */
 export async function detectKlingElements(videoPath: string): Promise<
-  { ok: true; total: number; elements: KlingElementSlot[] } | { ok: false; error: "forbidden" | "none" | "failed" }
+  { ok: true; total: number; elements: KlingElementSlot[] } | { ok: false; error: "forbidden" | "none" | "balance" | "video" | "failed" }
 > {
   const user = await guard("templates.manage");
   if (!user) return { ok: false, error: "forbidden" };
   const videoUrl = templateVideoUrl(videoPath);
   if (!videoUrl) return { ok: false, error: "failed" };
-  let faces;
+  let faces: Awaited<ReturnType<typeof identifyKlingFaces>> | null = null;
   try {
     faces = await identifyKlingFaces(videoUrl);
   } catch (e) {
     const code = e instanceof ProviderError ? e.code : "failed";
-    console.error("[admin.element]", code);
-    return { ok: false, error: "failed" };
+    if (code === "provider_http_429") {
+      await new Promise((r) => setTimeout(r, 2000));
+      try { faces = await identifyKlingFaces(videoUrl); } catch (again) {
+        return { ok: false, error: elementError(again) };
+      }
+    } else return { ok: false, error: elementError(e) };
   }
+  if (!faces) return { ok: false, error: "failed" };
   if (!faces.length) return { ok: false, error: "none" };
   const kept = [...faces].sort((a, b) => (b.endMs - b.startMs) - (a.endMs - a.startMs)).slice(0, SEEDANCE_MAX_PEOPLE);
   kept.sort((a, b) => a.startMs - b.startMs || a.faceId.localeCompare(b.faceId));
@@ -278,6 +283,14 @@ export async function detectKlingElements(videoPath: string): Promise<
     elements.push({ id: face.faceId, previewPath: stored ?? face.imageUrl, startMs: face.startMs, endMs: face.endMs });
   }
   return { ok: true, total: faces.length, elements };
+}
+
+function elementError(e: unknown): "balance" | "video" | "failed" {
+  const code = e instanceof ProviderError ? e.code : "failed";
+  console.error("[admin.element]", code, e instanceof ProviderError ? e.message : "");
+  if (code === "provider_no_balance") return "balance";
+  if (code === "provider_bad_params") return "video";
+  return "failed";
 }
 
 function templateVideoUrl(path: string): string | null {

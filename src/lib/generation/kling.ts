@@ -27,15 +27,16 @@ async function call<T>(path: string, init: RequestInit = {}, timeoutMs = 30_000)
   }
   const body = (await res.json().catch(() => ({}))) as T & { code?: number; message?: string };
   const msg = String(body?.message ?? "").slice(0, 300);
-  if (res.status === 401 || res.status === 403) throw new ProviderError("provider_auth", false, msg);
-  // Kling answers "Account balance not enough" with 429 too: that is not "busy, retry".
-  if (/balance|insufficient|package|quota|arrear/i.test(msg)) throw new ProviderError("provider_no_balance", false, `${res.status} ${msg}`);
-  if (res.status === 429) throw new ProviderError("provider_http_429", true, msg);
-  if (res.status >= 500) throw new ProviderError(`provider_http_${res.status}`, true, msg);
-  if (!res.ok || (body.code !== undefined && body.code !== 0)) {
-    if (/balance|insufficient|package|quota|arrear/i.test(msg)) throw new ProviderError("provider_no_balance", false, `${body.code} ${msg}`);
-    throw new ProviderError("provider_bad_params", false, `${res.status} ${body.code} ${msg}`);
+  const serviceCode = Number(body.code);
+  const detail = `${res.status} ${Number.isFinite(serviceCode) ? serviceCode : ""} ${msg}`.replace(/\s+/g, " ").trim();
+  if (res.status === 401 || res.status === 403) throw new ProviderError("provider_auth", false, detail);
+  // 1101/1102 are a real empty balance. 1303 also mentions "package", but that is the concurrency limit.
+  if (serviceCode === 1101 || serviceCode === 1102 || /balance not enough|account balance|in arrears/i.test(msg)) {
+    throw new ProviderError("provider_no_balance", false, detail);
   }
+  if (res.status === 429 || serviceCode === 1302 || serviceCode === 1303) throw new ProviderError("provider_http_429", true, detail);
+  if (res.status >= 500) throw new ProviderError(`provider_http_${res.status}`, true, detail);
+  if (!res.ok || (body.code !== undefined && body.code !== 0)) throw new ProviderError("provider_bad_params", false, detail);
   return body;
 }
 
