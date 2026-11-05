@@ -5,12 +5,12 @@ import { parseSeedanceConfig } from "@/lib/templates/seedance-config";
 describe("Kling prompt priorities", () => {
   it("keeps the template rules mandatory and the customer's wish lower priority", () => {
     const p = buildKlingDirectPrompt("edit", "template", "national costume", "red dress, smiling");
-    expect(p).toContain("Keep the clothing of the original people");
+    expect(p).toContain("Dress them in the garments from @video_1");
     expect(p).toContain("Mandatory template instruction: national costume");
     expect(p.indexOf("Mandatory template instruction")).toBeLessThan(p.indexOf("Optional customer wish"));
     expect(p).toMatch(/ignore any part that asks to change the faces or the clothing/);
     expect(p).toContain("including the final seconds");
-    expect(p).toContain("Use @image_1 as the only character reference");
+    expect(p).toContain("Use @element_1 as the only character");
     expect(p).toContain("must not appear in any frame");
   });
 
@@ -58,13 +58,13 @@ describe("Kling prompt with things to swap", () => {
     const p = buildKlingDirectPrompt("edit", "photo", "", "", 1, [], [{ what: "car" }]);
     expect(p).toContain("@image_2 is a photo of a car, not a person");
     expect(p).toContain("Replace the car in @video_1 with the car from @image_2");
-    expect(p).toContain("reference image (@image_1)");
+    expect(p).toContain("photo (@image_1)");
   });
   it("an outfit photo dresses the person", async () => {
     const { buildKlingDirectPrompt } = await import("@/lib/generation/kling");
     const p = buildKlingDirectPrompt("edit", "template", "", "", 1, [], [{ what: "outfit" }]);
     expect(p).toContain("Dress the person in the outfit shown in @image_2");
-    expect(p).not.toContain("Keep the clothing of the original people");
+    expect(p).not.toContain("Dress them in the garments from @video_1");
   });
   it("slots: people first, then objects", async () => {
     const { seedanceSlots } = await import("@/lib/templates/seedance-config");

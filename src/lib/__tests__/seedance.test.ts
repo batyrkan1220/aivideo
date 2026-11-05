@@ -41,8 +41,8 @@ describe("config", () => {
   });
   it("prompt: edit keeps the scene, maps several people by position", () => {
     const p = buildKlingDirectPrompt("edit", "photo", "", "", 2, ["the biggest one in the frame", "in the background"]);
-    expect(p).toContain("Use @image_1 and @image_2 as the only character reference");
-    expect(p).toContain("the person the biggest one in the frame with the person from @image_1");
+    expect(p).toContain("Use @element_1 and @element_2 as the only character");
+    expect(p).toContain("the person the biggest one in the frame with the person from @element_1");
     expect(p).toContain("@image_2");
     expect(p).toContain("100% identical");
   });
@@ -57,11 +57,13 @@ describe("provider (Kling official API)", () => {
     expect(seedanceProvider.validateInputs({ ...base, faces, config: { durationSec: 40 } })).toContain("bad_duration");
   });
 
-  it("edits the template video and reads the result", async () => {
+  it("locks the face as an element, then generates the video", async () => {
     const calls: { url: string; init?: RequestInit; body?: unknown }[] = [];
     const replies = [
+      { code: 0, data: { task_id: "el-1", task_status: "submitted" } },
+      { code: 0, data: { task_status: "processing" } },
+      { code: 0, data: { task_status: "succeed", task_result: { elements: [{ element_id: 308 }] } } },
       { code: 0, data: { id: "kt-1", status: "submitted" } },
-      { code: 0, data: [{ id: "kt-1", status: "processing" }] },
       { code: 0, data: [{ id: "kt-1", status: "succeeded", outputs: [{ type: "video", url: "https://kling.cdn/out.mp4" }], billing: [{ charge_type: "unit", amount: "9.6" }] }] },
       { code: 0, data: [{ id: "kt-1", status: "failed", message: "risk control" }] },
     ];
@@ -70,19 +72,26 @@ describe("provider (Kling official API)", () => {
       return new Response(JSON.stringify(replies.shift()), { status: 200 });
     }));
     const r = await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { durationSec: 8.1, wish: "night city", allowWish: true } });
-    expect(calls[0].url).toBe("https://api-singapore.klingai.com/omni-video/kling-4.0");
+    expect(calls[0].url).toBe("https://api-singapore.klingai.com/v1/general/advanced-custom-elements");
     expect((calls[0].init?.headers as Record<string, string>).Authorization).toBe(`Bearer ${"g".repeat(20)}`);
-    const body = calls[0].body as { contents: { type: string; url?: string; id?: string; text?: string }[]; settings: Record<string, unknown> };
+    expect(r.providerJobId).toBe("el-1");
+    expect(r.cost).toBeCloseTo(klingUnits(8.1, S) * 0.14, 4);
+    expect(await seedanceProvider.getStatus("el-1", { startedAt: null, state: r.state ?? null })).toEqual({ state: "processing" });
+    const advanced = await seedanceProvider.getStatus("el-1", { startedAt: null, state: r.state ?? null });
+    expect(advanced).toMatchObject({ state: "processing", next: { providerJobId: "kt-1", state: { stage: "klingd" } } });
+    const video = calls.find((c) => c.url.endsWith("/omni-video/kling-4.0"));
+    const body = video?.body as { contents: { type: string; url?: string; id?: string; text?: string; element_id?: string }[]; settings: Record<string, unknown> };
     expect(body.contents).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: "feature_video", url: "https://cdn/v.mp4", id: "video_1" }),
+      expect.objectContaining({ type: "element", element_id: "308", id: "element_1" }),
       expect.objectContaining({ type: "refer_image", url: "https://s/1.jpg", id: "image_1" }),
     ]));
     expect(body.contents[0].text).toContain("night city");
+    expect(body.contents[0].text).toContain("@element_1");
     expect(body.settings).toMatchObject({ resolution: "720p", duration: 8, aspect_ratio: "9:16" });
-    expect(r.cost).toBeCloseTo(klingUnits(8.1, S) * 0.14, 4);
-    expect(await seedanceProvider.getStatus("kt-1", { startedAt: null, state: null })).toEqual({ state: "processing" });
-    expect(await seedanceProvider.getStatus("kt-1", { startedAt: null, state: null })).toEqual({ state: "succeeded", outputUrl: "https://kling.cdn/out.mp4" });
-    expect(await seedanceProvider.getStatus("kt-1", { startedAt: null, state: null })).toMatchObject({ state: "failed", errorCode: "provider_content_rejected" });
+    const videoState = advanced.state === "processing" ? advanced.next?.state ?? null : null;
+    expect(await seedanceProvider.getStatus("kt-1", { startedAt: null, state: videoState })).toEqual({ state: "succeeded", outputUrl: "https://kling.cdn/out.mp4" });
+    expect(await seedanceProvider.getStatus("kt-1", { startedAt: null, state: videoState })).toMatchObject({ state: "failed", errorCode: "provider_content_rejected" });
     vi.unstubAllGlobals();
   });
 

@@ -2,8 +2,8 @@ import "server-only";
 import { seedanceConfigSchema, SEEDANCE_MAX_PEOPLE, SEEDANCE_MAX_REFS, SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC } from "@/lib/templates/seedance-config";
 import { seedanceCostUsd } from "@/lib/pricing-seedance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
-import { type GenerationProvider } from "./types";
-import { buildKlingDirectPrompt, getKlingTask, submitKlingOmni } from "./kling";
+import { type GenerationProvider, type ProviderState } from "./types";
+import { buildKlingDirectPrompt, createKlingFaceElement, getKlingElement, getKlingTask, submitKlingOmni } from "./kling";
 
 /**
  * The video provider (key "seedance" for existing rows): Kling 4.0 via Kling's official API.
@@ -62,11 +62,50 @@ export const seedanceProvider: GenerationProvider = {
     const people = Math.min(SEEDANCE_MAX_PEOPLE, Math.max(1, photos.length - objects.length));
     const prompt = buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : "", people, cfg.positions, objects);
     const resolution = input.quality === "1080p" ? "1080p" : "720p";
-    const id = await submitKlingOmni({ videoUrl: input.templateVideoUrl, photoUrls: photos, mode: cfg.klingMode, prompt, durationSec, aspectRatio: cfg.aspectRatio, resolution });
-    return { providerJobId: id, cost: seedanceCostUsd(durationSec, await seedancePricingSettings(), {}, resolution), state: { stage: "klingd" } };
+    // The photo becomes a character element first. A loose photo reference matches the opening
+    // and then follows the face inside the template video.
+    const elementTaskId = await createKlingFaceElement(photos[0]);
+    const state: ProviderState = {
+      stage: "element", videoUrl: input.templateVideoUrl, photoUrls: photos, people,
+      elementIds: [], prompt, durationSec, aspectRatio: cfg.aspectRatio, resolution,
+    };
+    return { providerJobId: elementTaskId, cost: seedanceCostUsd(durationSec, await seedancePricingSettings(), {}, resolution), state };
   },
 
-  async getStatus(providerJobId) {
-    return getKlingTask(providerJobId);
+  async getStatus(providerJobId, ctx) {
+    const lock = faceLockState(ctx.state);
+    if (!lock) return getKlingTask(providerJobId);
+    const el = await getKlingElement(providerJobId);
+    if (el.state === "processing") return { state: "processing" };
+    if (el.state === "failed") return { state: "failed", errorCode: el.errorCode, retryable: false };
+    const elementIds = [...lock.elementIds, el.elementId];
+    if (elementIds.length < lock.people) {
+      const taskId = await createKlingFaceElement(lock.photoUrls[elementIds.length]);
+      return { state: "processing", next: { providerJobId: taskId, state: { ...lock, elementIds } as ProviderState } };
+    }
+    const id = await submitKlingOmni({
+      videoUrl: lock.videoUrl, photoUrls: lock.photoUrls, elementIds, mode: "edit",
+      prompt: lock.prompt, durationSec: lock.durationSec, aspectRatio: lock.aspectRatio, resolution: lock.resolution,
+    });
+    return { state: "processing", next: { providerJobId: id, state: { stage: "klingd" } } };
   },
 };
+
+type FaceLockState = {
+  stage: "element" | "klingd";
+  videoUrl: string;
+  photoUrls: string[];
+  people: number;
+  elementIds: string[];
+  prompt: string;
+  durationSec: number;
+  aspectRatio: string;
+  resolution: "720p" | "1080p";
+};
+
+function faceLockState(s: ProviderState): FaceLockState | null {
+  if (!s || String(s.stage) !== "element" || !Array.isArray(s.photoUrls) || typeof s.videoUrl !== "string" || typeof s.prompt !== "string") return null;
+  if (!Array.isArray(s.elementIds) || typeof s.people !== "number" || typeof s.durationSec !== "number" || typeof s.aspectRatio !== "string") return null;
+  if (s.resolution !== "720p" && s.resolution !== "1080p") return null;
+  return s as FaceLockState;
+}

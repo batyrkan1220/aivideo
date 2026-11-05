@@ -44,34 +44,36 @@ export type KlingMode = "edit" | "reference";
 /** Edit = the template video itself is edited (scene 1:1); reference = a new video following its motion. */
 export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "template", adminPrompt: string, wish: string, people = 1, positions: string[] = [], objects: { what: string }[] = []): string {
   // Priority: the template rules (identity, clothing, admin instruction) are mandatory; the customer's wish is applied only where it does not contradict them.
-  const refs = Array.from({ length: people }, (_, i) => `@image_${i + 1}`);
+  // @element_N is the locked character. @image_N is that same person's photo. @video_1 must not supply a face.
+  const faces = Array.from({ length: people }, (_, i) => `@element_${i + 1}`);
+  const photos = Array.from({ length: people }, (_, i) => `@image_${i + 1}`);
   // Things to swap (car, horse, outfit…): their photos come right after the people's.
   const things = objects.map((o, j) => ({ what: o.what.trim().toLowerCase(), ref: `@image_${people + j + 1}` }));
   const outfitRef = things.find((t) => ["outfit", "clothes", "clothing"].includes(t.what))?.ref;
   const look = outfitRef
     ? `Dress the ${people === 1 ? "person" : "people"} in the outfit shown in ${outfitRef}: the same garments, colors, fabric and details, fitted naturally to the body. ${outfitRef} is a photo of clothing, not a person.`
     : outfit === "template"
-    ? "Keep the clothing of the original people in @video_1."
-    : `Use the clothing of the people in ${refs.join(", ")}.`;
+    ? "Dress them in the garments from @video_1: the same clothes, colors and details, fitted to this person's body. Do not copy the face, hair or identity from @video_1."
+    : `Use the clothing of the people in ${photos.join(", ")}.`;
   const who = people === 1
-    ? "replace the main person with the person from @image_1."
-    : `replace ${refs.map((r, i) => `the person ${positions[i]?.trim() || `number ${i + 1} from the left`} with the person from ${r}`).join(", and ")}.`;
+    ? "replace the main person with the person from @element_1."
+    : `replace ${faces.map((r, i) => `the person ${positions[i]?.trim() || `number ${i + 1} from the left`} with the person from ${r}`).join(", and ")}.`;
   const same = [
-    `Each new person must look 100% identical to their reference image (${refs.join(", ")}) in every frame: preserve the facial features, face shape, eyes, eyebrows, nose, mouth, teeth, ears, moles, hairstyle, hair color, skin tone, age and body proportions exactly.`,
-    // Turns of the head are where likeness usually breaks: keep the same 3D face from every angle.
-    "Keep the identity consistent from every angle — front, three-quarter, profile, looking up and looking down: the same skull and face shape, forehead, jawline and chin, cheekbones, nose bridge and nose profile, lip shape and ear shape. When the reference does not show a side of the face, reconstruct it so it matches the reference exactly.",
+    `Each person must look 100% identical to their character (${faces.join(", ")}) and their photo (${photos.join(", ")}) in every frame from the first second through the last: preserve the facial features, face shape, eyes, eyebrows, nose, mouth, teeth, ears, moles, hairstyle, hair color, skin tone, age and body proportions exactly.`,
+    "Keep the identity consistent from every angle — front, three-quarter, profile, looking up and looking down: the same skull and face shape, forehead, jawline and chin, cheekbones, nose bridge and nose profile, lip shape and ear shape. When the photo does not show a side of the face, reconstruct it so it still matches that same person.",
     "Natural, realistic skin with real texture and pores, scars, birthmarks and natural facial asymmetry kept. Do not beautify, slim, smooth, stylize or change the faces; no filters.",
-    "The likeness must hold through the whole video, including the final seconds: when the head turns, the shot changes, or the person is seen from the side, keep this same person. Never restore the original face from @video_1.",
+    "The likeness must hold through the whole video, including the final seconds: when the head turns, the shot changes, or the person is seen from the side, keep this same person. Never restore or blend in the original face from @video_1.",
   ].join(" ");
+  const motion = "@video_1 is motion and scene only: copy its camera, body movement, timing, location, background, objects, lighting, framing, cuts and sound. The face in @video_1 is not a character and must not appear in any frame, from the first second through the last.";
   const parts = mode === "edit"
     ? [
-        `Use ${refs.join(" and ")} as the only character reference. ${who[0].toUpperCase()}${who.slice(1)}`,
+        `Use ${faces.join(" and ")} as the only character. ${photos.join(" and ")} ${people === 1 ? "is a photo of that same person" : "are photos of those same people"}. ${who[0].toUpperCase()}${who.slice(1)}`,
         same,
         look,
-        "Take the camera, motion, timing, location, background, objects, lighting, framing, cuts and sound from @video_1. The face in @video_1 is not a character and must not appear in any frame, including the final seconds.",
+        motion,
       ]
     : [
-        "Follow the motion, actions, timing, camera movement, framing and cuts of @video_1, and recreate its location, background and lighting.",
+        motion,
         `In the new video, ${who.replace(/\.$/, "")}.`,
         same,
         look,
@@ -91,15 +93,55 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   return parts.join(" ");
 }
 
-export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: string[]; mode: KlingMode; prompt: string; durationSec: number; aspectRatio: string; resolution?: "720p" | "1080p" }): Promise<string> {
+/** Lock one customer photo as a character element. Video generation then uses it for identity, not as a loose reference. */
+export async function createKlingFaceElement(photoUrl: string): Promise<string> {
+  const d = await call<{ data?: { task_id?: string; id?: string } }>("/v1/general/advanced-custom-elements", {
+    method: "POST",
+    body: JSON.stringify({
+      element_name: `f${Date.now().toString(36)}`.slice(0, 20),
+      element_description: "This exact person. Keep the face unchanged in every frame.",
+      reference_type: "image_refer",
+      element_image_list: { frontal_image: photoUrl, refer_images: [{ image_url: photoUrl }] },
+      tag_list: [{ tag_id: "o_102" }],
+    }),
+  });
+  const id = d.data?.task_id ?? d.data?.id;
+  if (!id) throw new ProviderError("provider_bad_response", true, "kling element: missing task id");
+  console.log("[kling] element task", id, "submitted");
+  return String(id);
+}
+
+export async function getKlingElement(taskId: string): Promise<{ state: "processing" } | { state: "ready"; elementId: string } | { state: "failed"; errorCode: string }> {
+  const d = await call<{ data?: { task_status?: string; task_status_msg?: string; task_result?: { elements?: { element_id?: string | number }[] } } }>(
+    `/v1/general/advanced-custom-elements/${encodeURIComponent(taskId)}`,
+  );
+  const status = String(d.data?.task_status ?? "");
+  if (status === "succeed" || status === "succeeded") {
+    const elementId = d.data?.task_result?.elements?.[0]?.element_id;
+    if (elementId === undefined || elementId === null || elementId === "") return { state: "failed", errorCode: "provider_bad_response" };
+    console.log("[kling] element", taskId, "ready", String(elementId));
+    return { state: "ready", elementId: String(elementId) };
+  }
+  if (status === "failed") {
+    const reason = String(d.data?.task_status_msg ?? "").slice(0, 300);
+    console.error("[kling] element failed", taskId, reason);
+    const content = /risk|sensitive|policy|moderat|safety|inappropriate|violat/i.test(reason);
+    return { state: "failed", errorCode: content ? "provider_content_rejected" : "provider_failed" };
+  }
+  return { state: "processing" };
+}
+
+export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: string[]; elementIds?: string[]; mode: KlingMode; prompt: string; durationSec: number; aspectRatio: string; resolution?: "720p" | "1080p" }): Promise<string> {
   const duration = Math.min(30, Math.max(3, Math.round(opts.durationSec)));
   const d = await call<{ data?: { id?: string } }>("/omni-video/kling-4.0", {
     method: "POST",
     body: JSON.stringify({
       contents: [
         { type: "prompt", text: opts.prompt },
-        // feature_video supplies motion only. base_video edits the original person, so the client's face never replaces it.
+        // feature_video is motion and scene. The element locks the client's face for the whole video.
+        // base_video would edit the original person, so the client's face never replaces it.
         { type: "feature_video", url: opts.videoUrl, id: "video_1" },
+        ...(opts.elementIds ?? []).map((elementId, i) => ({ type: "element", element_id: String(elementId), id: `element_${i + 1}` })),
         ...opts.photoUrls.slice(0, 7).map((url, i) => ({ type: "refer_image", url, id: `image_${i + 1}` })),
       ],
       // Vertical 720p for phones (1080p when the customer paid for Full HD) unless the template asks for another format.
@@ -108,6 +150,7 @@ export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: strin
   });
   const id = d.data?.id;
   if (!id) throw new ProviderError("provider_bad_response", false, "kling: missing task id");
+  console.log("[kling] video task", id, `elements=${opts.elementIds?.length ?? 0}`);
   return id;
 }
 
