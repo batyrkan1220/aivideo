@@ -10,7 +10,8 @@ describe("Kling prompt priorities", () => {
     expect(p.indexOf("Mandatory template instruction")).toBeLessThan(p.indexOf("Optional customer wish"));
     expect(p).toMatch(/ignore any part that asks to change the faces or the clothing/);
     expect(p).toContain("including the final seconds");
-    expect(p).toContain("must stay the reference person until the last frame");
+    expect(p).toContain("Use @image_1 as the only character reference");
+    expect(p).toContain("must not appear in any frame");
   });
 
   it("adds no wish section when the customer wrote nothing", () => {

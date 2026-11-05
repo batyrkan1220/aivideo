@@ -65,10 +65,10 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   ].join(" ");
   const parts = mode === "edit"
     ? [
-        `Edit @video_1: ${who}`,
+        `Use ${refs.join(" and ")} as the only character reference. ${who[0].toUpperCase()}${who.slice(1)}`,
         same,
         look,
-        "Keep the scene of @video_1 unchanged: background, location, other people, objects, lighting, camera movement, framing, cuts, motion, timing and sound. The replaced person's face, head, hair and skin are not part of that scene and must stay the reference person until the last frame.",
+        "Take the camera, motion, timing, location, background, objects, lighting, framing, cuts and sound from @video_1. The face in @video_1 is not a character and must not appear in any frame, including the final seconds.",
       ]
     : [
         "Follow the motion, actions, timing, camera movement, framing and cuts of @video_1, and recreate its location, background and lighting.",
@@ -98,7 +98,8 @@ export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: strin
     body: JSON.stringify({
       contents: [
         { type: "prompt", text: opts.prompt },
-        { type: opts.mode === "edit" ? "base_video" : "feature_video", url: opts.videoUrl, id: "video_1" },
+        // feature_video supplies motion only. base_video edits the original person, so the client's face never replaces it.
+        { type: "feature_video", url: opts.videoUrl, id: "video_1" },
         ...opts.photoUrls.slice(0, 7).map((url, i) => ({ type: "refer_image", url, id: `image_${i + 1}` })),
       ],
       // Vertical 720p for phones (1080p when the customer paid for Full HD) unless the template asks for another format.

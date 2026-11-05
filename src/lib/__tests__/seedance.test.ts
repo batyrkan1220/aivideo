@@ -41,7 +41,7 @@ describe("config", () => {
   });
   it("prompt: edit keeps the scene, maps several people by position", () => {
     const p = buildKlingDirectPrompt("edit", "photo", "", "", 2, ["the biggest one in the frame", "in the background"]);
-    expect(p).toContain("Edit @video_1");
+    expect(p).toContain("Use @image_1 and @image_2 as the only character reference");
     expect(p).toContain("the person the biggest one in the frame with the person from @image_1");
     expect(p).toContain("@image_2");
     expect(p).toContain("100% identical");
@@ -74,7 +74,7 @@ describe("provider (Kling official API)", () => {
     expect((calls[0].init?.headers as Record<string, string>).Authorization).toBe(`Bearer ${"g".repeat(20)}`);
     const body = calls[0].body as { contents: { type: string; url?: string; id?: string; text?: string }[]; settings: Record<string, unknown> };
     expect(body.contents).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: "base_video", url: "https://cdn/v.mp4", id: "video_1" }),
+      expect.objectContaining({ type: "feature_video", url: "https://cdn/v.mp4", id: "video_1" }),
       expect.objectContaining({ type: "refer_image", url: "https://s/1.jpg", id: "image_1" }),
     ]));
     expect(body.contents[0].text).toContain("night city");
