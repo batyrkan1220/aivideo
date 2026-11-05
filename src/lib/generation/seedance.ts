@@ -3,7 +3,7 @@ import { seedanceConfigSchema, SEEDANCE_MAX_OBJECTS, SEEDANCE_MAX_PEOPLE, SEEDAN
 import { seedanceCostUsd } from "@/lib/pricing-seedance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { type GenerationProvider, type ProviderState } from "./types";
-import { buildKlingDirectPrompt, createKlingFaceElement, getKlingElement, getKlingTask, submitKlingOmni } from "./kling";
+import { buildKlingDirectPrompt, createKlingElement, getKlingElement, getKlingTask, klingElementTag, submitKlingOmni } from "./kling";
 
 /**
  * The video provider (key "seedance" for existing rows): Kling 4.0 via Kling's official API.
@@ -65,10 +65,12 @@ export const seedanceProvider: GenerationProvider = {
     const people = Math.min(declaredPeople, Math.max(1, photos.length - objects.length));
     const prompt = buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : "", people, cfg.positions, objects);
     const resolution = input.quality === "1080p" ? "1080p" : "720p";
-    // The client photo becomes a Kling element first. The video request names that element element_1.
-    const elementTaskId = await createKlingFaceElement(photos[0]);
+    // Each uploaded photo becomes its own element, in order: people (o_102), then things (animal, prop, clothing).
+    const usedPhotos = photos.slice(0, people + objects.length);
+    const tags = [...Array.from({ length: people }, () => "o_102"), ...objects.map((o) => klingElementTag(o.what))];
+    const elementTaskId = await createKlingElement(usedPhotos[0], tags[0] ?? "o_102");
     const state: ProviderState = {
-      stage: "element", videoUrl: input.templateVideoUrl, photoUrls: photos, people,
+      stage: "element", videoUrl: input.templateVideoUrl, photoUrls: usedPhotos, people, tags,
       elementIds: [], prompt, durationSec, aspectRatio: cfg.aspectRatio, resolution, mode: cfg.klingMode,
     };
     return { providerJobId: elementTaskId, cost: seedanceCostUsd(durationSec, await seedancePricingSettings(), {}, resolution), state };
@@ -81,14 +83,15 @@ export const seedanceProvider: GenerationProvider = {
     if (el.state === "processing") return { state: "processing" };
     if (el.state === "failed") return { state: "failed", errorCode: el.errorCode, retryable: false };
     const elementIds = [...lock.elementIds, el.elementId];
-    if (elementIds.length < lock.people) {
+    const total = lock.tags?.length ? Math.min(lock.tags.length, lock.photoUrls.length) : lock.people;
+    if (elementIds.length < total) {
       const nextPhoto = lock.photoUrls[elementIds.length];
       if (typeof nextPhoto !== "string" || !nextPhoto) return { state: "failed", errorCode: "missing_inputs", retryable: false };
-      const taskId = await createKlingFaceElement(nextPhoto);
+      const taskId = await createKlingElement(nextPhoto, lock.tags?.[elementIds.length] ?? "o_102");
       return { state: "processing", next: { providerJobId: taskId, state: { ...lock, elementIds } as ProviderState } };
     }
     const id = await submitKlingOmni({
-      videoUrl: lock.videoUrl, photoUrls: lock.photoUrls, elementIds, peopleCount: lock.people,
+      videoUrl: lock.videoUrl, elementIds,
       mode: lock.mode === "reference" ? "reference" : "edit",
       prompt: lock.prompt, durationSec: lock.durationSec, aspectRatio: lock.aspectRatio, resolution: lock.resolution,
     });
@@ -101,6 +104,8 @@ type FaceLockState = {
   videoUrl: string;
   photoUrls: string[];
   people: number;
+  /** Official tag id per photo, same order as photoUrls. Missing on jobs started before things were elements. */
+  tags?: string[];
   elementIds: string[];
   prompt: string;
   durationSec: number;

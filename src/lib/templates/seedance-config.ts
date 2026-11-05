@@ -10,7 +10,7 @@ import type { FaceSlot } from "./schema";
 export const SEEDANCE_MAX_PEOPLE = 5;
 /** Besides people: up to 2 things to swap (car, horse, outfit…), one customer photo each. */
 export const SEEDANCE_MAX_OBJECTS = 2;
-/** Kling 4.0 takes up to 10 reference images; we send people + objects. */
+/** Kling 4.0 accepts up to 7 elements. People plus things stay inside that. */
 export const SEEDANCE_MAX_REFS = SEEDANCE_MAX_PEOPLE + SEEDANCE_MAX_OBJECTS;
 
 /** Ready-made things to swap: Russian label for the customer, English word for the model. */
@@ -70,7 +70,7 @@ export function seedanceSlotLabel(i: number, n: number) {
   return n === 1 ? "Ваше фото" : `${i + 1}-й человек (слева)`;
 }
 
-/** Customer upload slots. providerInput = `img_<n>` (= @image_<n> in the prompt). People first, then objects. */
+/** Customer upload slots. People first, then things. Kling names them element_1 onward in this order. */
 export function seedanceSlots(n: number, keyPrefix = "face_", labels: string[] = [], objects: SwapObject[] = []): FaceSlot[] {
   const people: FaceSlot[] = Array.from({ length: n }, (_, i) => ({
     key: `${keyPrefix}${i + 1}`,

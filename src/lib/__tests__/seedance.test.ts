@@ -106,18 +106,20 @@ describe("provider (Kling official API)", () => {
     vi.unstubAllGlobals();
   });
 
-  it("locks two people and keeps the car photo as a thing, with clothing from their photos", async () => {
+  it("locks two people and the car as elements, with clothing from their photos", async () => {
     const group = [
       { slotKey: "face_1", providerInput: "img_1", imageUrl: "https://s/1.jpg" },
       { slotKey: "face_2", providerInput: "img_2", imageUrl: "https://s/2.jpg" },
       { slotKey: "obj_1", providerInput: "img_3", imageUrl: "https://s/car.jpg" },
     ];
-    const calls: { url: string; body?: unknown }[] = [];
+    const calls: { url: string; body?: { tag_list?: { tag_id?: string }[] } }[] = [];
     const replies = [
       { code: 0, data: { task_id: "el-1", task_status: "submitted" } },
       { code: 0, data: { task_status: "succeed", task_result: { elements: [{ element_id: 11 }] } } },
       { code: 0, data: { task_id: "el-2", task_status: "submitted" } },
       { code: 0, data: { task_status: "succeed", task_result: { elements: [{ element_id: 22 }] } } },
+      { code: 0, data: { task_id: "el-3", task_status: "submitted" } },
+      { code: 0, data: { task_status: "succeed", task_result: { elements: [{ element_id: 33 }] } } },
       { code: 0, data: { id: "kt-2", status: "submitted" } },
     ];
     vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
@@ -131,8 +133,13 @@ describe("provider (Kling official API)", () => {
     const second = await seedanceProvider.getStatus(r.providerJobId, { startedAt: null, state: r.state ?? null });
     expect(second).toMatchObject({ state: "processing", next: { providerJobId: "el-2" } });
     const secondState = second.state === "processing" ? second.next?.state ?? null : null;
-    const video = await seedanceProvider.getStatus("el-2", { startedAt: null, state: secondState });
+    const third = await seedanceProvider.getStatus("el-2", { startedAt: null, state: secondState });
+    expect(third).toMatchObject({ state: "processing", next: { providerJobId: "el-3" } });
+    const thirdState = third.state === "processing" ? third.next?.state ?? null : null;
+    const video = await seedanceProvider.getStatus("el-3", { startedAt: null, state: thirdState });
     expect(video).toMatchObject({ state: "processing", next: { providerJobId: "kt-2" } });
+    const created = calls.filter((c) => c.url.endsWith("/advanced-custom-elements"));
+    expect(created.map((c) => c.body?.tag_list?.[0]?.tag_id)).toEqual(["o_102", "o_102", "o_104"]);
     const body = calls.find((c) => c.url.endsWith("/omni-video/kling-4.0"))?.body as {
       contents: { type: string; id?: string; url?: string; element_id?: string; text?: string }[];
     };
@@ -140,13 +147,12 @@ describe("provider (Kling official API)", () => {
     expect(elements).toEqual([
       expect.objectContaining({ element_id: "11", id: "element_1" }),
       expect.objectContaining({ element_id: "22", id: "element_2" }),
+      expect.objectContaining({ element_id: "33", id: "element_3" }),
     ]);
-    expect(body.contents.filter((c) => c.type === "refer_image")).toEqual([
-      expect.objectContaining({ url: "https://s/car.jpg", id: "image_1" }),
-    ]);
+    expect(body.contents.some((c) => c.type === "refer_image")).toBe(false);
     expect(body.contents.find((c) => c.type === "base_video" || c.type === "feature_video")?.type).toBe("base_video");
     expect(body.contents[0].text).toContain("Do not use the clothing from @video_1");
-    expect(body.contents[0].text).toContain("@image_1 is a photo of a car, not a person");
+    expect(body.contents[0].text).toContain("@element_3 is the car, not a person");
     expect(body.contents[0].text).not.toContain("Clothing follows @video_1");
     vi.unstubAllGlobals();
   });

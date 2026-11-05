@@ -44,13 +44,13 @@ export type KlingMode = "edit" | "reference";
 
 /** Edit = base_video (the template itself is edited). Reference = feature_video (motion only). */
 export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "template", adminPrompt: string, wish: string, people = 1, positions: string[] = [], objects: { what: string }[] = []): string {
-  // Kling 4.0: a person is an element (@element_N). A plain photo is a refer_image (@image_N), used here only for things that are not people.
+  // Kling 4.0: every customer photo is an element. People are element_1 onward, then each thing.
   // The prompt must say what each reference is for, and an edit must say what changes and what stays.
   const faces = Array.from({ length: people }, (_, i) => `@element_${i + 1}`);
-  const things = objects.map((o, j) => ({ what: o.what.trim().toLowerCase(), ref: `@image_${j + 1}` }));
+  const things = objects.map((o, j) => ({ what: o.what.trim().toLowerCase(), ref: `@element_${people + j + 1}` }));
   const outfitRef = things.find((t) => ["outfit", "clothes", "clothing"].includes(t.what))?.ref;
   const look = outfitRef
-    ? `Dress the ${people === 1 ? "person" : "people"} in the outfit shown in ${outfitRef}: the same garments, colors, fabric and details, fitted naturally to the body. ${outfitRef} is a photo of clothing, not a person. Do not take the clothing from @video_1.`
+    ? `Dress the ${people === 1 ? "person" : "people"} in the outfit shown in ${outfitRef}: the same garments, colors, fabric and details, fitted naturally to the body. ${outfitRef} is clothing, not a person. Do not take the clothing from @video_1.`
     : outfit === "template"
     ? `Keep the clothing from @video_1: the same garments, costume, colors and details, fitted to the body. The face stays ${faces.join(" and ")}.`
     : `Clothing follows ${faces.join(" and ")}. Do not use the clothing from @video_1.`;
@@ -64,7 +64,7 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   const parts = [lead, identity, look];
   for (const t of things) {
     if (t.ref === outfitRef) continue;
-    parts.push(`${t.ref} is a photo of a ${t.what}, not a person. Replace the ${t.what} in @video_1 with the ${t.what} from ${t.ref}: the same type, model or breed, color, shape, markings and details. Keep it exactly where the original ${t.what} is, with the same size, angle, perspective and movement, matching the scene's lighting, reflections and shadows, consistent in every frame.`);
+    parts.push(`${t.ref} is the ${t.what}, not a person. Replace the ${t.what} in @video_1 with the ${t.what} from ${t.ref}: the same type, model or breed, color, shape, markings and details. Keep it exactly where the original ${t.what} is, with the same size, angle, perspective and movement, matching the scene's lighting, reflections and shadows, consistent in every frame.`);
   }
   parts.push("Photorealistic, natural, sharp face, no text, no watermark.");
   if (adminPrompt) parts.push(`Mandatory template instruction: ${adminPrompt}`);
@@ -77,17 +77,31 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   return parts.join(" ");
 }
 
-/** Lock one customer photo as a character element. Video generation then uses it for identity, not as a loose reference. */
-export async function createKlingFaceElement(photoUrl: string): Promise<string> {
+/** Official element tags: o_102 character, o_103 animal, o_104 prop, o_105 clothing, o_108 other. */
+export function klingElementTag(what: string): string {
+  const w = what.trim().toLowerCase();
+  if (["horse", "dog", "cat"].includes(w)) return "o_103";
+  if (["outfit", "clothes", "clothing"].includes(w)) return "o_105";
+  if (["car", "motorcycle"].includes(w)) return "o_104";
+  return "o_108";
+}
+
+const elementDescription = (tagId: string) =>
+  tagId === "o_102" ? "This exact person. Keep the face unchanged in every frame."
+  : tagId === "o_103" ? "This exact animal. Keep its appearance unchanged in every frame."
+  : tagId === "o_105" ? "This exact clothing. Keep the garments, colors and details unchanged."
+  : "This exact object. Keep its appearance unchanged in every frame.";
+
+/** Register one customer photo as an element. image_refer needs a front view and 1–3 extra views; one upload fills both. */
+export async function createKlingElement(photoUrl: string, tagId = "o_102"): Promise<string> {
   const d = await call<{ data?: { task_id?: string; id?: string } }>("/v1/general/advanced-custom-elements", {
     method: "POST",
     body: JSON.stringify({
-      element_name: `f${Math.random().toString(36).slice(2, 10)}`.slice(0, 20),
-      element_description: "This exact person. Keep the face unchanged in every frame.",
+      element_name: `e${Math.random().toString(36).slice(2, 10)}`.slice(0, 20),
+      element_description: elementDescription(tagId),
       reference_type: "image_refer",
-      // image_refer needs a front photo and 1–3 extra views. The customer uploads one photo, so that photo is both.
       element_image_list: { frontal_image: photoUrl, refer_images: [{ image_url: photoUrl }] },
-      tag_list: [{ tag_id: "o_102" }],
+      tag_list: [{ tag_id: tagId }],
     }),
   });
   const id = d.data?.task_id ?? d.data?.id;
@@ -116,12 +130,10 @@ export async function getKlingElement(taskId: string): Promise<{ state: "process
   return { state: "processing" };
 }
 
-export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: string[]; elementIds?: string[]; peopleCount?: number; mode: KlingMode; prompt: string; durationSec: number; aspectRatio: string; resolution?: "720p" | "1080p" }): Promise<string> {
+export async function submitKlingOmni(opts: { videoUrl: string; elementIds?: string[]; mode: KlingMode; prompt: string; durationSec: number; aspectRatio: string; resolution?: "720p" | "1080p" }): Promise<string> {
   const duration = Math.min(30, Math.max(3, Math.round(opts.durationSec)));
-  const people = Math.max(0, opts.peopleCount ?? opts.elementIds?.length ?? 1);
-  const objectPhotos = opts.photoUrls.slice(people);
   // Edit the template itself (base_video) or follow it as motion only (feature_video). Never both.
-  // People are elements. Other customer photos (car, horse, outfit) are refer_image, named image_1 onward.
+  // Every customer photo is already an element: element_1, element_2, … No plain refer_image.
   const videoType = opts.mode === "reference" ? "feature_video" : "base_video";
   const aspect = ["21:9", "16:9", "9:16", "1:1", "adaptive"].includes(opts.aspectRatio) ? opts.aspectRatio : "adaptive";
   const d = await call<{ data?: { id?: string } }>("/omni-video/kling-4.0", {
@@ -131,14 +143,13 @@ export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: strin
         { type: "prompt", text: opts.prompt },
         { type: videoType, url: opts.videoUrl, id: "video_1" },
         ...(opts.elementIds ?? []).map((elementId, i) => ({ type: "element", element_id: String(elementId), id: `element_${i + 1}` })),
-        ...objectPhotos.map((url, i) => ({ type: "refer_image", url, id: `image_${i + 1}` })),
       ],
       settings: { resolution: opts.resolution === "1080p" ? "1080p" : "720p", duration, aspect_ratio: aspect },
     }),
   });
   const id = d.data?.id;
   if (!id) throw new ProviderError("provider_bad_response", false, "kling: missing task id");
-  console.log("[kling] video task", id, `video=${videoType} elements=${opts.elementIds?.length ?? 0} objects=${objectPhotos.length}`);
+  console.log("[kling] video task", id, `video=${videoType} elements=${opts.elementIds?.length ?? 0}`);
   return id;
 }
 
