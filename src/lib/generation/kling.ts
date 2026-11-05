@@ -52,17 +52,16 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   const look = outfitRef
     ? `Dress the ${people === 1 ? "person" : "people"} in the outfit shown in ${outfitRef}: the same garments, colors, fabric and details, fitted naturally to the body. ${outfitRef} is clothing, not a person. Do not take the clothing from @video_1.`
     : outfit === "template"
-    ? `Keep the clothing from @video_1: the same garments, costume, colors and details, fitted to the body. The face stays ${faces.join(" and ")}.`
+    ? `Keep the clothing from @video_1: the same garments, costume, colors and details, fitted to the body. The face and head stay ${faces.join(" and ")}, not the original person in @video_1.`
     : `Clothing follows ${faces.join(" and ")}. Do not use the clothing from @video_1.`;
   const who = people === 1
     ? "replace the main person with the person from @element_1"
     : `replace ${faces.map((r, i) => `the person ${positions[i]?.trim() || `number ${i + 1} from the left`} with the person from ${r}`).join(", and ")}`;
-  const identity = `Keep ${faces.join(" and ")} a 1:1 match in every frame until the last frame, whether the head looks left, right, into profile, or away from the camera. Same face shape, eyes, nose, lips, jaw, skin, moles, hairstyle and age, and stay sharp. Do not drift and do not return to the original face in @video_1.`;
+  const appearance = `The person visible in every frame must be ${faces.join(" and ")}: the same face, head, eyes, nose, lips, jaw, skin, moles, hairstyle and age, from the front, from the left and from the right, until the last frame. Do not keep the original face or head from @video_1.`;
   const lead = mode === "edit"
     ? `Edit @video_1. ${who[0].toUpperCase()}${who.slice(1)}. Keep the scene, camera, body movement, timing, location, background, lighting, framing and cuts of @video_1. Change only who the ${people === 1 ? "person is" : "people are"}.`
-    : `Follow the movement, camera and timing of @video_1. Do not copy the face from @video_1. ${who[0].toUpperCase()}${who.slice(1)}.`;
-  const sound = "Keep the original music, song, voice and sound effects of @video_1 exactly as they are, from the first moment to the last. Do not replace, remix, or add new music.";
-  const parts = [lead, sound, identity, look];
+    : `Follow the movement, camera and timing of @video_1. Do not copy the face or head from @video_1. ${who[0].toUpperCase()}${who.slice(1)}.`;
+  const parts = [appearance, lead, look];
   for (const t of things) {
     if (t.ref === outfitRef) continue;
     parts.push(`${t.ref} is the ${t.what}, not a person. Replace the ${t.what} in @video_1 with the ${t.what} from ${t.ref}: the same type, model or breed, color, shape, markings and details. Keep it a 1:1 match from the left and from the right until the last frame, exactly where the original ${t.what} is, with the same size, angle, perspective and movement, matching the scene's lighting, reflections and shadows.`);
@@ -88,7 +87,7 @@ export function klingElementTag(what: string): string {
 }
 
 const elementDescription = (tagId: string) =>
-  tagId === "o_102" ? "Exact face, 1:1, looking left or right, every frame until the end."
+  tagId === "o_102" ? "This exact face and head. Use it instead of the person in the video."
   : tagId === "o_103" ? "Exact animal, 1:1 from every angle, every frame until the end."
   : tagId === "o_105" ? "Exact clothing, 1:1, every frame until the end."
   : "Exact object, 1:1 from every angle, every frame until the end.";

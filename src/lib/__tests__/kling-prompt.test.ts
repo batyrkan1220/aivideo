@@ -13,7 +13,9 @@ describe("Kling prompt priorities", () => {
     expect(p).toContain("the person from @element_1");
     expect(p).not.toContain("@image_1");
     expect(p).toContain("Keep the scene, camera, body movement");
-    expect(p).toContain("Keep the original music, song, voice and sound effects of @video_1");
+    expect(p).toContain("The person visible in every frame must be @element_1");
+    expect(p).toContain("Do not keep the original face or head from @video_1");
+    expect(p.indexOf("The person visible")).toBeLessThan(p.indexOf("Edit @video_1"));
   });
 
   it("adds no wish section when the customer wrote nothing", () => {
@@ -64,8 +66,8 @@ describe("Kling prompt with things to swap", () => {
     const p = buildKlingDirectPrompt("edit", "photo", "", "", 1, [], [{ what: "car" }]);
     expect(p).toContain("@element_2 is the car, not a person");
     expect(p).toContain("Replace the car in @video_1 with the car from @element_2");
-    expect(p).toContain("Keep @element_1 a 1:1 match");
-    expect(p).toContain("whether the head looks left, right");
+    expect(p).toContain("The person visible in every frame must be @element_1");
+    expect(p).toContain("from the left and from the right");
     expect(p).toContain("until the last frame");
     expect(p).not.toContain("@image_1");
   });
