@@ -14,7 +14,8 @@ const ads = {
 };
 const csp = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' https://telegram.org ${ads.script}`,
+  // wasm-unsafe-eval: the admin element scan compiles its local vision model.
+  `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://telegram.org ${ads.script}`,
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: ${supabase} ${ads.img}`,
   `media-src 'self' blob: ${supabase}`,

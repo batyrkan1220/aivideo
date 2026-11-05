@@ -62,7 +62,7 @@ export function faceIssues(faces: FaceWidths, framing: Framing): PhotoIssue[] {
 
 // Tiny Face Detector (face-api, ~190 KB model in /models/face), loaded on the first photo only.
 let faceApi: Promise<typeof import("@vladmandic/face-api") | null> | null = null;
-function loadFaceApi() {
+export function loadFaceApi() {
   faceApi ??= (async () => {
     try {
       const fa = await import("@vladmandic/face-api/dist/face-api.esm.js");
@@ -177,10 +177,11 @@ export type VideoPerson = { x: number; size: number; image: Blob | null }; // fa
 
 /** Evenly spaced times from the start of the video to the end, so a person who appears only later is still found. */
 function videoSampleTimes(duration: number): number[] {
-  const d = Number.isFinite(duration) && duration > 0.3 ? duration : 1;
-  const end = Math.max(0.12, d - 0.12);
-  const count = Math.min(20, Math.max(6, Math.ceil(d)));
-  return Array.from({ length: count }, (_, i) => 0.12 + ((end - 0.12) * i) / Math.max(1, count - 1));
+  const d = Number.isFinite(duration) && duration > 0.4 ? duration : 1;
+  const end = Math.max(0.2, d - 0.12);
+  const count = Math.min(30, Math.max(1, Math.round(d)));
+  if (count === 1) return [Math.min(0.4, end)];
+  return Array.from({ length: count }, (_, i) => 0.2 + ((end - 0.2) * i) / (count - 1));
 }
 
 function faceJpeg(source: HTMLCanvasElement, box: Box): Promise<Blob | null> {
