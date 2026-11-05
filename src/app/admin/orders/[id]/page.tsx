@@ -9,6 +9,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { formatKzt, type PriceBreakdown } from "@/lib/pricing";
 import { ActionForm } from "../action-form";
 import { retryGeneration, cancelGeneration, refundPayment } from "../actions";
+import { unitsFromUsd } from "@/lib/pricing-seedance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { Badge, Stat, orderState, usd, nowMs } from "../../ui";
 
@@ -47,6 +48,7 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
   const isPhoto = !!video && /\.(jpe?g|png|webp)$/i.test(video.private_storage_path);
   const kidCost = (kids ?? []).reduce((n, k) => n + ((Array.isArray(k.generation_jobs) ? k.generation_jobs : []) as { provider_cost: number | null }[]).reduce((m, j) => m + (Number(j.provider_cost) || 0), 0), 0);
   const costUsd = (jobs ?? []).filter((j) => j.provider !== "combo").reduce((n, j) => n + (Number(j.provider_cost) || 0), 0) + kidCost;
+  const units = unitsFromUsd((jobs ?? []).filter((j) => j.provider === "seedance").reduce((n, j) => n + (Number(j.provider_cost) || 0), 0), ap);
   const costKzt = Math.round(costUsd * ap.tengePerUsd);
   const providers = (payments ?? []).filter((p) => p.status === "succeeded").map((p) => p.provider as string);
   const real = providers.some((p) => !["free", "sandbox", "tole_sandbox"].includes(p));
@@ -63,7 +65,7 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
     <div className="space-y-6">
       <div>
         <Link href="/admin/orders" className="-my-2 inline-block py-2 text-sm text-muted hover:text-ink">← {ru.admin.nav.orders}</Link>
-        <h1 className="mt-2 flex flex-wrap items-center gap-2 text-2xl font-extrabold tracking-tight">{o.public_order_number} <Badge color={st.color}>{st.label}</Badge></h1>
+        <h1 className="mt-2 flex flex-wrap items-center gap-2 text-2xl font-extrabold tracking-tight">{o.public_order_number} <Badge color={st.color}>{st.label}</Badge>{units !== null && <span className="text-base font-semibold text-muted">{units.toLocaleString("ru-RU", { maximumFractionDigits: 2 })} юн.</span>}</h1>
         <p className="text-sm text-muted">{snap.title_kk}, {snap.quality?.labelKk ?? o.quality}, {fmt.format(new Date(o.created_at))}</p>
       </div>
 
@@ -163,16 +165,19 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
         {!jobs?.length ? <p className="text-sm text-muted">{A.none}</p> : (
           <div className="overflow-x-auto"><table className="w-full text-left text-sm">
             <thead className="text-muted"><tr><th className={th}>{A.provider}</th><th className={th}>{A.providerRef}</th><th className={th}>{A.colStatus}</th><th className={th}>{A.attempts}</th><th className={th}>{A.error}</th><th className={th}>{A.cost}</th></tr></thead>
-            <tbody className="divide-y divide-line">{jobs.map((j) => (
+            <tbody className="divide-y divide-line">{jobs.map((j) => {
+              const jobUnits = j.provider === "seedance" ? unitsFromUsd(Number(j.provider_cost) || 0, ap) : null;
+              return (
               <tr key={j.id}>
                 <td className={td}>{j.provider}</td>
                 <td className={`${td} font-mono text-xs`}>{j.provider_job_id ?? "—"}</td>
                 <td className={td}>{ru.order.generation[j.status as keyof typeof ru.order.generation] ?? j.status}{j.progress !== null ? ` (${j.progress}%)` : ""}</td>
                 <td className={td}>{j.attempt_count}</td>
                 <td className={`${td} text-xs`}>{j.error_code ? <><span className="font-mono">{j.error_code}</span><span className="block text-muted">{j.safe_error_message}</span></> : "—"}</td>
-                <td className={td}>{j.provider_cost ? <>{formatKzt(Math.round(Number(j.provider_cost) * ap.tengePerUsd))} <span className="text-xs text-muted">{usd(Number(j.provider_cost))}</span></> : "—"}</td>
+                <td className={td}>{j.provider_cost ? <>{jobUnits !== null && <span className="font-semibold">{jobUnits.toLocaleString("ru-RU", { maximumFractionDigits: 2 })} юн. · </span>}{formatKzt(Math.round(Number(j.provider_cost) * ap.tengePerUsd))} <span className="text-xs text-muted">{usd(Number(j.provider_cost))}</span></> : "—"}</td>
               </tr>
-            ))}</tbody>
+              );
+            })}</tbody>
           </table></div>
         )}
       </section>

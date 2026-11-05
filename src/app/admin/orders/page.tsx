@@ -7,6 +7,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { formatKzt } from "@/lib/pricing";
+import { unitsFromUsd } from "@/lib/pricing-seedance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { Badge, Chips, PageHead, fmtDate, orderState } from "../ui";
 
@@ -90,7 +91,7 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
   };
 
   let q = db.from("orders")
-    .select("id,public_order_number,created_at,amount_kzt,payment_status,generation_status,template_snapshot_json,profiles(email,telegram_username,display_name,phone),generation_jobs(provider_cost),payments(provider,status)", { count: "exact" })
+    .select("id,public_order_number,created_at,amount_kzt,payment_status,generation_status,template_snapshot_json,profiles(email,telegram_username,display_name,phone),generation_jobs(provider,provider_cost),payments(provider,status)", { count: "exact" })
     .is("parent_order_id", null)
     .order("created_at", { ascending: false });
   if (number) q = q.eq("public_order_number", number);
@@ -148,8 +149,10 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
                 const pays = (Array.isArray(o.payments) ? o.payments : o.payments ? [o.payments] : []) as { provider: string; status: string }[];
                 const providers = pays.filter((p) => p.status === "succeeded").map((p) => p.provider);
                 const st = orderState(o.payment_status, o.generation_status, o.amount_kzt, providers);
-                const jobs = (Array.isArray(o.generation_jobs) ? o.generation_jobs : o.generation_jobs ? [o.generation_jobs] : []) as { provider_cost: number | null }[];
+                const jobs = (Array.isArray(o.generation_jobs) ? o.generation_jobs : o.generation_jobs ? [o.generation_jobs] : []) as { provider: string; provider_cost: number | null }[];
                 const usdCost = jobs.reduce((n, j) => n + (Number(j.provider_cost) || 0), 0);
+                const videoUsd = jobs.filter((j) => j.provider === "seedance").reduce((n, j) => n + (Number(j.provider_cost) || 0), 0);
+                const units = unitsFromUsd(videoUsd, ap);
                 const cost = Math.round(usdCost * ap.tengePerUsd);
                 const real = providers.some((p) => !["free", "sandbox", "tole_sandbox"].includes(p));
                 const snap = o.template_snapshot_json as { title_kk?: string; provider_key?: string };
@@ -158,6 +161,7 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
                   <tr key={o.id} className="hover:bg-paper">
                     <td className="px-4 py-3">
                       <Link href={`/admin/orders/${o.id}`} className="font-bold hover:underline">{o.public_order_number}</Link>
+                      {units !== null && <span className="ml-2 text-xs font-semibold text-night">{units.toLocaleString("ru-RU", { maximumFractionDigits: 2 })} юн.</span>}
                       <span className="block text-xs text-muted">{fmtDate.format(new Date(o.created_at))}</span>
                     </td>
                     <td className="px-4 py-3">

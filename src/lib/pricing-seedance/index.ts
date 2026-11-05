@@ -47,6 +47,12 @@ export function klingUnits(durationSec: number, s: SeedancePricing): number {
   return Math.round((input + output) * s.klingUnitsPerSec * 100) / 100;
 }
 
+/** Units a stored provider cost stands for (cost ÷ unit price). Null when nothing was spent. */
+export function unitsFromUsd(costUsd: number, s: SeedancePricing): number | null {
+  if (!(costUsd > 0) || !(s.klingUnitUsd > 0)) return null;
+  return Math.round((costUsd / s.klingUnitUsd) * 100) / 100;
+}
+
 /** Admin-facing line: units this video takes at 720p and at 1080p. */
 export function klingUnitLabel(durationSec: number, s: SeedancePricing): string {
   const u = klingUnits(durationSec, s);
