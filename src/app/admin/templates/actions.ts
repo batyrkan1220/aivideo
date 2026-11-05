@@ -7,6 +7,7 @@ import { z } from "zod";
 import { audit, requirePermission, ForbiddenError } from "@/lib/auth/session";
 import { env } from "@/lib/env";
 import { identifyKlingFaces } from "@/lib/generation/kling";
+import { klingScanFile } from "@/lib/generation/kling-scan";
 import { ProviderError } from "@/lib/generation/types";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import {
@@ -261,17 +262,23 @@ export async function detectKlingElements(videoPath: string): Promise<
   if (!user) return { ok: false, error: "forbidden" };
   const videoUrl = templateVideoUrl(videoPath);
   if (!videoUrl) return { ok: false, error: "failed" };
+  const prepared = await uploadKlingScan(videoUrl);
+  const scanUrl = prepared?.url ?? videoUrl;
   let faces: Awaited<ReturnType<typeof identifyKlingFaces>> | null = null;
   try {
-    faces = await identifyKlingFaces(videoUrl);
-  } catch (e) {
-    const code = e instanceof ProviderError ? e.code : "failed";
-    if (code === "provider_http_429") {
-      await new Promise((r) => setTimeout(r, 2000));
-      try { faces = await identifyKlingFaces(videoUrl); } catch (again) {
-        return { ok: false, error: elementError(again) };
-      }
-    } else return { ok: false, error: elementError(e) };
+    try {
+      faces = await identifyKlingFaces(scanUrl);
+    } catch (e) {
+      const code = e instanceof ProviderError ? e.code : "failed";
+      if (code === "provider_http_429") {
+        await new Promise((r) => setTimeout(r, 2000));
+        try { faces = await identifyKlingFaces(scanUrl); } catch (again) {
+          return { ok: false, error: elementError(again) };
+        }
+      } else return { ok: false, error: elementError(e) };
+    }
+  } finally {
+    if (prepared) await supabaseAdmin().storage.from("template-media").remove([prepared.path]).catch(() => undefined);
   }
   if (!faces) return { ok: false, error: "failed" };
   if (!faces.length) return { ok: false, error: "none" };
@@ -291,6 +298,16 @@ function elementError(e: unknown): "balance" | "video" | "failed" {
   if (code === "provider_no_balance") return "balance";
   if (code === "provider_bad_params") return "video";
   return "failed";
+}
+
+/** Public copy without the 0×0 audio track, so Kling measures the picture. */
+async function uploadKlingScan(videoUrl: string): Promise<{ url: string; path: string } | null> {
+  const file = await klingScanFile(videoUrl);
+  if (!file) return null;
+  const path = `elements/scan-${randomUUID()}.mp4`;
+  const { error } = await supabaseAdmin().storage.from("template-media").upload(path, file, { contentType: "video/mp4", upsert: false });
+  if (error) { console.error("[admin.element] scan upload", error.message); return null; }
+  return { path, url: `${env().NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/template-media/${path}` };
 }
 
 function templateVideoUrl(path: string): string | null {
