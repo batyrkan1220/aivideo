@@ -9,6 +9,8 @@ describe("Kling prompt priorities", () => {
     expect(p).toContain("Mandatory template instruction: national costume");
     expect(p.indexOf("Mandatory template instruction")).toBeLessThan(p.indexOf("Optional customer wish"));
     expect(p).toMatch(/ignore any part that asks to change the faces or the clothing/);
+    expect(p).toContain("including the final seconds");
+    expect(p).toContain("must stay the reference person until the last frame");
   });
 
   it("adds no wish section when the customer wrote nothing", () => {

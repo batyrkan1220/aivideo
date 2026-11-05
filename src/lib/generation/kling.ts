@@ -60,14 +60,15 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
     `Each new person must look 100% identical to their reference image (${refs.join(", ")}) in every frame: preserve the facial features, face shape, eyes, eyebrows, nose, mouth, teeth, ears, moles, hairstyle, hair color, skin tone, age and body proportions exactly.`,
     // Turns of the head are where likeness usually breaks: keep the same 3D face from every angle.
     "Keep the identity consistent from every angle — front, three-quarter, profile, looking up and looking down: the same skull and face shape, forehead, jawline and chin, cheekbones, nose bridge and nose profile, lip shape and ear shape. When the reference does not show a side of the face, reconstruct it so it matches the reference exactly.",
-    "Natural, realistic skin with real texture and pores, natural facial asymmetry kept. Do not beautify, slim, smooth, stylize or change the faces; no filters.",
+    "Natural, realistic skin with real texture and pores, scars, birthmarks and natural facial asymmetry kept. Do not beautify, slim, smooth, stylize or change the faces; no filters.",
+    "The likeness must hold through the whole video, including the final seconds: when the head turns, the shot changes, or the person is seen from the side, keep this same person. Never restore the original face from @video_1.",
   ].join(" ");
   const parts = mode === "edit"
     ? [
         `Edit @video_1: ${who}`,
         same,
         look,
-        "Keep everything else in @video_1 unchanged: background, location, other people, objects, lighting, camera movement, framing, cuts, motion, timing and sound.",
+        "Keep the scene of @video_1 unchanged: background, location, other people, objects, lighting, camera movement, framing, cuts, motion, timing and sound. The replaced person's face, head, hair and skin are not part of that scene and must stay the reference person until the last frame.",
       ]
     : [
         "Follow the motion, actions, timing, camera movement, framing and cuts of @video_1, and recreate its location, background and lighting.",
