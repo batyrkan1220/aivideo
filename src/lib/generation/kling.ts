@@ -57,14 +57,14 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   const who = people === 1
     ? "replace the main person with the person from @element_1"
     : `replace ${faces.map((r, i) => `the person ${positions[i]?.trim() || `number ${i + 1} from the left`} with the person from ${r}`).join(", and ")}`;
-  const identity = `The face and identity must match ${faces.join(" and ")} in every frame, including head turns and side angles. Do not return to the original face in @video_1.`;
+  const identity = `Keep ${faces.join(" and ")} a 1:1 match in every frame until the last frame, whether the head looks left, right, into profile, or away from the camera. Same face shape, eyes, nose, lips, jaw, skin, moles, hairstyle and age, and stay sharp. Do not drift and do not return to the original face in @video_1.`;
   const lead = mode === "edit"
     ? `Edit @video_1. ${who[0].toUpperCase()}${who.slice(1)}. Keep the scene, camera, body movement, timing, location, background, lighting, framing, cuts and sound of @video_1. Change only who the ${people === 1 ? "person is" : "people are"}.`
     : `Follow the movement, camera and timing of @video_1. Do not copy the face from @video_1. ${who[0].toUpperCase()}${who.slice(1)}.`;
   const parts = [lead, identity, look];
   for (const t of things) {
     if (t.ref === outfitRef) continue;
-    parts.push(`${t.ref} is the ${t.what}, not a person. Replace the ${t.what} in @video_1 with the ${t.what} from ${t.ref}: the same type, model or breed, color, shape, markings and details. Keep it exactly where the original ${t.what} is, with the same size, angle, perspective and movement, matching the scene's lighting, reflections and shadows, consistent in every frame.`);
+    parts.push(`${t.ref} is the ${t.what}, not a person. Replace the ${t.what} in @video_1 with the ${t.what} from ${t.ref}: the same type, model or breed, color, shape, markings and details. Keep it a 1:1 match from the left and from the right until the last frame, exactly where the original ${t.what} is, with the same size, angle, perspective and movement, matching the scene's lighting, reflections and shadows.`);
   }
   parts.push("Photorealistic, natural, sharp face, no text, no watermark.");
   if (adminPrompt) parts.push(`Mandatory template instruction: ${adminPrompt}`);
@@ -87,10 +87,10 @@ export function klingElementTag(what: string): string {
 }
 
 const elementDescription = (tagId: string) =>
-  tagId === "o_102" ? "This exact person. Keep the face unchanged in every frame."
-  : tagId === "o_103" ? "This exact animal. Keep its appearance unchanged in every frame."
-  : tagId === "o_105" ? "This exact clothing. Keep the garments, colors and details unchanged."
-  : "This exact object. Keep its appearance unchanged in every frame.";
+  tagId === "o_102" ? "Exact face, 1:1, looking left or right, every frame until the end."
+  : tagId === "o_103" ? "Exact animal, 1:1 from every angle, every frame until the end."
+  : tagId === "o_105" ? "Exact clothing, 1:1, every frame until the end."
+  : "Exact object, 1:1 from every angle, every frame until the end.";
 
 /** Register one customer photo as an element. image_refer needs a front view and 1–3 extra views; one upload fills both. */
 export async function createKlingElement(photoUrl: string, tagId = "o_102"): Promise<string> {

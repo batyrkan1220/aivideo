@@ -63,7 +63,9 @@ describe("Kling prompt with things to swap", () => {
     const p = buildKlingDirectPrompt("edit", "photo", "", "", 1, [], [{ what: "car" }]);
     expect(p).toContain("@element_2 is the car, not a person");
     expect(p).toContain("Replace the car in @video_1 with the car from @element_2");
-    expect(p).toContain("must match @element_1");
+    expect(p).toContain("Keep @element_1 a 1:1 match");
+    expect(p).toContain("whether the head looks left, right");
+    expect(p).toContain("until the last frame");
     expect(p).not.toContain("@image_1");
   });
   it("keeps three people and a horse or outfit as their own elements", () => {
