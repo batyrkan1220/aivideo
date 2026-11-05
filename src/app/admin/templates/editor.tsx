@@ -9,7 +9,7 @@ import { autoFaceSlots } from "@/lib/templates/schema";
 import { validateTemplateForm, firstErrorKey, type FieldErrors } from "@/lib/templates/editor-validation";
 import { OBJECT_PRESETS, parseSeedanceConfig, seedanceSlots, SEEDANCE_MAX_OBJECTS, SEEDANCE_MAX_PEOPLE, SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC, type SeedanceConfig } from "@/lib/templates/seedance-config";
 import { calculatePrice, formatKzt } from "@/lib/pricing";
-import { seedancePriceKzt, seedanceCostKzt, SEEDANCE_QUALITY, type SeedancePricing } from "@/lib/pricing-seedance";
+import { seedancePriceKzt, seedanceCostKzt, klingUnitLabel, SEEDANCE_QUALITY, type SeedancePricing } from "@/lib/pricing-seedance";
 import { FaceMap } from "@/components/face-map";
 import { detectVideoPeople } from "@/lib/uploads/photo-quality";
 import { saveTemplate, changeStatus, createUploadUrl } from "./actions";
@@ -208,6 +208,7 @@ export function TemplateEditor({
   const costOpts = { people: sd.people };
   const autoPrice = seedancePriceKzt(duration, Number(t.pricing.basePriceKzt) || 0, seedancePricing, costOpts);
   const costKzt = duration ? seedanceCostKzt(duration, seedancePricing, costOpts) : null;
+  const unitLabel = duration ? klingUnitLabel(duration, seedancePricing) : null;
 
   return (
     <div className="space-y-6 pb-56 sm:pb-28">
@@ -412,6 +413,7 @@ export function TemplateEditor({
                 ? e.autoPrice(formatKzt(autoPrice), Math.round(duration), formatKzt(costKzt ?? 0))
                 : e.manualPrice(formatKzt(costKzt ?? 0))}
           </p>
+          {unitLabel && <p className="mt-1 text-sm font-semibold">{unitLabel}</p>}
           {autoPrice !== null && costKzt !== null && <p className={`mt-1 text-sm font-medium ${autoPrice - costKzt >= 0 ? "text-success" : "text-danger"}`}>{e.profit(formatKzt(autoPrice - costKzt))}</p>}
         </div>
         )}

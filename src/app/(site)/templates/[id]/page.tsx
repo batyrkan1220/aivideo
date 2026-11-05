@@ -13,6 +13,9 @@ import { activeDiscount } from "@/lib/engage/discount";
 import { adOffer } from "@/lib/engage/offer";
 import { reusablePhotos } from "@/lib/orders/reusable";
 import { getSessionUser } from "@/lib/auth/session";
+import { can } from "@/lib/auth/permissions";
+import { klingUnitLabel } from "@/lib/pricing-seedance";
+import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { isGuestEmail } from "@/lib/telegram/session";
 import { env } from "@/lib/env";
 import type { TemplateDetail } from "@/lib/templates/queries";
@@ -34,6 +37,10 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
   void track("template_viewed", { templateId: t.id });
   const photo = t.media === "photo";
   const combo = t.comboIds ? await comboItems(t.comboIds) : undefined;
+  const user = await getSessionUser();
+  const staffUnits = !photo && t.durationSec && user && can(user.role, "templates.manage")
+    ? await staffUnitLabel(t.durationSec)
+    : null;
   return (
     <>
     <TrackView item={{ id: t.id, name: t.title, price: t.startingPriceKzt ?? 0 }} />
@@ -41,6 +48,7 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
     <TemplateDetailView
       t={t}
       combo={combo}
+      staffUnits={staffUnits}
       cta={
         <Suspense fallback={<div className="h-64 animate-pulse rounded-card bg-line" />}>
           <CreateSection t={t} />
@@ -49,6 +57,10 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
     />
     </>
   );
+}
+
+async function staffUnitLabel(durationSec: number): Promise<string> {
+  return klingUnitLabel(durationSec, await seedancePricingSettings());
 }
 
 async function CreateSection({ t }: { t: TemplateDetail }) {

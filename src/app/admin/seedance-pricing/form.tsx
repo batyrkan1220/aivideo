@@ -2,7 +2,7 @@
 import { useActionState, useState } from "react";
 import { ru } from "@/lib/i18n/ru";
 import { formatKzt } from "@/lib/pricing";
-import { seedanceAutoPriceKzt, seedanceCostKzt, seedanceCostUsd, seedancePricingSchema, type SeedancePricing } from "@/lib/pricing-seedance";
+import { klingUnits, seedanceAutoPriceKzt, seedanceCostKzt, seedanceCostUsd, seedancePricingSchema, type SeedancePricing } from "@/lib/pricing-seedance";
 import { saveSeedancePricing, type SeedancePricingState } from "./actions";
 
 const EXAMPLES = [5, 10, 15, 20, 30];
@@ -60,7 +60,7 @@ export function SeedancePricingForm({ value }: { value: SeedancePricing }) {
                   return (
                     <tr key={sec}>
                       <td className="py-2 pr-3">{sec} {P.sec}</td>
-                      <td className="py-2 pr-3 text-muted">{formatKzt(cost)} <span className="text-xs">(${seedanceCostUsd(sec, s, o).toFixed(2)} · {Math.round((Math.round(sec) * 2) * s.klingUnitsPerSec * 10) / 10} {P.units})</span></td>
+                      <td className="py-2 pr-3 text-muted">{formatKzt(cost)} <span className="text-xs">(${seedanceCostUsd(sec, s, o).toFixed(2)} · {klingUnits(sec, s)} {P.units})</span></td>
                       <td className="py-2 pr-3"><b>{formatKzt(price)}</b></td>
                       <td className={`py-2 pr-3 font-medium ${price - cost >= 0 ? "text-success" : "text-danger"}`}>{formatKzt(price - cost)}</td>
                     </tr>

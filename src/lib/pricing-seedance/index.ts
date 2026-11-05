@@ -4,8 +4,9 @@ import { seedanceOutputSec } from "@/lib/templates/seedance-config";
 
 /**
  * Kling 4.0 (official Kling API, 720p, with the template video) pricing.
- * Kling bills `klingUnitsPerSec` units for every second of the template video (rounded) + every
- * second of the result (real bills: 12.88 s → 15.6 units, 6.96 s → 8.4). Cost = units × unit price
+ * Kling bills `klingUnitsPerSec` units for every second of the template video (exact) + every
+ * second of the result (the whole seconds we ask for). Real bills: 10.04 s + 10 s → 12.02 units,
+ * 15.04 s + 15 s → 18.02. Cost = units × unit price
  * × $ rate; the customer price = cost × (1 + markup), rounded up, never below the minimum.
  *
  * Shared by server (orders, checkout) and browser (live price after a video upload).
@@ -39,10 +40,19 @@ export const qualityCostFactor = (providerQuality?: string | null) => (providerQ
 /** Kept for call sites; every template is Kling 4.0 now. */
 export type CostOpts = { mode?: string; people?: number };
 
-/** Kling units for a template video of this length. */
+/** Kling units for a template video of this length (720p). 1080p is this × HD1080_FACTOR. */
 export function klingUnits(durationSec: number, s: SeedancePricing): number {
-  const counted = Math.round(Math.min(durationSec, 30)) + seedanceOutputSec(durationSec);
-  return Math.round(counted * s.klingUnitsPerSec * 100) / 100;
+  const input = Math.min(Math.max(durationSec, 0), 30);
+  const output = seedanceOutputSec(durationSec);
+  return Math.round((input + output) * s.klingUnitsPerSec * 100) / 100;
+}
+
+/** Admin-facing line: units this video takes at 720p and at 1080p. */
+export function klingUnitLabel(durationSec: number, s: SeedancePricing): string {
+  const u = klingUnits(durationSec, s);
+  const hd = Math.round(u * HD1080_FACTOR * 100) / 100;
+  const text = (n: number) => n.toLocaleString("ru-RU", { maximumFractionDigits: 2 });
+  return `Kling: ${text(u)} юн. (720p) · ${text(hd)} юн. (1080p)`;
 }
 
 export function seedanceCostUsd(durationSec: number, s: SeedancePricing, _o: CostOpts = {}, providerQuality?: string | null): number {

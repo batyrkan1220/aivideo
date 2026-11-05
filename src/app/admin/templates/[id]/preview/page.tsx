@@ -6,6 +6,8 @@ import { getSessionUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { getTemplateForAdmin } from "@/lib/templates/queries";
 import { TemplateDetailView } from "@/components/template-detail";
+import { klingUnitLabel } from "@/lib/pricing-seedance";
+import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 
 export default function PreviewPage({ params }: { params: Promise<{ id: string }> }) {
   return (
@@ -22,10 +24,11 @@ async function Preview({ params }: { params: Promise<{ id: string }> }) {
   if (!can(u.role, "templates.manage")) return <p className="text-muted">{ru.admin.forbidden}</p>;
   const t = await getTemplateForAdmin(id);
   if (!t) notFound();
+  const staffUnits = t.media !== "photo" && t.durationSec ? klingUnitLabel(t.durationSec, await seedancePricingSettings()) : null;
   return (
     <>
       <Link href={`/admin/templates/${id}`} className="-my-2 inline-block py-2 text-sm font-medium text-muted hover:text-ink">← {ru.admin.editor.editTitle}</Link>
-      <TemplateDetailView t={t} />
+      <TemplateDetailView t={t} staffUnits={staffUnits} />
     </>
   );
 }

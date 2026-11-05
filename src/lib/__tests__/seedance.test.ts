@@ -11,10 +11,11 @@ import { klingUnits, seedanceCostUsd, seedanceAutoPriceKzt, seedancePriceKzt, ap
 
 describe("Kling 4.0 pricing (real bills)", () => {
   it("0.6 unit × (template s + result s)", () => {
-    expect(klingUnits(12.88, S)).toBe(15.6);
-    expect(klingUnits(10.83, S)).toBe(13.2);
-    expect(klingUnits(6.96, S)).toBe(8.4);
-    expect(seedanceCostUsd(12.88, S)).toBeCloseTo(15.6 * 0.14, 4);
+    expect(klingUnits(10.04, S)).toBe(12.02);
+    expect(klingUnits(15.04, S)).toBe(18.02);
+    expect(klingUnits(10, S)).toBe(12);
+    expect(klingUnits(12.88, S)).toBe(15.53);
+    expect(seedanceCostUsd(10.04, S)).toBeCloseTo(12.02 * 0.14, 4);
   });
   it("price = cost × (1 + markup), rounded up, not below the minimum; manual price wins", () => {
     expect(seedanceAutoPriceKzt(4, { ...S, minPriceKzt: 99_999 })).toBe(99_999);

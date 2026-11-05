@@ -8,6 +8,8 @@ import { can } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { mediaUrl } from "@/lib/templates/queries";
 import { formatKzt } from "@/lib/pricing";
+import { klingUnits } from "@/lib/pricing-seedance";
+import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { pricingConfigSchema } from "@/lib/templates/schema";
 import { DeleteTemplateButton } from "./delete-button";
 import { CopyLink } from "./copy-link";
@@ -46,12 +48,13 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;
   const db = supabaseAdmin();
 
-  const [{ data }, { data: stats }, { data: cats }] = await Promise.all([
+  const [{ data }, { data: stats }, { data: cats }, pricing] = await Promise.all([
     db.from("templates")
       .select("id,title_kk,status,required_face_count,updated_at,is_trending,provider_key,cover_asset_path,preview_video_path,preview_lite_path,preview_anim_path,pricing_config_json,category_id,video_duration_sec")
       .eq("kind", "catalog").is("deleted_at", null).order("updated_at", { ascending: false }),
     db.rpc("admin_template_stats", { p_from: new Date(nowMs() - 30 * 86400_000).toISOString() }),
     db.from("categories").select("id,title_kk"),
+    seedancePricingSettings(),
   ]);
   const all = data ?? [];
   const bot = await botUsername().catch(() => null);
@@ -93,6 +96,7 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
           {rows.map(({ t, s }) => {
             const cover = mediaUrl(t.cover_asset_path);
             const price = pricingConfigSchema.safeParse(t.pricing_config_json).data?.basePriceKzt;
+            const units = t.provider_key !== "kling_photo" && t.video_duration_sec ? klingUnits(Number(t.video_duration_sec), pricing) : null;
             const st = STATUS[t.status] ?? { label: t.status, color: "gray" as const };
             const conv = Number(s.views) ? Math.round((Number(s.orders) / Number(s.views)) * 1000) / 10 : null;
             return (
@@ -105,7 +109,7 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
                   </Link>
                   <div className="min-w-0 flex-1">
                     <Link href={`/admin/templates/${t.id}`} className="line-clamp-2 font-bold leading-snug hover:underline">{t.title_kk}</Link>
-                    <p className="mt-0.5 text-xs text-muted">{t.required_face_count} чел.{t.video_duration_sec ? ` · ${Math.round(Number(t.video_duration_sec))} с` : ""}{price ? ` · ${formatKzt(price)}` : " · авто-цена"}</p>
+                    <p className="mt-0.5 text-xs text-muted">{t.required_face_count} чел.{t.video_duration_sec ? ` · ${Math.round(Number(t.video_duration_sec))} с` : ""}{units !== null ? ` · ${units.toLocaleString("ru-RU", { maximumFractionDigits: 2 })} юн.` : ""}{price ? ` · ${formatKzt(price)}` : " · авто-цена"}</p>
                     <div className="mt-1.5 flex flex-wrap items-center gap-1">
                       <Badge color={st.color}>{st.label}</Badge>
                       {t.is_trending && <Badge color="lime">🔥 тренд</Badge>}

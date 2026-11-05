@@ -43,7 +43,7 @@ export function QualityPriceList({ t }: { t: TemplateDetail }) {
 
 type ComboPart = { id: string; title: string; cover: string | null };
 
-export function TemplateDetailView({ t, cta, combo }: { t: TemplateDetail; cta?: React.ReactNode; combo?: ComboPart[] }) {
+export function TemplateDetailView({ t, cta, combo, staffUnits }: { t: TemplateDetail; cta?: React.ReactNode; combo?: ComboPart[]; staffUnits?: string | null }) {
   return (
     <div className="mt-3 grid gap-5 md:mt-6 md:grid-cols-[minmax(0,360px)_1fr] md:gap-12">
       {combo ? <ComboGrid parts={combo} /> : (
@@ -85,6 +85,7 @@ export function TemplateDetailView({ t, cta, combo }: { t: TemplateDetail; cta?:
               </span>
             )}
             {t.isTrending && <span className="rounded-full bg-flash px-3 py-1.5 font-bold text-night">{kk.catalog2.trendBadge}</span>}
+            {staffUnits && <span className="rounded-full bg-brand px-3 py-1.5 font-semibold text-night">{staffUnits}</span>}
           </div>
         </div>
         {/* Phones: title, facts and how it works, right under the sample */}
@@ -93,6 +94,7 @@ export function TemplateDetailView({ t, cta, combo }: { t: TemplateDetail; cta?:
             <h1 className="text-[26px] font-extrabold leading-tight tracking-tight">{t.title}</h1>
             {t.startingPriceKzt !== null && <span className="mt-1 shrink-0 rounded-full bg-ink px-3 py-1.5 text-sm font-extrabold text-paper">{formatKzt(t.startingPriceKzt)}</span>}
           </div>
+          {staffUnits && <p className="mt-2 text-sm font-semibold text-night">{staffUnits}</p>}
           {t.description && <p className="mt-1 text-sm text-muted">{t.description}</p>}
           {(combo || t.isTrending) && (
             <ul className="mt-3 flex flex-wrap gap-1.5 text-[12px] font-semibold">
