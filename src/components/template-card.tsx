@@ -1,10 +1,11 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { kk } from "@/lib/i18n/kk";
 import { formatKzt } from "@/lib/pricing";
 import { autoplayRefused, useImgPreviews } from "@/lib/video-autoplay";
-import { primeSound } from "@/lib/sound-handoff";
+import { primeSound, videoShown } from "@/lib/sound-handoff";
 
 export type CardData = {
   id: string;
@@ -73,6 +74,7 @@ function releasePlayback(v: HTMLVideoElement) {
  *  - visible cards autoplay (muted, inline); off-screen videos are paused.
  */
 export function TemplateCard({ t, priority = false }: { t: CardData; priority?: boolean }) {
+  const pathname = usePathname();
   const videoRef = useRef<HTMLVideoElement>(null);
   const cardRef = useRef<HTMLAnchorElement>(null);
   const [playing, setPlaying] = useState(false);
@@ -104,6 +106,7 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
     if (!v) return;
     v.muted = true; // Telegram WebView: the property must be set before play()
     v.defaultMuted = true;
+    if (!videoShown(v)) return;
     claimPlayback(v);
     wantRef.current = true;
     // Some WebViews (Telegram on iPad/iPhone) neither play nor reject: if the video still sits
@@ -113,15 +116,14 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
         if (autoplayRefused({ name: "NotAllowedError" })) { releasePlayback(v); setPlaying(true); }
       }
     }, 3500);
-    const onScreen = () => { const r = v.getBoundingClientRect(); return r.bottom > 0 && r.top < window.innerHeight; };
     const again = () => {
-      if (videoRef.current !== v || !v.isConnected) { waitingForGesture.delete(again); return; }
-      if (onScreen()) v.play().then(() => { waitingForGesture.delete(again); setPlaying(true); }).catch(() => {});
+      if (videoRef.current !== v || !videoShown(v)) { waitingForGesture.delete(again); return; }
+      v.play().then(() => { waitingForGesture.delete(again); setPlaying(true); }).catch(() => {});
     };
     v.play().then(() => setPlaying(true)).catch((err) => {
       if (autoplayRefused(err)) { releasePlayback(v); setPlaying(true); return; }
       // Not enough data yet: retry once the first frame is loaded; autoplay blocked: retry on first touch.
-      if (v.readyState < 2) v.addEventListener("loadeddata", () => { v.play().then(() => setPlaying(true)).catch(() => retryOnGesture(again)); }, { once: true });
+      if (v.readyState < 2) v.addEventListener("loadeddata", () => { if (videoShown(v)) v.play().then(() => setPlaying(true)).catch(() => retryOnGesture(again)); }, { once: true });
       else retryOnGesture(again);
     });
   };
@@ -144,7 +146,7 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
     const io = new IntersectionObserver(([e]) => (e.isIntersecting ? play() : stop()), { threshold: 0.6 });
     io.observe(el);
     return () => { io.disconnect(); stop(); };
-  }, [near]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [near, pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep the UI in sync when the playback manager pauses this video.
   useEffect(() => {
@@ -163,7 +165,11 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
       href={`/templates/${t.id}`}
       className="group block"
       // The tap itself starts the template's video with sound (see sound-handoff).
-      onClick={(e) => { if (!e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) primeSound(t.previewUrl); }}
+      onClick={(e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+        stop();
+        primeSound(t.previewUrl);
+      }}
       onMouseEnter={start}
       onMouseLeave={stop}
       onFocus={start}

@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { kk } from "@/lib/i18n/kk";
-import { takePrimed } from "@/lib/sound-handoff";
+import { takePrimed, videoShown } from "@/lib/sound-handoff";
 
 /**
  * Muted, looping, inline video that reliably autoplays — also inside the Telegram WebView,
@@ -21,6 +22,7 @@ export function AutoVideo(props: { src: string; poster?: string; controls?: bool
   const ref = useRef<HTMLVideoElement>(null);
   const active = useRef<HTMLVideoElement | null>(null); // the element actually playing
   const [muted, setMuted] = useState(true);
+  const pathname = usePathname();
   useEffect(() => {
     const own = ref.current;
     if (!own) return;
@@ -54,7 +56,7 @@ export function AutoVideo(props: { src: string; poster?: string; controls?: bool
       v.removeAttribute("muted");
       return v.play().then(() => { setMuted(false); return true; }).catch(() => false);
     };
-    const tryPlay = () => { v.play().catch(() => {}); };
+    const tryPlay = () => { if (videoShown(v)) v.play().catch(() => {}); else v.pause(); };
     // Blocked autoplay with sound: turn the sound on at the first touch anywhere.
     const unmuteOnTouch = (e: Event) => {
       if ((e.target as Element | null)?.closest?.("[data-sound-toggle]")) return; // the toggle handles itself
@@ -89,7 +91,7 @@ export function AutoVideo(props: { src: string; poster?: string; controls?: bool
       v.pause();
       if (adopted) { adopted.removeAttribute("src"); adopted.load(); adopted.remove(); }
     };
-  }, [props.src, props.preferSound, props.poster, props.controls]);
+  }, [props.src, props.preferSound, props.poster, props.controls, pathname]);
 
   const toggle = () => {
     const v = active.current ?? ref.current;

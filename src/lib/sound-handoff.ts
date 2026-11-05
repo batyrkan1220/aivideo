@@ -46,3 +46,25 @@ function drop() {
   primed.el.load();
   primed = null;
 }
+
+/** True when the video element is actually on screen, not just still mounted under another page. */
+export function videoShown(v: HTMLVideoElement): boolean {
+  if (!v.isConnected) return false;
+  if (typeof v.checkVisibility === "function" && !v.checkVisibility()) return false;
+  const r = v.getBoundingClientRect();
+  if (r.width < 8 || r.height < 8) return false;
+  const vh = window.innerHeight || 0;
+  const vw = window.innerWidth || 0;
+  const visibleH = Math.min(r.bottom, vh) - Math.max(r.top, 0);
+  const visibleW = Math.min(r.right, vw) - Math.max(r.left, 0);
+  return visibleH > r.height * 0.5 && visibleW > r.width * 0.5;
+}
+
+/** Stops previews that are no longer on a visible card (payment page, another route, scrolled away). */
+export function pauseHiddenVideos() {
+  if (primed && !primed.el.isConnected) drop();
+  document.querySelectorAll("video").forEach((node) => {
+    const v = node as HTMLVideoElement;
+    if (!videoShown(v)) v.pause();
+  });
+}
