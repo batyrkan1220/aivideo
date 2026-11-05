@@ -94,32 +94,6 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   return parts.join(" ");
 }
 
-export type KlingFoundFace = { faceId: string; imageUrl: string; startMs: number; endMs: number };
-
-/**
- * Every person Kling can see in the whole template video.
- * Docs: POST /v1/videos/identify-face → face_id, face_image, start_time, end_time.
- * This id marks who is in the video. The customer's photo for that slot is locked later
- * with createKlingFaceElement; this face_id is not sent as the video's element_id.
- */
-export async function identifyKlingFaces(videoUrl: string): Promise<KlingFoundFace[]> {
-  const d = await call<{ data?: { face_data?: { face_id?: string; face_image?: string; start_time?: number; end_time?: number }[] } }>(
-    "/v1/videos/identify-face",
-    { method: "POST", body: JSON.stringify({ video_url: videoUrl }) },
-    90_000,
-  );
-  const faces = (d.data?.face_data ?? [])
-    .map((f) => ({
-      faceId: String(f.face_id ?? "").trim(),
-      imageUrl: String(f.face_image ?? "").trim(),
-      startMs: Math.max(0, Math.round(Number(f.start_time) || 0)),
-      endMs: Math.max(0, Math.round(Number(f.end_time) || 0)),
-    }))
-    .filter((f) => f.faceId.length > 0 && f.faceId.length <= 80 && /^https:\/\//i.test(f.imageUrl));
-  console.log("[kling] identify-face", faces.length);
-  return faces;
-}
-
 /** Lock one customer photo as a character element. Video generation then uses it for identity, not as a loose reference. */
 export async function createKlingFaceElement(photoUrl: string): Promise<string> {
   const d = await call<{ data?: { task_id?: string; id?: string } }>("/v1/general/advanced-custom-elements", {

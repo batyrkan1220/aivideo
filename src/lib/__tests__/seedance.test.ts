@@ -6,7 +6,7 @@ vi.mock("@/lib/pricing-seedance/settings", async () => ({ seedancePricingSetting
 
 import { seedanceProvider, cleanWish } from "@/lib/generation/seedance";
 import { buildKlingDirectPrompt } from "@/lib/generation/kling";
-import { seedanceSlots, seedanceOutputSec, parseSeedanceConfig, swapObjectsFromFound } from "@/lib/templates/seedance-config";
+import { seedanceSlots, seedanceOutputSec, parseSeedanceConfig } from "@/lib/templates/seedance-config";
 import { klingUnits, seedanceCostUsd, seedanceAutoPriceKzt, seedancePriceKzt, applySeedancePricing, DEFAULT_SEEDANCE_PRICING as S } from "@/lib/pricing-seedance";
 
 describe("Kling 4.0 pricing (real bills)", () => {
@@ -32,20 +32,7 @@ describe("config", () => {
     expect(c.aspectRatio).toBe("9:16");
     expect(c.people).toBe(2);
     expect(seedanceSlots(2).map((s) => s.providerInput)).toEqual(["img_1", "img_2"]);
-    const bound = seedanceSlots(2, "face_", [], [], ["elements/a.jpg", "elements/b.jpg"], ["face-a", "face-b"]);
-    expect(bound.map((s) => [s.providerInput, s.klingId, s.previewImagePath])).toEqual([
-      ["img_1", "face-a", "elements/a.jpg"],
-      ["img_2", "face-b", "elements/b.jpg"],
-    ]);
-    expect(parseSeedanceConfig({ people: 2, klingElements: [{ id: "face-a", previewPath: "elements/a.jpg" }] }).klingElements[0].id).toBe("face-a");
-    expect(parseSeedanceConfig({ people: 1 }).foundElements).toEqual([]);
-    expect(swapObjectsFromFound([
-      { kind: "person", what: "person", label: "Человек" },
-      { kind: "object", what: "cake", label: "Торт" },
-      { kind: "object", what: "car", label: "Машина" },
-      { kind: "outfit", what: "outfit", label: "Одежда" },
-    ])).toEqual([{ what: "cake", label: "Фото: Торт" }, { what: "car", label: "Фото машины" }]);
-    expect(swapObjectsFromFound([{ kind: "outfit", what: "outfit", label: "Одежда" }])).toEqual([{ what: "outfit", label: "Фото одежды" }]);
+    expect(parseSeedanceConfig({ people: 2, klingElements: [{ id: "face-a", previewPath: "elements/a.jpg" }] }).people).toBe(2);
     expect(seedanceOutputSec(2)).toBe(3);
     expect(seedanceOutputSec(40)).toBe(30);
   });

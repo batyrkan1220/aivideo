@@ -131,8 +131,7 @@ export function parseRow(r: Row, seedancePricing: SeedancePricing = DEFAULT_SEED
     previewAnimUrl: mediaUrl(r.preview_anim_path ?? null),
     isTrending: r.is_trending,
     category: cat ? { id: cat.id, title: cat.title_kk, slug: cat.slug } : null,
-    // Slot preview images (if any) as absolute public URLs, so any component can show them.
-    faceSlots: orderedSlots(slots.data).map((s) => (s.previewImagePath ? { ...s, previewImagePath: mediaUrl(s.previewImagePath)! } : s)),
+    faceSlots: orderedSlots(slots.data).map(({ previewImagePath: _preview, klingId: _kling, ...s }) => s),
     qualities: qualities.data,
     pricing: pricing.data,
     maxUploadBytes: r.max_upload_bytes,

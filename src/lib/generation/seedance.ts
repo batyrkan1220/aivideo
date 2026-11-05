@@ -58,8 +58,7 @@ export const seedanceProvider: GenerationProvider = {
     const durationSec = Number(extra.durationSec);
     const photos = input.faces.map((f) => f.imageUrl).slice(0, SEEDANCE_MAX_REFS);
     // People first (img_1…img_n), then the things to swap (car, horse, outfit…).
-    // Slot i is the client photo bound to klingElements[i].id (the person Kling found in the template).
-    // The element sent to the video is created from that client photo, not from the template face.
+    // The element sent to the video is created from the client photo. How many people is the number set on the template.
     // Only photos that were actually uploaded count, so a car slot is never sent as a person.
     const declaredPeople = Math.min(SEEDANCE_MAX_PEOPLE, Math.max(1, cfg.people));
     const objects = cfg.objects.slice(0, Math.min(SEEDANCE_MAX_OBJECTS, Math.max(0, photos.length - declaredPeople)));

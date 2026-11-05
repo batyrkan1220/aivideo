@@ -10,8 +10,6 @@ import type { FaceSlot } from "./schema";
 export const SEEDANCE_MAX_PEOPLE = 5;
 /** Besides people: up to 2 things to swap (car, horse, outfit…), one customer photo each. */
 export const SEEDANCE_MAX_OBJECTS = 2;
-/** Photos shown after a full-video scan (people, clothes, and other things). */
-export const SEEDANCE_MAX_FOUND = 16;
 /** Kling 4.0 takes up to 10 reference images; we send people + objects. */
 export const SEEDANCE_MAX_REFS = SEEDANCE_MAX_PEOPLE + SEEDANCE_MAX_OBJECTS;
 
@@ -55,27 +53,6 @@ export const seedanceConfigSchema = z.object({
   positions: z.array(z.string().trim().max(60)).max(5).default([]),
   /** Things in the video to replace with the customer's photos (after the people). */
   objects: z.array(objectSchema).max(SEEDANCE_MAX_OBJECTS).catch([]).default([]),
-  /**
-   * People Kling found in the template video, in slot order.
-   * elements[0].id is the person client photo 1 replaces, elements[1].id is photo 2, and so on.
-   */
-  klingElements: z.array(z.object({
-    id: z.string().trim().min(1).max(80),
-    previewPath: z.string().trim().min(1).max(2000),
-    startMs: z.number().int().min(0).max(120_000).optional(),
-    endMs: z.number().int().min(0).max(120_000).optional(),
-  })).max(SEEDANCE_MAX_PEOPLE).catch([]).default([]),
-  /**
-   * Everything the browser scan showed: people, clothing, and other things, with a photo each.
-   * People still become the photo slots. At most two non-people become `objects` (the customer upload).
-   * These records are not sent to Kling.
-   */
-  foundElements: z.array(z.object({
-    kind: z.enum(["person", "outfit", "object"]),
-    what: z.string().trim().min(1).max(40),
-    label: z.string().trim().min(1).max(40),
-    previewPath: z.string().trim().min(1).max(300),
-  })).max(SEEDANCE_MAX_FOUND).catch([]).default([]),
 });
 export type SeedanceConfig = z.infer<typeof seedanceConfigSchema>;
 export type SeedanceMode = "kd";
@@ -93,31 +70,14 @@ export function seedanceSlotLabel(i: number, n: number) {
   return n === 1 ? "Ваше фото" : `${i + 1}-й человек (слева)`;
 }
 
-/** The two customer "replace this thing" slots. Largest objects first, then clothing. One slot per kind of thing. */
-export function swapObjectsFromFound(items: { kind: "person" | "outfit" | "object"; what: string; label: string }[]): SwapObject[] {
-  const ordered = [...items.filter((i) => i.kind === "object"), ...items.filter((i) => i.kind === "outfit")];
-  const unique: typeof ordered = [];
-  for (const t of ordered) {
-    if (unique.some((u) => u.what === t.what)) continue;
-    unique.push(t);
-  }
-  return unique.slice(0, SEEDANCE_MAX_OBJECTS).map((t) => {
-    const preset = Object.values(OBJECT_PRESETS).find((p) => p.en === t.what);
-    const label = preset?.ru ?? (t.label.startsWith("Фото") ? t.label : `Фото: ${t.label}`);
-    return { what: t.what.slice(0, 40), label: label.slice(0, 40) };
-  });
-}
-
 /** Customer upload slots. providerInput = `img_<n>` (= @image_<n> in the prompt). People first, then objects. */
-export function seedanceSlots(n: number, keyPrefix = "face_", labels: string[] = [], objects: SwapObject[] = [], previews: string[] = [], klingIds: string[] = []): FaceSlot[] {
+export function seedanceSlots(n: number, keyPrefix = "face_", labels: string[] = [], objects: SwapObject[] = []): FaceSlot[] {
   const people: FaceSlot[] = Array.from({ length: n }, (_, i) => ({
     key: `${keyPrefix}${i + 1}`,
     labelKk: labels[i]?.trim() || seedanceSlotLabel(i, n),
     position: { x: (i + 1) / (n + 1), y: 0.42 },
     providerInput: `img_${i + 1}`,
     order: i,
-    ...(previews[i] ? { previewImagePath: previews[i] } : {}),
-    ...(klingIds[i] ? { klingId: klingIds[i] } : {}),
   }));
   const things: FaceSlot[] = objects.slice(0, SEEDANCE_MAX_OBJECTS).map((o, j) => ({
     key: `obj_${j + 1}`,

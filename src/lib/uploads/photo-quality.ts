@@ -62,7 +62,7 @@ export function faceIssues(faces: FaceWidths, framing: Framing): PhotoIssue[] {
 
 // Tiny Face Detector (face-api, ~190 KB model in /models/face), loaded on the first photo only.
 let faceApi: Promise<typeof import("@vladmandic/face-api") | null> | null = null;
-export function loadFaceApi() {
+function loadFaceApi() {
   faceApi ??= (async () => {
     try {
       const fa = await import("@vladmandic/face-api/dist/face-api.esm.js");
@@ -170,102 +170,5 @@ export async function checkPhoto(file: File, framing: Framing = "auto"): Promise
     return issues;
   } catch {
     return [];
-  }
-}
-
-export type VideoPerson = { x: number; size: number; image: Blob | null }; // face centre (0..1 from the left), face width / frame width
-
-/** Evenly spaced times from the start of the video to the end, so a person who appears only later is still found. */
-function videoSampleTimes(duration: number): number[] {
-  const d = Number.isFinite(duration) && duration > 0.4 ? duration : 1;
-  const end = Math.max(0.2, d - 0.12);
-  const count = Math.min(30, Math.max(1, Math.round(d)));
-  if (count === 1) return [Math.min(0.4, end)];
-  return Array.from({ length: count }, (_, i) => 0.2 + ((end - 0.2) * i) / (count - 1));
-}
-
-function faceJpeg(source: HTMLCanvasElement, box: Box): Promise<Blob | null> {
-  const pad = Math.max(box.w, box.h) * 0.45;
-  const side = Math.max(box.w, box.h) + pad * 2;
-  const sx = Math.max(0, Math.min(box.x + box.w / 2 - side / 2, source.width - 1));
-  const sy = Math.max(0, Math.min(box.y + box.h / 2 - side / 2, source.height - 1));
-  const sw = Math.min(side, source.width - sx);
-  const sh = Math.min(side, source.height - sy);
-  const out = document.createElement("canvas");
-  out.width = out.height = 512;
-  const ctx = out.getContext("2d");
-  if (!ctx || sw < 2 || sh < 2) return Promise.resolve(null);
-  ctx.drawImage(source, sx, sy, sw, sh, 0, 0, 512, 512);
-  return new Promise((res) => out.toBlob((b) => res(b), "image/jpeg", 0.9));
-}
-
-function seekVideo(v: HTMLVideoElement, t: number): Promise<void> {
-  const end = Number.isFinite(v.duration) ? Math.max(0, v.duration - 0.05) : t;
-  const target = Math.min(Math.max(0, t), end);
-  if (Math.abs(v.currentTime - target) < 0.04) return Promise.resolve();
-  return new Promise((res) => {
-    const done = () => { v.onseeked = null; clearTimeout(timer); res(); };
-    const timer = setTimeout(done, 2000);
-    v.onseeked = done;
-    v.currentTime = target;
-  });
-}
-
-/**
- * Template editor: every person who appears anywhere in the video, as one @element each.
- * Faces are followed from the first frame to the last. The same person keeps one slot;
- * someone who shows up only in another part of the video gets the next slot. Left → right.
- * null = detector unavailable.
- */
-export async function detectVideoPeople(videoUrl: string): Promise<VideoPerson[] | null> {
-  const fa = await loadFaceApi();
-  if (!fa) return null;
-  const v = document.createElement("video");
-  v.muted = true; v.playsInline = true; v.preload = "auto"; v.crossOrigin = "anonymous"; v.src = videoUrl;
-  try {
-    await new Promise<void>((res, rej) => { v.onloadeddata = () => res(); v.onerror = () => rej(new Error("load")); });
-    const c = document.createElement("canvas");
-    const W = Math.min(960, v.videoWidth || 720);
-    c.width = W; c.height = Math.round(W * ((v.videoHeight || 1280) / (v.videoWidth || 720)));
-    const ctx = c.getContext("2d");
-    if (!ctx) return null;
-    const H = c.height;
-    type Track = { x: number; y: number; size: number; n: number; image: Blob | null };
-    const tracks: Track[] = [];
-    for (const t of videoSampleTimes(v.duration || 1)) {
-      await seekVideo(v, t);
-      ctx.drawImage(v, 0, 0, c.width, c.height);
-      const boxes = mergeBoxes([], (await fa.detectAllFaces(c, new fa.TinyFaceDetectorOptions({ inputSize: 608, scoreThreshold: 0.45 })))
-        .map((f) => ({ x: f.box.x, y: f.box.y, w: f.box.width, h: f.box.height }))).filter((b) => b.w / W > 0.03);
-      const faces = boxes
-        .map((b) => ({ box: b, x: (b.x + b.w / 2) / W, y: (b.y + b.h / 2) / H, size: b.w / W }))
-        .sort((a, b) => b.size - a.size);
-      const used = new Set<number>();
-      for (const face of faces) {
-        let best = -1;
-        let bestDist = 0.35;
-        tracks.forEach((tr, i) => {
-          if (used.has(i)) return;
-          const dist = Math.hypot(tr.x - face.x, tr.y - face.y);
-          if (dist < bestDist) { best = i; bestDist = dist; }
-        });
-        const shot = face.size >= (best >= 0 ? tracks[best].size : 0) ? await faceJpeg(c, face.box) : null;
-        if (best >= 0) {
-          const tr = tracks[best];
-          used.add(best);
-          tr.x = (tr.x * tr.n + face.x) / (tr.n + 1);
-          tr.y = (tr.y * tr.n + face.y) / (tr.n + 1);
-          if (face.size >= tr.size && shot) tr.image = shot;
-          tr.size = Math.max(tr.size, face.size);
-          tr.n += 1;
-        } else if (tracks.length < 8) {
-          tracks.push({ x: face.x, y: face.y, size: face.size, n: 1, image: shot });
-          used.add(tracks.length - 1);
-        }
-      }
-    }
-    return tracks.map((tr) => ({ x: tr.x, size: tr.size, image: tr.image })).sort((a, b) => a.x - b.x);
-  } catch {
-    return null;
   }
 }

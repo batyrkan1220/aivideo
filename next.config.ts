@@ -14,8 +14,7 @@ const ads = {
 };
 const csp = [
   "default-src 'self'",
-  // wasm-unsafe-eval: the admin element scan compiles its local vision model.
-  `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://telegram.org ${ads.script}`,
+  `script-src 'self' 'unsafe-inline' https://telegram.org ${ads.script}`,
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: ${supabase} ${ads.img}`,
   `media-src 'self' blob: ${supabase}`,
@@ -39,8 +38,6 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  // ffmpeg binary for light card previews: resolved from node_modules at runtime, not bundled.
-  serverExternalPackages: ["ffmpeg-static"],
   // The separate catalog page was merged into the home feed.
   async redirects() {
     return [{ source: "/templates", destination: "/", permanent: false }];

@@ -1,14 +1,10 @@
 "use server";
 import { clearMemo } from "@/lib/cache/memo";
-import { SEEDANCE_MAX_PEOPLE, SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC } from "@/lib/templates/seedance-config";
+import { SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC } from "@/lib/templates/seedance-config";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { audit, requirePermission, ForbiddenError } from "@/lib/auth/session";
-import { env } from "@/lib/env";
-import { identifyKlingFaces } from "@/lib/generation/kling";
-import { klingScanFile } from "@/lib/generation/kling-scan";
-import { ProviderError } from "@/lib/generation/types";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import {
   templateInputSchema, publishProblems, rowToInput, inputToRow, type PublishProblem,
@@ -250,90 +246,4 @@ export async function createUploadUrl(raw: unknown) {
   const { data, error } = await supabaseAdmin().storage.from("template-media").createSignedUploadUrl(path);
   if (error) { console.error("[admin.upload]", error.message); return { ok: false as const }; }
   return { ok: true as const, path: data.path, token: data.token };
-}
-
-export type KlingElementSlot = { id: string; previewPath: string; startMs: number; endMs: number };
-
-/** Kling reads the whole template video and returns one id + photo per person. Photo 1 binds to the first id. */
-export async function detectKlingElements(videoPath: string): Promise<
-  { ok: true; total: number; elements: KlingElementSlot[] } | { ok: false; error: "forbidden" | "none" | "balance" | "video" | "failed" }
-> {
-  const user = await guard("templates.manage");
-  if (!user) return { ok: false, error: "forbidden" };
-  const videoUrl = templateVideoUrl(videoPath);
-  if (!videoUrl) return { ok: false, error: "failed" };
-  const prepared = await uploadKlingScan(videoUrl);
-  const scanUrl = prepared?.url ?? videoUrl;
-  let faces: Awaited<ReturnType<typeof identifyKlingFaces>> | null = null;
-  try {
-    try {
-      faces = await identifyKlingFaces(scanUrl);
-    } catch (e) {
-      const code = e instanceof ProviderError ? e.code : "failed";
-      if (code === "provider_http_429") {
-        await new Promise((r) => setTimeout(r, 2000));
-        try { faces = await identifyKlingFaces(scanUrl); } catch (again) {
-          return { ok: false, error: elementError(again) };
-        }
-      } else return { ok: false, error: elementError(e) };
-    }
-  } finally {
-    if (prepared) await supabaseAdmin().storage.from("template-media").remove([prepared.path]).catch(() => undefined);
-  }
-  if (!faces) return { ok: false, error: "failed" };
-  if (!faces.length) return { ok: false, error: "none" };
-  const kept = [...faces].sort((a, b) => (b.endMs - b.startMs) - (a.endMs - a.startMs)).slice(0, SEEDANCE_MAX_PEOPLE);
-  kept.sort((a, b) => a.startMs - b.startMs || a.faceId.localeCompare(b.faceId));
-  const elements: KlingElementSlot[] = [];
-  for (const face of kept) {
-    const stored = await storeKlingFace(face.imageUrl);
-    elements.push({ id: face.faceId, previewPath: stored ?? face.imageUrl, startMs: face.startMs, endMs: face.endMs });
-  }
-  return { ok: true, total: faces.length, elements };
-}
-
-function elementError(e: unknown): "balance" | "video" | "failed" {
-  const code = e instanceof ProviderError ? e.code : "failed";
-  console.error("[admin.element]", code, e instanceof ProviderError ? e.message : "");
-  if (code === "provider_no_balance") return "balance";
-  if (code === "provider_bad_params") return "video";
-  return "failed";
-}
-
-/** Public copy without the 0×0 audio track, so Kling measures the picture. */
-async function uploadKlingScan(videoUrl: string): Promise<{ url: string; path: string } | null> {
-  const file = await klingScanFile(videoUrl);
-  if (!file) return null;
-  const path = `elements/scan-${randomUUID()}.mp4`;
-  const { error } = await supabaseAdmin().storage.from("template-media").upload(path, file, { contentType: "video/mp4", upsert: false });
-  if (error) { console.error("[admin.element] scan upload", error.message); return null; }
-  return { path, url: `${env().NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/template-media/${path}` };
-}
-
-function templateVideoUrl(path: string): string | null {
-  const raw = path.trim();
-  const base = `${env().NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/template-media`;
-  if (raw.startsWith(`${base}/previews/`)) return raw;
-  if (/^https?:/i.test(raw) || raw.includes("..") || !/^previews\/[A-Za-z0-9._-]+$/.test(raw)) return null;
-  return `${base}/${raw}`;
-}
-
-async function storeKlingFace(url: string): Promise<string | null> {
-  if (!/^https:\/\//i.test(url)) return null;
-  let res: Response;
-  try {
-    res = await fetch(url, { signal: AbortSignal.timeout(20_000), cache: "no-store" });
-  } catch {
-    return null;
-  }
-  if (!res.ok) return null;
-  const type = (res.headers.get("content-type") ?? "image/jpeg").split(";")[0].trim().toLowerCase();
-  const mime = type === "image/png" ? "image/png" : type === "image/webp" ? "image/webp" : "image/jpeg";
-  const ext = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.length < 100 || buf.length > 5 * 1024 * 1024) return null;
-  const path = `elements/${randomUUID()}.${ext}`;
-  const { error } = await supabaseAdmin().storage.from("template-media").upload(path, buf, { contentType: mime, upsert: false });
-  if (error) { console.error("[admin.element] store", error.message); return null; }
-  return path;
 }
