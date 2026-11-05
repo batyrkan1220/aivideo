@@ -69,7 +69,7 @@ export const seedanceProvider: GenerationProvider = {
     const elementTaskId = await createKlingFaceElement(photos[0]);
     const state: ProviderState = {
       stage: "element", videoUrl: input.templateVideoUrl, photoUrls: photos, people,
-      elementIds: [], prompt, durationSec, aspectRatio: cfg.aspectRatio, resolution,
+      elementIds: [], prompt, durationSec, aspectRatio: cfg.aspectRatio, resolution, mode: cfg.klingMode,
     };
     return { providerJobId: elementTaskId, cost: seedanceCostUsd(durationSec, await seedancePricingSettings(), {}, resolution), state };
   },
@@ -88,7 +88,8 @@ export const seedanceProvider: GenerationProvider = {
       return { state: "processing", next: { providerJobId: taskId, state: { ...lock, elementIds } as ProviderState } };
     }
     const id = await submitKlingOmni({
-      videoUrl: lock.videoUrl, photoUrls: lock.photoUrls, elementIds, mode: "edit",
+      videoUrl: lock.videoUrl, photoUrls: lock.photoUrls, elementIds, peopleCount: lock.people,
+      mode: lock.mode === "reference" ? "reference" : "edit",
       prompt: lock.prompt, durationSec: lock.durationSec, aspectRatio: lock.aspectRatio, resolution: lock.resolution,
     });
     return { state: "processing", next: { providerJobId: id, state: { stage: "klingd" } } };
@@ -105,6 +106,7 @@ type FaceLockState = {
   durationSec: number;
   aspectRatio: string;
   resolution: "720p" | "1080p";
+  mode?: "edit" | "reference";
 };
 
 function faceLockState(s: ProviderState): FaceLockState | null {

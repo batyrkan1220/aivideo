@@ -44,9 +44,8 @@ export type KlingMode = "edit" | "reference";
 /** Edit = the template video itself is edited (scene 1:1); reference = a new video following its motion. */
 export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "template", adminPrompt: string, wish: string, people = 1, positions: string[] = [], objects: { what: string }[] = []): string {
   // Priority: the template rules (identity, clothing, admin instruction) are mandatory; the customer's wish is applied only where it does not contradict them.
-  // @element_N is the locked character. @image_N is that same person's photo. @video_1 must not supply a face.
+  // People are elements only. @image_N is reserved for things (car, horse, outfit), never a face.
   const faces = Array.from({ length: people }, (_, i) => `@element_${i + 1}`);
-  const photos = Array.from({ length: people }, (_, i) => `@image_${i + 1}`);
   // Things to swap (car, horse, outfit…): their photos come right after the people's.
   const things = objects.map((o, j) => ({ what: o.what.trim().toLowerCase(), ref: `@image_${people + j + 1}` }));
   const outfitRef = things.find((t) => ["outfit", "clothes", "clothing"].includes(t.what))?.ref;
@@ -54,21 +53,20 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   const look = outfitRef
     ? `Dress the ${people === 1 ? "person" : "people"} in the outfit shown in ${outfitRef}: the same garments, colors, fabric and details, fitted naturally to the body. ${outfitRef} is a photo of clothing, not a person. Do not take the clothing from @video_1.`
     : outfit === "template"
-    ? "Clothing follows @video_1: the same garments, costume, colors and details, fitted to each person's body. Do not copy the face from @video_1."
-    : `Clothing follows the customer photos (${photos.join(", ")}). Do not use the clothing from @video_1.`;
+    ? `Clothing follows @video_1: the same garments, costume, colors and details, fitted to each person's body. The face stays ${faces.join(" and ")}.`
+    : `Clothing follows ${faces.join(", ")}. Do not use the clothing from @video_1.`;
   const who = people === 1
     ? "replace the main person with the person from @element_1."
     : `replace ${faces.map((r, i) => `the person ${positions[i]?.trim() || `number ${i + 1} from the left`} with the person from ${r}`).join(", and ")}.`;
   const same = [
-    `Each person must look 100% identical to their character (${faces.join(", ")}) and their photo (${photos.join(", ")}) in every frame from the first second through the last: preserve the facial features, face shape, eyes, eyebrows, nose, mouth, teeth, ears, moles, hairstyle, hair color, skin tone, age and body proportions exactly.`,
-    "Keep the identity consistent from every angle — front, three-quarter, profile, looking up and looking down: the same skull and face shape, forehead, jawline and chin, cheekbones, nose bridge and nose profile, lip shape and ear shape. When the photo does not show a side of the face, reconstruct it so it still matches that same person.",
-    "Natural, realistic skin with real texture and pores, scars, birthmarks and natural facial asymmetry kept. Do not beautify, slim, smooth, stylize or change the faces; no filters.",
-    "The likeness must hold through the whole video, including the final seconds: when the head turns, the shot changes, or the person is seen from the side, keep this same person. Never restore or blend in the original face from @video_1.",
+    `The face and identity of each person must strictly match ${faces.join(", ")} continuously and consistently throughout the entire duration of the clip, from the opening frame to the very last millisecond.`,
+    `Maintain 100% facial persistence and identity lock of ${faces.join(", ")} during all motion, head turns, rotation, side angles, close-ups and scene transitions.`,
+    `No facial morphing, no distortion, and absolutely no regression to any face present in @video_1. The human subject in @video_1 is solely a motion reference.`,
   ].join(" ");
-  const motion = "@video_1 supplies the camera, body movement, timing, location, background, lighting, framing, cuts and sound. The face in @video_1 is not a character and must not appear in any frame, from the first second through the last.";
+  const motion = `@video_1 is strictly a skeleton / motion-only guide with zero facial likeness: camera, body movement, timing, location, background, lighting, framing, cuts and sound. ${faces.join(" and ")} face identity lock must persist 100% until the very last frame.`;
   const parts = mode === "edit"
     ? [
-        `Use ${faces.join(" and ")} as the only ${people === 1 ? "character" : "characters"}. ${photos.join(" and ")} ${people === 1 ? "is a photo of that same person" : "are photos of those same people"}. ${who[0].toUpperCase()}${who.slice(1)}`,
+        `Use ${faces.join(" and ")} as the only ${people === 1 ? "character" : "characters"}. ${who[0].toUpperCase()}${who.slice(1)}`,
         same,
         look,
         motion,
@@ -132,18 +130,21 @@ export async function getKlingElement(taskId: string): Promise<{ state: "process
   return { state: "processing" };
 }
 
-export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: string[]; elementIds?: string[]; mode: KlingMode; prompt: string; durationSec: number; aspectRatio: string; resolution?: "720p" | "1080p" }): Promise<string> {
+export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: string[]; elementIds?: string[]; peopleCount?: number; mode: KlingMode; prompt: string; durationSec: number; aspectRatio: string; resolution?: "720p" | "1080p" }): Promise<string> {
   const duration = Math.min(30, Math.max(3, Math.round(opts.durationSec)));
+  const people = Math.max(0, opts.peopleCount ?? opts.elementIds?.length ?? 1);
+  // People are already locked as elements. refer_image is only for things that come after them.
+  const objectPhotos = opts.photoUrls.slice(people);
   const d = await call<{ data?: { id?: string } }>("/omni-video/kling-4.0", {
     method: "POST",
     body: JSON.stringify({
       contents: [
         { type: "prompt", text: opts.prompt },
         // feature_video is motion and scene. The element locks the client's face for the whole video.
-        // base_video would edit the original person, so the client's face never replaces it.
+        // A person photo sent again as refer_image fights that lock and the template face returns later.
         { type: "feature_video", url: opts.videoUrl, id: "video_1" },
         ...(opts.elementIds ?? []).map((elementId, i) => ({ type: "element", element_id: String(elementId), id: `element_${i + 1}` })),
-        ...opts.photoUrls.slice(0, 7).map((url, i) => ({ type: "refer_image", url, id: `image_${i + 1}` })),
+        ...objectPhotos.map((url, i) => ({ type: "refer_image", url, id: `image_${people + i + 1}` })),
       ],
       // Vertical 720p for phones (1080p when the customer paid for Full HD) unless the template asks for another format.
       settings: { resolution: opts.resolution === "1080p" ? "1080p" : "720p", duration, aspect_ratio: ["16:9", "1:1", "21:9"].includes(opts.aspectRatio) ? opts.aspectRatio : "9:16" },

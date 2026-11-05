@@ -9,15 +9,15 @@ describe("Kling prompt priorities", () => {
     expect(p).toContain("Mandatory template instruction: national costume");
     expect(p.indexOf("Mandatory template instruction")).toBeLessThan(p.indexOf("Optional customer wish"));
     expect(p).toMatch(/ignore any part that asks to change the faces or the clothing/);
-    expect(p).toContain("including the final seconds");
+    expect(p).toContain("very last millisecond");
     expect(p).toContain("Use @element_1 as the only character");
-    expect(p).toContain("must not appear in any frame");
+    expect(p).toContain("motion-only guide");
   });
 
   it("adds no wish section when the customer wrote nothing", () => {
     const p = buildKlingDirectPrompt("edit", "photo", "", "");
     expect(p).not.toContain("customer wish");
-    expect(p).toContain("Clothing follows the customer photos (@image_1)");
+    expect(p).toContain("Clothing follows @element_1");
     expect(p).toContain("Do not use the clothing from @video_1");
     expect(p).not.toContain("Clothing follows @video_1");
   });
@@ -62,7 +62,8 @@ describe("Kling prompt with things to swap", () => {
     const p = buildKlingDirectPrompt("edit", "photo", "", "", 1, [], [{ what: "car" }]);
     expect(p).toContain("@image_2 is a photo of a car, not a person");
     expect(p).toContain("Replace the car in @video_1 with the car from @image_2");
-    expect(p).toContain("photo (@image_1)");
+    expect(p).toContain("identity lock of @element_1");
+    expect(p).not.toContain("@image_1");
   });
   it("keeps three people as characters and a horse or outfit as their own photos", () => {
     const p = buildKlingDirectPrompt("edit", "template", "", "", 3, ["on the left", "in the center", "on the right"], [{ what: "horse" }, { what: "outfit" }]);
