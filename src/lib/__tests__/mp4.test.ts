@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mp4DurationSec, sniffVideoType } from "@/lib/custom-video/mp4";
+import { moovLocation, mp4DurationSec, sniffVideoType } from "@/lib/custom-video/mp4";
 
 function box(type: string, payload: Uint8Array) {
   const b = new Uint8Array(8 + payload.length);
@@ -28,5 +28,16 @@ describe("mp4", () => {
   });
   it("returns null without moov", () => {
     expect(mp4DurationSec(cat(ftyp("isom"), box("mdat", new Uint8Array(10))))).toBeNull();
+  });
+  it("finds moov after a box that is larger than the prefix", () => {
+    const head = cat(ftyp("isom"), box("mdat", new Uint8Array(50)).slice(0, 20));
+    expect(moovLocation(head)).toEqual({ start: ftyp("isom").length + 50 + 8, size: 0 });
+  });
+  it("finds a moov that is already in the prefix", () => {
+    const file = cat(ftyp("isom"), box("moov", mvhd(1000, 3000)));
+    const loc = moovLocation(file);
+    expect(loc?.start).toBe(ftyp("isom").length);
+    expect(loc && loc.size > 0).toBe(true);
+    expect(mp4DurationSec(file)).toBe(3);
   });
 });

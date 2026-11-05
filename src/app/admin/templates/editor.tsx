@@ -7,7 +7,7 @@ import { supabaseBrowser } from "@/lib/supabase/client";
 import type { TemplateInput, PublishProblem } from "@/lib/templates/admin-schema";
 import { autoFaceSlots } from "@/lib/templates/schema";
 import { validateTemplateForm, firstErrorKey, type FieldErrors } from "@/lib/templates/editor-validation";
-import { OBJECT_PRESETS, parseSeedanceConfig, seedanceSlots, SEEDANCE_MAX_OBJECTS, SEEDANCE_MAX_PEOPLE, type SeedanceConfig } from "@/lib/templates/seedance-config";
+import { OBJECT_PRESETS, parseSeedanceConfig, seedanceSlots, SEEDANCE_MAX_OBJECTS, SEEDANCE_MAX_PEOPLE, SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC, type SeedanceConfig } from "@/lib/templates/seedance-config";
 import { calculatePrice, formatKzt } from "@/lib/pricing";
 import { seedancePriceKzt, seedanceCostKzt, SEEDANCE_QUALITY, type SeedancePricing } from "@/lib/pricing-seedance";
 import { FaceMap } from "@/components/face-map";
@@ -84,6 +84,7 @@ export function TemplateEditor({
 }) {
   const router = useRouter();
   const [duration, setDuration] = useState<number | null>(null);
+  const [aspect, setAspect] = useState<number | null>(null);
   // Every template is a Seedance template: one quality (720p), Seedance provider and config.
   const [t, setT] = useState<TemplateInput>(() => ({ ...initial, providerKey: "seedance", qualities: [SEEDANCE_QUALITY] }));
   // Template video length → automatic price preview.
@@ -91,7 +92,10 @@ export function TemplateEditor({
     if (!t.previewVideoPath) return;
     const v = document.createElement("video");
     v.preload = "metadata";
-    v.onloadedmetadata = () => setDuration(Number.isFinite(v.duration) ? v.duration : null);
+    v.onloadedmetadata = () => {
+      setDuration(Number.isFinite(v.duration) ? v.duration : null);
+      setAspect(v.videoWidth > 0 && v.videoHeight > 0 ? Math.round((v.videoWidth / v.videoHeight) * 10000) / 10000 : null);
+    };
     v.src = /^https?:/.test(t.previewVideoPath) ? t.previewVideoPath : `${mediaBase}/${t.previewVideoPath}`;
     return () => { v.onloadedmetadata = null; v.removeAttribute("src"); };
   }, [t.previewVideoPath, mediaBase]);
@@ -160,12 +164,11 @@ export function TemplateEditor({
     const payload = isPhoto
       ? { ...t, coverAssetPath: cover, previewVideoPath: null, providerKey: PHOTO_PROVIDER, providerConfig: ph, faceSlots: sent, qualities: [PHOTO_QUALITY] }
       : { ...t, coverAssetPath: cover, providerKey: "seedance", providerConfig: sd, faceSlots: sent };
-    const r = await saveTemplate(payload, id);
+    const r = await saveTemplate(payload, id, { durationSec: duration, aspect });
     if (!r.ok) {
-      setMsg({ kind: "err", text: r.error === "forbidden" ? ru.admin.forbidden : r.error === "invalid" ? e.invalid : ru.errors.generic });
+      setMsg({ kind: "err", text: r.error === "too_long" ? e.durationBad : r.error === "forbidden" ? ru.admin.forbidden : r.error === "invalid" ? e.invalid : ru.errors.generic });
       return null;
     }
-    if (r.videoPath) { setT((p) => ({ ...p, previewVideoPath: r.videoPath! })); setMsg({ kind: "ok", text: e.trimmed }); }
     setDirty(false);
     return r.id;
   };
@@ -174,7 +177,7 @@ export function TemplateEditor({
     const savedId = await persist(false);
     if (!savedId) return;
     setMode(null);
-    setMsg((m) => (m?.kind === "ok" && m.text === e.trimmed ? m : { kind: "ok", text: e.saved }));
+    setMsg({ kind: "ok", text: e.saved });
     if (!id) router.replace(`/admin/templates/${savedId}`);
     else router.refresh();
   });
@@ -251,7 +254,7 @@ export function TemplateEditor({
       <Section title={e.sections.media}>
         {isPhoto
           ? <PhotoExampleField error={err("cover")} path={t.coverAssetPath} mediaBase={mediaBase} onUploaded={(p) => set("coverAssetPath", p)} />
-          : <VideoField error={err("preview")} path={t.previewVideoPath} mediaBase={mediaBase} onUploaded={(p) => { set("previewVideoPath", p); void detectPeople(p); }} onCover={(p) => set("coverAssetPath", p)} />}
+          : <VideoField error={err("preview")} path={t.previewVideoPath} mediaBase={mediaBase} onUploaded={(p, meta) => { set("previewVideoPath", p); setDuration(meta?.duration ?? null); setAspect(meta?.aspect ?? null); void detectPeople(p); }} onCover={(p) => set("coverAssetPath", p)} />}
       </Section>
 
       {isPhoto ? (
@@ -595,12 +598,40 @@ function PhotoExampleField({ error, path, mediaBase, onUploaded }: { error?: str
   );
 }
 
+function readVideoMeta(file: File): Promise<{ duration: number; aspect: number | null } | null> {
+  return new Promise((resolve) => {
+    const v = document.createElement("video");
+    const url = URL.createObjectURL(file);
+    const finish = (meta: { duration: number; aspect: number | null } | null) => {
+      URL.revokeObjectURL(url);
+      v.onloadedmetadata = null;
+      v.onerror = null;
+      v.removeAttribute("src");
+      resolve(meta);
+    };
+    const timer = setTimeout(() => finish(null), 8_000);
+    v.preload = "metadata";
+    v.onloadedmetadata = () => {
+      clearTimeout(timer);
+      const duration = Number.isFinite(v.duration) ? v.duration : null;
+      const aspect = v.videoWidth > 0 && v.videoHeight > 0 ? Math.round((v.videoWidth / v.videoHeight) * 10000) / 10000 : null;
+      finish(duration && duration > 0 ? { duration, aspect } : null);
+    };
+    v.onerror = () => { clearTimeout(timer); finish(null); };
+    v.src = url;
+  });
+}
+
 const VIDEO_TYPES = ["video/mp4", "video/webm"];
 const VIDEO_MAX = 50 * 1024 * 1024;
 
 function VideoField({
   error, path, mediaBase, onUploaded, onCover,
-}: { error?: string; path: string | null; mediaBase: string; onUploaded: (p: string) => void; onCover: (p: string | null) => void }) {
+}: {
+  error?: string; path: string | null; mediaBase: string;
+  onUploaded: (p: string, meta: { duration: number; aspect: number | null } | null) => void;
+  onCover: (p: string | null) => void;
+}) {
   const [busy, setBusy] = useState(false);
   const [uploadErr, setUploadErr] = useState<string | null>(null);
   const url = path ? (/^https?:/.test(path) ? path : `${mediaBase}/${path}`) : null;
@@ -610,6 +641,8 @@ function VideoField({
     if (!file) return;
     setUploadErr(null);
     if (!VIDEO_TYPES.includes(file.type) || file.size > VIDEO_MAX) { setUploadErr(e.badFile); return; }
+    const meta = await readVideoMeta(file);
+    if (meta && (meta.duration < SEEDANCE_MIN_SEC - 0.5 || meta.duration > SEEDANCE_MAX_SEC + 0.5)) { setUploadErr(e.durationBad); return; }
     setBusy(true);
     try {
       const r = await createUploadUrl({ kind: "preview", contentType: file.type, size: file.size });
@@ -617,7 +650,7 @@ function VideoField({
       const { error: upErr } = await supabaseBrowser().storage.from("template-media")
         .uploadToSignedUrl(r.path, r.token, file, { contentType: file.type });
       if (upErr) { setUploadErr(e.uploadFailed); return; }
-      onUploaded(r.path);
+      onUploaded(r.path, meta);
       // Cover for catalog cards, made from this video (best effort).
       const blob = await captureCover(file);
       onCover(blob ? await uploadCover(blob) : null);

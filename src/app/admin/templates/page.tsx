@@ -111,7 +111,6 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
                       {t.is_trending && <Badge color="lime">🔥 тренд</Badge>}
                       {t.category_id && catName.get(t.category_id) && <Badge>{catName.get(t.category_id)}</Badge>}
                       {!t.preview_video_path && <Badge color="red">нет видео</Badge>}
-                      {t.preview_video_path && (!t.preview_lite_path || !t.preview_anim_path) && <Badge color="amber">превью сжимается</Badge>}
                     </div>
                   </div>
                 </div>

@@ -18,6 +18,29 @@ function u32(b: Uint8Array, o: number) { return ((b[o] << 24) >>> 0) + (b[o + 1]
 function u64(b: Uint8Array, o: number) { return u32(b, o) * 2 ** 32 + u32(b, o + 4); }
 function type4(b: Uint8Array, o: number) { return String.fromCharCode(b[o], b[o + 1], b[o + 2], b[o + 3]); }
 
+/**
+ * Where `moov` sits, from a prefix of the file (often just the first boxes).
+ * `size` is 0 when the box starts after this buffer — the caller fetches that range only.
+ */
+export function moovLocation(b: Uint8Array): { start: number; size: number } | null {
+  let o = 0;
+  while (o + 8 <= b.length) {
+    let size = u32(b, o);
+    const t = type4(b, o + 4);
+    let header = 8;
+    if (size === 1) {
+      if (o + 16 > b.length) return null;
+      size = u64(b, o + 8);
+      header = 16;
+    } else if (size === 0) return { start: o, size: 0 };
+    if (size < header) return null;
+    if (t === "moov") return { start: o, size };
+    if (o + size > b.length) return { start: o + size, size: 0 };
+    o += size;
+  }
+  return o > 0 ? { start: o, size: 0 } : null;
+}
+
 /** Walks boxes in [start, end) and returns the payload range of the first box named `name`. */
 function findBox(b: Uint8Array, start: number, end: number, name: string): [number, number] | null {
   let o = start;
