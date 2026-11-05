@@ -50,11 +50,12 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   // Things to swap (car, horse, outfit…): their photos come right after the people's.
   const things = objects.map((o, j) => ({ what: o.what.trim().toLowerCase(), ref: `@image_${people + j + 1}` }));
   const outfitRef = things.find((t) => ["outfit", "clothes", "clothing"].includes(t.what))?.ref;
+  // Clothing comes only from the template setting. A dedicated outfit photo wins over that setting.
   const look = outfitRef
-    ? `Dress the ${people === 1 ? "person" : "people"} in the outfit shown in ${outfitRef}: the same garments, colors, fabric and details, fitted naturally to the body. ${outfitRef} is a photo of clothing, not a person.`
+    ? `Dress the ${people === 1 ? "person" : "people"} in the outfit shown in ${outfitRef}: the same garments, colors, fabric and details, fitted naturally to the body. ${outfitRef} is a photo of clothing, not a person. Do not take the clothing from @video_1.`
     : outfit === "template"
-    ? "Dress them in the garments from @video_1: the same clothes, colors and details, fitted to this person's body. Do not copy the face, hair or identity from @video_1."
-    : `Use the clothing of the people in ${photos.join(", ")}.`;
+    ? "Clothing follows @video_1: the same garments, costume, colors and details, fitted to each person's body. Do not copy the face from @video_1."
+    : `Clothing follows the customer photos (${photos.join(", ")}). Do not use the clothing from @video_1.`;
   const who = people === 1
     ? "replace the main person with the person from @element_1."
     : `replace ${faces.map((r, i) => `the person ${positions[i]?.trim() || `number ${i + 1} from the left`} with the person from ${r}`).join(", and ")}.`;
@@ -64,10 +65,10 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
     "Natural, realistic skin with real texture and pores, scars, birthmarks and natural facial asymmetry kept. Do not beautify, slim, smooth, stylize or change the faces; no filters.",
     "The likeness must hold through the whole video, including the final seconds: when the head turns, the shot changes, or the person is seen from the side, keep this same person. Never restore or blend in the original face from @video_1.",
   ].join(" ");
-  const motion = "@video_1 is motion and scene only: copy its camera, body movement, timing, location, background, objects, lighting, framing, cuts and sound. The face in @video_1 is not a character and must not appear in any frame, from the first second through the last.";
+  const motion = "@video_1 supplies the camera, body movement, timing, location, background, lighting, framing, cuts and sound. The face in @video_1 is not a character and must not appear in any frame, from the first second through the last.";
   const parts = mode === "edit"
     ? [
-        `Use ${faces.join(" and ")} as the only character. ${photos.join(" and ")} ${people === 1 ? "is a photo of that same person" : "are photos of those same people"}. ${who[0].toUpperCase()}${who.slice(1)}`,
+        `Use ${faces.join(" and ")} as the only ${people === 1 ? "character" : "characters"}. ${photos.join(" and ")} ${people === 1 ? "is a photo of that same person" : "are photos of those same people"}. ${who[0].toUpperCase()}${who.slice(1)}`,
         same,
         look,
         motion,
@@ -98,7 +99,7 @@ export async function createKlingFaceElement(photoUrl: string): Promise<string> 
   const d = await call<{ data?: { task_id?: string; id?: string } }>("/v1/general/advanced-custom-elements", {
     method: "POST",
     body: JSON.stringify({
-      element_name: `f${Date.now().toString(36)}`.slice(0, 20),
+      element_name: `f${Math.random().toString(36).slice(2, 10)}`.slice(0, 20),
       element_description: "This exact person. Keep the face unchanged in every frame.",
       reference_type: "image_refer",
       element_image_list: { frontal_image: photoUrl, refer_images: [{ image_url: photoUrl }] },

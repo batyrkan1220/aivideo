@@ -1,5 +1,5 @@
 import "server-only";
-import { seedanceConfigSchema, SEEDANCE_MAX_PEOPLE, SEEDANCE_MAX_REFS, SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC } from "@/lib/templates/seedance-config";
+import { seedanceConfigSchema, SEEDANCE_MAX_OBJECTS, SEEDANCE_MAX_PEOPLE, SEEDANCE_MAX_REFS, SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC } from "@/lib/templates/seedance-config";
 import { seedanceCostUsd } from "@/lib/pricing-seedance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { type GenerationProvider, type ProviderState } from "./types";
@@ -58,8 +58,10 @@ export const seedanceProvider: GenerationProvider = {
     const durationSec = Number(extra.durationSec);
     const photos = input.faces.map((f) => f.imageUrl).slice(0, SEEDANCE_MAX_REFS);
     // People first (img_1…img_n), then the things to swap (car, horse, outfit…).
-    const objects = cfg.objects.slice(0, Math.max(0, photos.length - 1));
-    const people = Math.min(SEEDANCE_MAX_PEOPLE, Math.max(1, photos.length - objects.length));
+    // Only photos that were actually uploaded count, so a car slot is never sent as a person.
+    const declaredPeople = Math.min(SEEDANCE_MAX_PEOPLE, Math.max(1, cfg.people));
+    const objects = cfg.objects.slice(0, Math.min(SEEDANCE_MAX_OBJECTS, Math.max(0, photos.length - declaredPeople)));
+    const people = Math.min(declaredPeople, Math.max(1, photos.length - objects.length));
     const prompt = buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : "", people, cfg.positions, objects);
     const resolution = input.quality === "1080p" ? "1080p" : "720p";
     // The photo becomes a character element first. A loose photo reference matches the opening
@@ -80,7 +82,9 @@ export const seedanceProvider: GenerationProvider = {
     if (el.state === "failed") return { state: "failed", errorCode: el.errorCode, retryable: false };
     const elementIds = [...lock.elementIds, el.elementId];
     if (elementIds.length < lock.people) {
-      const taskId = await createKlingFaceElement(lock.photoUrls[elementIds.length]);
+      const nextPhoto = lock.photoUrls[elementIds.length];
+      if (typeof nextPhoto !== "string" || !nextPhoto) return { state: "failed", errorCode: "missing_inputs", retryable: false };
+      const taskId = await createKlingFaceElement(nextPhoto);
       return { state: "processing", next: { providerJobId: taskId, state: { ...lock, elementIds } as ProviderState } };
     }
     const id = await submitKlingOmni({
