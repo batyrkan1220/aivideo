@@ -56,7 +56,12 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   const spot = (i: number) => `${positions[i]?.trim() || `number ${i + 1} from the left`}${shown(i)}`;
   const who = people === 1
     ? `Replace the main person${positions[0]?.trim() ? ` (${positions[0].trim()})` : ""}${shown(0)} in @video_1 with the person from @image_1.`
-    : `Replace ${refs.map((r, i) => `the person ${spot(i)} with the person from ${r}`).join(", and ")}. ${refs.join(", ")} are ${people} different people: do not swap, blend or mix their faces.`;
+    : [
+        `There are ${people} people to replace in @video_1. Replace every one of them, in every frame:`,
+        ...refs.map((r, i) => `- The person ${spot(i)} becomes the person from ${r}.`),
+        `All ${people} must be replaced; none of them may keep the face or look of the original person.`,
+        `${refs.join(", ")} are ${people} different people: each one goes only to their own place. Do not swap, blend or mix their faces.`,
+      ].join("\n");
   const same = [
     `The new ${people === 1 ? "person" : "people"} must look 100% identical to ${refs.join(", ")} in every frame, from the first frame to the very last: the same face shape, eyes, eyebrows, nose, lips, jaw, ears, moles, hairstyle, hair color, skin tone and age.`,
     "Keep the identity the same from every angle: front, three-quarter, profile, looking up and looking down. Never return to the original face from @video_1, also not in the last seconds.",
@@ -72,7 +77,9 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
         `Edit @video_1. ${who}`,
         same,
         look,
-        "Keep everything else in @video_1 unchanged: background, location, other people, objects, lighting, camera movement, framing, cuts, motion and timing.",
+        people === 1
+          ? "Keep everything else in @video_1 unchanged: background, location, other people, objects, lighting, camera movement, framing, cuts, motion and timing."
+          : `Apart from these ${people} people, keep everything in @video_1 unchanged: background, location, objects, lighting, camera movement, framing, cuts, motion and timing.`,
       ]
     : [
         "Follow the motion, actions, timing, camera movement, framing and cuts of @video_1, and recreate its location, background and lighting.",

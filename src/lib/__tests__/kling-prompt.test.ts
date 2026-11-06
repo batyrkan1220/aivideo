@@ -71,9 +71,11 @@ describe("Kling prompt with things to swap", () => {
   });
   it("three people by position, then a horse and an outfit", () => {
     const p = buildKlingDirectPrompt("edit", "template", "", "", 3, ["on the left", "in the center", "on the right"], [{ what: "horse" }, { what: "outfit" }]);
-    expect(p).toContain("the person on the left with the person from @image_1");
-    expect(p).toContain("the person on the right with the person from @image_3");
-    expect(p).toContain("@image_1, @image_2, @image_3 are 3 different people: do not swap, blend or mix their faces");
+    expect(p).toContain("- The person on the left becomes the person from @image_1.");
+    expect(p).toContain("- The person on the right becomes the person from @image_3.");
+    expect(p).toContain("All 3 must be replaced");
+    expect(p).not.toContain("other people");
+    expect(p).toContain("@image_1, @image_2, @image_3 are 3 different people: each one goes only to their own place");
     expect(p).toContain("@image_4 is a photo of a horse");
     expect(p).toContain("Dress the people in the outfit from @image_5");
     expect(p).not.toContain("Keep the clothing from @video_1");

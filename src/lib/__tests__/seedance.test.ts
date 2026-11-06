@@ -43,8 +43,8 @@ describe("config", () => {
   it("prompt: edit keeps the scene, maps several people by position", () => {
     const p = buildKlingDirectPrompt("edit", "photo", "", "", 2, ["the biggest one in the frame", "in the background"]);
     expect(p.startsWith("Edit @video_1.")).toBe(true);
-    expect(p).toContain("the person the biggest one in the frame with the person from @image_1");
-    expect(p).toContain("the person in the background with the person from @image_2");
+    expect(p).toContain("- The person the biggest one in the frame becomes the person from @image_1.");
+    expect(p).toContain("- The person in the background becomes the person from @image_2.");
   });
 });
 
@@ -81,22 +81,6 @@ describe("provider (Kling official API)", () => {
     expect(body.settings).toMatchObject({ resolution: "720p", duration: 8, aspect_ratio: "9:16", audio: "original" });
     expect(await seedanceProvider.getStatus("kt-1", { startedAt: null, state: r.state ?? null })).toEqual({ state: "succeeded", outputUrl: "https://kling.cdn/out.mp4" });
     expect(await seedanceProvider.getStatus("kt-1", { startedAt: null, state: r.state ?? null })).toMatchObject({ state: "failed", errorCode: "provider_content_rejected" });
-    vi.unstubAllGlobals();
-  });
-
-  it("adds the template cut-out after the customer's photo only when the toggle is on", async () => {
-    const bodies: { contents: { type: string; url?: string; text?: string }[] }[] = [];
-    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
-      bodies.push(JSON.parse(String(init?.body)));
-      return new Response(JSON.stringify({ code: 0, data: { id: "kt-3" } }), { status: 200 });
-    }));
-    await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { durationSec: 8, targets: ["targets/clear.jpg"], targetsKling: ["targets/a.jpg"], showTargets: true } });
-    await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { durationSec: 8, targets: ["targets/clear.jpg"], targetsKling: ["targets/a.jpg"] } });
-    const imgs = (b: (typeof bodies)[number]) => b.contents.filter((c) => c.type === "refer_image").map((c) => c.url);
-    expect(imgs(bodies[0])).toEqual(["https://s/1.jpg", "https://sb.test/storage/v1/object/public/template-media/targets/a.jpg"]);
-    expect(bodies[0].contents[0].text).toContain("shown in @image_2");
-    expect(imgs(bodies[1])).toEqual(["https://s/1.jpg"]);
-    expect(bodies[1].contents[0].text).not.toContain("cut-out");
     vi.unstubAllGlobals();
   });
 
@@ -142,10 +126,11 @@ describe("provider (Kling official API)", () => {
       if (init?.body) bodies.push(JSON.parse(String(init.body)));
       return new Response(JSON.stringify(replies.shift()), { status: 200 });
     }));
-    const r = await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { durationSec: 8, targetsKling: ["targets/a.jpg"], showTargets: true } });
+    const withCar = [...faces, { slotKey: "obj_1", providerInput: "img_2", imageUrl: "https://s/car.jpg" }];
+    const r = await seedanceProvider.submit({ jobId: "j", ...base, faces: withCar, config: { durationSec: 8, showTargets: true, objects: [{ what: "car", label: "Фото машины", target: "targets/a.jpg" }] } });
     const st = await seedanceProvider.getStatus("kt-5", { startedAt: null, state: r.state ?? null });
     expect(st).toMatchObject({ state: "processing", next: { providerJobId: "kt-6", state: { stage: "klingd" } } });
-    expect(bodies[1].contents.filter((c) => c.type === "refer_image").map((c) => c.url)).toEqual(["https://s/1.jpg"]);
+    expect(bodies[1].contents.filter((c) => c.type === "refer_image").map((c) => c.url)).toEqual(["https://s/1.jpg", "https://s/car.jpg"]);
     expect(bodies[1].contents[0].text).not.toContain("cut-out");
     vi.unstubAllGlobals();
   });

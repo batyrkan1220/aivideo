@@ -37,8 +37,8 @@ describe("prompt uses the descriptions", () => {
 describe("cut-outs in the prompt", () => {
   it("points at the template cut-out and warns not to copy it", () => {
     const p = buildKlingDirectPrompt("edit", "template", "", "", 2, ["on the left", "on the right"], [{ what: "car" }], ["@image_4", "", "@image_5"]);
-    expect(p).toContain("the person on the left shown in @image_4 with the person from @image_1");
-    expect(p).toContain("the person on the right with the person from @image_2");
+    expect(p).toContain("- The person on the left shown in @image_4 becomes the person from @image_1.");
+    expect(p).toContain("- The person on the right becomes the person from @image_2.");
     expect(p).toContain("Replace the car shown in @image_5 in @video_1 with the car from @image_3");
     expect(p).toContain("@image_4, @image_5 are cut-outs from @video_1 that only show which one to replace");
   });

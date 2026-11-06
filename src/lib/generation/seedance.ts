@@ -69,8 +69,9 @@ export const seedanceProvider: GenerationProvider = {
     const usedPhotos = photos.slice(0, people + objects.length);
     // Optional cut-outs from the template, after the customer's photos, while Kling's 10 images last.
     const cutouts: string[] = [];
-    // People: only the cut-outs with the original face hidden (the plain ones would lend Kling that face).
-    const targetPaths = [...Array.from({ length: people }, (_, i) => cfg.targetsKling[i] ?? ""), ...objects.map((o) => o.target ?? "")];
+    // Person cut-outs are not sent: with them Kling mixed up or kept people (TM-100024, TM-100026).
+    // Only things (car, horse…) get their cut-out, so Kling knows which one to swap.
+    const targetPaths = [...Array.from({ length: people }, () => ""), ...objects.map((o) => o.target ?? "")];
     const targetRefs = targetPaths.map((path) => {
       const url = cfg.showTargets ? mediaUrl(path?.trim() || null) : null;
       if (!url || usedPhotos.length + cutouts.length >= KLING_MAX_IMAGES) return "";
