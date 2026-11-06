@@ -33,7 +33,7 @@ const resultSchema = z.object({
   scene: z.string().max(600).catch(""),
 });
 
-const PROMPT = `These are frames, in time order, from one short video. A customer will upload photos to replace the people in it (and maybe some things) with an AI video model.
+const promptFor = (kinds: string[]) => `These are frames, in time order, from one short video. A customer will upload photos to replace the people in it (and maybe some things) with an AI video model.
 List the people who are clearly visible and important in the video (ignore tiny background passers-by), ordered from left to right as they mainly appear. At most ${SEEDANCE_MAX_PEOPLE}.
 For each person give:
 - where: short English position, e.g. "on the left", "in the center", "on the right", "in the foreground", "in the background". Use "" if there is only one person.
@@ -41,8 +41,10 @@ For each person give:
 - ru: the same position and description in Russian, for the admin.
 - frame: the 0-based index of the frame where this person is seen best (large, face visible).
 - box: [ymin, xmin, ymax, xmax] of this person in that frame, from 0 to 1000 (head to at least the waist).
-Also list up to ${SEEDANCE_MAX_OBJECTS} large, prominent things a customer might want to swap for their own, only of these kinds: ${KINDS.join(", ")}. "outfit" only if the clothing itself is the main subject. Skip small props. For each:
-- what: exactly one of ${KINDS.join(", ")}
+Also list up to ${SEEDANCE_MAX_OBJECTS} large, prominent things a customer might want to swap for their own, only of these kinds: ${kinds.join(", ")}. Skip small props.
+A thing must be separate from every listed person: never list a person's worn clothes, hair or body as a thing. Never list the same person or thing twice. If nothing fits, return objects: [].
+For each thing:
+- what: exactly one of ${kinds.join(", ")}
 - look: short English description and position, e.g. "the white sedan on the right". Max 12 words.
 - ru: the same in Russian.
 - frame and box: as for people, around the whole thing.
@@ -92,6 +94,25 @@ function hintText(hint?: { people: number; objects: string[] }) {
   return `\nKnown: the video has exactly ${hint.people} main ${hint.people === 1 ? "person" : "people"} to replace (the most prominent ones) and ${things}. List exactly that.`;
 }
 
+/** Share of box a that lies inside box b (0–1). */
+export function covered(a: Box | null, b: Box | null): number {
+  if (!a || !b) return 0;
+  const h = Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0]));
+  const w = Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
+  const area = (a[2] - a[0]) * (a[3] - a[1]);
+  return area > 0 ? (h * w) / area : 0;
+}
+
+/** The same person or thing listed twice (same frame, mostly the same box): keep the first. */
+function dedupe<T extends { frame: number; box: Box | null; what?: string }>(list: T[]): T[] {
+  const out: T[] = [];
+  for (const x of list) {
+    if (out.some((y) => y.frame === x.frame && y.what === x.what && Math.max(covered(x.box, y.box), covered(y.box, x.box)) > 0.7)) continue;
+    out.push(x);
+  }
+  return out;
+}
+
 /** A usable box: inside 0–1000, not empty. */
 function cleanBox(b: number[] | null): VisionBox["box"] {
   if (!b) return null;
@@ -101,12 +122,14 @@ function cleanBox(b: number[] | null): VisionBox["box"] {
 
 /** hint: the admin's numbers to keep (exactly this many people, these things only). */
 export async function describeTemplateFrames(frames: string[], hint?: { people: number; objects: string[] }): Promise<VisionResult> {
+  // Worn clothing is the template's outfit setting, not a thing to swap: "outfit" only when the admin already has one.
+  const kinds: string[] = KINDS.filter((k) => k !== "outfit" || hint?.objects.includes("outfit"));
   const { GEMINI_API_KEY: key, GEMINI_MODEL: model } = env();
   if (!key) throw new VisionError("not_configured");
   // Busy models answer 503/429: try again, then the next model in the list.
   const models = [...new Set([model, ...FALLBACK_MODELS])];
   const payload = JSON.stringify({
-    contents: [{ role: "user", parts: [...frames.map((data) => ({ inline_data: { mime_type: "image/jpeg", data } })), { text: PROMPT + hintText(hint) }] }],
+    contents: [{ role: "user", parts: [...frames.map((data) => ({ inline_data: { mime_type: "image/jpeg", data } })), { text: promptFor(kinds) + hintText(hint) }] }],
     generationConfig: { temperature: 0.2, responseMimeType: "application/json", responseSchema },
   });
   let body: GeminiBody | null = null;
@@ -125,12 +148,13 @@ export async function describeTemplateFrames(frames: string[], hint?: { people: 
   try { raw = JSON.parse(text); } catch { throw new VisionError("failed"); }
   const parsed = resultSchema.parse(raw);
   const clean = (s: string, n: number) => s.replace(/[@<>{}\[\]\\]/g, " ").replace(/\s+/g, " ").trim().slice(0, n);
-  return {
-    people: parsed.people.slice(0, SEEDANCE_MAX_PEOPLE).map((p) => ({ where: clean(p.where, 50), look: clean(p.look, 110), ru: clean(p.ru, 160), frame: Math.min(p.frame, frames.length - 1), box: cleanBox(p.box) })),
-    objects: parsed.objects
-      .map((o) => ({ what: o.what.trim().toLowerCase(), look: clean(o.look, 110), ru: clean(o.ru, 160), frame: Math.min(o.frame, frames.length - 1), box: cleanBox(o.box) }))
-      .filter((o) => KINDS.includes(o.what as (typeof KINDS)[number]))
-      .slice(0, SEEDANCE_MAX_OBJECTS),
-    scene: clean(parsed.scene, 500),
-  };
+  const people = dedupe(parsed.people.map((p) => ({ where: clean(p.where, 50), look: clean(p.look, 110), ru: clean(p.ru, 160), frame: Math.min(p.frame, frames.length - 1), box: cleanBox(p.box) })))
+    .slice(0, SEEDANCE_MAX_PEOPLE);
+  const objects = dedupe(parsed.objects
+    .map((o) => ({ what: o.what.trim().toLowerCase(), look: clean(o.look, 110), ru: clean(o.ru, 160), frame: Math.min(o.frame, frames.length - 1), box: cleanBox(o.box) }))
+    .filter((o) => kinds.includes(o.what)))
+    // A "thing" that sits inside a found person (their clothes, their body) is that person again.
+    .filter((o) => !people.some((p) => p.frame === o.frame && covered(o.box, p.box) > 0.6))
+    .slice(0, SEEDANCE_MAX_OBJECTS);
+  return { people, objects, scene: clean(parsed.scene, 500) };
 }

@@ -62,3 +62,31 @@ describe("Gemini busy", () => {
     vi.useRealTimers();
   });
 });
+
+describe("no doubles", () => {
+  it("drops a worn outfit listed as a thing and a person listed twice", async () => {
+    let prompt = "";
+    vi.stubGlobal("fetch", vi.fn(async (_u: string, init: RequestInit) => {
+      prompt = JSON.parse(String(init.body)).contents[0].parts.at(-1).text;
+      const json = {
+        people: [
+          { where: "in the center", look: "man", ru: "мужчина", frame: 0, box: [100, 100, 900, 450] },
+          { where: "in the center", look: "woman in red", ru: "женщина", frame: 1, box: [100, 500, 950, 900] },
+          { where: "in the center", look: "woman in red again", ru: "женщина", frame: 1, box: [110, 510, 940, 890] },
+        ],
+        objects: [
+          { what: "outfit", look: "red outfit", ru: "наряд", frame: 1, box: [300, 520, 900, 880] },
+          { what: "car", look: "car behind her", ru: "машина", frame: 1, box: [400, 520, 800, 880] },
+          { what: "car", look: "white car", ru: "машина", frame: 2, box: [500, 0, 900, 400] },
+        ],
+        scene: "",
+      };
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(json) }] } }] }), { status: 200 });
+    }));
+    const r = await describeTemplateFrames(["A", "B", "C"]);
+    expect(r.people.map((p) => p.look)).toEqual(["man", "woman in red"]);
+    expect(r.objects.map((o) => o.look)).toEqual(["white car"]);
+    expect(prompt).not.toContain("outfit");
+    vi.unstubAllGlobals();
+  });
+});
