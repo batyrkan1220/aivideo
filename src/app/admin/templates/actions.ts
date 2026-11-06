@@ -1,5 +1,6 @@
 "use server";
 import { clearMemo } from "@/lib/cache/memo";
+import { queueLitePreview } from "@/lib/templates/lite-preview";
 import { SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC } from "@/lib/templates/seedance-config";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -55,6 +56,8 @@ export async function saveTemplate(raw: unknown, id: string | null, metaRaw?: un
     const { data, error } = await db.from("templates")
       .insert({ ...row, status: "draft", created_by: user.id, ...storedVideo(row.preview_video_path, meta) }).select("id").single();
     if (error) { console.error("[admin.template.create]", error.code, error.message); return { ok: false, error: "generic" }; }
+    // Light card copies (MP4, animated WebP, cover thumbnail) are made in the background.
+    if (row.preview_video_path) queueLitePreview(data.id);
     await audit(user.id, "template.create", "template", data.id, { title: row.title_kk });
     clearMemo();
     revalidatePath("/admin/templates");
@@ -91,6 +94,7 @@ export async function saveTemplate(raw: unknown, id: string | null, metaRaw?: un
     await db.from("templates").update({ cover_thumb_path: null }).eq("id", id);
     if (before.cover_thumb_path?.startsWith("covers/thumb")) await db.storage.from("template-media").remove([before.cover_thumb_path]);
   }
+  if (row.preview_video_path && (row.preview_video_path !== before.preview_video_path || row.cover_asset_path !== before.cover_asset_path)) queueLitePreview(id);
   await audit(user.id, "template.update", "template", id, { title: row.title_kk });
   const pricingChanged =
     JSON.stringify(before.pricing_config_json) !== JSON.stringify(row.pricing_config_json) ||

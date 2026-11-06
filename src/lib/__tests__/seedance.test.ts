@@ -84,24 +84,6 @@ describe("provider (Kling official API)", () => {
     vi.unstubAllGlobals();
   });
 
-  it("finishes a job that was waiting for an element by sending the photos instead", async () => {
-    const calls: { url: string; body?: { contents: { type: string; id?: string; text?: string }[] } }[] = [];
-    const replies = [
-      { code: 0, data: { task_status: "succeed", task_result: { elements: [{ element_id: 5 }] } } },
-      { code: 0, data: { id: "kt-9", status: "submitted" } },
-    ];
-    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
-      calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
-      return new Response(JSON.stringify(replies.shift()), { status: 200 });
-    }));
-    const state = { stage: "element", videoUrl: "https://cdn/v.mp4", photoUrls: ["https://s/1.jpg"], people: 1, elementIds: [], prompt: "replace with @element_1", durationSec: 8, aspectRatio: "9:16", resolution: "720p", mode: "edit" };
-    expect(await seedanceProvider.getStatus("el-1", { startedAt: null, state })).toMatchObject({ state: "processing", next: { providerJobId: "kt-9", state: { stage: "klingd" } } });
-    const body = calls[1].body!;
-    expect(body.contents.map((c) => c.type)).toEqual(["prompt", "base_video", "refer_image"]);
-    expect(body.contents[0].text).toBe("replace with @image_1");
-    vi.unstubAllGlobals();
-  });
-
   it("maps errors (auth / no balance sent as 429 / busy)", async () => {
     for (const [status, msg, code, retry] of [
       [401, "bad key", "provider_auth", false],

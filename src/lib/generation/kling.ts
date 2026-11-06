@@ -93,61 +93,6 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   return parts.join(" ");
 }
 
-/** Official element tags: o_102 character, o_103 animal, o_104 prop, o_105 clothing, o_108 other. */
-export function klingElementTag(what: string): string {
-  const w = what.trim().toLowerCase();
-  if (["horse", "dog", "cat"].includes(w)) return "o_103";
-  if (["outfit", "clothes", "clothing"].includes(w)) return "o_105";
-  if (["car", "motorcycle"].includes(w)) return "o_104";
-  return "o_108";
-}
-
-const elementDescription = (tagId: string, note?: string) => {
-  const base = tagId === "o_102" ? "This exact face and head. Use it for that one person only."
-    : tagId === "o_103" ? "Exact animal, 1:1 from every angle, every frame until the end."
-    : tagId === "o_105" ? "Exact clothing, 1:1, every frame until the end."
-    : "Exact object, 1:1 from every angle, every frame until the end.";
-  return (note ? `${note} ${base}` : base).slice(0, 100);
-};
-
-/** Register one customer photo as an element. image_refer needs a front view and 1–3 extra views; one upload fills both. */
-export async function createKlingElement(photoUrl: string, tagId = "o_102", note?: string): Promise<string> {
-  const d = await call<{ data?: { task_id?: string; id?: string } }>("/v1/general/advanced-custom-elements", {
-    method: "POST",
-    body: JSON.stringify({
-      element_name: `e${Math.random().toString(36).slice(2, 10)}`.slice(0, 20),
-      element_description: elementDescription(tagId, note),
-      reference_type: "image_refer",
-      element_image_list: { frontal_image: photoUrl, refer_images: [{ image_url: photoUrl }] },
-      tag_list: [{ tag_id: tagId }],
-    }),
-  });
-  const id = d.data?.task_id ?? d.data?.id;
-  if (!id) throw new ProviderError("provider_bad_response", true, "kling element: missing task id");
-  console.log("[kling] element task", id, "submitted");
-  return String(id);
-}
-
-export async function getKlingElement(taskId: string): Promise<{ state: "processing" } | { state: "ready"; elementId: string } | { state: "failed"; errorCode: string }> {
-  const d = await call<{ data?: { task_status?: string; task_status_msg?: string; task_result?: { elements?: { element_id?: string | number }[] } } }>(
-    `/v1/general/advanced-custom-elements/${encodeURIComponent(taskId)}`,
-  );
-  const status = String(d.data?.task_status ?? "");
-  if (status === "succeed" || status === "succeeded") {
-    const elementId = d.data?.task_result?.elements?.[0]?.element_id;
-    if (elementId === undefined || elementId === null || elementId === "") return { state: "failed", errorCode: "provider_bad_response" };
-    console.log("[kling] element", taskId, "ready", String(elementId));
-    return { state: "ready", elementId: String(elementId) };
-  }
-  if (status === "failed") {
-    const reason = String(d.data?.task_status_msg ?? "").slice(0, 300);
-    console.error("[kling] element failed", taskId, reason);
-    const content = /risk|sensitive|policy|moderat|safety|inappropriate|violat/i.test(reason);
-    return { state: "failed", errorCode: content ? "provider_content_rejected" : "provider_failed" };
-  }
-  return { state: "processing" };
-}
-
 export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: string[]; mode: KlingMode; prompt: string; durationSec: number; aspectRatio: string; resolution?: "720p" | "1080p" }): Promise<string> {
   const duration = Math.min(30, Math.max(3, Math.round(opts.durationSec)));
   // Edit: the template itself is edited (base_video), so place and motion stay 1:1. Reference: a new video following it.

@@ -2,8 +2,8 @@ import "server-only";
 import { seedanceConfigSchema, SEEDANCE_MAX_OBJECTS, SEEDANCE_MAX_PEOPLE, SEEDANCE_MAX_REFS, SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC } from "@/lib/templates/seedance-config";
 import { seedanceCostUsd } from "@/lib/pricing-seedance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
-import { type GenerationProvider, type ProviderState } from "./types";
-import { buildKlingDirectPrompt, getKlingElement, getKlingTask, submitKlingOmni } from "./kling";
+import { type GenerationProvider } from "./types";
+import { buildKlingDirectPrompt, getKlingTask, submitKlingOmni } from "./kling";
 
 /**
  * The video provider (key "seedance" for existing rows): Kling 4.0 via Kling's official API.
@@ -74,40 +74,7 @@ export const seedanceProvider: GenerationProvider = {
     return { providerJobId, cost: seedanceCostUsd(durationSec, await seedancePricingSettings(), {}, resolution), state: { stage: "klingd" } };
   },
 
-  async getStatus(providerJobId, ctx) {
-    const lock = faceLockState(ctx.state);
-    if (!lock) return getKlingTask(providerJobId);
-    const el = await getKlingElement(providerJobId);
-    if (el.state === "processing") return { state: "processing" };
-    if (el.state === "failed") return { state: "failed", errorCode: el.errorCode, retryable: false };
-    // Jobs started before elements were dropped: send the photos as reference images.
-    const id = await submitKlingOmni({
-      videoUrl: lock.videoUrl, photoUrls: lock.photoUrls,
-      mode: lock.mode === "reference" ? "reference" : "edit",
-      prompt: lock.prompt.replace(/@element_(\d+)/g, "@image_$1"), durationSec: lock.durationSec, aspectRatio: lock.aspectRatio, resolution: lock.resolution,
-    });
-    return { state: "processing", next: { providerJobId: id, state: { stage: "klingd" } } };
+  getStatus(providerJobId) {
+    return getKlingTask(providerJobId);
   },
 };
-
-type FaceLockState = {
-  stage: "element" | "klingd";
-  videoUrl: string;
-  photoUrls: string[];
-  people: number;
-  /** Official tag id per photo, same order as photoUrls. Missing on jobs started before things were elements. */
-  tags?: string[];
-  elementIds: string[];
-  prompt: string;
-  durationSec: number;
-  aspectRatio: string;
-  resolution: "720p" | "1080p";
-  mode?: "edit" | "reference";
-};
-
-function faceLockState(s: ProviderState): FaceLockState | null {
-  if (!s || String(s.stage) !== "element" || !Array.isArray(s.photoUrls) || typeof s.videoUrl !== "string" || typeof s.prompt !== "string") return null;
-  if (!Array.isArray(s.elementIds) || typeof s.people !== "number" || typeof s.durationSec !== "number" || typeof s.aspectRatio !== "string") return null;
-  if (s.resolution !== "720p" && s.resolution !== "1080p") return null;
-  return s as FaceLockState;
-}
