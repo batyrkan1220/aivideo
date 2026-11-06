@@ -189,40 +189,21 @@ body:has(> .theme-app:not(.fixed)) { background: #faf5f1; }
   backdrop-filter: blur(20px) saturate(180%);
 }
 
-/* Phone tab bar: "liquid glass". Mostly see-through, the content behind is blurred and its colours
-   brightened; a light rim and an inner highlight give the edge, so it reads on light and dark cards. */
+/* Phone tab bar: clear glass. The content behind shows through, blurred; a crisp hairline rim
+   and a thin top highlight give the edge. No glows or text shadows, so icons and labels stay sharp. */
 /* No "position" here: the bar is "fixed" from its classes, and unlayered CSS would override them. */
 .glass-dock {
-  isolation: isolate;
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.5) 0%, rgb(255 255 255 / 0.28) 100%);
-  -webkit-backdrop-filter: blur(26px) saturate(210%) brightness(1.06);
-  backdrop-filter: blur(26px) saturate(210%) brightness(1.06);
-  border: 1px solid rgb(255 255 255 / 0.55);
+  background: rgb(255 255 255 / 0.62);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  border: 0.5px solid rgb(255 255 255 / 0.9);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.85),
-    inset 0 -1px 0 rgb(255 255 255 / 0.18),
-    inset 0 0 22px rgb(255 255 255 / 0.18),
-    0 18px 40px -18px rgb(22 22 22 / 0.45),
-    0 4px 12px -6px rgb(22 22 22 / 0.18);
+    inset 0 1px 0 rgb(255 255 255 / 0.9),
+    0 0 0 0.5px rgb(22 22 22 / 0.08),
+    0 12px 32px -12px rgb(22 22 22 / 0.35);
 }
-/* A soft light streak across the top, like light on glass. */
-.glass-dock::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  pointer-events: none;
-  background:
-    radial-gradient(120% 70% at 20% -20%, rgb(255 255 255 / 0.55), transparent 60%),
-    radial-gradient(90% 60% at 100% 120%, rgb(215 244 67 / 0.14), transparent 70%);
-}
-/* Labels stay readable over any picture. */
-.glass-dock a { text-shadow: 0 0 6px rgb(255 255 255 / 0.7); }
-/* No blur support: fall back to a solid frosted look. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass-dock { background: rgb(255 255 255 / 0.92); }
+  .glass-dock { background: rgb(255 255 255 / 0.95); }
 }
 
 
