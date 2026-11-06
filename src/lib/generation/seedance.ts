@@ -78,18 +78,52 @@ export const seedanceProvider: GenerationProvider = {
       cutouts.push(url);
       return `@image_${usedPhotos.length + cutouts.length}`;
     });
-    const prompt = buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : "", people, cfg.positions, objects, targetRefs);
+    const wish = cfg.allowWish ? cleanWish(extra.wish) : "";
+    const pricing = await seedancePricingSettings();
+    if (people > 1 && cfg.klingMode === "edit") {
+      // Kling cleanly replaces one person per run (2–3 at once got mixed up or kept: TM-100026/27).
+      // So the video is edited once per person, each run on the previous result; things go with the last run.
+      const objectPhotos = usedPhotos.slice(people);
+      const passes: Pass[] = Array.from({ length: people }, (_, k) => {
+        const last = k === people - 1;
+        const where = cfg.positions[k]?.trim() || `number ${k + 1} from the left`;
+        return {
+          photoUrls: [usedPhotos[k], ...(last ? objectPhotos : [])],
+          prompt: buildKlingDirectPrompt("edit", outfit, cfg.prompt, last ? wish : "", 1, [where], last ? objects : []),
+        };
+      });
+      const providerJobId = await submitKlingOmni({ videoUrl: input.templateVideoUrl, mode: "edit", durationSec, aspectRatio: cfg.aspectRatio, resolution, ...passes[0] });
+      console.log("[kling] person 1 of", people);
+      return {
+        providerJobId,
+        cost: seedanceCostUsd(durationSec, pricing, {}, resolution),
+        state: { stage: "pass", k: 0, passes, durationSec, aspectRatio: cfg.aspectRatio, resolution },
+      };
+    }
+    const prompt = buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, wish, people, cfg.positions, objects, targetRefs);
     const plain = { videoUrl: input.templateVideoUrl, photoUrls: usedPhotos, mode: cfg.klingMode, durationSec, aspectRatio: cfg.aspectRatio, resolution };
     const providerJobId = await submitKlingOmni({ ...plain, photoUrls: [...usedPhotos, ...cutouts], prompt });
     // If Kling refuses the task because of a cut-out (it charges nothing then), the same order goes again without them.
     const fallback = cutouts.length
-      ? { ...plain, prompt: buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : "", people, cfg.positions, objects) }
+      ? { ...plain, prompt: buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, wish, people, cfg.positions, objects) }
       : null;
-    return { providerJobId, cost: seedanceCostUsd(durationSec, await seedancePricingSettings(), {}, resolution), state: { stage: "klingd", ...(fallback ? { fallback } : {}) } };
+    return { providerJobId, cost: seedanceCostUsd(durationSec, pricing, {}, resolution), state: { stage: "klingd", ...(fallback ? { fallback } : {}) } };
   },
 
   async getStatus(providerJobId, ctx) {
     const st = await getKlingTask(providerJobId);
+    const run = passOf(ctx.state);
+    if (run) {
+      // One person per run: the next run edits the previous result.
+      if (st.state !== "succeeded" || run.k + 1 >= run.passes.length) return st;
+      const k = run.k + 1;
+      const id = await submitKlingOmni({ videoUrl: st.outputUrl, mode: "edit", durationSec: run.durationSec, aspectRatio: run.aspectRatio, resolution: run.resolution, ...run.passes[k] });
+      console.log("[kling] person", k + 1, "of", run.passes.length);
+      return {
+        state: "processing",
+        next: { providerJobId: id, state: { ...run, k } as ProviderState, cost: seedanceCostUsd(run.durationSec, await seedancePricingSettings(), {}, run.resolution) },
+      };
+    }
     const fb = fallbackOf(ctx.state);
     if (st.state !== "failed" || st.errorCode === "provider_content_rejected" || !fb) return st;
     console.log("[kling] task", providerJobId, "failed with template cut-outs; sending again without them");
@@ -104,4 +138,14 @@ function fallbackOf(state: ProviderState): Fallback | null {
   if (!f || typeof f.videoUrl !== "string" || !Array.isArray(f.photoUrls) || typeof f.prompt !== "string" || typeof f.durationSec !== "number") return null;
   return { videoUrl: f.videoUrl, photoUrls: f.photoUrls.filter((u): u is string => typeof u === "string"), prompt: f.prompt, durationSec: f.durationSec,
     mode: f.mode === "reference" ? "reference" : "edit", aspectRatio: typeof f.aspectRatio === "string" ? f.aspectRatio : "adaptive", resolution: f.resolution === "1080p" ? "1080p" : "720p" };
+}
+
+type Pass = { photoUrls: string[]; prompt: string };
+type PassRun = { stage: "pass"; k: number; passes: Pass[]; durationSec: number; aspectRatio: string; resolution: "720p" | "1080p" };
+function passOf(state: ProviderState): PassRun | null {
+  const s = state as Partial<PassRun> | null;
+  if (!s || s.stage !== "pass" || typeof s.k !== "number" || !Array.isArray(s.passes) || typeof s.durationSec !== "number") return null;
+  const passes = s.passes.filter((p): p is Pass => !!p && Array.isArray(p.photoUrls) && typeof p.prompt === "string");
+  if (!passes.length || s.k >= passes.length) return null;
+  return { stage: "pass", k: s.k, passes, durationSec: s.durationSec, aspectRatio: typeof s.aspectRatio === "string" ? s.aspectRatio : "adaptive", resolution: s.resolution === "1080p" ? "1080p" : "720p" };
 }

@@ -37,8 +37,12 @@ export const SEEDANCE_QUALITY_1080: Quality = {
 /** Kling cost multiplier for a provider quality. */
 export const qualityCostFactor = (providerQuality?: string | null) => (providerQuality === "1080p" ? HD1080_FACTOR : 1);
 
-/** Kept for call sites; every template is Kling 4.0 now. */
+/**
+ * people = people in the video to replace. Kling cleanly replaces one person per run, so a video
+ * with 2–3 people is edited once per person: the Kling cost (and the automatic price) is × people.
+ */
 export type CostOpts = { mode?: string; people?: number };
+export const klingPasses = (o: CostOpts = {}) => Math.max(1, Math.min(5, Math.round(o.people ?? 1)));
 
 /** Kling units for a template video of this length (720p). 1080p is this × HD1080_FACTOR. */
 export function klingUnits(durationSec: number, s: SeedancePricing): number {
@@ -54,15 +58,16 @@ export function unitsFromUsd(costUsd: number, s: SeedancePricing): number | null
 }
 
 /** Admin-facing line: units this video takes at 720p and at 1080p. */
-export function klingUnitLabel(durationSec: number, s: SeedancePricing): string {
-  const u = klingUnits(durationSec, s);
+export function klingUnitLabel(durationSec: number, s: SeedancePricing, o: CostOpts = {}): string {
+  const u = Math.round(klingUnits(durationSec, s) * klingPasses(o) * 100) / 100;
   const hd = Math.round(u * HD1080_FACTOR * 100) / 100;
   const text = (n: number) => n.toLocaleString("ru-RU", { maximumFractionDigits: 2 });
-  return `Kling: ${text(u)} юн. (720p) · ${text(hd)} юн. (1080p)`;
+  const runs = klingPasses(o) > 1 ? ` · ${klingPasses(o)} прохода, по одному на человека` : "";
+  return `Kling: ${text(u)} юн. (720p) · ${text(hd)} юн. (1080p)${runs}`;
 }
 
-export function seedanceCostUsd(durationSec: number, s: SeedancePricing, _o: CostOpts = {}, providerQuality?: string | null): number {
-  return Math.round(klingUnits(durationSec, s) * s.klingUnitUsd * qualityCostFactor(providerQuality) * 10_000) / 10_000;
+export function seedanceCostUsd(durationSec: number, s: SeedancePricing, o: CostOpts = {}, providerQuality?: string | null): number {
+  return Math.round(klingUnits(durationSec, s) * klingPasses(o) * s.klingUnitUsd * qualityCostFactor(providerQuality) * 10_000) / 10_000;
 }
 
 export function seedanceCostKzt(durationSec: number, s: SeedancePricing, o: CostOpts = {}): number {

@@ -98,7 +98,7 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
           {rows.map(({ t, s }) => {
             const cover = mediaUrl(t.cover_asset_path);
             const price = pricingConfigSchema.safeParse(t.pricing_config_json).data?.basePriceKzt;
-            const units = t.provider_key !== "kling_photo" && t.video_duration_sec ? klingUnits(Number(t.video_duration_sec), pricing) : null;
+            const units = t.provider_key !== "kling_photo" && t.video_duration_sec ? Math.round(klingUnits(Number(t.video_duration_sec), pricing) * Math.max(1, Number(t.people_n) || 1) * 100) / 100 : null;
             const st = STATUS[t.status] ?? { label: t.status, color: "gray" as const };
             const conv = Number(s.views) ? Math.round((Number(s.orders) / Number(s.views)) * 1000) / 10 : null;
             return (

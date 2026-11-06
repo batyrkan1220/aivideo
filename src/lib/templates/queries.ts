@@ -104,7 +104,7 @@ export function parseRow(r: Row, seedancePricing: SeedancePricing = DEFAULT_SEED
     const duration = r.video_duration_sec == null ? null : Number(r.video_duration_sec);
     // A video outside Seedance's 4–30 s cannot be generated: no price, so it cannot be ordered.
     const usable = duration === null || (duration >= SEEDANCE_MIN_SEC - 0.5 && duration <= maxSecFor(parseSeedanceMode(r.seedance_mode)) + 0.5);
-    const price = usable ? seedancePriceKzt(duration, parsedP.data.basePriceKzt, seedancePricing, { people: r.required_face_count }) : null;
+    const price = usable ? seedancePriceKzt(duration, parsedP.data.basePriceKzt, seedancePricing, { people: slots.data.filter((x) => x.kind !== "object").length || 1 }) : null;
     const eff = applySeedancePricing(parsedP.data, price ?? 0);
     qualities = { success: true, data: eff.qualities } as typeof parsedQ;
     pricing = { success: true, data: eff.pricing } as typeof parsedP;

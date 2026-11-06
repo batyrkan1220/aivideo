@@ -221,7 +221,7 @@ export function TemplateEditor({
   const costOpts = { people: sd.people };
   const autoPrice = seedancePriceKzt(duration, Number(t.pricing.basePriceKzt) || 0, seedancePricing, costOpts);
   const costKzt = duration ? seedanceCostKzt(duration, seedancePricing, costOpts) : null;
-  const unitLabel = duration ? klingUnitLabel(duration, seedancePricing) : null;
+  const unitLabel = duration ? klingUnitLabel(duration, seedancePricing, { people: sd.people }) : null;
 
   return (
     <div className="space-y-6 pb-56 sm:pb-28">

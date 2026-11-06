@@ -29,7 +29,7 @@ describe("Gemini template vision", () => {
 describe("prompt uses the descriptions", () => {
   it("one person and an object with a description", () => {
     const p = buildKlingDirectPrompt("edit", "template", "", "", 1, ["woman in a red dress"], [{ what: "car", look: "the white sedan" }]);
-    expect(p).toContain("Replace the main person (woman in a red dress) in @video_1 with the person from @image_1.");
+    expect(p).toContain("Replace the person woman in a red dress in @video_1 with the person from @image_1.");
     expect(p).toContain("Replace the car (the white sedan) in @video_1 with the car from @image_2");
   });
 });

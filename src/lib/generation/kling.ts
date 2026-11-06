@@ -55,7 +55,7 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   const outfitRef = things.find((t) => ["outfit", "clothes", "clothing"].includes(t.what))?.ref;
   const spot = (i: number) => `${positions[i]?.trim() || `number ${i + 1} from the left`}${shown(i)}`;
   const who = people === 1
-    ? `Replace the main person${positions[0]?.trim() ? ` (${positions[0].trim()})` : ""}${shown(0)} in @video_1 with the person from @image_1.`
+    ? `Replace ${positions[0]?.trim() ? `the person ${positions[0].trim()}` : "the main person"}${shown(0)} in @video_1 with the person from @image_1.`
     : [
         `There are ${people} people to replace in @video_1. Replace every one of them, in every frame:`,
         ...refs.map((r, i) => `- The person ${spot(i)} becomes the person from ${r}.`),
