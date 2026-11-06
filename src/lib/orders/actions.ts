@@ -44,7 +44,8 @@ async function loadPublishedVersion(templateId: string) {
   if (!v) return null;
   const snap = v.configuration_snapshot as Record<string, unknown>;
   // Catalog video templates are orderable only after the AI analysis (people, cut-outs, scene).
-  if (t.kind === "catalog" && snap.provider_key === "seedance" && !(snap.provider_config_json as { analyzedAt?: unknown } | null)?.analyzedAt) return null;
+  if (t.kind === "catalog" && snap.provider_key === "seedance" && !(snap.provider_config_json as { analyzedAt?: unknown } | null)?.analyzedAt
+    && (await catalogSettings()).requireAnalysis) return null;
   // 2–3 people only when the admin switched them on.
   if (t.kind === "catalog" && Number((snap.provider_config_json as { people?: unknown } | null)?.people ?? 1) > 1 && !(await catalogSettings()).multiPeople) return null;
   const slots = z.array(faceSlotSchema).safeParse(snap.face_slots_json);

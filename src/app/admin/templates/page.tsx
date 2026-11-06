@@ -18,6 +18,7 @@ import { env } from "@/lib/env";
 import { Badge, Chips, PageHead, nowMs } from "../ui";
 import { ReanalyzeButton } from "./reanalyze-button";
 import { MultiPeopleToggle } from "./multi-people-toggle";
+import { RequireAnalysisToggle } from "./require-analysis-toggle";
 import { catalogSettings } from "@/lib/catalog/settings";
 import { unclearPeople } from "@/lib/templates/analysis";
 
@@ -53,6 +54,7 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;
   const db = supabaseAdmin();
 
+  const needAi = (await catalogSettings()).requireAnalysis;
   const [{ data }, { data: stats }, { data: cats }, pricing] = await Promise.all([
     db.from("templates")
       .select("id,title_kk,status,required_face_count,updated_at,is_trending,provider_key,cover_asset_path,preview_video_path,preview_lite_path,preview_anim_path,pricing_config_json,category_id,video_duration_sec,analyzed_at:provider_config_json->>analyzedAt,people_n:provider_config_json->people,positions:provider_config_json->positions")
@@ -121,7 +123,9 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
                       {t.category_id && catName.get(t.category_id) && <Badge>{catName.get(t.category_id)}</Badge>}
                       {!t.preview_video_path && <Badge color="red">нет видео</Badge>}
                       {t.preview_video_path && (!t.preview_lite_path || !t.preview_anim_path) && <Badge color="amber">превью сжимается</Badge>}
-                      {t.provider_key === "seedance" && !t.analyzed_at && <Badge color="red">нужен ИИ-анализ · недоступен клиентам</Badge>}
+                      {t.provider_key === "seedance" && !t.analyzed_at && (needAi
+                        ? <Badge color="red">нужен ИИ-анализ · недоступен клиентам</Badge>
+                        : <Badge color="amber">без ИИ-анализа</Badge>)}
                       {t.provider_key === "seedance" && t.analyzed_at && unclearPeople({ people: Number(t.people_n) || 1, positions: Array.isArray(t.positions) ? (t.positions as string[]) : [] }).length > 0 && <Badge color="amber">проверьте описания людей</Badge>}
                       {t.provider_key === "seedance" && t.preview_video_path && <ReanalyzeButton id={t.id} />}
                     </div>
@@ -158,5 +162,6 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
 
 async function MultiPeople() {
   await connection(); // request-time only
-  return <MultiPeopleToggle on={(await catalogSettings()).multiPeople} />;
+  const cs = await catalogSettings();
+  return <><RequireAnalysisToggle on={cs.requireAnalysis} /><MultiPeopleToggle on={cs.multiPeople} /></>;
 }

@@ -6,9 +6,11 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 /**
  * Catalog switches. multiPeople: templates with 2–3 people (one Kling run per person, still being
  * tested) are shown to customers only when this is on; off = they show "Шаблон недоступен".
+ * requireAnalysis: catalog video templates need the AI analysis before customers can order them;
+ * off = they are open without it (while Gemini is not available).
  */
 export const CATALOG_KEY = "catalog";
-const schema = z.object({ multiPeople: z.boolean().default(false) });
+const schema = z.object({ multiPeople: z.boolean().default(false), requireAnalysis: z.boolean().default(true) });
 export type CatalogSettings = z.infer<typeof schema>;
 
 export function catalogSettings(): Promise<CatalogSettings> {

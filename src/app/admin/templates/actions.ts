@@ -1,4 +1,5 @@
 "use server";
+import { catalogSettings } from "@/lib/catalog/settings";
 import { clearMemo } from "@/lib/cache/memo";
 import { snapshotVersion } from "@/lib/templates/versions";
 import { queueLitePreview } from "@/lib/templates/lite-preview";
@@ -152,7 +153,7 @@ export async function changeStatus(
     const { data: r } = await db.from("templates").select("*").eq("id", id).single();
     if (!r) return { ok: false, error: "generic" };
     const input = templateInputSchema.safeParse(rowToInput(r));
-    const problems = input.success ? publishProblems(input.data, r.video_duration_sec == null ? null : Number(r.video_duration_sec), r.kind === "catalog") : (["invalid_face_slots"] as PublishProblem[]);
+    const problems = input.success ? publishProblems(input.data, r.video_duration_sec == null ? null : Number(r.video_duration_sec), r.kind === "catalog", (await catalogSettings()).requireAnalysis) : (["invalid_face_slots"] as PublishProblem[]);
     if (problems.length) return { ok: false, error: "generic", problems };
     const { error } = await db.from("templates")
       .update({ status: "published", published_at: r.published_at ?? new Date().toISOString() }).eq("id", id);
@@ -270,16 +271,23 @@ export async function reanalyzeTemplate(id: string): Promise<{ ok: boolean }> {
 }
 
 /** Admin: show or hide templates with 2–3 people (one Kling run per person) to customers. */
-export async function setMultiPeople(on: boolean): Promise<{ ok: boolean }> {
+/** Changes one catalog switch and keeps the others. */
+async function setCatalogSwitch(key: "multiPeople" | "requireAnalysis", on: boolean, action: string): Promise<{ ok: boolean }> {
   const user = await guard("templates.manage");
   if (!user) return { ok: false };
   const { CATALOG_KEY } = await import("@/lib/catalog/settings");
-  const { error } = await supabaseAdmin().from("site_settings").upsert({
-    key: CATALOG_KEY, value: { multiPeople: !!on }, updated_by: user.id, updated_at: new Date().toISOString(),
-  });
+  const db = supabaseAdmin();
+  const { data: cur } = await db.from("site_settings").select("value").eq("key", CATALOG_KEY).maybeSingle();
+  const value = { ...((cur?.value as Record<string, unknown> | null) ?? {}), [key]: !!on };
+  const { error } = await db.from("site_settings").upsert({ key: CATALOG_KEY, value, updated_by: user.id, updated_at: new Date().toISOString() });
   if (error) return { ok: false };
-  await audit(user.id, "catalog.multi_people", "site_settings", null, { on: !!on });
+  await audit(user.id, action, "site_settings", null, { on: !!on });
   clearMemo();
   revalidatePath("/admin/templates");
+  revalidatePath("/", "layout");
   return { ok: true };
 }
+
+export async function setMultiPeople(on: boolean) { return setCatalogSwitch("multiPeople", on, "catalog.multi_people"); }
+/** Off while Gemini is not available: templates without the AI analysis are open to customers. */
+export async function setRequireAnalysis(on: boolean) { return setCatalogSwitch("requireAnalysis", on, "catalog.require_analysis"); }

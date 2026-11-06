@@ -200,8 +200,10 @@ async function loadTemplates(opts: { q?: string; category?: string; sort?: Catal
   const page = Math.max(1, opts.page ?? 1);
   const from = (page - 1) * PAGE_SIZE;
   const cols = opts.category ? CARD_COLUMNS.replace("categories(", "categories!inner(") : CARD_COLUMNS;
-  let query = supabasePublic().from("templates").select(cols, { count: "exact" }).eq("status", "published").eq("kind", "catalog").eq("ai_ready", true);
-  if (!(await catalogSettings()).multiPeople) query = query.lte("people_n", 1);
+  const cs = await catalogSettings();
+  let query = supabasePublic().from("templates").select(cols, { count: "exact" }).eq("status", "published").eq("kind", "catalog");
+  if (cs.requireAnalysis) query = query.eq("ai_ready", true);
+  if (!cs.multiPeople) query = query.lte("people_n", 1);
 
   query = opts.media === "photo" ? query.eq("provider_key", PHOTO_PROVIDER) : query.neq("provider_key", PHOTO_PROVIDER);
   if (opts.category) query = query.eq("categories.slug", opts.category);
@@ -220,8 +222,11 @@ async function loadTemplates(opts: { q?: string; category?: string; sort?: Catal
 export async function listTrending(limit = 8) {
   await connection(); // request-time only: never run during prerender
   return memo(`cat:trending:${limit}`, 60_000, async () => {
-  const { data } = await supabasePublic().from("templates").select(CARD_COLUMNS)
-    .eq("status", "published").eq("kind", "catalog").eq("ai_ready", true).neq("provider_key", PHOTO_PROVIDER).eq("is_trending", true).lte("people_n", (await catalogSettings()).multiPeople ? 99 : 1).order("sort_order").limit(limit);
+  const cs = await catalogSettings();
+  let q = supabasePublic().from("templates").select(CARD_COLUMNS)
+    .eq("status", "published").eq("kind", "catalog").neq("provider_key", PHOTO_PROVIDER).eq("is_trending", true).lte("people_n", cs.multiPeople ? 99 : 1);
+  if (cs.requireAnalysis) q = q.eq("ai_ready", true);
+  const { data } = await q.order("sort_order").limit(limit);
   return await toCards(data as unknown as Row[]);
   });
 }
@@ -229,8 +234,11 @@ export async function listTrending(limit = 8) {
 export async function listNewest(limit = 8) {
   await connection(); // request-time only: never run during prerender
   return memo(`cat:newest:${limit}`, 60_000, async () => {
-  const { data } = await supabasePublic().from("templates").select(CARD_COLUMNS)
-    .eq("status", "published").eq("kind", "catalog").eq("ai_ready", true).neq("provider_key", PHOTO_PROVIDER).lte("people_n", (await catalogSettings()).multiPeople ? 99 : 1).order("published_at", { ascending: false, nullsFirst: false }).limit(limit);
+  const cs = await catalogSettings();
+  let q = supabasePublic().from("templates").select(CARD_COLUMNS)
+    .eq("status", "published").eq("kind", "catalog").neq("provider_key", PHOTO_PROVIDER).lte("people_n", cs.multiPeople ? 99 : 1);
+  if (cs.requireAnalysis) q = q.eq("ai_ready", true);
+  const { data } = await q.order("published_at", { ascending: false, nullsFirst: false }).limit(limit);
   return await toCards(data as unknown as Row[]);
   });
 }
@@ -243,8 +251,11 @@ export async function getTemplate(id: string): Promise<TemplateDetail | null> {
       .eq("id", id).eq("status", "published").in("kind", ["catalog", "combo"]).maybeSingle();
     if (!data) return null;
     const t = await parseOne(data as unknown as Row);
+    const cs = await catalogSettings();
+    // Without the AI analysis a template is open only while the admin switched the requirement off.
+    if (t && !cs.requireAnalysis) t.available = true;
     // 2–3 people (one Kling run each) are shown only when the admin switched them on.
-    if (t && t.peopleCount > 1 && !(await catalogSettings()).multiPeople) t.available = false;
+    if (t && t.peopleCount > 1 && !cs.multiPeople) t.available = false;
     return t;
   });
 }
