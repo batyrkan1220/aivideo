@@ -54,7 +54,7 @@ export function TemplateDetailView({ t, cta, combo, staffUnits }: { t: TemplateD
         {/* The box is sized from the stored video proportions before anything loads: no jump. */}
         <div
           style={{ "--a": String(t.videoAspect ?? 9 / 16), aspectRatio: String(t.videoAspect ?? 9 / 16) } as React.CSSProperties}
-          className="relative mx-auto w-[min(100%,calc(70svh*var(--a)))] overflow-hidden rounded-[1.75rem] bg-night shadow-[0_24px_60px_-24px_rgba(0,0,0,0.35)] ring-1 ring-black/5 md:w-[min(100%,calc(80vh*var(--a)))]">
+          className="relative mx-auto w-[min(100%,calc(58svh*var(--a)))] overflow-hidden rounded-[1.75rem] bg-night shadow-[0_24px_60px_-24px_rgba(0,0,0,0.35)] ring-1 ring-black/5 md:w-[min(100%,calc(80vh*var(--a)))]">
           {t.previewUrl ? (
             <AutoVideo src={t.previewUrl} poster={t.coverUrl ?? undefined} soundToggle preferSound className="block h-full w-full object-cover" />
           ) : t.coverUrl ? (

@@ -552,41 +552,47 @@ export function CreateFlow({
         );
       })()}
 
-      {/* Quality: a dropdown, 720p by default; picking Full HD updates the total right away. */}
+      {/* Quality: two cards side by side (a dropdown cut the text on phones); the total updates at once. */}
       {effQualities.length > 1 && <section className="rounded-card border border-line bg-surface p-4 sm:p-5">
-        <label htmlFor="quality" className="text-[16px] font-extrabold tracking-tight">{c.qualityTitle}</label>
-        <div className="relative mt-3">
-          <select id="quality" value={quality} onChange={(e) => setQuality(e.target.value)}
-            className="h-13 w-full appearance-none rounded-2xl border-2 border-line bg-paper pl-4 pr-11 text-[16px] font-semibold text-ink outline-none focus:border-ink">
-            {effQualities.map((q) => {
-              const extra = waitingForVideo ? null : calculatePrice(effPricing, q, faceCount).totalKzt - calculatePrice(effPricing, effQualities[0], faceCount).totalKzt;
-              return (
-                <option key={q.key} value={q.key}>
-                  {q.key === "1080p" ? `Высокое (1080p)${extra ? ` · +${formatKzt(extra)}` : ""}` : `Обычное (720p)${extra === null ? "" : ` · ${c.qualityIncluded.toLowerCase()}`}`}
-                </option>
-              );
-            })}
-          </select>
-          <svg viewBox="0 0 24 24" className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="m8 10 4-4 4 4M8 14l4 4 4-4" /></svg>
+        <h2 className="text-[16px] font-extrabold tracking-tight">{c.qualityTitle}</h2>
+        <div role="radiogroup" aria-label={c.qualityTitle} className="mt-3 grid grid-cols-2 gap-2.5">
+          {effQualities.map((q) => {
+            const extra = waitingForVideo ? null : calculatePrice(effPricing, q, faceCount).totalKzt - calculatePrice(effPricing, effQualities[0], faceCount).totalKzt;
+            const on = quality === q.key;
+            const hd = q.key === "1080p";
+            return (
+              <button key={q.key} type="button" role="radio" aria-checked={on} onClick={() => setQuality(q.key)}
+                className={`rounded-2xl border-2 px-3.5 py-3 text-left transition-colors ${on ? "border-ink bg-paper" : "border-line bg-surface hover:border-muted"}`}>
+                <span className="flex items-center justify-between gap-2">
+                  <span className="text-[15px] font-extrabold">{hd ? "Высокое" : "Обычное"}</span>
+                  <span className={`grid h-5 w-5 place-items-center rounded-full border-2 ${on ? "border-ink bg-ink" : "border-line"}`} aria-hidden>{on && <span className="h-2 w-2 rounded-full bg-white" />}</span>
+                </span>
+                <span className="mt-0.5 block text-xs text-muted">{hd ? "1080p" : "720p"}</span>
+                <span className={`mt-1.5 block text-sm font-semibold ${extra ? "text-ink" : "text-success"}`}>
+                  {extra ? `+${formatKzt(extra)}` : c.qualityIncluded}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </section>}
 
       {/* Step: Kaspi phone */}
       {needPhone && (
-        <section className={`rounded-card bg-[#f14635] p-4 text-white transition-shadow sm:p-5 ${nudge === "phone" ? "ring-4 ring-[#f14635]/35" : ""}`}>
-          {/* Kaspi step: Kaspi red with the Kaspi mark, so the customer instantly sees where the bill goes. */}
+        <section className={`rounded-card border border-line bg-surface p-4 transition-shadow sm:p-5 ${nudge === "phone" ? "ring-4 ring-ink/15" : ""}`}>
+          {/* Kaspi step in the site's light style; the Kaspi mark shows where the bill goes. */}
           <h2 className="flex items-center gap-2.5 text-[16px] font-extrabold tracking-tight sm:text-lg">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/kaspi.png" alt="Kaspi" width={32} height={32} className="h-8 w-8 shrink-0 rounded-[9px] ring-2 ring-white/70" />
+            <img src="/kaspi.png" alt="Kaspi" width={32} height={32} className="h-8 w-8 shrink-0 rounded-[9px]" />
             {(++step, c.stepPhone)}
-            {phoneOk && !!phone && <span className="ml-auto flex h-6 w-6 items-center justify-center rounded-full bg-white text-[12px] font-extrabold text-[#f14635]" aria-hidden>✓</span>}
+            {phoneOk && !!phone && <span className="ml-auto flex h-6 w-6 items-center justify-center rounded-full bg-success text-[12px] font-extrabold text-white" aria-hidden>✓</span>}
           </h2>
           <KzPhoneInput
             ref={phoneRef} value={phone} onChange={setPhone} ariaLabel={kk.tole.phoneLabel} invalid={!!phone && !phoneOk}
-            className={`mt-3 h-13 w-full rounded-2xl border-2 bg-white text-lg transition-colors ${phone && !phoneOk ? "border-night" : "border-white focus-within:border-night"}`}
+            className={`mt-3 h-13 w-full rounded-2xl border-2 bg-paper text-lg transition-colors ${phone && !phoneOk ? "border-danger" : "border-line focus-within:border-ink"}`}
           />
-          <p className="mt-1.5 text-xs font-medium text-white/90">
-            {phone && !phoneOk ? `⚠️ ${kk.order.payErrors.phone_invalid}` : kk.tole.phoneHint}
+          <p className={`mt-1.5 text-xs font-medium ${phone && !phoneOk ? "text-danger" : "text-muted"}`}>
+            {phone && !phoneOk ? kk.order.payErrors.phone_invalid : kk.tole.phoneHint}
           </p>
         </section>
       )}

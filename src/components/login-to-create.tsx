@@ -10,7 +10,7 @@ export function LoginToCreate({ next }: { next: string }) {
       <span className="grid h-11 w-11 place-items-center rounded-full bg-[#2AABEE]/12 text-[#229ED9]"><TelegramIcon /></span>
       <h2 className="mt-3 text-lg font-extrabold">{T.createLoginTitle}</h2>
       <p className="mb-5 mt-1 text-sm text-muted">{T.createLoginText}</p>
-      <TelegramBotLogin next={next} />
+      <TelegramBotLogin next={next} compact />
     </div>
   );
 }
