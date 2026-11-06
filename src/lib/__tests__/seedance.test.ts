@@ -235,5 +235,36 @@ describe("templates with cuts (shot by shot)", () => {
     sceneMock.split = null;
     vi.unstubAllGlobals();
   });
+  it("two people with a cut: every shot gets both runs, the second on the first's result", async () => {
+    sceneMock.split = { parts: [{ start: 0, len: 5, file: Buffer.from("a") }, { start: 5, len: 10, file: Buffer.from("b") }] };
+    const faces2 = [{ slotKey: "face_1", providerInput: "img_1", imageUrl: "https://s/1.jpg" }, { slotKey: "face_2", providerInput: "img_2", imageUrl: "https://s/2.jpg" }];
+    const bodies: { contents: { type: string; url?: string; text?: string }[] }[] = [];
+    const replies = [
+      { code: 0, data: { id: "a1" } }, { code: 0, data: { id: "b1" } },                                   // submit: both shots, person 1
+      { code: 0, data: [{ status: "succeeded", outputs: [{ type: "video", url: "https://k/a1.mp4" }] }] }, // poll a1
+      { code: 0, data: { id: "a2" } },                                                                     // shot 1, person 2
+      { code: 0, data: [{ status: "succeeded", outputs: [{ type: "video", url: "https://k/b1.mp4" }] }] }, // poll b1
+      { code: 0, data: { id: "b2" } },                                                                     // shot 2, person 2
+      { code: 0, data: [{ status: "succeeded", outputs: [{ type: "video", url: "https://k/a2.mp4" }] }] },
+      { code: 0, data: [{ status: "succeeded", outputs: [{ type: "video", url: "https://k/b2.mp4" }] }] },
+    ];
+    vi.stubGlobal("fetch", vi.fn(async (_u: string, init?: RequestInit) => {
+      if (init?.body) bodies.push(JSON.parse(String(init.body)));
+      return new Response(JSON.stringify(replies.shift()), { status: 200 });
+    }));
+    const r = await seedanceProvider.submit({ jobId: "j2", ...base, faces: faces2, config: { durationSec: 15, people: 2, positions: ["on the left", "on the right"] } });
+    const p1 = await seedanceProvider.getStatus("a1", { startedAt: null, state: r.state ?? null });
+    expect(p1.state).toBe("processing");
+    const st2 = (p1 as { next?: { state: Record<string, unknown> } }).next!.state;
+    const done = await seedanceProvider.getStatus("a2", { startedAt: null, state: st2 });
+    expect(done).toMatchObject({ state: "succeeded" });
+    const vids = bodies.map((b) => b.contents.find((c) => c.type === "base_video")?.url);
+    const imgs = bodies.map((b) => b.contents.find((c) => c.type === "refer_image")?.url);
+    expect(vids).toEqual(["https://sb.test/signed/kling-shots/j2/p0.mp4", "https://sb.test/signed/kling-shots/j2/p1.mp4", "https://k/a1.mp4", "https://k/b1.mp4"]);
+    expect(imgs).toEqual(["https://s/1.jpg", "https://s/1.jpg", "https://s/2.jpg", "https://s/2.jpg"]);
+    expect(bodies[2].contents[0].text).toContain("on the right");
+    expect(sceneMock.joined.at(-1)).toEqual(["https://k/a2.mp4", "https://k/b2.mp4"]);
+    sceneMock.split = null;
+    vi.unstubAllGlobals();
+  });
 });
-

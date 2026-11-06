@@ -17,6 +17,7 @@ import { botUsername } from "@/lib/partners";
 import { env } from "@/lib/env";
 import { Badge, Chips, PageHead, nowMs } from "../ui";
 import { ReanalyzeButton } from "./reanalyze-button";
+import { ShotsButton } from "./shots-button";
 import { MultiPeopleToggle } from "./multi-people-toggle";
 import { RequireAnalysisToggle } from "./require-analysis-toggle";
 import { catalogSettings } from "@/lib/catalog/settings";
@@ -128,6 +129,7 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
                         : <Badge color="amber">без ИИ-анализа</Badge>)}
                       {t.provider_key === "seedance" && t.analyzed_at && unclearPeople({ people: Number(t.people_n) || 1, positions: Array.isArray(t.positions) ? (t.positions as string[]) : [] }).length > 0 && <Badge color="amber">проверьте описания людей</Badge>}
                       {t.provider_key === "seedance" && t.preview_video_path && <ReanalyzeButton id={t.id} />}
+                      {t.provider_key === "seedance" && t.preview_video_path && <ShotsButton id={t.id} />}
                     </div>
                   </div>
                 </div>

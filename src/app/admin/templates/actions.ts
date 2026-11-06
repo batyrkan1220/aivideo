@@ -270,6 +270,25 @@ export async function reanalyzeTemplate(id: string): Promise<{ ok: boolean }> {
   return { ok: true };
 }
 
+/** Admin: the scene changes ffmpeg finds in the template video and the shots Kling gets, with a frame of each. */
+export async function templateShots(id: string) {
+  const user = await guard("templates.manage");
+  if (!user || !z.string().uuid().safeParse(id).success) return null;
+  const { data: t } = await supabaseAdmin().from("templates").select("preview_video_path,kling_video_path").eq("id", id).maybeSingle();
+  const { mediaUrl } = await import("@/lib/templates/queries");
+  const url = mediaUrl(t?.kling_video_path ?? t?.preview_video_path ?? null);
+  if (!url) return null;
+  try {
+    const { previewShots } = await import("@/lib/media/scene-parts");
+    const r = await previewShots(url);
+    console.log("[scenes] admin", id, `total=${r.total.toFixed(2)} cuts=${r.cuts.map((c) => c.toFixed(2)).join(",") || "-"} shots=${r.parts.map((p) => `${p.start.toFixed(2)}+${p.len.toFixed(2)}`).join(",")}`);
+    return r;
+  } catch (err) {
+    console.error("[scenes] admin failed", err instanceof Error ? err.message.slice(0, 160) : "error");
+    return null;
+  }
+}
+
 /** Admin: show or hide templates with 2–3 people (one Kling run per person) to customers. */
 /** Changes one catalog switch and keeps the others. */
 async function setCatalogSwitch(key: "multiPeople" | "requireAnalysis", on: boolean, action: string): Promise<{ ok: boolean }> {

@@ -30,6 +30,42 @@ const q = ["-hide_banner", "-y", "-threads", "1"];
 // was killed while encoding a 720×1280 shot (TM-100035).
 const x264 = ["-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency", "-x264-params", "ref=1", "-threads", "1"];
 
+async function findShots(inPath: string) {
+  // Scene changes from a small, cheap copy of the picture.
+  const log = await ffmpegLog([...q, "-i", inPath, "-an", "-filter_threads", "1",
+    "-vf", "scale=160:-2,select='gt(scene,0.35)',showinfo", "-f", "null", "-"]);
+  const dur = /Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(log);
+  const total = dur ? Number(dur[1]) * 3600 + Number(dur[2]) * 60 + Number(dur[3]) : 0;
+  const cuts = [...log.matchAll(/pts_time:(\d+(?:\.\d+)?)/g)].map((m) => Number(m[1]));
+  return { total, cuts, parts: planParts(total, cuts) };
+}
+
+/**
+ * Admin view of how an order of this template is cut: every scene change ffmpeg finds, the shots
+ * Kling gets (3 s or more), and a small frame from the middle of each scene.
+ */
+export async function previewShots(videoUrl: string): Promise<{ total: number; cuts: number[]; parts: Part[]; scenes: { start: number; len: number; jpg: string }[] }> {
+  const release = holdMedia();
+  const dir = await mkdtemp(join(tmpdir(), "ps-"));
+  try {
+    const inPath = join(dir, "in");
+    await download(videoUrl, inPath);
+    const { total, cuts, parts } = await findShots(inPath);
+    const edges = [0, ...cuts.filter((c) => c > 0.05 && c < total - 0.05), total];
+    const scenes: { start: number; len: number; jpg: string }[] = [];
+    for (let i = 0; i < edges.length - 1 && i < 24; i++) {
+      const start = edges[i], len = edges[i + 1] - start, o = join(dir, `s${i}.jpg`);
+      await ffmpegLog([...q, "-loglevel", "error", "-ss", (start + len / 2).toFixed(3), "-i", inPath, "-frames:v", "1",
+        "-vf", "scale=240:-2", "-q:v", "5", o]);
+      scenes.push({ start, len, jpg: `data:image/jpeg;base64,${(await readFile(o)).toString("base64")}` });
+    }
+    return { total, cuts, parts, scenes };
+  } finally {
+    release();
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
 /** Shots of the video (start/length in seconds), or null when it is one shot. */
 export async function splitAtCuts(videoUrl: string): Promise<{ parts: (Part & { file: Buffer })[] } | null> {
   const release = holdMedia();
@@ -37,13 +73,7 @@ export async function splitAtCuts(videoUrl: string): Promise<{ parts: (Part & { 
   try {
     const inPath = join(dir, "in");
     await download(videoUrl, inPath);
-    // Scene changes from a small, cheap copy of the picture.
-    const log = await ffmpegLog([...q, "-i", inPath, "-an", "-filter_threads", "1",
-      "-vf", "scale=160:-2,select='gt(scene,0.35)',showinfo", "-f", "null", "-"]);
-    const dur = /Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(log);
-    const total = dur ? Number(dur[1]) * 3600 + Number(dur[2]) * 60 + Number(dur[3]) : 0;
-    const cuts = [...log.matchAll(/pts_time:(\d+(?:\.\d+)?)/g)].map((m) => Number(m[1]));
-    const parts = planParts(total, cuts);
+    const { total, cuts, parts } = await findShots(inPath);
     console.log("[scenes]", `total=${total.toFixed(2)} cuts=${cuts.map((c) => c.toFixed(2)).join(",") || "-"} parts=${parts.length}`);
     if (parts.length < 2) return null;
     const out: (Part & { file: Buffer })[] = [];
