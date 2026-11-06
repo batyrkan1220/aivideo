@@ -1,3 +1,4 @@
+import { ArrowUpRight } from "lucide-react";
 import { Suspense } from "react";
 import Link from "next/link";
 import { ru } from "@/lib/i18n/ru";
@@ -11,14 +12,14 @@ export const metadata = { title: ru.admin.title };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div lang="ru" className="min-h-dvh bg-paper">
-      <header className="border-b border-line bg-white">
-        <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4 pt-[env(safe-area-inset-top)]">
-          <Link href="/admin" className="flex items-center gap-2"><Logo className="text-base" compact /><span className="font-extrabold">{ru.admin.title}</span></Link>
-          <Link href="/" className="ml-auto rounded-full border border-line px-3 py-1.5 text-sm font-semibold text-muted hover:border-ink hover:text-ink">{ru.admin.toSite} ↗</Link>
+    <div lang="ru" className="theme-app min-h-dvh bg-paper text-ink">
+      <header className="glass sticky top-0 z-30 border-b border-line/60">
+        <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 pt-[env(safe-area-inset-top)] sm:px-6">
+          <Link href="/admin" className="flex items-center gap-2.5"><Logo className="text-base" compact /><span className="font-extrabold">{ru.admin.title}</span></Link>
+          <Link href="/" className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-4 text-sm font-semibold text-ink/80 elev-xs hover:border-line-strong hover:text-ink">{ru.admin.toSite}<ArrowUpRight size={15} aria-hidden /></Link>
         </div>
       </header>
-      <Suspense fallback={<p className="p-8 text-muted">{ru.common.loading}</p>}>
+      <Suspense fallback={<div className="mx-auto grid max-w-7xl gap-4 px-4 py-8 sm:px-6"><div className="skeleton h-9 w-64 rounded-full" /><div className="skeleton h-40 rounded-card" /></div>}>
         <Gate>{children}</Gate>
       </Suspense>
     </div>
@@ -35,31 +36,31 @@ async function Gate({ children }: { children: React.ReactNode }) {
   const r = u.role;
   const groups: NavGroup[] = [
     { title: "Продажи", items: [
-      ...(can(r, "dashboard.view") ? [{ href: "/admin", label: "Обзор", icon: "📊" }] : []),
-      ...(can(r, "orders.view") ? [{ href: "/admin/orders", label: "Заказы", icon: "🧾" }] : []),
-      ...(can(r, "dashboard.view") ? [{ href: "/admin/funnel", label: "Воронка по рекламе", icon: "🎯" }] : []),
-      ...(can(r, "users.manage") ? [{ href: "/admin/payments", label: "Платежи · Tolepay", icon: "💳" }] : []),
+      ...(can(r, "dashboard.view") ? [{ href: "/admin", label: "Обзор", icon: "overview" }] : []),
+      ...(can(r, "orders.view") ? [{ href: "/admin/orders", label: "Заказы", icon: "orders" }] : []),
+      ...(can(r, "dashboard.view") ? [{ href: "/admin/funnel", label: "Воронка по рекламе", icon: "funnel" }] : []),
+      ...(can(r, "users.manage") ? [{ href: "/admin/payments", label: "Платежи · Tolepay", icon: "payments" }] : []),
     ] },
     { title: "Каталог", items: can(r, "templates.manage") ? [
-      { href: "/admin/templates", label: "Шаблоны", icon: "🎬" },
-      { href: "/admin/categories", label: "Категории", icon: "🗂" },
-      { href: "/admin/combos", label: "Фото-комбо", icon: "📸" },
-      { href: "/admin/home", label: "Главная страница", icon: "🏠" },
+      { href: "/admin/templates", label: "Шаблоны", icon: "templates" },
+      { href: "/admin/categories", label: "Категории", icon: "categories" },
+      { href: "/admin/combos", label: "Фото-комбо", icon: "combos" },
+      { href: "/admin/home", label: "Главная страница", icon: "home" },
     ] : [] },
     { title: "Сервисы", items: can(r, "templates.manage") ? [
-      { href: "/admin/services", label: "ИИ и расходы", icon: "🤖" },
+      { href: "/admin/services", label: "ИИ и расходы", icon: "ai" },
     ] : [] },
     { title: "Люди", items: can(r, "users.manage") ? [
-      { href: "/admin/users", label: "Пользователи", icon: "👤" },
-      { href: "/admin/partners", label: "Партнёры", icon: "🤝" },
-      { href: "/admin/bot", label: "Telegram-бот", icon: "✈️" },
-      { href: "/admin/pixels", label: "Пиксели и аналитика", icon: "📈" },
+      { href: "/admin/users", label: "Пользователи", icon: "users" },
+      { href: "/admin/partners", label: "Партнёры", icon: "partners" },
+      { href: "/admin/bot", label: "Telegram-бот", icon: "bot" },
+      { href: "/admin/pixels", label: "Пиксели и аналитика", icon: "pixels" },
     ] : [] },
-    { title: "Система", items: can(r, "audit.view") ? [{ href: "/admin/audit", label: "Журнал", icon: "📜" }] : [] },
+    { title: "Система", items: can(r, "audit.view") ? [{ href: "/admin/audit", label: "Журнал", icon: "audit" }] : [] },
   ].filter((g) => g.items.length);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-4 lg:grid lg:grid-cols-[13.5rem_minmax(0,1fr)] lg:gap-8 lg:py-8">
+    <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-10 lg:py-10">
       <aside><AdminNav groups={groups} /></aside>
       <main className="min-w-0 pt-2 lg:pt-0">{children}</main>
     </div>

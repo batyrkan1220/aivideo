@@ -556,7 +556,7 @@ export function TemplateEditor({
             {pending ? e.saving : e.save}
           </button>
           {status !== "published" && status !== "archived" && (
-            <button type="button" disabled={pending} onClick={() => status_("publish")} className="h-11 rounded-full bg-brand px-6 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50">
+            <button type="button" disabled={pending} onClick={() => status_("publish")} className="btn-lime h-11 rounded-full px-6 text-sm font-semibold disabled:opacity-50">
               {e.publish}
             </button>
           )}

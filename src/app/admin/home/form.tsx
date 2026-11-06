@@ -29,7 +29,7 @@ export function ShowcaseForm({ options, current }: { options: Option[]; current:
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-4">
-        <button disabled={pending} className="h-11 rounded-full bg-brand px-6 font-semibold text-white hover:bg-brand-dark disabled:opacity-50">
+        <button disabled={pending} className="btn-lime h-11 rounded-full px-6 font-semibold disabled:opacity-50">
           {pending ? ru.common.loading : H.save}
         </button>
         <a href="/" target="_blank" rel="noopener" className="text-sm font-semibold text-brand hover:underline">{H.preview}</a>
