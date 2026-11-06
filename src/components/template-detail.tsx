@@ -89,7 +89,7 @@ export function TemplateDetailView({ t, cta, combo, staffUnits }: { t: TemplateD
         {/* Phones: title, facts and how it works, right under the sample */}
         <div className="md:hidden">
           <div className="flex items-start justify-between gap-3">
-            <h1 className="t-h1">{t.title}</h1>
+            <h1 className="font-display text-[28px] font-extrabold leading-8 tracking-[-0.025em]">{t.title}</h1>
             {t.startingPriceKzt !== null && <span className="mt-1 shrink-0 rounded-full bg-night px-3.5 py-1.5 text-sm font-extrabold text-white elev-sm">{formatKzt(t.startingPriceKzt)}</span>}
           </div>
           {staffUnits && <p className="mt-2 text-sm font-semibold text-night">{staffUnits}</p>}

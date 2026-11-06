@@ -1,3 +1,6 @@
+import { ChevronDown, LifeBuoy, RotateCcw } from "lucide-react";
+import { ButtonLink } from "@/components/ui/button";
+import { Alert, Skeleton } from "@/components/ui/states";
 import { Suspense } from "react";
 import { DownloadVideo, SendComboToChat } from "@/components/download-video";
 import Link from "next/link";
@@ -28,8 +31,8 @@ export const metadata = { title: kk.order.title };
 type SP = { deleted?: string; error?: string; pay_error?: string };
 export default function OrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<SP> }) {
   return (
-    <main className="mx-auto max-w-3xl px-4 pb-6 pt-4 sm:pt-10">
-      <Suspense fallback={<p className="text-muted">{kk.common.loading}</p>}>
+    <main className="mx-auto max-w-3xl px-4 pb-8 pt-6 sm:px-6 sm:pt-12">
+      <Suspense fallback={<div className="grid gap-4"><Skeleton className="h-10 w-56 rounded-full" /><Skeleton className="h-[60svh] rounded-card" /></div>}>
         <OrderView params={params} searchParams={searchParams} />
       </Suspense>
     </main>
@@ -110,32 +113,33 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
 
   const done = o.generation_status === "completed";
   const busy = ["queued", "processing", "postprocessing"].includes(o.generation_status);
-  const chip = o.payment_status === "refunded" ? { t: kk.order.payment.refunded, c: "bg-line text-ink" }
-    : o.payment_status !== "succeeded" ? { t: payLabel, c: "bg-lavender text-night" }
-    : done ? { t: genLabel, c: "bg-brand-soft text-night" }
-    : o.generation_status === "failed" ? { t: genLabel, c: "bg-rose text-night" }
-    : { t: genLabel, c: "bg-peach text-night" };
+  // Status colours from the design system (AAA text on soft backgrounds).
+  const chip = o.payment_status === "refunded" ? { t: kk.order.payment.refunded, c: "bg-mist text-muted" }
+    : o.payment_status !== "succeeded" ? { t: payLabel, c: "bg-info-soft text-info" }
+    : done ? { t: genLabel, c: "bg-success-soft text-success" }
+    : o.generation_status === "failed" ? { t: genLabel, c: "bg-danger-soft text-danger" }
+    : { t: genLabel, c: "bg-warning-soft text-warning" };
   const regenHref = (o.template_snapshot_json as { user_video_path?: string } | null)?.user_video_path ? "/create" : `/templates/${o.template_id}`;
 
   return (
     <div className="space-y-4">
       <div>
         <Link href="/orders" className="tg-hide -my-2 inline-block py-2 text-sm font-medium text-muted hover:text-ink">← {kk.gallery.title}</Link>
-        <h1 className="mt-2 text-[26px] font-extrabold leading-tight tracking-tight sm:text-3xl">{snap.title_kk}</h1>
+        <h1 className="t-h1 mt-2">{snap.title_kk}</h1>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
-          <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${chip.c}`}>{chip.t}</span>
+          <span className={`t-micro rounded-full px-2.5 py-1 ${chip.c}`}>{chip.t}</span>
           <span>{o.public_order_number} · {fmt.format(new Date(o.created_at))}</span>
         </div>
       </div>
 
-      {sp.deleted === "video" && <p role="status" className="rounded-[20px] bg-surface p-4 text-sm ring-1 ring-line">{kk.result.videoDeleted}</p>}
-      {sp.deleted === "photos" && <p role="status" className="rounded-[20px] bg-surface p-4 text-sm ring-1 ring-line">{kk.result.photosDeleted}</p>}
-      {sp.error === "busy" && <p role="alert" className="rounded-[20px] bg-danger/10 p-4 text-sm text-danger">{kk.result.busy}</p>}
+      {sp.deleted === "video" && <Alert tone="success">{kk.result.videoDeleted}</Alert>}
+      {sp.deleted === "photos" && <Alert tone="success">{kk.result.photosDeleted}</Alert>}
+      {sp.error === "busy" && <Alert tone="warning">{kk.result.busy}</Alert>}
       {sp.pay_error && sp.pay_error in kk.order.payErrors && (
-        <p role="alert" className="rounded-[20px] bg-danger/10 p-4 text-sm text-danger">{kk.order.payErrors[sp.pay_error as keyof typeof kk.order.payErrors]}</p>
+        <Alert tone="danger">{kk.order.payErrors[sp.pay_error as keyof typeof kk.order.payErrors]}</Alert>
       )}
       {o.payment_status === "failed" && (
-        <p role="alert" className="rounded-[20px] bg-danger/10 p-4 text-sm font-medium text-danger">{kk.order.failedMsg}</p>
+        <Alert tone="danger">{kk.order.failedMsg}</Alert>
       )}
 
       {/* Awaiting payment: the pay step comes first. */}
@@ -148,15 +152,15 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
         />
       )}
       {o.generation_status === "failed" && (
-        <section role="alert" className="rounded-[20px] bg-danger/10 p-5 text-sm">
+        <section role="alert" className="rounded-card bg-danger-soft p-6 text-sm">
           <p className="text-base font-bold text-danger">{kk.order.generation.failed}</p>
           <p className="mt-1 text-ink">{job?.safe_error_message ?? kk.generation.errors.generic}</p>
-          <Link href="/support" className="btn-glow mt-4 inline-flex h-10 items-center rounded-full px-5 text-sm font-bold">{kk.result.contactSupport}</Link>
+          <ButtonLink href="/support" className="mt-4">{kk.result.contactSupport}</ButtonLink>
         </section>
       )}
 
       {isCombo && (kids ?? []).length > 0 && (
-        <section className="rounded-[24px] bg-surface p-4 ring-1 ring-line sm:p-6">
+        <section className="rounded-card border border-line/80 bg-surface p-4 sm:p-6">
           <p className="text-[15px] font-extrabold">
             {kk.combo.ready((kids ?? []).filter((k) => k.generation_status === "completed").length, (kids ?? []).length)}
           </p>
@@ -180,15 +184,15 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
       )}
 
       {done && !isCombo && (
-        <section className="rounded-[24px] bg-surface p-4 ring-1 ring-line sm:p-6">
+        <section className="rounded-card border border-line/80 bg-surface p-4 sm:p-6">
           {video && notExpired(video.expires_at) ? (
             <>
               {isPhoto ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={`/api/orders/${o.id}/video`} alt={kk.photos.watch} className="mx-auto max-h-[56svh] w-auto max-w-full rounded-[20px] bg-night object-contain sm:max-h-none sm:max-w-sm" />
+                <img src={`/api/orders/${o.id}/video`} alt={kk.photos.watch} className="mx-auto max-h-[56svh] w-auto max-w-full rounded-[1.25rem] bg-night object-contain elev-md sm:max-h-none sm:max-w-sm" />
               ) : (
                 <video src={`/api/orders/${o.id}/video`} controls playsInline preload="metadata" aria-label={kk.result.watch}
-                  className="mx-auto aspect-[9/16] w-full max-w-[min(100%,calc(56svh*9/16))] rounded-[20px] bg-night sm:max-w-sm" />
+                  className="mx-auto aspect-[9/16] w-full max-w-[min(100%,calc(56svh*9/16))] rounded-[1.25rem] bg-night elev-md sm:max-w-sm" />
               )}
               <div className="mx-auto mt-4 max-w-sm">
                 <DownloadVideo orderId={o.id} photo={isPhoto} />
@@ -199,15 +203,15 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
             <p className="text-sm text-muted">{video ? kk.result.expired : kk.result.videoDeleted}</p>
           )}
           <div className="mx-auto mt-4 grid max-w-sm grid-cols-2 gap-2">
-            <Link href={regenHref} className="flex h-11 items-center justify-center rounded-full bg-ink text-sm font-bold text-paper">↻ {kk.result.regenerate}</Link>
-            <Link href="/support" className="flex h-11 items-center justify-center rounded-full bg-paper text-sm font-bold ring-1 ring-line">{kk.nav.support}</Link>
+            <ButtonLink href={regenHref} icon={<RotateCcw size={16} aria-hidden />}>{kk.result.regenerate}</ButtonLink>
+            <ButtonLink href="/support" variant="secondary" icon={<LifeBuoy size={16} aria-hidden />}>{kk.nav.support}</ButtonLink>
           </div>
         </section>
       )}
 
       {/* Guests (paid without signing in): one tap links Telegram — the video is sent there and the order is never lost. */}
       {guest && (
-        <section className="relative overflow-hidden rounded-[24px] bg-[#2AABEE]/10 p-4 ring-1 ring-[#2AABEE]/30 sm:p-6">
+        <section className="relative overflow-hidden rounded-card bg-[#2AABEE]/10 p-4 ring-1 ring-[#2AABEE]/30 sm:p-6">
           <span className="absolute right-3 top-3 rounded-full bg-brand px-2.5 py-1 text-xs font-extrabold text-night">🎁 −20%</span>
           <p className="pr-16 text-[16px] font-extrabold">{kk.order.tgTitle}</p>
           <ul className="mb-3 mt-2 space-y-1 text-sm">
@@ -238,12 +242,12 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
       )}
 
       {/* Details: price, photos and housekeeping — tucked away once the work is done. */}
-      <details className="group rounded-[20px] bg-surface ring-1 ring-line" open={!done && !awaitingPayment}>
-        <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3.5 text-[15px] font-semibold">
+      <details className="group rounded-card border border-line/80 bg-surface" open={!done && !awaitingPayment}>
+        <summary className="flex cursor-pointer list-none items-center justify-between rounded-card px-4 py-4 text-[15px] font-semibold transition-colors hover:bg-mist/60 sm:px-6">
           {kk.order.details}
-          <span className="text-muted transition-transform group-open:rotate-45" aria-hidden>＋</span>
+          <ChevronDown size={18} className="text-muted transition-transform duration-200 group-open:rotate-180" aria-hidden />
         </summary>
-        <div className="space-y-4 border-t border-line px-4 pb-4 pt-3 text-sm">
+        <div className="space-y-4 border-t border-line px-4 pb-4 pt-4 text-sm sm:px-6">
           <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-6 gap-y-1.5 [&>dd]:break-words">
             <dt className="text-muted">{kk.result.orderNumber}</dt><dd>{o.public_order_number}</dd>
             <dt className="text-muted">{kk.order.created}</dt><dd>{fmt.format(new Date(o.created_at))}</dd>

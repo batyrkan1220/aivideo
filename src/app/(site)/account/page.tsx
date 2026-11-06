@@ -17,7 +17,7 @@ const P = kk.profile;
 export default function AccountPage() {
   return (
     <main className="mx-auto w-full max-w-xl px-4 pb-6 pt-4 sm:pt-10">
-      <Suspense fallback={<div className="h-60 animate-pulse rounded-[24px] bg-surface" />}>
+      <Suspense fallback={<div className="skeleton h-60 rounded-card" />}>
         <Profile />
       </Suspense>
     </main>
@@ -31,8 +31,8 @@ const Chevron = () => (
 function Row({ href, icon, label, hint }: { href: string; icon: string; label: string; hint?: string }) {
   return (
     <li>
-      <Link href={href} className="flex items-center gap-3 px-4 py-3.5 transition-colors active:bg-paper">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-paper text-base" aria-hidden>{icon}</span>
+      <Link href={href} className="flex items-center gap-4 px-4 py-4 transition-colors hover:bg-mist/60 active:bg-mist sm:px-6">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-mist text-base" aria-hidden>{icon}</span>
         <span className="min-w-0 flex-1">
           <span className="block text-[15px] font-semibold">{label}</span>
           {hint && <span className="block truncate text-xs text-muted">{hint}</span>}
@@ -46,8 +46,8 @@ function Row({ href, icon, label, hint }: { href: string; icon: string; label: s
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mt-6">
-      <h2 className="section-title mb-2 px-1 text-muted">{title}</h2>
-      <ul className="divide-y divide-line overflow-hidden rounded-[20px] bg-surface ring-1 ring-line">{children}</ul>
+      <h2 className="t-eyebrow mb-3 px-1 text-muted">{title}</h2>
+      <ul className="divide-y divide-line overflow-hidden rounded-card border border-line/80 bg-surface">{children}</ul>
     </section>
   );
 }
@@ -69,7 +69,7 @@ async function Profile() {
   return (
     <>
       {/* Header card */}
-      <section className="relative overflow-hidden rounded-[24px] bg-night p-5 text-white">
+      <section className="relative overflow-hidden rounded-card bg-night p-6 text-white elev-lg">
         <span className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full bg-[#d7f443]/20 blur-3xl" aria-hidden />
         <div className="relative flex items-center gap-4">
           <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#d7f443] text-2xl font-extrabold text-black" aria-hidden>
@@ -101,7 +101,7 @@ async function Profile() {
 
       {/* Guest (photos uploaded from an ad, not confirmed yet): keep them by signing in with Telegram. */}
       {guest && (
-        <section className="mt-4 rounded-[24px] bg-surface p-4 ring-1 ring-line">
+        <section className="mt-4 rounded-card border border-line/80 bg-surface p-4 sm:p-6">
           <p className="font-bold">{kk.account.guestTitle}</p>
           <p className="mb-3 mt-0.5 text-sm text-muted">{kk.account.guestText}</p>
           <TelegramBotLogin next="/account" compact />
@@ -123,8 +123,8 @@ async function Profile() {
       </Group>
 
       <section className="mt-6">
-        <h2 className="section-title mb-2 px-1 text-muted">{P.settings}</h2>
-        <div className="space-y-4 rounded-[20px] bg-surface p-4 ring-1 ring-line">
+        <h2 className="t-eyebrow mb-3 px-1 text-muted">{P.settings}</h2>
+        <div className="space-y-4 rounded-card border border-line/80 bg-surface p-4 sm:p-6">
           <div>
             <p className="mb-2 text-[15px] font-semibold">{kk.account.editName}</p>
             <DisplayNameForm current={user.displayName ?? ""} />
@@ -140,7 +140,7 @@ async function Profile() {
       {/* Inside the Telegram Mini App the account is the Telegram account: no logout / delete there. */}
       <section className="tg-hide mt-6 space-y-3">
         <div className="flex justify-center"><LogoutButton action={logoutAction} /></div>
-        <details className="rounded-[20px] bg-surface p-4 ring-1 ring-line">
+        <details className="rounded-card border border-line/80 bg-surface p-4 sm:p-6">
           <summary className="cursor-pointer text-sm font-semibold text-danger">{kk.account.deleteAccount}</summary>
           <div className="mt-3">
             <TelegramDeleteNote />

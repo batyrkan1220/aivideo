@@ -1,3 +1,5 @@
+import { Clapperboard } from "lucide-react";
+import { Alert, EmptyState } from "@/components/ui/states";
 import { Suspense } from "react";
 import { connection } from "next/server";
 import { kk } from "@/lib/i18n/kk";
@@ -24,10 +26,14 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
       </Suspense>
 
       {/* Desktop hero */}
-      <section className="mx-auto hidden max-w-6xl grid-cols-[1.15fr_0.85fr] items-center gap-8 px-4 pb-6 pt-12 md:grid">
-        <div className="min-w-0">
-          <h1 className="max-w-3xl font-display text-5xl font-extrabold leading-[1.05] tracking-tight lg:text-6xl">{kk.home.title}</h1>
-          <p className="mt-5 max-w-xl text-lg text-muted">{kk.home.lead}</p>
+      <section className="relative mx-auto hidden max-w-6xl grid-cols-[1.15fr_0.85fr] items-center gap-10 px-6 pb-8 pt-16 md:grid">
+        <div className="pointer-events-none absolute -left-40 -top-24 h-96 w-96 rounded-full bg-brand/30 blur-3xl" aria-hidden />
+        <div className="relative min-w-0">
+          <span className="t-micro inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 elev-xs">
+            <span className="h-2 w-2 rounded-full bg-[#9cbf12]" aria-hidden />{kk.home.badge}
+          </span>
+          <h1 className="mt-5 max-w-3xl font-display text-5xl font-extrabold leading-[1.04] tracking-[-0.035em] lg:text-6xl">{kk.home.title}</h1>
+          <p className="mt-5 max-w-xl text-lg leading-7 text-muted">{kk.home.lead}</p>
           <HowItWorks />
         </div>
         <div className="min-w-0">
@@ -65,11 +71,11 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
 
 function HowItWorks({ compact = false }: { compact?: boolean }) {
   return (
-    <ol className={compact ? "no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 text-xs" : "mt-8 grid max-w-xl grid-cols-3 gap-4 text-sm"}>
+    <ol className={compact ? "no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 text-xs" : "mt-8 grid max-w-xl grid-cols-3 gap-3 text-sm"}>
       {kk.home.steps.map((s, i) => (
-        <li key={s.t} className={compact ? "flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full bg-surface py-1.5 pl-1.5 pr-3 ring-1 ring-line" : "border-t-2 border-ink pt-3"}>
-          <span className={compact ? "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-night" : "font-display text-2xl font-bold text-brand"}>{i + 1}</span>
-          <span className={compact ? "font-medium" : "mt-1 block font-semibold"}>{compact ? s.short : s.t}</span>
+        <li key={s.t} className={compact ? "flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full bg-surface py-1.5 pl-1.5 pr-3 ring-1 ring-line" : "rounded-2xl border border-line/80 bg-surface p-4 elev-xs"}>
+          <span className={compact ? "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-night" : `grid h-8 w-8 place-items-center rounded-full text-sm font-extrabold ${["bg-peach", "bg-lavender", "bg-rose"][i % 3]}`}>{i + 1}</span>
+          <span className={compact ? "font-medium" : "mt-3 block font-semibold leading-5"}>{compact ? s.short : s.t}</span>
         </li>
       ))}
     </ol>
@@ -84,7 +90,7 @@ async function Feed({ searchParams }: { searchParams: Promise<SP> }) {
   const first = await listTemplates({ page: 1, sort: "trending", category });
 
   return (
-    <div className="mx-auto max-w-6xl px-4">
+    <div className="mx-auto max-w-6xl px-4 sm:px-6">
       {/* Sticky category chips, like an app's filter bar */}
       <h2 id="templates" className="section-title mt-5 scroll-mt-20 text-muted md:hidden">{kk.home.templatesTitle}</h2>
       {categories.length > 0 && (
@@ -93,10 +99,7 @@ async function Feed({ searchParams }: { searchParams: Promise<SP> }) {
         </div>
       )}
       {first.items.length === 0 ? (
-        <div className="mt-4 rounded-card border border-dashed border-line bg-surface px-6 py-16 text-center">
-          <h2 className="font-display text-xl font-bold">{kk.home.emptyTitle}</h2>
-          <p className="mx-auto mt-2 max-w-md text-muted">{kk.home.emptyText}</p>
-        </div>
+        <div className="mt-4"><EmptyState icon={<Clapperboard size={26} strokeWidth={1.8} aria-hidden />} title={kk.home.emptyTitle} text={kk.home.emptyText} /></div>
       ) : (
         <VideoFeed
           key={category ?? "all"}
@@ -115,7 +118,7 @@ async function Notice({ searchParams }: { searchParams: Promise<SP> }) {
   if (sp.account !== "deleted") return null;
   return (
     <p role="status" className="mx-auto mt-6 max-w-6xl px-4">
-      <span className="block rounded-card bg-paper p-4 text-sm ring-1 ring-line">{kk.account.accountDeleted}</span>
+      <Alert tone="success">{kk.account.accountDeleted}</Alert>
     </p>
   );
 }
