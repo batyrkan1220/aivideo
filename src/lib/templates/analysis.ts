@@ -10,8 +10,10 @@ export type FoundPerson = { where: string; look: string; ru: string; frame: numb
 export type FoundObject = { what: string; look: string; ru: string; frame: number; box: Box | null };
 export type Analysis = { people: FoundPerson[]; objects: FoundObject[]; scene: string };
 
-/** Version of the analysis: 2 = person cut-outs for Kling have the original face hidden. */
-export const ANALYSIS_VERSION = 2;
+/** Version of the analysis: 2 = face-hidden cut-outs for Kling; 3 = scene notes call people only "the person". */
+export const ANALYSIS_VERSION = 3;
+/** Scene notes written by the analysis start with this; such a prompt is ours and may be rewritten. */
+export const SCENE_PREFIX = "Keep the video 1:1:";
 
 /** The face box inside a cut-out made by cutoutRect, in the cut-out's own pixels (with a little room). */
 export function faceInCutout(W: number, H: number, box: Box, face: Box): { x: number; y: number; w: number; h: number } | null {
@@ -70,7 +72,8 @@ export function applyAnalysis(cfg: SeedanceConfig, a: Analysis, cuts: { people: 
       return { what: f.what, label: preset?.ru ?? "Фото предмета", look: f.look.slice(0, 120), ...(cuts.objects[j] ? { target: cuts.objects[j] } : {}) };
     });
   }
-  const scene = a.scene ? `Keep the video 1:1: ${a.scene}`.slice(0, 1500) : "";
+  const scene = a.scene ? `${SCENE_PREFIX} ${a.scene}`.slice(0, 1500) : "";
+  const ownPrompt = cfg.prompt.trim() && !cfg.prompt.trim().startsWith(SCENE_PREFIX);
   return {
     ...cfg,
     people: n,
@@ -80,7 +83,8 @@ export function applyAnalysis(cfg: SeedanceConfig, a: Analysis, cuts: { people: 
     targetsKling: Array.from({ length: n }, (_, i) => cuts.peopleKling?.[i] ?? ""),
     objects,
     // The scene note only fills an empty prompt; the admin's own text is never replaced here.
-    prompt: cfg.prompt.trim() ? cfg.prompt : scene,
+    // The admin's own text is never replaced; an earlier scene note from the analysis is.
+    prompt: ownPrompt ? cfg.prompt : scene || cfg.prompt,
     showTargets: cuts.people.some(Boolean) || cuts.objects.some(Boolean) ? true : cfg.showTargets,
     analyzedAt: now.toISOString(),
     analysisVersion: ANALYSIS_VERSION,
