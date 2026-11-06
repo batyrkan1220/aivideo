@@ -12,7 +12,7 @@ import { calculatePrice, formatKzt } from "@/lib/pricing";
 import { seedancePriceKzt, seedanceCostKzt, klingUnitLabel, SEEDANCE_QUALITY, type SeedancePricing } from "@/lib/pricing-seedance";
 import { FaceMap } from "@/components/face-map";
 import { detectVideoPeople } from "@/lib/uploads/photo-quality";
-import { saveTemplate, changeStatus, createUploadUrl } from "./actions";
+import { saveTemplate, changeStatus, createUploadUrl, detectTemplateElements } from "./actions";
 import { DeleteTemplateButton } from "./delete-button";
 import { parsePhotoConfig, photoSlots, PHOTO_ASPECTS, PHOTO_MAX_PEOPLE, PHOTO_PROVIDER, PHOTO_QUALITY, type PhotoConfig } from "@/lib/templates/photo-config";
 
@@ -142,6 +142,29 @@ export function TemplateEditor({
     setSd(patch);
     const desc = kept.map((p, i) => e.seedance.detectPerson(i + 1, n === 1 ? "" : e.seedance.positionOptions[where(i) as keyof typeof e.seedance.positionOptions], p.size === biggest && n > 1)).join(" · ");
     setPeople({ busy: false, text: e.seedance.detectFound(found.length, n, desc) });
+  };
+
+  // Gemini: who and what is in the template video, with descriptions for the Kling prompt.
+  const [ai, setAi] = useState<{ busy: boolean; text?: string; err?: boolean }>({ busy: false });
+  const detectWithAi = async () => {
+    if (!t.previewVideoPath) return;
+    setAi({ busy: true });
+    const frames = await videoFrames(/^https?:/.test(t.previewVideoPath) ? t.previewVideoPath : `${mediaBase}/${t.previewVideoPath}`);
+    if (!frames?.length) { setAi({ busy: false, err: true, text: e.seedance.aiFailed }); return; }
+    const r = await detectTemplateElements(frames);
+    if (!r.ok) { setAi({ busy: false, err: true, text: r.error === "not_configured" ? e.seedance.aiNoKey : r.error === "forbidden" ? ru.admin.forbidden : e.seedance.aiFailed }); return; }
+    const n = Math.max(1, Math.min(SEEDANCE_MAX_PEOPLE, r.people.length));
+    const positions = r.people.slice(0, n).map((p) => [p.where, p.look].filter(Boolean).join(", ").slice(0, 120));
+    const objects = r.objects.slice(0, SEEDANCE_MAX_OBJECTS).map((o) => {
+      const preset = Object.values(OBJECT_PRESETS).find((p) => p.en === o.what);
+      return { what: o.what, label: preset?.ru ?? "Фото предмета", look: o.look.slice(0, 120) };
+    });
+    setSd({ people: n, positions, objects });
+    const lines = [
+      ...r.people.slice(0, n).map((p, i) => `${i + 1}. ${p.ru}`),
+      ...r.objects.slice(0, objects.length).map((o) => `+ ${o.ru}`),
+    ];
+    setAi({ busy: false, text: r.people.length ? e.seedance.aiFound(lines.join(" · ")) : e.seedance.detectNone });
   };
 
   // Customer photo slots = the number of people the admin set, left → right (the server derives them too).
@@ -324,25 +347,30 @@ export function TemplateEditor({
                 {people.busy ? e.seedance.detecting : e.seedance.detect}
               </button>
               {people.text && <span className="mt-1 block text-xs font-medium">{people.text}</span>}
+              <button type="button" disabled={ai.busy || !t.previewVideoPath} onClick={() => void detectWithAi()}
+                className="mt-2 ml-2 rounded-full bg-night px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">
+                {ai.busy ? e.seedance.aiBusy : e.seedance.aiDetect}
+              </button>
+              {ai.text && <span className={`mt-1 block text-xs font-medium ${ai.err ? "text-danger" : ""}`}>{ai.text}</span>}
             </Field>
             <Field label={e.seedance.aspect}>
               <select className={inputCls()} value={sd.aspectRatio} onChange={(ev) => setSd({ aspectRatio: ev.target.value as SeedanceConfig["aspectRatio"] })}>
                 {(["9:16", "16:9", "1:1", "adaptive"] as const).map((k) => <option key={k} value={k}>{e.seedance.aspectOptions[k]}</option>)}
               </select>
             </Field>
-            {sd.people > 1 && (
+            {sd.people >= 1 && (
               <div className="grid gap-2 sm:col-span-2">
                 <span className="text-sm font-medium">{e.seedance.labels}</span>
+                <span className="text-xs text-muted">{e.seedance.positionHint}</span>
+                <datalist id="kling-positions">{Object.entries(e.seedance.positionOptions).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</datalist>
                 {Array.from({ length: sd.people }, (_, i) => (
-                  <div key={i} className="grid gap-2 sm:grid-cols-[1fr_200px]">
+                  <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1.4fr]">
                     <input className={inputCls()} maxLength={40} placeholder={`${i + 1}-й человек (слева)`}
                       value={sd.labels[i] ?? ""}
                       onChange={(ev) => { const l = [...sd.labels]; while (l.length < sd.people) l.push(""); l[i] = ev.target.value; setSd({ labels: l.slice(0, sd.people) }); }} />
-                    <select className={inputCls()} value={sd.positions[i] ?? ""}
-                      onChange={(ev) => { const p = [...sd.positions]; while (p.length < sd.people) p.push(""); p[i] = ev.target.value; setSd({ positions: p.slice(0, sd.people) }); }}>
-                      <option value="">{e.seedance.positionAuto(i + 1)}</option>
-                      {Object.entries(e.seedance.positionOptions).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                    </select>
+                    <input className={inputCls()} maxLength={120} list="kling-positions" placeholder={e.seedance.positionAuto(i + 1)}
+                      value={sd.positions[i] ?? ""}
+                      onChange={(ev) => { const p = [...sd.positions]; while (p.length < sd.people) p.push(""); p[i] = ev.target.value; setSd({ positions: p.slice(0, sd.people) }); }} />
                   </div>
                 ))}
               </div>
@@ -367,6 +395,8 @@ export function TemplateEditor({
                     onChange={(ev) => { const list = [...sd.objects]; list[j] = { ...o, label: ev.target.value }; setSd({ objects: list }); }} />
                   <button type="button" onClick={() => setSd({ objects: sd.objects.filter((_, k) => k !== j) })}
                     className="rounded-full px-3 text-sm font-medium text-muted hover:text-danger">Убрать</button>
+                  <input className={`${inputCls()} sm:col-span-3`} maxLength={120} placeholder="Какой именно в видео, по-английски (необязательно): the white car on the right" value={o.look ?? ""}
+                    onChange={(ev) => { const list = [...sd.objects]; list[j] = { ...o, look: ev.target.value }; setSd({ objects: list }); }} />
                   {!Object.values(OBJECT_PRESETS).some((p) => p.en === o.what) && (
                     <input className={`${inputCls()} sm:col-span-3`} maxLength={40} placeholder="Что это по-английски (для ИИ), например: boat, guitar" value={o.what}
                       onChange={(ev) => { const list = [...sd.objects]; list[j] = { ...o, what: ev.target.value }; setSd({ objects: list }); }} />
@@ -694,4 +724,33 @@ function VideoField({
 export function NewTemplateEditor(props: Omit<Parameters<typeof TemplateEditor>[0], "id">) {
   const { bfcacheId } = useRouter();
   return <TemplateEditor key={bfcacheId} id={null} {...props} />;
+}
+
+/** Up to 6 JPEG frames (≤640 px, under ~900 KB together: the server action limit is 1 MB) from the template video, base64 without the data: prefix. null = the browser could not read it. */
+async function videoFrames(url: string): Promise<string[] | null> {
+  const v = document.createElement("video");
+  v.muted = true; v.playsInline = true; v.preload = "auto"; v.crossOrigin = "anonymous"; v.src = url;
+  try {
+    await new Promise<void>((res, rej) => { v.onloadeddata = () => res(); v.onerror = () => rej(new Error("load")); setTimeout(() => rej(new Error("timeout")), 20_000); });
+    const d = v.duration || 1;
+    const scale = Math.min(1, 640 / Math.max(v.videoWidth || 720, v.videoHeight || 1280));
+    const c = document.createElement("canvas");
+    c.width = Math.round((v.videoWidth || 720) * scale); c.height = Math.round((v.videoHeight || 1280) * scale);
+    const ctx = c.getContext("2d");
+    if (!ctx) return null;
+    const out: string[] = [];
+    for (const f of [0.05, 0.2, 0.4, 0.6, 0.8, 0.95]) {
+      v.currentTime = Math.min(d * f, Math.max(0, d - 0.1));
+      await new Promise<void>((res) => { v.onseeked = () => res(); });
+      ctx.drawImage(v, 0, 0, c.width, c.height);
+      out.push(c.toDataURL("image/jpeg", 0.72).split(",")[1] ?? "");
+    }
+    const frames = out.filter(Boolean);
+    while (frames.length > 3 && frames.reduce((n, f) => n + f.length, 0) > 900_000) frames.splice(Math.floor(frames.length / 2), 1);
+    return frames;
+  } catch {
+    return null;
+  } finally {
+    v.removeAttribute("src"); v.load();
+  }
 }

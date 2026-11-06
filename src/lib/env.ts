@@ -29,6 +29,9 @@ const schema = z.object({
   // Replicate — prunaai/p-video-replace (several people in one video).
   // Kling AI official API (api-singapore.klingai.com) — API key from the Kling console.
   KLING_API_KEY: z.string().transform((v) => v.trim().replace(/^["']|["']$/g, "").trim()).pipe(z.string().min(10)).optional(),
+  // Google Gemini (vision): finds the people and things in a template video for the admin editor.
+  GEMINI_API_KEY: z.string().transform((v) => v.trim().replace(/^["']|["']$/g, "").trim()).pipe(z.string().min(10)).optional(),
+  GEMINI_MODEL: z.string().trim().min(3).max(60).default("gemini-3.6-flash"),
   REPLICATE_API_TOKEN: z.string().transform((v) => v.trim().replace(/^["']|["']$/g, "").trim()).pipe(z.string().min(10)).optional(),
   UPLOAD_MAX_BYTES: z.coerce.number().int().positive().default(10 * 1024 * 1024),
   UPLOAD_MIN_DIMENSION: z.coerce.number().int().positive().default(256),
@@ -43,7 +46,7 @@ const schema = z.object({
 
 const OPTIONAL_INTEGRATION_KEYS = new Set([
   "TOLE_API_KEY", "TOLE_CONNECTION_ID", "TOLE_WEBHOOK_SECRET", "TOLE_API_BASE_URL",
-  "KLING_API_KEY", "TELEGRAM_BOT_TOKEN",
+  "KLING_API_KEY", "TELEGRAM_BOT_TOKEN", "GEMINI_API_KEY",
   "TELIKS_API_SECRET",
   "KASPI_MERCHANT_ID", "KASPI_API_KEY", "KASPI_WEBHOOK_SECRET", "KASPI_API_BASE_URL",
 ]);

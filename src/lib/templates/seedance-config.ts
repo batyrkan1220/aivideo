@@ -27,6 +27,8 @@ export const objectSchema = z.object({
   what: z.string().trim().min(1).max(40),
   /** What the customer sees above the upload box. */
   label: z.string().trim().min(1).max(40),
+  /** Optional: which one in the video and how it looks, in English ("the white sedan on the right"). */
+  look: z.string().trim().max(120).optional(),
 });
 export type SwapObject = z.infer<typeof objectSchema>;
 export const SEEDANCE_MIN_SEC = 3;
@@ -50,7 +52,7 @@ export const seedanceConfigSchema = z.object({
   /** The outfit: the customer's own (photo), the original person's in the template, or the customer picks one (default: template). */
   outfit: z.enum(["photo", "template", "choice"]).catch("photo").default("photo"),
   /** Where each person is in the frame (English for the model), e.g. "on the left". */
-  positions: z.array(z.string().trim().max(60)).max(5).default([]),
+  positions: z.array(z.string().trim().max(120)).max(5).default([]),
   /** Things in the video to replace with the customer's photos (after the people). */
   objects: z.array(objectSchema).max(SEEDANCE_MAX_OBJECTS).catch([]).default([]),
 });

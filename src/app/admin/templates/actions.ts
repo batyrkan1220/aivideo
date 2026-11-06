@@ -251,3 +251,21 @@ export async function createUploadUrl(raw: unknown) {
   if (error) { console.error("[admin.upload]", error.message); return { ok: false as const }; }
   return { ok: true as const, path: data.path, token: data.token };
 }
+
+export type DetectResult =
+  | { ok: true; people: { where: string; look: string; ru: string }[]; objects: { what: string; look: string; ru: string }[] }
+  | { ok: false; error: "forbidden" | "not_configured" | "failed" | "invalid" };
+
+/** Template editor: Gemini lists the people and things in a few frames the browser cut from the video. */
+export async function detectTemplateElements(framesRaw: unknown): Promise<DetectResult> {
+  const user = await guard("templates.manage");
+  if (!user) return { ok: false, error: "forbidden" };
+  const frames = z.array(z.string().regex(/^[A-Za-z0-9+/=]+$/).max(500_000)).min(1).max(8).safeParse(framesRaw);
+  if (!frames.success) return { ok: false, error: "invalid" };
+  const { describeTemplateFrames, VisionError } = await import("@/lib/templates/vision");
+  try {
+    return { ok: true, ...(await describeTemplateFrames(frames.data)) };
+  } catch (err) {
+    return { ok: false, error: err instanceof VisionError ? err.code : "failed" };
+  }
+}
