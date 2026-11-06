@@ -213,6 +213,9 @@ export const kk = {
   },
   auth: {
     loginTitle: "Вход в аккаунт",
+    toCatalog: "К трендам",
+    badge: "Вход за пару секунд",
+    safeNote: "Мы не видим ваш пароль и не пишем вам без спроса.",
     signupTitle: "Регистрация",
     email: "Электронная почта",
     password: "Пароль",
