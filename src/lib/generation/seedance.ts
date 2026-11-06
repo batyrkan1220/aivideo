@@ -237,7 +237,7 @@ const submitShot = (run: ShotRun, k: number) => {
   const s = run.shots[k], pass = run.passes[s.k ?? 0];
   return submitKlingOmni({
     videoUrl: (s.k ?? 0) > 0 && s.mid ? s.mid : s.url, photoUrls: pass.photoUrls, mode: "edit", prompt: pass.prompt,
-    durationSec: s.len, aspectRatio: run.aspectRatio, resolution: run.resolution,
+    durationSec: Math.max(3, s.len), aspectRatio: run.aspectRatio, resolution: run.resolution,
   });
 };
 

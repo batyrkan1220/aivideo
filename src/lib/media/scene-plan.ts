@@ -1,12 +1,18 @@
 /** One shot of a template video, in seconds. */
 export type Part = { start: number; len: number };
 
-/** Kling edits 3 s or more; at most this many shots per order (one Kling task each). */
-export const MIN_PART_SEC = 3;
-export const MAX_PARTS = 5;
+/**
+ * Every scene is its own shot, also a short one: inside a shot Kling keeps the face only until the
+ * next cut (TM-100039: scenes of 1.8 and 2.7 s were merged and lost the face). Kling edits 3 s or
+ * more, so a shorter shot is sent held on its last frame up to 3 s and cut back after (KLING_MIN_SEC).
+ * Under MIN_PART_SEC a "scene" is a flash or a double detection and stays with its neighbour.
+ */
+export const MIN_PART_SEC = 0.8;
+export const KLING_MIN_SEC = 3;
+export const MAX_PARTS = 6;
 
 /**
- * Shots from the scene changes: a cut is used only when both sides are at least 3 s long (a shorter
+ * Shots from the scene changes: a cut is used only when both sides are at least MIN_PART_SEC long (a shorter
  * shot stays with the one before it); with too many shots the shortest neighbours are merged.
  */
 export function planParts(total: number, cuts: number[], min = MIN_PART_SEC, max = MAX_PARTS): Part[] {
