@@ -146,6 +146,8 @@ export function TemplateEditor({
 
   // Gemini: who and what is in the template video, with descriptions for the Kling prompt.
   const [ai, setAi] = useState<{ busy: boolean; text?: string; err?: boolean }>({ busy: false });
+  // The prompt already had text: the scene note is offered, not written over it.
+  const [sceneTip, setSceneTip] = useState<string | null>(null);
   const detectWithAi = async () => {
     if (!t.previewVideoPath) return;
     setAi({ busy: true });
@@ -159,7 +161,10 @@ export function TemplateEditor({
       const preset = Object.values(OBJECT_PRESETS).find((p) => p.en === o.what);
       return { what: o.what, label: preset?.ru ?? "Фото предмета", look: o.look.slice(0, 120) };
     });
-    setSd({ people: n, positions, objects });
+    // The scene note goes into the template prompt; the template is edited (edit mode), so the video stays 1:1.
+    const scene = r.scene ? `Keep the video 1:1: ${r.scene}` : "";
+    setSd({ people: n, positions, objects, klingMode: "edit", ...(scene && !sd.prompt.trim() ? { prompt: scene.slice(0, 1500) } : {}) });
+    setSceneTip(scene && sd.prompt.trim() ? scene : null);
     const lines = [
       ...r.people.slice(0, n).map((p, i) => `${i + 1}. ${p.ru}`),
       ...r.objects.slice(0, objects.length).map((o) => `+ ${o.ru}`),
@@ -416,6 +421,12 @@ export function TemplateEditor({
             <Field label={e.seedance.prompt} field="seedance.prompt" error={err("seedance.prompt")} className="sm:col-span-2">
               <textarea className={`${inputCls(err("seedance.prompt"))} min-h-24`} value={sd.prompt} maxLength={1500} onChange={(ev) => setSd({ prompt: ev.target.value })} />
               <span className="mt-1 block text-xs text-muted">{e.seedance.promptHint}</span>
+              {sceneTip && (
+                <span className="mt-2 block rounded-xl bg-paper p-2 text-xs ring-1 ring-line">
+                  {e.seedance.aiScene} <span className="font-medium">{sceneTip}</span>
+                  <button type="button" onClick={() => { setSd({ prompt: sceneTip.slice(0, 1500) }); setSceneTip(null); }} className="ml-2 font-semibold underline">{e.seedance.aiSceneUse}</button>
+                </span>
+              )}
             </Field>
             <p className={`text-xs sm:col-span-2 ${(duration !== null && (duration < 2.5 || duration > 30.5)) || (frame && (frame.w < 700 || frame.h < 700)) ? "font-semibold text-danger" : "text-muted"}`}>
               {e.seedance.durationHint}{duration !== null ? ` · ${Math.round(duration * 10) / 10} сек` : ""}{frame ? ` · ${frame.w}×${frame.h}` : ""}

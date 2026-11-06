@@ -253,7 +253,7 @@ export async function createUploadUrl(raw: unknown) {
 }
 
 export type DetectResult =
-  | { ok: true; people: { where: string; look: string; ru: string }[]; objects: { what: string; look: string; ru: string }[] }
+  | { ok: true; people: { where: string; look: string; ru: string }[]; objects: { what: string; look: string; ru: string }[]; scene: string }
   | { ok: false; error: "forbidden" | "not_configured" | "failed" | "invalid" };
 
 /** Template editor: Gemini lists the people and things in a few frames the browser cut from the video. */
