@@ -97,7 +97,16 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
     parts.push(`${cutouts.join(", ")} ${cutouts.length === 1 ? "is a cut-out" : "are cut-outs"} from @video_1 that only show${cutouts.length === 1 ? "s" : ""} which one to replace; faces in them are hidden on purpose. The faces come only from the customer photos ${refs.join(", ")}. Never copy anything else from the cut-outs into the result.`);
   }
   parts.push("Photorealistic, natural, sharp face, no text, no watermark.");
-  if (adminPrompt) parts.push(`Mandatory template instruction: ${adminPrompt}`);
+  // The template note describes the ORIGINAL video (often "a young woman …"). Labelled plainly, Kling read it
+  // as "keep this woman" and returned the template unchanged (TM-100020/21/31). It only fixes scene and motion.
+  if (adminPrompt) {
+    parts.push(`Scene and motion to keep from @video_1 (it describes the original video; any person mentioned in it is still replaced as described above): ${adminPrompt}`);
+  }
+  const photosRef = refs.join(", ");
+  parts.push(
+    `Final check: every replaced person in the result is the person from ${photosRef}, with their face, hair, skin and body. ` +
+    "The original person from @video_1 must not appear in any frame. Do not return @video_1 unchanged.",
+  );
   if (wish) {
     parts.push(
       "Everything above is mandatory and has priority.",

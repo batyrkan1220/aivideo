@@ -50,7 +50,7 @@ For each thing:
 - look: short English description and position, e.g. "the white sedan on the right". Max 12 words.
 - ru: the same in Russian.
 - frame and box: as for people, around the whole thing.
-Finally write scene: 1–3 short English sentences (max 50 words) for the video model that lock everything that must stay exactly as in this video, 1:1: the location and background, lighting and colors, camera movement and framing, and what each person does and when (gestures, moves, turns, timing). Only describe what is there; do not suggest any change and do not describe faces.
+Finally write scene: 1–3 short English sentences (max 50 words) for the video model that lock everything that must stay exactly as in this video, 1:1: the location and background, lighting and colors, camera movement and framing, and what each person does and when (gestures, moves, turns, timing). Call people only "the person" (or "the first person", "the second person"): never their gender, age, hair, face, body or clothing, because they will be replaced by someone else. Only describe what is there; do not suggest any change.
 Reply with JSON only.`;
 
 const responseSchema = {

@@ -7,8 +7,9 @@ describe("Kling prompt priorities", () => {
     const p = buildKlingDirectPrompt("edit", "template", "national costume", "red dress, smiling");
     expect(p.startsWith("Edit @video_1. Replace the main person in @video_1 with the person from @image_1.")).toBe(true);
     expect(p).toContain("Keep the clothing from @video_1");
-    expect(p).toContain("Mandatory template instruction: national costume");
-    expect(p.indexOf("Mandatory template instruction")).toBeLessThan(p.indexOf("Optional customer wish"));
+    expect(p).toContain("any person mentioned in it is still replaced as described above): national costume");
+    expect(p.indexOf("Scene and motion to keep")).toBeLessThan(p.indexOf("Optional customer wish"));
+    expect(p).toContain("The original person from @video_1 must not appear in any frame. Do not return @video_1 unchanged.");
     expect(p).toMatch(/ignore any part that asks to change the faces or the clothing/);
     expect(p).toContain("Never return to the original face from @video_1");
     expect(p).toContain("Replace the whole person, not only the face: head, hair, neck, arms, hands, legs and feet");
