@@ -27,10 +27,14 @@ import { mediaUrl } from "@/lib/templates/queries";
 */
 const MAX_SOURCE_BYTES = 80 * 1024 * 1024;
 const LITE_DIR = "previews/lite4/";
+const KLING_DIR = "previews/kling1/";
 const ANIM_DIR = "previews/anim5/";
 const THUMB_DIR = "covers/thumb1/";
 const queue: string[] = [];
 let running = false;
+
+/** True while preview copies are being made (other ffmpeg jobs wait: the server has 512 MB). */
+export const liteBusy = () => running;
 
 /** Queue a template for a (re)made light preview. Safe to call many times. */
 export function queueLitePreview(templateId: string) {
@@ -41,10 +45,10 @@ export function queueLitePreview(templateId: string) {
 /** Server start: every template with a video but no light preview yet. */
 export async function backfillLitePreviews() {
   const { data } = await supabaseAdmin().from("templates")
-    .select("id,cover_asset_path,cover_thumb_path,preview_video_path,preview_lite_path,preview_anim_path,video_aspect").not("preview_video_path", "is", null).is("deleted_at", null).limit(1000);
+    .select("id,cover_asset_path,cover_thumb_path,preview_video_path,preview_lite_path,preview_anim_path,video_aspect,video_px").not("preview_video_path", "is", null).is("deleted_at", null).limit(1000);
   // Missing, or still an old v1 copy (an original kept as-is because it was already small counts as done).
   const todo = (data ?? []).filter((r) => !r.preview_lite_path || (!r.preview_lite_path.startsWith(LITE_DIR) && r.preview_lite_path !== r.preview_video_path)
-    || !r.preview_anim_path?.startsWith(ANIM_DIR) || (!!r.cover_asset_path && !r.cover_thumb_path?.startsWith(THUMB_DIR)) || !r.video_aspect);
+    || !r.preview_anim_path?.startsWith(ANIM_DIR) || (!!r.cover_asset_path && !r.cover_thumb_path?.startsWith(THUMB_DIR)) || !r.video_aspect || !r.video_px);
   for (const r of todo) queueLitePreview(r.id);
   if (!todo.length) void cleanupOrphans();
   return todo.length;
@@ -69,7 +73,7 @@ async function drain() {
 
 async function makeOne(templateId: string): Promise<boolean> {
   const db = supabaseAdmin();
-  const { data: t } = await db.from("templates").select("cover_asset_path,cover_thumb_path,preview_video_path,preview_lite_path,preview_anim_path").eq("id", templateId).maybeSingle();
+  const { data: t } = await db.from("templates").select("cover_asset_path,cover_thumb_path,preview_video_path,preview_lite_path,preview_anim_path,kling_video_path").eq("id", templateId).maybeSingle();
   const oldLite = t?.preview_lite_path ?? null;
   const oldAnim = t?.preview_anim_path ?? null;
   const src = t?.preview_video_path;
@@ -88,6 +92,21 @@ async function makeOne(templateId: string): Promise<boolean> {
     if (inputSize > MAX_SOURCE_BYTES) return false;
     // Width ÷ height of the original (rotation applied), so the template page can reserve its box.
     const aspect = await probeAspect(inPath).catch(() => null);
+    // Kling refuses a template video under 700 px ("The video width should not be less than 700px"):
+    // such videos get an upscaled copy (short side 720) that only Kling uses.
+    const px = await probeSize(inPath).catch(() => null);
+    let klingPath: string | null = t?.kling_video_path ?? null;
+    if (px && Math.min(px.w, px.h) < 720 && !klingPath) {
+      const kOut = join(dir, "kling.mp4");
+      try {
+        await runFfmpeg(inPath, kOut, upscaleArgs);
+        const p = `${KLING_DIR}${randomUUID()}.mp4`;
+        const { error } = await db.storage.from("template-media").upload(p, await readFile(kOut), { contentType: "video/mp4", cacheControl: "31536000", upsert: false });
+        if (!error) { klingPath = p; console.log("[lite-preview] kling copy", templateId, `${px.w}x${px.h}`); }
+      } catch (err) {
+        console.error("[lite-preview] kling copy failed", err instanceof Error ? err.message.slice(0, 200) : "error");
+      }
+    }
     const fresh = !oldLite || oldLite === src || !oldLite.startsWith(LITE_DIR);
     let litePath = oldLite ?? src;
     const uploaded: string[] = [];
@@ -145,7 +164,8 @@ async function makeOne(templateId: string): Promise<boolean> {
       }
     }
     // Only if the template still has the same video (the admin may have replaced it meanwhile).
-    const { data: updated } = await db.from("templates").update({ preview_lite_path: litePath, preview_anim_path: animPath, cover_thumb_path: thumbPath, ...(aspect ? { video_aspect: aspect } : {}) })
+    if (klingPath && klingPath !== t?.kling_video_path) uploaded.push(klingPath);
+    const { data: updated } = await db.from("templates").update({ preview_lite_path: litePath, preview_anim_path: animPath, cover_thumb_path: thumbPath, ...(aspect ? { video_aspect: aspect } : {}), ...(px ? { video_px: `${px.w}x${px.h}` } : {}), kling_video_path: klingPath })
       .eq("id", templateId).eq("preview_video_path", src).select("id");
     if (!updated?.length && uploaded.length) await db.storage.from("template-media").remove(uploaded);
     // Replaced light copies (never the original video) are no longer needed.
@@ -191,6 +211,32 @@ const thumbArgs = (inPath: string, outPath: string) => [
   "-vf", `${CARD_CROP},scale=360:480:flags=lanczos,setsar=1`, "-c:v", "libwebp", "-q:v", "78", outPath,
 ];
 
+// Short side to 720 px (Kling needs 700+), same frames and sound, high quality, single-threaded.
+const upscaleArgs = (inPath: string, outPath: string) => [
+  "-hide_banner", "-loglevel", "error", "-y", "-threads", "1", "-i", inPath, "-threads", "1", "-filter_threads", "1",
+  "-vf", "scale=w='if(gt(iw,ih),-2,720)':h='if(gt(iw,ih),720,-2)':flags=lanczos,setsar=1",
+  "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",
+  "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", outPath,
+];
+
+/** Display size (rotation applied) of a video from ffmpeg's stream info. */
+async function probeSize(inPath: string): Promise<{ w: number; h: number } | null> {
+  const bin = await ffmpegPath();
+  const info = await new Promise<string>((resolve) => {
+    const p = spawn(bin, ["-hide_banner", "-i", inPath], { stdio: ["ignore", "ignore", "pipe"] });
+    let out = "";
+    p.stderr.on("data", (d) => { out = (out + d).slice(-8000); });
+    const timer = setTimeout(() => p.kill("SIGKILL"), 20_000);
+    p.on("close", () => { clearTimeout(timer); resolve(out); });
+    p.on("error", () => { clearTimeout(timer); resolve(""); });
+  });
+  const m = /Video:.*?(\d{2,5})x(\d{2,5})/.exec(info);
+  if (!m) return null;
+  let w = Number(m[1]), h = Number(m[2]);
+  if (/rotat(e|ion of)\s*:?\s*-?(90|270)/i.test(info)) [w, h] = [h, w];
+  return { w, h };
+}
+
 /** Reads the display aspect (w/h) of a video from ffmpeg's stream info, honouring 90° rotation. */
 async function probeAspect(inPath: string): Promise<number | null> {
   const bin = await ffmpegPath();
@@ -216,12 +262,12 @@ async function probeAspect(inPath: string): Promise<number | null> {
 async function cleanupOrphans() {
   try {
     const db = supabaseAdmin();
-    const { data: rows } = await db.from("templates").select("cover_thumb_path,preview_lite_path,preview_anim_path");
-    const keep = new Set((rows ?? []).flatMap((r) => [r.cover_thumb_path, r.preview_lite_path, r.preview_anim_path]).filter(Boolean) as string[]);
+    const { data: rows } = await db.from("templates").select("cover_thumb_path,preview_lite_path,preview_anim_path,kling_video_path");
+    const keep = new Set((rows ?? []).flatMap((r) => [r.cover_thumb_path, r.preview_lite_path, r.preview_anim_path, r.kling_video_path]).filter(Boolean) as string[]);
     const dirs: string[] = [];
     for (const root of ["previews", "covers"]) {
       const { data } = await db.storage.from("template-media").list(root, { limit: 1000 });
-      for (const e of data ?? []) if (!e.id && /^(lite\d*|anim\d+|thumb\d+)$/.test(e.name)) dirs.push(`${root}/${e.name}`);
+      for (const e of data ?? []) if (!e.id && /^(lite\d*|anim\d+|thumb\d+|kling\d+)$/.test(e.name)) dirs.push(`${root}/${e.name}`);
     }
     let removed = 0;
     for (const d of dirs) {

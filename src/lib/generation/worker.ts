@@ -143,6 +143,11 @@ async function submitJob(job: Job) {
     faces.push({ slotKey: s.key, providerInput: s.providerInput, imageUrl: signed.signedUrl });
   }
   let templateVideoUrl = mediaUrl((snap.preview_video_path as string) ?? null) ?? "";
+  // Template videos under 700 px have an upscaled copy for Kling (Kling refuses them otherwise).
+  if (typeof snap.preview_video_path === "string" && snap.preview_video_path) {
+    const { data: tv } = await db.from("templates").select("preview_video_path,kling_video_path").eq("id", order.template_id).maybeSingle();
+    if (tv?.kling_video_path && tv.preview_video_path === snap.preview_video_path) templateVideoUrl = mediaUrl(tv.kling_video_path) ?? templateVideoUrl;
+  }
   if (typeof snap.user_video_path === "string" && snap.user_video_path) {
     // "Өз видеом": the customer's own private video, shared with the provider via a signed URL.
     const { data: signedVideo } = await db.storage.from("user-videos").createSignedUrl(snap.user_video_path, 24 * 3600);

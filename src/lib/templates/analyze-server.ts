@@ -14,7 +14,7 @@ import { mediaUrl } from "./queries";
 import { parseSeedanceConfig, seedanceSlots } from "./seedance-config";
 import { analysisHint, applyAnalysis, cutoutRect, isAnalyzed, type Box } from "./analysis";
 import { describeTemplateFrames, VisionError } from "./vision";
-import { runFfmpeg } from "./lite-preview";
+import { liteBusy, runFfmpeg } from "./lite-preview";
 import { snapshotVersion } from "./versions";
 
 /*
@@ -47,6 +47,8 @@ async function drain() {
   let ok = 0, failed = 0;
   try {
     while (queue.length) {
+      // One ffmpeg job on the server at a time.
+      while (liteBusy()) await new Promise((r) => setTimeout(r, 3000));
       const id = queue.shift()!;
       try {
         if (await analyzeTemplate(id)) ok++; else failed++;

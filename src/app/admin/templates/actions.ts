@@ -83,6 +83,9 @@ export async function saveTemplate(raw: unknown, id: string | null, metaRaw?: un
     const old = before.preview_lite_path;
     await db.from("templates").update({
       preview_anim_path: null,
+      // The Kling copy and the measured size belong to the old video; the preview job remakes them.
+      kling_video_path: null,
+      video_px: null,
       preview_lite_path: row.preview_video_path,
       video_duration_sec: meta.durationSec ? roundSec(meta.durationSec) : null,
       video_aspect: meta.aspect,
