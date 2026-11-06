@@ -11,7 +11,7 @@ import { OBJECT_PRESETS, parseSeedanceConfig, seedanceSlots, SEEDANCE_MAX_OBJECT
 import { calculatePrice, formatKzt } from "@/lib/pricing";
 import { seedancePriceKzt, seedanceCostKzt, klingUnitLabel, SEEDANCE_QUALITY, type SeedancePricing } from "@/lib/pricing-seedance";
 import { FaceMap } from "@/components/face-map";
-import { detectVideoPeople } from "@/lib/uploads/photo-quality";
+import { applyAnalysis, cutoutRect, type Box } from "@/lib/templates/analysis";
 import { saveTemplate, changeStatus, createUploadUrl, detectTemplateElements } from "./actions";
 import { DeleteTemplateButton } from "./delete-button";
 import { parsePhotoConfig, photoSlots, PHOTO_ASPECTS, PHOTO_MAX_PEOPLE, PHOTO_PROVIDER, PHOTO_QUALITY, type PhotoConfig } from "@/lib/templates/photo-config";
@@ -123,61 +123,30 @@ export function TemplateEditor({
   const setPricing = (patch: Partial<TemplateInput["pricing"]>) => set("pricing", { ...t.pricing, ...patch });
   const setSd = (patch: Partial<SeedanceConfig>) => { setSdState((p) => ({ ...p, ...patch })); setDirty(true); };
 
-  // Who is in the template video: faces found on a few frames, left → right.
-  const [people, setPeople] = useState<{ busy: boolean; text?: string }>({ busy: false });
-  const detectPeople = async (path: string | null = t.previewVideoPath) => {
-    if (!path) return;
-    setPeople({ busy: true });
-    const found = await detectVideoPeople(/^https?:/.test(path) ? path : `${mediaBase}/${path}`);
-    if (!found) { setPeople({ busy: false, text: e.seedance.detectFailed }); return; }
-    if (!found.length) { setPeople({ busy: false, text: e.seedance.detectNone }); return; }
-    const max = SEEDANCE_MAX_PEOPLE;
-    const n = Math.min(found.length, max);
-    // Kept people: the biggest faces, shown left → right.
-    const kept = [...found].sort((a, b) => b.size - a.size).slice(0, n).sort((a, b) => a.x - b.x);
-    const biggest = Math.max(...kept.map((p) => p.size));
-    const where = (i: number) => (n === 1 ? "" : i === 0 ? "on the left" : i === n - 1 ? "on the right" : "in the center");
-    const patch: Partial<SeedanceConfig> = { people: n };
-    patch.positions = kept.map((_, i) => where(i));
-    setSd(patch);
-    const desc = kept.map((p, i) => e.seedance.detectPerson(i + 1, n === 1 ? "" : e.seedance.positionOptions[where(i) as keyof typeof e.seedance.positionOptions], p.size === biggest && n > 1)).join(" · ");
-    setPeople({ busy: false, text: e.seedance.detectFound(found.length, n, desc) });
-  };
-
-  // Gemini: who and what is in the template video, with descriptions for the Kling prompt.
-  const [ai, setAi] = useState<{ busy: boolean; text?: string; err?: boolean }>({ busy: false });
+  // AI analysis (Gemini): people, things, a cut-out of each and a scene note that keeps the video 1:1.
+  // Catalog video templates cannot be published or ordered without it.
+  const [ai, setAi] = useState<{ busy: boolean; text?: string; err?: boolean; found?: string[] }>({ busy: false });
   // The prompt already had text: the scene note is offered, not written over it.
   const [sceneTip, setSceneTip] = useState<string | null>(null);
-  const detectWithAi = async () => {
+  const analyze = async () => {
     if (!t.previewVideoPath) return;
     setAi({ busy: true });
     const frames = await videoFrames(/^https?:/.test(t.previewVideoPath) ? t.previewVideoPath : `${mediaBase}/${t.previewVideoPath}`);
     if (!frames?.length) { setAi({ busy: false, err: true, text: e.seedance.aiFailed }); return; }
     const r = await detectTemplateElements(frames);
     if (!r.ok) { setAi({ busy: false, err: true, text: r.error === "not_configured" ? e.seedance.aiNoKey : r.error === "forbidden" ? ru.admin.forbidden : e.seedance.aiFailed }); return; }
-    const n = Math.max(1, Math.min(SEEDANCE_MAX_PEOPLE, r.people.length));
-    const positions = r.people.slice(0, n).map((p) => [p.where, p.look].filter(Boolean).join(", ").slice(0, 120));
-    const objects = r.objects.slice(0, SEEDANCE_MAX_OBJECTS).map((o) => {
-      const preset = Object.values(OBJECT_PRESETS).find((p) => p.en === o.what);
-      return { what: o.what, label: preset?.ru ?? "Фото предмета", look: o.look.slice(0, 120) };
-    });
-    // The scene note goes into the template prompt; the template is edited (edit mode), so the video stays 1:1.
-    const scene = r.scene ? `Keep the video 1:1: ${r.scene}` : "";
-    // Cut each one out of its best frame: the customer sees who/what their photo replaces.
-    const cut = async (x: { frame: number; box: [number, number, number, number] | null }) => {
+    const cut = async (x: { frame: number; box: Box | null }) => {
       const blob = x.box ? await cropFrame(frames[x.frame] ?? frames[0], x.box) : null;
       return blob ? (await uploadTarget(blob)) ?? "" : "";
     };
-    const targets = await Promise.all(r.people.slice(0, n).map(cut));
-    const objectCuts = await Promise.all(r.objects.slice(0, objects.length).map(cut));
-    const withCuts = objects.map((o, j) => (objectCuts[j] ? { ...o, target: objectCuts[j] } : o));
-    setSd({ people: n, positions, objects: withCuts, targets, klingMode: "edit", ...(scene && !sd.prompt.trim() ? { prompt: scene.slice(0, 1500) } : {}) });
+    const people = await Promise.all(r.people.slice(0, SEEDANCE_MAX_PEOPLE).map(cut));
+    const objects = await Promise.all(r.objects.slice(0, SEEDANCE_MAX_OBJECTS).map(cut));
+    const next = applyAnalysis(sd, r, { people, objects });
+    // A whole new analysis is a new start: edit mode keeps the template video 1:1.
+    setSd({ ...next, klingMode: "edit" });
+    const scene = r.scene ? `Keep the video 1:1: ${r.scene}` : "";
     setSceneTip(scene && sd.prompt.trim() ? scene : null);
-    const lines = [
-      ...r.people.slice(0, n).map((p, i) => `${i + 1}. ${p.ru}`),
-      ...r.objects.slice(0, objects.length).map((o) => `+ ${o.ru}`),
-    ];
-    setAi({ busy: false, text: r.people.length ? e.seedance.aiFound(lines.join(" · ")) : e.seedance.detectNone });
+    setAi({ busy: false, text: r.people.length ? e.seedance.aiDone : e.seedance.detectNone, found: [...r.people.map((x) => x.ru), ...r.objects.map((x) => x.ru)] });
   };
 
   // Customer photo slots = the number of people the admin set, left → right (the server derives them too).
@@ -296,9 +265,8 @@ export function TemplateEditor({
           ? <PhotoExampleField error={err("cover")} path={t.coverAssetPath} mediaBase={mediaBase} onUploaded={(p) => set("coverAssetPath", p)} />
           : <VideoField error={err("preview")} path={t.previewVideoPath} mediaBase={mediaBase} onUploaded={(p, meta) => {
               set("previewVideoPath", p); setDuration(meta?.duration ?? null); setAspect(meta?.aspect ?? null);
-              // Cut-outs belong to the old video.
-              setSd({ targets: [], objects: sd.objects.map(({ target: _t, ...o }) => o), showTargets: false });
-              void detectPeople(p);
+              // Cut-outs and the analysis belong to the old video.
+              setSd({ targets: [], objects: sd.objects.map(({ target: _t, ...o }) => o), showTargets: false, analyzedAt: undefined });
             }} onCover={(p) => set("coverAssetPath", p)} />}
       </Section>
 
@@ -342,118 +310,135 @@ export function TemplateEditor({
       <Section title={e.seedance.title}>
         <p className="text-sm text-muted">{e.seedance.intro}</p>
         <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_minmax(0,320px)]">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={e.seedance.klingMode}>
-              <select className={inputCls()} value={sd.klingMode} onChange={(ev) => setSd({ klingMode: ev.target.value as SeedanceConfig["klingMode"] })}>
-                <option value="edit">{e.seedance.klingModeOptions.edit}</option>
-                <option value="reference">{e.seedance.klingModeOptions.reference}</option>
-              </select>
-            </Field>
-            <Field label={e.seedance.outfit}>
-              <select className={inputCls()} value={sd.outfit} onChange={(ev) => setSd({ outfit: ev.target.value as SeedanceConfig["outfit"] })}>
-                <option value="photo">{e.seedance.outfitOptions.photo}</option>
-                <option value="template">{e.seedance.outfitOptions.template}</option>
-                <option value="choice">{e.seedance.outfitOptions.choice}</option>
-              </select>
-            </Field>
-            <Field label={e.seedance.people}>
-              <select className={inputCls()} value={sd.people} onChange={(ev) => setSd({ people: Number(ev.target.value) })}>
-                {Array.from({ length: SEEDANCE_MAX_PEOPLE }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
-              <button type="button" disabled={people.busy || !t.previewVideoPath} onClick={() => void detectPeople()}
-                className="mt-2 rounded-full border border-line px-3 py-1.5 text-xs font-semibold hover:border-ink disabled:opacity-50">
-                {people.busy ? e.seedance.detecting : e.seedance.detect}
-              </button>
-              {people.text && <span className="mt-1 block text-xs font-medium">{people.text}</span>}
-              <button type="button" disabled={ai.busy || !t.previewVideoPath} onClick={() => void detectWithAi()}
-                className="mt-2 ml-2 rounded-full bg-night px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">
-                {ai.busy ? e.seedance.aiBusy : e.seedance.aiDetect}
-              </button>
-              {ai.text && <span className={`mt-1 block text-xs font-medium ${ai.err ? "text-danger" : ""}`}>{ai.text}</span>}
-              {(sd.targets.some(Boolean) || sd.objects.some((o) => o.target)) && (
-                <span className="mt-2 block text-xs">
-                  <label className="inline-flex items-center gap-2 font-medium">
-                    <input type="checkbox" checked={sd.showTargets} onChange={(ev) => setSd({ showTargets: ev.target.checked })} />
-                    {e.seedance.showTargets}
-                  </label>
-                  <span className="block text-muted">{e.seedance.showTargetsHint}</span>
-                  <button type="button" onClick={() => setSd({ targets: [], objects: sd.objects.map(({ target: _t, ...o }) => o), showTargets: false })} className="mt-1 font-semibold text-muted underline hover:text-danger">{e.seedance.clearTargets}</button>
+          <div className="grid gap-5">
+            {/* Step 1: AI analysis — required for every catalog video template. */}
+            <div className={`rounded-2xl p-4 ring-1 ${sd.analyzedAt ? "bg-paper ring-line" : "bg-[#fff8e6] ring-[#f0c36d]"}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-semibold">{e.seedance.step1}</span>
+                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${sd.analyzedAt ? "bg-brand text-night" : "bg-[#f0c36d] text-night"}`}>
+                  {sd.analyzedAt ? e.seedance.analyzed(new Date(sd.analyzedAt).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" })) : e.seedance.notAnalyzed}
                 </span>
-              )}
-            </Field>
-            <Field label={e.seedance.aspect}>
-              <select className={inputCls()} value={sd.aspectRatio} onChange={(ev) => setSd({ aspectRatio: ev.target.value as SeedanceConfig["aspectRatio"] })}>
-                {(["9:16", "16:9", "1:1", "adaptive"] as const).map((k) => <option key={k} value={k}>{e.seedance.aspectOptions[k]}</option>)}
-              </select>
-            </Field>
-            {sd.people >= 1 && (
-              <div className="grid gap-2 sm:col-span-2">
-                <span className="text-sm font-medium">{e.seedance.labels}</span>
-                <span className="text-xs text-muted">{e.seedance.positionHint}</span>
-                <datalist id="kling-positions">{Object.entries(e.seedance.positionOptions).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</datalist>
-                {Array.from({ length: sd.people }, (_, i) => (
-                  <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1.4fr]">
-                    <input className={inputCls()} maxLength={40} placeholder={`${i + 1}-й человек (слева)`}
-                      value={sd.labels[i] ?? ""}
-                      onChange={(ev) => { const l = [...sd.labels]; while (l.length < sd.people) l.push(""); l[i] = ev.target.value; setSd({ labels: l.slice(0, sd.people) }); }} />
-                    <input className={inputCls()} maxLength={120} list="kling-positions" placeholder={e.seedance.positionAuto(i + 1)}
-                      value={sd.positions[i] ?? ""}
-                      onChange={(ev) => { const p = [...sd.positions]; while (p.length < sd.people) p.push(""); p[i] = ev.target.value; setSd({ positions: p.slice(0, sd.people) }); }} />
-                  </div>
-                ))}
               </div>
-            )}
-            {/* Things to swap besides people (car, horse, outfit…): one customer photo each. */}
-            <div className="grid gap-2 rounded-xl bg-paper p-3 ring-1 ring-line sm:col-span-2">
-              <span className="text-sm font-medium">Что ещё заменить в видео (кроме людей)</span>
-              <span className="text-xs text-muted">Клиент загрузит фото этой вещи — ИИ поставит её вместо той, что в видео. Например, свою машину или лошадь.</span>
-              {sd.objects.map((o, j) => (
-                <div key={j} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-                  <select className={inputCls()} value={(Object.entries(OBJECT_PRESETS).find(([, p]) => p.en === o.what)?.[0]) ?? "custom"}
-                    onChange={(ev) => {
-                      const p = OBJECT_PRESETS[ev.target.value as keyof typeof OBJECT_PRESETS];
-                      const list = [...sd.objects];
-                      list[j] = p ? { what: p.en, label: p.ru } : { what: "", label: "Фото предмета" };
-                      setSd({ objects: list });
-                    }}>
-                    {Object.entries(OBJECT_PRESETS).map(([k, p]) => <option key={k} value={k}>{p.ru.replace("Фото ", "")}</option>)}
-                    <option value="custom">Другое…</option>
-                  </select>
-                  <input className={inputCls()} maxLength={40} placeholder="Подпись для клиента" value={o.label}
-                    onChange={(ev) => { const list = [...sd.objects]; list[j] = { ...o, label: ev.target.value }; setSd({ objects: list }); }} />
-                  <button type="button" onClick={() => setSd({ objects: sd.objects.filter((_, k) => k !== j) })}
-                    className="rounded-full px-3 text-sm font-medium text-muted hover:text-danger">Убрать</button>
-                  <input className={`${inputCls()} sm:col-span-3`} maxLength={120} placeholder="Какой именно в видео, по-английски (необязательно): the white car on the right" value={o.look ?? ""}
-                    onChange={(ev) => { const list = [...sd.objects]; list[j] = { ...o, look: ev.target.value }; setSd({ objects: list }); }} />
-                  {!Object.values(OBJECT_PRESETS).some((p) => p.en === o.what) && (
-                    <input className={`${inputCls()} sm:col-span-3`} maxLength={40} placeholder="Что это по-английски (для ИИ), например: boat, guitar" value={o.what}
-                      onChange={(ev) => { const list = [...sd.objects]; list[j] = { ...o, what: ev.target.value }; setSd({ objects: list }); }} />
-                  )}
+              <p className="mt-1 text-xs text-muted">{e.seedance.step1Hint}</p>
+              <button type="button" disabled={ai.busy || !t.previewVideoPath} onClick={() => void analyze()}
+                className="mt-3 rounded-full bg-night px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
+                {ai.busy ? e.seedance.aiBusy : sd.analyzedAt ? e.seedance.aiAgain : e.seedance.aiDetect}
+              </button>
+              {!t.previewVideoPath && <span className="ml-2 text-xs text-muted">{e.seedance.needVideo}</span>}
+              {ai.text && <p className={`mt-2 text-xs font-medium ${ai.err ? "text-danger" : ""}`}>{ai.text}</p>}
+              {ai.found && ai.found.length > 0 && <p className="mt-1 text-xs text-muted">{ai.found.join(" · ")}</p>}
+
+              {/* What the AI found: each person and thing with its cut-out. Editable. */}
+              {sd.analyzedAt && (
+                <div className="mt-4 grid gap-3">
+                  <datalist id="kling-positions">{Object.entries(e.seedance.positionOptions).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</datalist>
+                  {Array.from({ length: sd.people }, (_, i) => (
+                    <div key={`p${i}`} className="grid gap-3 rounded-xl bg-white p-3 ring-1 ring-line sm:grid-cols-[72px_1fr]">
+                      <Cutout path={sd.targets[i]} mediaBase={mediaBase} label={`${i + 1}`} />
+                      <div className="grid gap-2">
+                        <span className="text-sm font-semibold">{e.seedance.personN(i + 1)}</span>
+                        <input className={inputCls()} maxLength={120} list="kling-positions" placeholder={e.seedance.positionAuto(i + 1)} value={sd.positions[i] ?? ""}
+                          onChange={(ev) => { const p = [...sd.positions]; while (p.length < sd.people) p.push(""); p[i] = ev.target.value; setSd({ positions: p.slice(0, sd.people) }); }} />
+                        <input className={inputCls()} maxLength={40} placeholder={e.seedance.customerLabel(i + 1, sd.people)} value={sd.labels[i] ?? ""}
+                          onChange={(ev) => { const l = [...sd.labels]; while (l.length < sd.people) l.push(""); l[i] = ev.target.value; setSd({ labels: l.slice(0, sd.people) }); }} />
+                      </div>
+                    </div>
+                  ))}
+                  {sd.objects.map((o, j) => (
+                    <div key={`o${j}`} className="grid gap-3 rounded-xl bg-white p-3 ring-1 ring-line sm:grid-cols-[72px_1fr]">
+                      <Cutout path={o.target} mediaBase={mediaBase} label="+" />
+                      <div className="grid gap-2">
+                        <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                          <select className={inputCls()} value={(Object.entries(OBJECT_PRESETS).find(([, p]) => p.en === o.what)?.[0]) ?? "custom"}
+                            onChange={(ev) => {
+                              const p = OBJECT_PRESETS[ev.target.value as keyof typeof OBJECT_PRESETS];
+                              const list = [...sd.objects];
+                              list[j] = p ? { ...o, what: p.en, label: p.ru } : { ...o, what: "", label: "Фото предмета" };
+                              setSd({ objects: list });
+                            }}>
+                            {Object.entries(OBJECT_PRESETS).map(([k, p]) => <option key={k} value={k}>{p.ru.replace("Фото ", "")}</option>)}
+                            <option value="custom">Другое…</option>
+                          </select>
+                          <input className={inputCls()} maxLength={40} placeholder="Подпись для клиента" value={o.label}
+                            onChange={(ev) => { const list = [...sd.objects]; list[j] = { ...o, label: ev.target.value }; setSd({ objects: list }); }} />
+                          <button type="button" onClick={() => setSd({ objects: sd.objects.filter((_, k) => k !== j) })}
+                            className="rounded-full px-3 text-sm font-medium text-muted hover:text-danger">Убрать</button>
+                        </div>
+                        <input className={inputCls()} maxLength={120} placeholder="Какой именно в видео, по-английски: the white car on the right" value={o.look ?? ""}
+                          onChange={(ev) => { const list = [...sd.objects]; list[j] = { ...o, look: ev.target.value }; setSd({ objects: list }); }} />
+                        {!Object.values(OBJECT_PRESETS).some((p) => p.en === o.what) && (
+                          <input className={inputCls()} maxLength={40} placeholder="Что это по-английски (для ИИ), например: boat, guitar" value={o.what}
+                            onChange={(ev) => { const list = [...sd.objects]; list[j] = { ...o, what: ev.target.value }; setSd({ objects: list }); }} />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex flex-wrap items-center gap-3 text-xs">
+                    <label className="inline-flex items-center gap-2">
+                      <span className="text-muted">{e.seedance.people}:</span>
+                      <select className="rounded-lg border border-line px-2 py-1" value={sd.people} onChange={(ev) => setSd({ people: Number(ev.target.value) })}>
+                        {Array.from({ length: SEEDANCE_MAX_PEOPLE }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
+                      </select>
+                    </label>
+                    {sd.objects.length < SEEDANCE_MAX_OBJECTS && (
+                      <button type="button" onClick={() => setSd({ objects: [...sd.objects, { what: OBJECT_PRESETS.car.en, label: OBJECT_PRESETS.car.ru }] })}
+                        className="rounded-full border border-line bg-white px-3 py-1.5 font-semibold hover:border-ink">{e.seedance.addThing}</button>
+                    )}
+                    <label className="inline-flex items-center gap-2 font-medium">
+                      <input type="checkbox" checked={sd.showTargets} onChange={(ev) => setSd({ showTargets: ev.target.checked })} />
+                      {e.seedance.showTargets}
+                    </label>
+                  </div>
+                  <span className="text-xs text-muted">{e.seedance.showTargetsHint}</span>
                 </div>
-              ))}
-              {sd.objects.length < SEEDANCE_MAX_OBJECTS && (
-                <button type="button" onClick={() => setSd({ objects: [...sd.objects, { what: OBJECT_PRESETS.car.en, label: OBJECT_PRESETS.car.ru }] })}
-                  className="justify-self-start rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold hover:border-ink">+ Добавить вещь (машина, лошадь, одежда…)</button>
               )}
             </div>
-            <Field label={e.seedance.framing} className="sm:col-span-2">
-              <select className={inputCls()} value={sd.framing} onChange={(ev) => setSd({ framing: ev.target.value as SeedanceConfig["framing"] })}>
-                {(["face", "half", "full"] as const).map((k) => <option key={k} value={k}>{e.seedance.framingOptions[k]}</option>)}
-              </select>
-            </Field>
-            <Field label={e.seedance.prompt} field="seedance.prompt" error={err("seedance.prompt")} className="sm:col-span-2">
-              <textarea className={`${inputCls(err("seedance.prompt"))} min-h-24`} value={sd.prompt} maxLength={1500} onChange={(ev) => setSd({ prompt: ev.target.value })} />
-              <span className="mt-1 block text-xs text-muted">{e.seedance.promptHint}</span>
-              {sceneTip && (
-                <span className="mt-2 block rounded-xl bg-paper p-2 text-xs ring-1 ring-line">
-                  {e.seedance.aiScene} <span className="font-medium">{sceneTip}</span>
-                  <button type="button" onClick={() => { setSd({ prompt: sceneTip.slice(0, 1500) }); setSceneTip(null); }} className="ml-2 font-semibold underline">{e.seedance.aiSceneUse}</button>
-                </span>
-              )}
-            </Field>
-            <p className={`text-xs sm:col-span-2 ${(duration !== null && (duration < 2.5 || duration > 30.5)) || (frame && (frame.w < 700 || frame.h < 700)) ? "font-semibold text-danger" : "text-muted"}`}>
-              {e.seedance.durationHint}{duration !== null ? ` · ${Math.round(duration * 10) / 10} сек` : ""}{frame ? ` · ${frame.w}×${frame.h}` : ""}
-            </p>
+
+            {/* Step 2: the scene stays 1:1. */}
+            <div className="grid gap-4 rounded-2xl bg-paper p-4 ring-1 ring-line sm:grid-cols-2">
+              <span className="font-semibold sm:col-span-2">{e.seedance.step2}</span>
+              <Field label={e.seedance.klingMode} className="sm:col-span-2">
+                <select className={inputCls()} value={sd.klingMode} onChange={(ev) => setSd({ klingMode: ev.target.value as SeedanceConfig["klingMode"] })}>
+                  <option value="edit">{e.seedance.klingModeOptions.edit}</option>
+                  <option value="reference">{e.seedance.klingModeOptions.reference}</option>
+                </select>
+              </Field>
+              <Field label={e.seedance.prompt} field="seedance.prompt" error={err("seedance.prompt")} className="sm:col-span-2">
+                <textarea className={`${inputCls(err("seedance.prompt"))} min-h-24`} value={sd.prompt} maxLength={1500} onChange={(ev) => setSd({ prompt: ev.target.value })} />
+                <span className="mt-1 block text-xs text-muted">{e.seedance.promptHint}</span>
+                {sceneTip && (
+                  <span className="mt-2 block rounded-xl bg-white p-2 text-xs ring-1 ring-line">
+                    {e.seedance.aiScene} <span className="font-medium">{sceneTip}</span>
+                    <button type="button" onClick={() => { setSd({ prompt: sceneTip.slice(0, 1500) }); setSceneTip(null); }} className="ml-2 font-semibold underline">{e.seedance.aiSceneUse}</button>
+                  </span>
+                )}
+              </Field>
+              <p className={`text-xs sm:col-span-2 ${(duration !== null && (duration < 2.5 || duration > 30.5)) || (frame && (frame.w < 700 || frame.h < 700)) ? "font-semibold text-danger" : "text-muted"}`}>
+                {e.seedance.durationHint}{duration !== null ? ` · ${Math.round(duration * 10) / 10} сек` : ""}{frame ? ` · ${frame.w}×${frame.h}` : ""}
+              </p>
+            </div>
+
+            {/* Step 3: what the customer chooses and uploads. */}
+            <div className="grid gap-4 rounded-2xl bg-paper p-4 ring-1 ring-line sm:grid-cols-2">
+              <span className="font-semibold sm:col-span-2">{e.seedance.step3}</span>
+              <Field label={e.seedance.outfit}>
+                <select className={inputCls()} value={sd.outfit} onChange={(ev) => setSd({ outfit: ev.target.value as SeedanceConfig["outfit"] })}>
+                  <option value="photo">{e.seedance.outfitOptions.photo}</option>
+                  <option value="template">{e.seedance.outfitOptions.template}</option>
+                  <option value="choice">{e.seedance.outfitOptions.choice}</option>
+                </select>
+              </Field>
+              <Field label={e.seedance.aspect}>
+                <select className={inputCls()} value={sd.aspectRatio} onChange={(ev) => setSd({ aspectRatio: ev.target.value as SeedanceConfig["aspectRatio"] })}>
+                  {(["9:16", "16:9", "1:1", "adaptive"] as const).map((k) => <option key={k} value={k}>{e.seedance.aspectOptions[k]}</option>)}
+                </select>
+              </Field>
+              <Field label={e.seedance.framing} className="sm:col-span-2">
+                <select className={inputCls()} value={sd.framing} onChange={(ev) => setSd({ framing: ev.target.value as SeedanceConfig["framing"] })}>
+                  {(["face", "half", "full"] as const).map((k) => <option key={k} value={k}>{e.seedance.framingOptions[k]}</option>)}
+                </select>
+              </Field>
+            </div>
           </div>
           {slots.length > 0 && <FaceMap slots={slots} mediaBase={mediaBase} />}
         </div>
@@ -614,27 +599,25 @@ async function captureCover(source: File | string, maxWidth = 540): Promise<Blob
   }
 }
 
+function Cutout({ path, mediaBase, label }: { path?: string; mediaBase: string; label: string }) {
+  const src = path ? (/^https?:/.test(path) ? path : `${mediaBase}/${path}`) : null;
+  return src
+    // eslint-disable-next-line @next/next/no-img-element
+    ? <img src={src} alt="" className="h-24 w-[72px] rounded-lg object-cover ring-1 ring-line" />
+    : <span className="grid h-24 w-[72px] place-items-center rounded-lg bg-paper text-lg font-bold text-muted ring-1 ring-line">{label}</span>;
+}
+
 /** Cut-out of a template person or thing (box in 0–1000 of the frame): 1:2–2:1, 320–720 px. */
-async function cropFrame(b64: string, box: [number, number, number, number]): Promise<Blob | null> {
+async function cropFrame(b64: string, box: Box): Promise<Blob | null> {
   try {
     const img = new Image();
     img.src = `data:image/jpeg;base64,${b64}`;
     await img.decode();
-    const W = img.naturalWidth, H = img.naturalHeight;
-    const [y0, x0, y1, x1] = box.map((v) => v / 1000);
-    // Some room around it, then widen or heighten to between 1:2 and 2:1 (Kling takes 2:5–5:2 only).
-    let cx = ((x0 + x1) / 2) * W, cy = ((y0 + y1) / 2) * H;
-    let w = (x1 - x0) * W * 1.3, h = (y1 - y0) * H * 1.2;
-    if (w < 24 || h < 24) return null;
-    if (h > w * 2) w = h / 2; else if (w > h * 2) h = w / 2;
-    w = Math.min(w, W); h = Math.min(h, H);
-    cx = Math.min(Math.max(cx, w / 2), W - w / 2); cy = Math.min(Math.max(cy, h / 2), H - h / 2);
-    const sx = cx - w / 2, sy = cy - h / 2, sw = w, sh = h;
-    // Kling wants at least 300 px on each side: small cut-outs are scaled up, large ones down to 720.
-    const k = Math.min(720 / Math.max(sw, sh), Math.max(1, 320 / Math.min(sw, sh)));
+    const r = cutoutRect(img.naturalWidth, img.naturalHeight, box);
+    if (!r) return null;
     const c = document.createElement("canvas");
-    c.width = Math.round(sw * k); c.height = Math.round(sh * k);
-    c.getContext("2d")?.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
+    c.width = r.outW; c.height = r.outH;
+    c.getContext("2d")?.drawImage(img, r.sx, r.sy, r.sw, r.sh, 0, 0, c.width, c.height);
     return await new Promise<Blob | null>((res) => c.toBlob((b) => res(b), "image/jpeg", 0.85));
   } catch {
     return null;

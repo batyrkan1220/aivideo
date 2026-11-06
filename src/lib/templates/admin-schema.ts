@@ -25,10 +25,10 @@ export type TemplateInput = z.infer<typeof templateInputSchema>;
 export type PublishProblem =
   | "missing_cover" | "missing_preview" | "invalid_face_slots" | "no_available_quality"
   | "duplicate_quality_key" | "missing_provider" | "price_out_of_range"
-  | "bad_duration" | "missing_example" | "missing_price";
+  | "bad_duration" | "missing_example" | "missing_price" | "not_analyzed";
 
 /** A template may be published only when it is complete and coherent. durationSec = template video length. */
-export function publishProblems(t: TemplateInput, durationSec?: number | null): PublishProblem[] {
+export function publishProblems(t: TemplateInput, durationSec?: number | null, catalog = true): PublishProblem[] {
   const p: PublishProblem[] = [];
   const photo = t.providerKey === PHOTO_PROVIDER;
   if (photo) {
@@ -42,6 +42,8 @@ export function publishProblems(t: TemplateInput, durationSec?: number | null): 
   const { minPriceKzt, maxPriceKzt } = t.pricing;
   if (maxPriceKzt !== undefined && maxPriceKzt < minPriceKzt) p.push("price_out_of_range");
   // Seedance: the template video is the motion reference, 4–30 s.
+  // Every catalog video template goes through the AI analysis (people, things, cut-outs, scene).
+  if (catalog && t.providerKey === "seedance" && !parseSeedanceConfig(t.providerConfig).analyzedAt) p.push("not_analyzed");
   if (t.providerKey === "seedance" && durationSec != null && (durationSec < SEEDANCE_MIN_SEC - 0.5 || durationSec > maxSecFor(parseSeedanceConfig(t.providerConfig).mode) + 0.5)) p.push("bad_duration");
   return p;
 }

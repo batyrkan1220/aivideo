@@ -1,5 +1,6 @@
 "use server";
 import { clearMemo } from "@/lib/cache/memo";
+import { snapshotVersion } from "@/lib/templates/versions";
 import { queueLitePreview } from "@/lib/templates/lite-preview";
 import { SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC } from "@/lib/templates/seedance-config";
 import { randomUUID } from "node:crypto";
@@ -69,6 +70,11 @@ export async function saveTemplate(raw: unknown, id: string | null, metaRaw?: un
     .select("pricing_config_json, supported_qualities_json, status, preview_video_path, preview_lite_path, preview_anim_path, cover_asset_path, cover_thumb_path, video_duration_sec").eq("id", id).single();
   if (!before) return { ok: false, error: "generic" };
 
+  // A new video needs a new AI analysis: the old cut-outs and descriptions belong to the old one.
+  if (row.provider_key === "seedance" && row.preview_video_path !== before.preview_video_path && row.provider_config_json && typeof row.provider_config_json === "object") {
+    const { analyzedAt: _old, ...rest } = row.provider_config_json as Record<string, unknown>;
+    row.provider_config_json = rest;
+  }
   const { error } = await db.from("templates").update(row).eq("id", id);
   if (error) { console.error("[admin.template.update]", error.code, error.message); return { ok: false, error: "generic" }; }
 
@@ -129,26 +135,6 @@ function roundSec(sec: number) {
   return Math.round(sec * 100) / 100;
 }
 
-/** Immutable configuration snapshot; orders reference the version that was current when created. */
-async function snapshotVersion(templateId: string) {
-  const db = supabaseAdmin();
-  const { data: t } = await db.from("templates").select("*").eq("id", templateId).single();
-  if (!t) return;
-  const { data: last } = await db.from("template_versions").select("version_number")
-    .eq("template_id", templateId).order("version_number", { ascending: false }).limit(1).maybeSingle();
-  const snapshot = {
-    title_kk: t.title_kk, required_face_count: t.required_face_count, face_slots_json: t.face_slots_json,
-    supported_qualities_json: t.supported_qualities_json, pricing_config_json: t.pricing_config_json,
-    provider_key: t.provider_key, provider_config_json: t.provider_config_json,
-    preview_video_path: t.preview_video_path, cover_asset_path: t.cover_asset_path, max_upload_bytes: t.max_upload_bytes,
-  };
-  const { data: v, error } = await db.from("template_versions")
-    .insert({ template_id: templateId, version_number: (last?.version_number ?? 0) + 1, configuration_snapshot: snapshot })
-    .select("id").single();
-  if (error) { console.error("[admin.template.version]", error.code); return; }
-  await db.from("templates").update({ current_version_id: v.id }).eq("id", templateId);
-}
-
 export type StatusResult = { ok: true } | { ok: false; error: "forbidden" | "generic"; problems?: PublishProblem[] };
 
 export async function changeStatus(
@@ -163,7 +149,7 @@ export async function changeStatus(
     const { data: r } = await db.from("templates").select("*").eq("id", id).single();
     if (!r) return { ok: false, error: "generic" };
     const input = templateInputSchema.safeParse(rowToInput(r));
-    const problems = input.success ? publishProblems(input.data, r.video_duration_sec == null ? null : Number(r.video_duration_sec)) : (["invalid_face_slots"] as PublishProblem[]);
+    const problems = input.success ? publishProblems(input.data, r.video_duration_sec == null ? null : Number(r.video_duration_sec), r.kind === "catalog") : (["invalid_face_slots"] as PublishProblem[]);
     if (problems.length) return { ok: false, error: "generic", problems };
     const { error } = await db.from("templates")
       .update({ status: "published", published_at: r.published_at ?? new Date().toISOString() }).eq("id", id);
@@ -268,4 +254,14 @@ export async function detectTemplateElements(framesRaw: unknown): Promise<Detect
   } catch (err) {
     return { ok: false, error: err instanceof VisionError ? err.code : "failed" };
   }
+}
+
+/** Admin: run the AI analysis on the server again (people count and things stay as set). */
+export async function reanalyzeTemplate(id: string): Promise<{ ok: boolean }> {
+  const user = await guard("templates.manage");
+  if (!user || !z.string().uuid().safeParse(id).success) return { ok: false };
+  const { queueAnalysis } = await import("@/lib/templates/analyze-server");
+  queueAnalysis(id);
+  await audit(user.id, "template.reanalyze", "template", id, {});
+  return { ok: true };
 }

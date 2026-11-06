@@ -27,6 +27,18 @@ export async function register() {
       }
     })();
   }, 20_000);
+  // AI analysis (people, things, cut-outs, scene) for catalog video templates that don't have one yet.
+  setTimeout(() => {
+    void (async () => {
+      try {
+        const { backfillAnalysis } = await import("@/lib/templates/analyze-server");
+        const n = await backfillAnalysis();
+        if (n) console.log(`[analysis] queued ${n}`);
+      } catch (err) {
+        console.error("[analysis] backfill failed", err instanceof Error ? err.message : err);
+      }
+    })();
+  }, 90_000);
   setTimeout(() => {
     void (async () => {
       try {

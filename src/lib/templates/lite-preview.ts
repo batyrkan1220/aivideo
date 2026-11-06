@@ -163,7 +163,7 @@ async function makeOne(templateId: string): Promise<boolean> {
   }
 }
 
-async function ffmpegPath(): Promise<string> {
+export async function ffmpegPath(): Promise<string> {
   const mod = (await import("ffmpeg-static")) as unknown as { default?: string | null } | string;
   const p = typeof mod === "string" ? mod : mod.default;
   if (!p) throw new Error("ffmpeg binary missing");
@@ -253,7 +253,7 @@ async function cleanupOrphans() {
   }
 }
 
-async function runFfmpeg(inPath: string, outPath: string, build: (i: string, o: string) => string[]) {
+export async function runFfmpeg(inPath: string, outPath: string, build: (i: string, o: string) => string[]) {
   const bin = await ffmpegPath();
   const args = build(inPath, outPath);
   await new Promise<void>((resolve, reject) => {

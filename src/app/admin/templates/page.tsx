@@ -16,6 +16,7 @@ import { CopyLink } from "./copy-link";
 import { botUsername } from "@/lib/partners";
 import { env } from "@/lib/env";
 import { Badge, Chips, PageHead, nowMs } from "../ui";
+import { ReanalyzeButton } from "./reanalyze-button";
 
 type SP = { s?: string; q?: string; sort?: string };
 const STATUS: Record<string, { label: string; color: "green" | "gray" | "amber" }> = {
@@ -50,7 +51,7 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
 
   const [{ data }, { data: stats }, { data: cats }, pricing] = await Promise.all([
     db.from("templates")
-      .select("id,title_kk,status,required_face_count,updated_at,is_trending,provider_key,cover_asset_path,preview_video_path,preview_lite_path,preview_anim_path,pricing_config_json,category_id,video_duration_sec")
+      .select("id,title_kk,status,required_face_count,updated_at,is_trending,provider_key,cover_asset_path,preview_video_path,preview_lite_path,preview_anim_path,pricing_config_json,category_id,video_duration_sec,analyzed_at:provider_config_json->>analyzedAt")
       .eq("kind", "catalog").is("deleted_at", null).order("updated_at", { ascending: false }),
     db.rpc("admin_template_stats", { p_from: new Date(nowMs() - 30 * 86400_000).toISOString() }),
     db.from("categories").select("id,title_kk"),
@@ -116,6 +117,8 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
                       {t.category_id && catName.get(t.category_id) && <Badge>{catName.get(t.category_id)}</Badge>}
                       {!t.preview_video_path && <Badge color="red">нет видео</Badge>}
                       {t.preview_video_path && (!t.preview_lite_path || !t.preview_anim_path) && <Badge color="amber">превью сжимается</Badge>}
+                      {t.provider_key === "seedance" && !t.analyzed_at && <Badge color="red">нужен ИИ-анализ · недоступен клиентам</Badge>}
+                      {t.provider_key === "seedance" && t.preview_video_path && <ReanalyzeButton id={t.id} />}
                     </div>
                   </div>
                 </div>

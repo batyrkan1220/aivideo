@@ -9,11 +9,9 @@ import { OBJECT_PRESETS, SEEDANCE_MAX_OBJECTS, SEEDANCE_MAX_PEOPLE } from "./see
  * ("the person on the left, a woman in a red dress"); the Russian ones are shown to the admin.
  * Only small JPEG frames made in the admin's browser are sent; the video itself never is.
  */
-/** frame: index of the frame where it is seen best; box: [ymin, xmin, ymax, xmax] in 0–1000 of that frame. */
-export type VisionBox = { frame: number; box: [number, number, number, number] | null };
-export type VisionPerson = { where: string; look: string; ru: string } & VisionBox;
-export type VisionObject = { what: string; look: string; ru: string } & VisionBox;
-export type VisionResult = { people: VisionPerson[]; objects: VisionObject[]; scene: string };
+import type { Analysis, Box } from "./analysis";
+export type VisionResult = Analysis;
+type VisionBox = { frame: number; box: Box | null };
 
 const KINDS = Object.values(OBJECT_PRESETS).map((p) => p.en);
 
@@ -88,6 +86,12 @@ export class VisionError extends Error {
 }
 
 /** frames: base64 JPEG without the data: prefix. */
+function hintText(hint?: { people: number; objects: string[] }) {
+  if (!hint) return "";
+  const things = hint.objects.length ? `exactly these things: ${hint.objects.join(", ")}` : "no things (objects: [])";
+  return `\nKnown: the video has exactly ${hint.people} main ${hint.people === 1 ? "person" : "people"} to replace (the most prominent ones) and ${things}. List exactly that.`;
+}
+
 /** A usable box: inside 0–1000, not empty. */
 function cleanBox(b: number[] | null): VisionBox["box"] {
   if (!b) return null;
@@ -95,13 +99,14 @@ function cleanBox(b: number[] | null): VisionBox["box"] {
   return y1 - y0 >= 20 && x1 - x0 >= 20 ? [y0, x0, y1, x1] : null;
 }
 
-export async function describeTemplateFrames(frames: string[]): Promise<VisionResult> {
+/** hint: the admin's numbers to keep (exactly this many people, these things only). */
+export async function describeTemplateFrames(frames: string[], hint?: { people: number; objects: string[] }): Promise<VisionResult> {
   const { GEMINI_API_KEY: key, GEMINI_MODEL: model } = env();
   if (!key) throw new VisionError("not_configured");
   // Busy models answer 503/429: try again, then the next model in the list.
   const models = [...new Set([model, ...FALLBACK_MODELS])];
   const payload = JSON.stringify({
-    contents: [{ role: "user", parts: [...frames.map((data) => ({ inline_data: { mime_type: "image/jpeg", data } })), { text: PROMPT }] }],
+    contents: [{ role: "user", parts: [...frames.map((data) => ({ inline_data: { mime_type: "image/jpeg", data } })), { text: PROMPT + hintText(hint) }] }],
     generationConfig: { temperature: 0.2, responseMimeType: "application/json", responseSchema },
   });
   let body: GeminiBody | null = null;
