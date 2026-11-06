@@ -33,7 +33,7 @@ export type ProviderJobStatus =
       /** Multi-step providers: the next step was submitted — track this id/state from now on. */
       next?: { providerJobId: string; state: ProviderState; cost?: number; credits?: number };
     }
-  | { state: "succeeded"; outputUrl: string; cost?: number }
+  | { state: "succeeded"; outputUrl: string; cost?: number; /** The finished file itself, when the provider made it locally (joined parts). */ outputBytes?: Uint8Array }
   | { state: "failed"; errorCode: string; retryable: boolean; cost?: number };
 
 export class ProviderError extends Error {

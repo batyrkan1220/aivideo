@@ -309,6 +309,23 @@ export function runFfmpeg(inPath: string, outPath: string, build: (i: string, o:
   return run;
 }
 
+/** Runs ffmpeg in the same one-at-a-time chain and returns the end of its log (stderr). */
+export function ffmpegLog(args: string[], timeoutMs = 180_000): Promise<string> {
+  const run = ffmpegChain.then(async () => {
+    const bin = await ffmpegPath();
+    return new Promise<string>((resolve, reject) => {
+      const p = spawn(bin, args, { stdio: ["ignore", "ignore", "pipe"] });
+      let out = "";
+      p.stderr.on("data", (d) => { out = (out + d).slice(-60_000); });
+      const timer = setTimeout(() => p.kill("SIGKILL"), timeoutMs);
+      p.on("error", (e) => { clearTimeout(timer); reject(e); });
+      p.on("close", (code) => { clearTimeout(timer); if (code === 0) resolve(out); else reject(new Error(`ffmpeg ${code}: ${out.slice(-300)}`)); });
+    });
+  });
+  ffmpegChain = run.catch(() => {});
+  return run;
+}
+
 async function runFfmpegNow(inPath: string, outPath: string, build: (i: string, o: string) => string[]) {
   const bin = await ffmpegPath();
   const args = build(inPath, outPath);

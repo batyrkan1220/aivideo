@@ -2,9 +2,10 @@ import "server-only";
 import { seedanceConfigSchema, SEEDANCE_MAX_OBJECTS, SEEDANCE_MAX_PEOPLE, SEEDANCE_MAX_REFS, SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC } from "@/lib/templates/seedance-config";
 import { seedanceCostUsd } from "@/lib/pricing-seedance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
-import { type GenerationProvider, type ProviderState } from "./types";
+import { ProviderError, type GenerationProvider, type ProviderState } from "./types";
 import { buildKlingDirectPrompt, getKlingTask, KLING_MAX_IMAGES, submitKlingOmni } from "./kling";
 import { mediaUrl } from "@/lib/templates/queries";
+import { supabaseAdmin } from "@/lib/supabase/server";
 
 /**
  * The video provider (key "seedance" for existing rows): Kling 4.0 via Kling's official API.
@@ -102,6 +103,23 @@ export const seedanceProvider: GenerationProvider = {
     }
     const prompt = buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, wish, people, cfg.positions, objects, targetRefs);
     const plain = { videoUrl: input.templateVideoUrl, photoUrls: usedPhotos, mode: cfg.klingMode, durationSec, aspectRatio: cfg.aspectRatio, resolution };
+    // A template with cuts: Kling loses the face after a cut, so each shot is edited on its own (TM-100034).
+    if (cfg.klingMode === "edit") {
+      const shots = await prepareShots(input.jobId, input.templateVideoUrl);
+      if (shots) {
+        const run: ShotRun = { stage: "shots", shots, photoUrls: [...usedPhotos, ...cutouts], prompt: `${prompt} ${SHOT_NOTE}`, aspectRatio: cfg.aspectRatio, resolution, soundUrl: input.templateVideoUrl };
+        const first = await submitShot(run, 0);
+        shots[0].id = first;
+        let cost = seedanceCostUsd(shots[0].len, pricing, {}, resolution);
+        for (let k = 1; k < shots.length; k++) {
+          // Busy or refused: tried again on the next poll, which also reports a real failure.
+          const id = await submitShot(run, k).catch(() => null);
+          if (id) { shots[k].id = id; cost += seedanceCostUsd(shots[k].len, pricing, {}, resolution); }
+        }
+        console.log("[kling] template in", shots.length, "shots");
+        return { providerJobId: first, cost, state: run };
+      }
+    }
     const providerJobId = await submitKlingOmni({ ...plain, photoUrls: [...usedPhotos, ...cutouts], prompt });
     // If Kling refuses the task because of a cut-out (it charges nothing then), the same order goes again without them.
     const fallback = cutouts.length
@@ -111,6 +129,8 @@ export const seedanceProvider: GenerationProvider = {
   },
 
   async getStatus(providerJobId, ctx) {
+    const shotRun = shotsOf(ctx.state);
+    if (shotRun) return shotStatus(shotRun);
     const st = await getKlingTask(providerJobId);
     const run = passOf(ctx.state);
     if (run) {
@@ -148,4 +168,88 @@ function passOf(state: ProviderState): PassRun | null {
   const passes = s.passes.filter((p): p is Pass => !!p && Array.isArray(p.photoUrls) && typeof p.prompt === "string");
   if (!passes.length || s.k >= passes.length) return null;
   return { stage: "pass", k: s.k, passes, durationSec: s.durationSec, aspectRatio: typeof s.aspectRatio === "string" ? s.aspectRatio : "adaptive", resolution: s.resolution === "1080p" ? "1080p" : "720p" };
+}
+
+// ---------------------------------------------------------------- shot by shot
+
+/** Added to each shot's prompt: the shot is a piece of a longer video. */
+const SHOT_NOTE = "@video_1 is one shot of a longer video: edit only what is in this shot, keep its start and end exactly as they are.";
+const SHOTS_BUCKET = "user-videos";
+type Shot = { path: string; url: string; len: number; id?: string | null; out?: string | null };
+type ShotRun = { stage: "shots"; shots: Shot[]; photoUrls: string[]; prompt: string; aspectRatio: string; resolution: "720p" | "1080p"; soundUrl: string };
+
+function shotsOf(state: ProviderState): ShotRun | null {
+  const s = state as Partial<ShotRun> | null;
+  if (!s || s.stage !== "shots" || !Array.isArray(s.shots) || !s.shots.length || !Array.isArray(s.photoUrls) || typeof s.prompt !== "string") return null;
+  return { stage: "shots", shots: s.shots as Shot[], photoUrls: s.photoUrls, prompt: s.prompt, aspectRatio: typeof s.aspectRatio === "string" ? s.aspectRatio : "adaptive",
+    resolution: s.resolution === "1080p" ? "1080p" : "720p", soundUrl: typeof s.soundUrl === "string" ? s.soundUrl : "" };
+}
+
+/** Cuts the template into shots and stores them privately for Kling; null = one shot (or it could not be cut). */
+async function prepareShots(jobId: string, videoUrl: string): Promise<Shot[] | null> {
+  try {
+    const { splitAtCuts } = await import("@/lib/media/scene-parts");
+    const split = await splitAtCuts(videoUrl);
+    if (!split) return null;
+    const db = supabaseAdmin();
+    const shots: Shot[] = [];
+    for (const [k, p] of split.parts.entries()) {
+      const path = `kling-shots/${jobId}/p${k}.mp4`;
+      const { error } = await db.storage.from(SHOTS_BUCKET).upload(path, p.file, { contentType: "video/mp4", upsert: true });
+      const { data: signed } = error ? { data: null } : await db.storage.from(SHOTS_BUCKET).createSignedUrl(path, 48 * 3600);
+      if (!signed) { console.error("[kling] shot upload failed", error?.message?.slice(0, 120)); return null; }
+      shots.push({ path, url: signed.signedUrl, len: p.len });
+    }
+    return shots;
+  } catch (err) {
+    console.error("[kling] shots skipped", err instanceof Error ? err.message.slice(0, 160) : "error");
+    return null;
+  }
+}
+
+const submitShot = (run: ShotRun, k: number) => submitKlingOmni({
+  videoUrl: run.shots[k].url, photoUrls: run.photoUrls, mode: "edit", prompt: run.prompt,
+  durationSec: run.shots[k].len, aspectRatio: run.aspectRatio, resolution: run.resolution,
+});
+
+async function removeShots(run: ShotRun) {
+  await supabaseAdmin().storage.from(SHOTS_BUCKET).remove(run.shots.map((s) => s.path)).catch(() => {});
+}
+
+async function shotStatus(run: ShotRun): Promise<import("./types").ProviderJobStatus> {
+  const shots = run.shots.map((s) => ({ ...s }));
+  const pricing = await seedancePricingSettings();
+  let added = 0, changed = false;
+  for (const [k, s] of shots.entries()) {
+    if (s.out) continue;
+    if (!s.id) {
+      try {
+        s.id = await submitShot(run, k);
+        added += seedanceCostUsd(s.len, pricing, {}, run.resolution);
+        changed = true;
+      } catch (err) {
+        if (err instanceof ProviderError && err.retryable) continue;
+        await removeShots(run);
+        return { state: "failed", errorCode: err instanceof ProviderError ? err.code : "provider_failed", retryable: false };
+      }
+      continue;
+    }
+    const st = await getKlingTask(s.id);
+    if (st.state === "succeeded") { s.out = st.outputUrl; changed = true; }
+    else if (st.state === "failed") { await removeShots(run); return st; }
+  }
+  const firstId = shots.find((s) => s.id)?.id ?? "";
+  if (shots.every((s) => s.out)) {
+    const { joinParts } = await import("@/lib/media/scene-parts");
+    const bytes = await joinParts(shots.map((s) => s.out!), shots.map((s) => s.len), run.soundUrl);
+    await removeShots(run);
+    console.log("[kling] shots joined", shots.length);
+    return { state: "succeeded", outputUrl: shots[0].out!, outputBytes: bytes };
+  }
+  const done = shots.filter((s) => s.out).length;
+  return {
+    state: "processing",
+    progress: Math.round((done / shots.length) * 90),
+    ...(changed ? { next: { providerJobId: firstId, state: { ...run, shots } as ProviderState, cost: added } } : {}),
+  };
 }

@@ -2,6 +2,17 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/env", () => ({ env: () => ({ KLING_API_KEY: "g".repeat(20), NEXT_PUBLIC_SUPABASE_URL: "https://sb.test" }) }));
+const sceneMock = vi.hoisted(() => ({ split: null as null | { parts: { start: number; len: number; file: Buffer }[] }, joined: [] as string[][] }));
+vi.mock("@/lib/media/scene-parts", () => ({
+  splitAtCuts: async () => sceneMock.split,
+  joinParts: async (urls: string[]) => { sceneMock.joined.push(urls); return new Uint8Array([1, 2, 3]); },
+}));
+const storage = vi.hoisted(() => ({ removed: [] as string[] }));
+vi.mock("@/lib/supabase/server", () => ({ supabaseAdmin: () => ({ storage: { from: () => ({
+  upload: async () => ({ error: null }),
+  createSignedUrl: async (path: string) => ({ data: { signedUrl: `https://sb.test/signed/${path}` } }),
+  remove: async (paths: string[]) => { storage.removed.push(...paths); return {}; },
+}) } }) }));
 vi.mock("@/lib/pricing-seedance/settings", async () => ({ seedancePricingSettings: async () => (await import("@/lib/pricing-seedance")).DEFAULT_SEEDANCE_PRICING }));
 
 import { seedanceProvider, cleanWish } from "@/lib/generation/seedance";
@@ -188,3 +199,40 @@ describe("provider (Kling official API)", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("templates with cuts (shot by shot)", () => {
+  const faces = [{ slotKey: "face_1", providerInput: "img_1", imageUrl: "https://s/1.jpg" }];
+  const base = { templateVideoUrl: "https://t/v.mp4", templateFrameUrl: null, quality: "720p" };
+  it("each shot is a Kling task with the same photo; the shots are joined at the end", async () => {
+    sceneMock.split = { parts: [{ start: 0, len: 4.04, file: Buffer.from("a") }, { start: 4.04, len: 9.12, file: Buffer.from("b") }] };
+    const bodies: { contents: { type: string; url?: string; text?: string }[]; settings: { duration: number } }[] = [];
+    const replies = [
+      { code: 0, data: { id: "s-1" } }, { code: 0, data: { id: "s-2" } },
+      { code: 0, data: [{ status: "succeeded", outputs: [{ type: "video", url: "https://k/1.mp4" }] }] },
+      { code: 0, data: [{ status: "processing" }] },
+      { code: 0, data: [{ status: "succeeded", outputs: [{ type: "video", url: "https://k/2.mp4" }] }] },
+    ];
+    vi.stubGlobal("fetch", vi.fn(async (_u: string, init?: RequestInit) => {
+      if (init?.body) bodies.push(JSON.parse(String(init.body)));
+      return new Response(JSON.stringify(replies.shift()), { status: 200 });
+    }));
+    const r = await seedanceProvider.submit({ jobId: "j9", ...base, faces, config: { durationSec: 13.16 } });
+    expect(r.providerJobId).toBe("s-1");
+    expect(bodies).toHaveLength(2);
+    expect(bodies.map((b) => b.contents.find((c) => c.type === "base_video")?.url)).toEqual([
+      "https://sb.test/signed/kling-shots/j9/p0.mp4", "https://sb.test/signed/kling-shots/j9/p1.mp4"]);
+    expect(bodies.every((b) => b.contents.some((c) => c.type === "refer_image" && c.url === "https://s/1.jpg"))).toBe(true);
+    expect(bodies.map((b) => b.settings.duration)).toEqual([4, 9]);
+    expect(bodies[0].contents[0].text).toContain("one shot of a longer video");
+    const p1 = await seedanceProvider.getStatus("s-1", { startedAt: null, state: r.state ?? null });
+    expect(p1.state).toBe("processing");
+    const state2 = (p1 as { next?: { state: Record<string, unknown> } }).next!.state;
+    const done = await seedanceProvider.getStatus("s-1", { startedAt: null, state: state2 });
+    expect(done).toMatchObject({ state: "succeeded", outputBytes: new Uint8Array([1, 2, 3]) });
+    expect(sceneMock.joined.at(-1)).toEqual(["https://k/1.mp4", "https://k/2.mp4"]);
+    expect(storage.removed).toEqual(["kling-shots/j9/p0.mp4", "kling-shots/j9/p1.mp4"]);
+    sceneMock.split = null;
+    vi.unstubAllGlobals();
+  });
+});
+

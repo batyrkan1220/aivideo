@@ -236,11 +236,11 @@ async function pollJob(job: Job) {
   if (st.state === "failed") {
     return failJob(job, st.errorCode, { ...polled, provider_cost: st.cost ?? job.provider_cost });
   }
-  if (st.state === "succeeded") return finalize(job, st.outputUrl, st.cost);
+  if (st.state === "succeeded") return finalize(job, st.outputUrl, st.cost, st.outputBytes);
 }
 
 /** Download → validate → store privately → mark completed. Retries are free (provider already done). */
-async function finalize(job: Job, outputUrl: string, cost?: number) {
+async function finalize(job: Job, outputUrl: string, cost?: number, ready?: Uint8Array) {
   const db = supabaseAdmin();
   await db.from("generation_jobs").update({ status: "postprocessing", progress: 100 }).eq("id", job.id);
   await db.from("orders").update({ generation_status: "postprocessing" }).eq("id", job.order_id);
@@ -252,7 +252,8 @@ async function finalize(job: Job, outputUrl: string, cost?: number) {
   };
 
   let bytes: Uint8Array;
-  try {
+  if (ready) bytes = ready;
+  else try {
     const res = await fetch(outputUrl, { signal: AbortSignal.timeout(60_000) });
     if (!res.ok) return retryLater("output_download_failed");
     const len = Number(res.headers.get("content-length") ?? 0);
