@@ -33,3 +33,10 @@ export function planParts(total: number, cuts: number[], min = MIN_PART_SEC, max
   }
   return edges.slice(0, -1).map((s, i) => ({ start: s, len: edges[i + 1] - s }));
 }
+
+/**
+ * Length a shot is sent to Kling with: whole seconds, rounded up, at least 3. Kling returns whole
+ * seconds only (5.27 s in → 5 s out lost the end of the shot, TM-100039), so the shot is held on its
+ * last frame up to that length and the join cuts it back to its real length.
+ */
+export const klingShotSec = (len: number) => Math.max(KLING_MIN_SEC, Math.ceil(len - 0.01));

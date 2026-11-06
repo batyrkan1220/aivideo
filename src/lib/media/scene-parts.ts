@@ -7,7 +7,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as WebReadableStream } from "node:stream/web";
 import { ffmpegLog, holdMedia } from "@/lib/templates/lite-preview";
-import { KLING_MIN_SEC, planParts, type Part } from "./scene-plan";
+import { klingShotSec, planParts, type Part } from "./scene-plan";
 
 /*
   Kling keeps the customer's face only inside one continuous shot: after a cut in the template it
@@ -80,8 +80,9 @@ export async function splitAtCuts(videoUrl: string): Promise<{ parts: (Part & { 
     for (const [k, p] of parts.entries()) {
       const o = join(dir, `p${k}.mp4`);
       // Exact cut points: re-encoded (stream copy would snap to keyframes), sound kept.
-      // Under 3 s: held on the last frame (and silence) up to Kling's minimum; the join cuts it back.
-      const hold = Math.max(0, KLING_MIN_SEC + 0.1 - p.len);
+      // Held on the last frame (and silence) up to whole seconds (at least 3): Kling returns whole
+      // seconds only, so nothing of the shot is lost; the join cuts it back to its real length.
+      const hold = klingShotSec(p.len) + 0.05 - p.len;
       await ffmpegLog([...q, "-loglevel", "error", "-ss", p.start.toFixed(3), "-t", p.len.toFixed(3), "-i", inPath,
         ...(hold ? ["-vf", `tpad=stop_mode=clone:stop_duration=${hold.toFixed(3)}`, "-af", `apad=pad_dur=${hold.toFixed(3)}`] : []),
         "-filter_threads", "1", ...x264, "-crf", "17", "-pix_fmt", "yuv420p",

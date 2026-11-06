@@ -5,6 +5,7 @@ import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { ProviderError, type GenerationProvider, type ProviderState } from "./types";
 import { buildKlingDirectPrompt, getKlingTask, KLING_MAX_IMAGES, submitKlingOmni } from "./kling";
 import { mediaUrl } from "@/lib/templates/queries";
+import { klingShotSec } from "@/lib/media/scene-plan";
 import { supabaseAdmin } from "@/lib/supabase/server";
 
 /**
@@ -189,11 +190,11 @@ async function startShots(jobId: string, videoUrl: string, passes: Pass[], aspec
   const run: ShotRun = { stage: "shots", shots, passes: passes.map((p) => ({ ...p, prompt: `${p.prompt} ${SHOT_NOTE}` })), aspectRatio, resolution, soundUrl: videoUrl };
   const first = await submitShot(run, 0);
   shots[0].id = first;
-  let cost = seedanceCostUsd(shots[0].len, pricing, {}, resolution);
+  let cost = seedanceCostUsd(klingShotSec(shots[0].len), pricing, {}, resolution);
   for (let k = 1; k < shots.length; k++) {
     // Busy or refused: tried again on the next poll, which also reports a real failure.
     const id = await submitShot(run, k).catch(() => null);
-    if (id) { shots[k].id = id; cost += seedanceCostUsd(shots[k].len, pricing, {}, resolution); }
+    if (id) { shots[k].id = id; cost += seedanceCostUsd(klingShotSec(shots[k].len), pricing, {}, resolution); }
   }
   console.log("[kling] template in", shots.length, "shots ×", run.passes.length, passes.length > 1 ? "people" : "person");
   return { providerJobId: first, cost, state: run as unknown as ProviderState };
@@ -237,7 +238,7 @@ const submitShot = (run: ShotRun, k: number) => {
   const s = run.shots[k], pass = run.passes[s.k ?? 0];
   return submitKlingOmni({
     videoUrl: (s.k ?? 0) > 0 && s.mid ? s.mid : s.url, photoUrls: pass.photoUrls, mode: "edit", prompt: pass.prompt,
-    durationSec: Math.max(3, s.len), aspectRatio: run.aspectRatio, resolution: run.resolution,
+    durationSec: klingShotSec(s.len), aspectRatio: run.aspectRatio, resolution: run.resolution,
   });
 };
 
@@ -265,7 +266,7 @@ async function shotStatus(run: ShotRun): Promise<import("./types").ProviderJobSt
     }
     try {
       s.id = await submitShot(cur, k);
-      added += seedanceCostUsd(s.len, pricing, {}, run.resolution);
+      added += seedanceCostUsd(klingShotSec(s.len), pricing, {}, run.resolution);
       changed = true;
     } catch (err) {
       if (err instanceof ProviderError && err.retryable) continue;

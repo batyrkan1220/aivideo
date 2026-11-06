@@ -223,7 +223,7 @@ describe("templates with cuts (shot by shot)", () => {
     expect(bodies.map((b) => b.contents.find((c) => c.type === "base_video")?.url)).toEqual([
       "https://sb.test/signed/kling-shots/j9/p0.mp4", "https://sb.test/signed/kling-shots/j9/p1.mp4"]);
     expect(bodies.every((b) => b.contents.some((c) => c.type === "refer_image" && c.url === "https://s/1.jpg"))).toBe(true);
-    expect(bodies.map((b) => b.settings.duration)).toEqual([4, 9]);
+    expect(bodies.map((b) => b.settings.duration)).toEqual([5, 10]); // whole seconds, rounded up: nothing of a shot is lost
     expect(bodies[0].contents[0].text).toContain("one shot of a longer video");
     const p1 = await seedanceProvider.getStatus("s-1", { startedAt: null, state: r.state ?? null });
     expect(p1.state).toBe("processing");
