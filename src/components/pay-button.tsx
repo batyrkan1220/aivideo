@@ -32,12 +32,12 @@ function WebPay({ orderId, label, sandbox, askPhone = false }: { orderId: string
       )}
       <button
         disabled={pending}
-        className="h-13 w-full rounded-full bg-flash font-semibold text-night transition-opacity hover:opacity-90 disabled:opacity-60"
+        className="btn-glow h-13 w-full rounded-full font-semibold disabled:opacity-60"
       >
         {pending ? kk.order.paying : label}
       </button>
-      {sandbox && <p className="mt-2 text-center text-xs font-semibold text-flash">{kk.sandbox.badge}</p>}
-      {state.error && <p role="alert" className="mt-3 text-center text-sm text-flash">{kk.order.payErrors[state.error]}</p>}
+      {sandbox && <p className="mt-2 text-center text-xs font-semibold text-muted">{kk.sandbox.badge}</p>}
+      {state.error && <p role="alert" className="mt-3 text-center text-sm text-danger">{kk.order.payErrors[state.error]}</p>}
     </form>
   );
 }

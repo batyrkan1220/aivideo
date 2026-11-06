@@ -60,7 +60,7 @@ async function Inner({ params }: { params: Promise<{ paymentId: string }> }) {
 
   const header = (
     <>
-      {sandbox && <p className="-mx-6 -mt-6 mb-5 rounded-t-card bg-flash px-4 py-2 text-center text-sm font-bold text-night">{kk.sandbox.badge}</p>}
+      {sandbox && <p className="-mx-6 -mt-6 mb-5 rounded-t-card bg-brand px-4 py-2 text-center text-sm font-bold text-night">{kk.sandbox.badge}</p>}
       <h1 className="font-display text-xl font-bold">{kk.tole.title}</h1>
       <dl className="mt-4 flex items-baseline justify-between border-y border-line py-4">
         <dt className="text-sm text-muted">{kk.order.number}: {order?.public_order_number}</dt>
@@ -106,7 +106,7 @@ async function Inner({ params }: { params: Promise<{ paymentId: string }> }) {
       </form>
 
       {sandbox && env().APP_ENV !== "production" && (
-        <form action={simulateTolePayment} className="mt-6 rounded-xl border-2 border-dashed border-flash p-4">
+        <form action={simulateTolePayment} className="mt-6 rounded-xl border-2 border-dashed border-brand p-4">
           <p className="text-sm font-semibold">{kk.tole.simulateTitle}</p>
           <input type="hidden" name="paymentId" value={pay.id} />
           <div className="mt-3 flex gap-2">

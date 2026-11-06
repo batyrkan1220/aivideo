@@ -84,7 +84,7 @@ export function TemplateDetailView({ t, cta, combo, staffUnits }: { t: TemplateD
                 {formatKzt(t.startingPriceKzt)} {kk.catalog.from}
               </span>
             )}
-            {t.isTrending && <span className="rounded-full bg-flash px-3 py-1.5 font-bold text-night">{kk.catalog2.trendBadge}</span>}
+            {t.isTrending && <span className="rounded-full bg-brand px-3 py-1.5 font-bold text-night">{kk.catalog2.trendBadge}</span>}
             {staffUnits && <span className="rounded-full bg-brand px-3 py-1.5 font-semibold text-night">{staffUnits}</span>}
           </div>
         </div>

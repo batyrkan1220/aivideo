@@ -102,7 +102,8 @@ html[data-tg] .under-header { top: 0; }
   --color-coral: #f0564a;
   --color-danger: #d93a32;
   --color-success: #1f9d55;
-  --color-flash: #f0564a;
+  /* Accent marks ("Тренд" and the like) use the chartreuse brand colour, not coral. */
+  --color-flash: #d7f443;
   --radius-card: 1.5rem;
   --font-display: "Inter Variable", system-ui, -apple-system, "SF Pro Display", sans-serif;
   color-scheme: light;
