@@ -466,7 +466,7 @@ export const ru = {
         ],
         labels: "Подписи фото для клиента (по порядку)",
         klingMode: "Как работает Kling",
-        klingModeOptions: { edit: "Редактировать видео шаблона (сцена 1:1)", reference: "Новое видео по движению шаблона" },
+        klingModeOptions: { edit: "Шаблон — движение и сцена, человек из фото", reference: "Новое видео по движению шаблона" },
         faceSwap: "После Kling уточнить лицо заменой лица (≈ $0.094/сек, до 29 секунд)",
         positionAuto: (n: number) => `Где в кадре: авто (${n}-й слева)`,
         positionOptions: {

@@ -7,8 +7,8 @@ import { buildKlingDirectPrompt, createKlingElement, getKlingElement, getKlingTa
 
 /**
  * The video provider (key "seedance" for existing rows): Kling 4.0 via Kling's official API.
- * The template video is edited — the people in it are replaced by the customer's photos — or,
- * in "reference" mode, a new video follows its motion. 720p, 9:16 by default.
+ * The template video is a feature reference. The people in it are replaced by the customer's photos.
+ * 720p, 9:16 by default.
  */
 
 /** Customer text is free input: no media tags, no control characters, limited length. */

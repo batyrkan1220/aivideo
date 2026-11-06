@@ -10,13 +10,12 @@ describe("Kling prompt priorities", () => {
     expect(p).toContain("Mandatory template instruction: national costume");
     expect(p.indexOf("Mandatory template instruction")).toBeLessThan(p.indexOf("Optional customer wish"));
     expect(p).toMatch(/ignore any part that asks to change the faces or the clothing/);
-    expect(p).toContain("Edit @video_1");
+    expect(p).toContain("Reference only the camera, movement, timing");
     expect(p).toContain("the person from @element_1");
     expect(p).not.toContain("@image_1");
-    expect(p).toContain("Keep only the camera, movement, timing");
     expect(p).toContain("@element_1 is one person");
     expect(p).toContain("Do not keep the original face, head, hair, skin or body from @video_1");
-    expect(p.indexOf("@element_1 is one person")).toBeLessThan(p.indexOf("Edit @video_1"));
+    expect(p.indexOf("@element_1 is one person")).toBeLessThan(p.indexOf("Reference only the camera"));
   });
 
   it("adds no wish section when the customer wrote nothing", () => {
@@ -74,7 +73,7 @@ describe("Kling prompt with things to swap", () => {
   });
   it("keeps three people and a horse or outfit as their own elements", () => {
     const p = buildKlingDirectPrompt("edit", "template", "", "", 3, ["on the left", "in the center", "on the right"], [{ what: "horse" }, { what: "outfit" }]);
-    expect(p).toContain("Edit @video_1");
+    expect(p).toContain("Reference only the camera, movement, timing");
     expect(p).toContain("the person on the left with the person from @element_1");
     expect(p).toContain("the person on the right with the person from @element_3");
     expect(p).toContain("@element_1 is one separate person, on the left");

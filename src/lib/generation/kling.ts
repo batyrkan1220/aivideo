@@ -42,7 +42,7 @@ async function call<T>(path: string, init: RequestInit = {}, timeoutMs = 30_000)
 
 export type KlingMode = "edit" | "reference";
 
-/** Edit = base_video (the template itself is edited). Reference = feature_video (motion only). */
+/** Both modes send the template as a feature reference. "edit" also keeps the place and background. */
 export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "template", adminPrompt: string, wish: string, people = 1, positions: string[] = [], objects: { what: string }[] = []): string {
   // Kling 4.0: every customer photo is an element. People are element_1 onward, then each thing.
   // The prompt must say what each reference is for, and an edit must say what changes and what stays.
@@ -62,9 +62,10 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   const appearance = people === 1
     ? `@element_1 is one person. The main person must match ${match("@element_1")}. Do not keep the original face, head, hair, skin or body from @video_1.`
     : `${faces.map((r, i) => `${r} is one separate person, ${spot(i)}. That person must match ${match(r)}.`).join(" ")} These are ${people} different people. Do not swap their faces, blend them, or give one person's face to another. Do not keep any original face from @video_1.`;
-  const lead = mode === "edit"
-    ? `Edit @video_1. ${who[0].toUpperCase()}${who.slice(1)}. Keep only the camera, movement, timing, location, background, lighting, framing and cuts of @video_1.`
-    : `Follow only the movement, camera and timing of @video_1. Do not copy the face, head, hair, skin or body from @video_1. ${who[0].toUpperCase()}${who.slice(1)}.`;
+  const scene = mode === "reference"
+    ? "the movement, camera and timing"
+    : "the camera, movement, timing, location, background, lighting, framing and cuts";
+  const lead = `Reference only ${scene} of @video_1. ${who[0].toUpperCase()}${who.slice(1)}. Do not copy the original person from @video_1.`;
   const parts = [appearance, lead, look];
   for (const t of things) {
     if (t.ref === outfitRef) continue;
@@ -138,9 +139,10 @@ export async function getKlingElement(taskId: string): Promise<{ state: "process
 
 export async function submitKlingOmni(opts: { videoUrl: string; elementIds?: string[]; mode: KlingMode; prompt: string; durationSec: number; aspectRatio: string; resolution?: "720p" | "1080p" }): Promise<string> {
   const duration = Math.min(30, Math.max(3, Math.round(opts.durationSec)));
-  // Edit the template itself (base_video) or follow it as motion only (feature_video). Never both.
+  // Official subject replacement uses the template as a feature reference. base_video edits the
+  // original file and often returns that person unchanged. Never send both video types.
   // Every customer photo is already an element: element_1, element_2, … No plain refer_image.
-  const videoType = opts.mode === "reference" ? "feature_video" : "base_video";
+  const videoType = "feature_video";
   const aspect = ["21:9", "16:9", "9:16", "1:1", "adaptive"].includes(opts.aspectRatio) ? opts.aspectRatio : "adaptive";
   const d = await call<{ data?: { id?: string } }>("/omni-video/kling-4.0", {
     method: "POST",
@@ -156,7 +158,7 @@ export async function submitKlingOmni(opts: { videoUrl: string; elementIds?: str
   });
   const id = d.data?.id;
   if (!id) throw new ProviderError("provider_bad_response", false, "kling: missing task id");
-  console.log("[kling] video task", id, `video=${videoType} elements=${opts.elementIds?.length ?? 0}`);
+  console.log("[kling] video task", id, `video=${videoType} mode=${opts.mode} elements=${opts.elementIds?.length ?? 0}`);
   return id;
 }
 

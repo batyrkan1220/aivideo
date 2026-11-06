@@ -42,10 +42,9 @@ describe("config", () => {
   });
   it("prompt: edit keeps the scene, maps several people by position", () => {
     const p = buildKlingDirectPrompt("edit", "photo", "", "", 2, ["the biggest one in the frame", "in the background"]);
-    expect(p).toContain("Edit @video_1");
+    expect(p).toContain("Reference only the camera, movement, timing");
     expect(p).toContain("the person the biggest one in the frame with the person from @element_1");
     expect(p).toContain("@element_2");
-    expect(p).toContain("Keep only the camera, movement, timing");
   });
 });
 
@@ -82,7 +81,7 @@ describe("provider (Kling official API)", () => {
     expect(advanced).toMatchObject({ state: "processing", next: { providerJobId: "kt-1", state: { stage: "klingd" } } });
     const video = calls.find((c) => c.url.endsWith("/omni-video/kling-4.0"));
     const body = video?.body as { contents: { type: string; url?: string; id?: string; text?: string; element_id?: string }[]; settings: Record<string, unknown> };
-    expect(body.contents.map((c) => c.type)).toEqual(["prompt", "base_video", "element"]);
+    expect(body.contents.map((c) => c.type)).toEqual(["prompt", "feature_video", "element"]);
     expect(body.contents[2]).toMatchObject({ type: "element", element_id: "308", id: "element_1" });
     expect(body.contents.some((c) => c.type === "refer_image")).toBe(false);
     expect(body.contents[0].text).toContain("night city");
@@ -155,7 +154,8 @@ describe("provider (Kling official API)", () => {
       expect.objectContaining({ element_id: "33", id: "element_3" }),
     ]);
     expect(body.contents.some((c) => c.type === "refer_image")).toBe(false);
-    expect(body.contents.find((c) => c.type === "base_video" || c.type === "feature_video")?.type).toBe("base_video");
+    expect(body.contents.find((c) => c.type === "base_video" || c.type === "feature_video")?.type).toBe("feature_video");
+    expect(body.contents.some((c) => c.type === "base_video")).toBe(false);
     expect(body.contents[0].text).toContain("Do not use the clothing from @video_1");
     expect(body.contents[0].text).toContain("@element_3 is the car, not a person");
     expect(body.contents[0].text).toContain("@element_1 is one separate person");

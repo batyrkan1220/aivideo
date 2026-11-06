@@ -3,8 +3,8 @@ import type { FaceSlot } from "./schema";
 
 /**
  * Template config for Kling 4.0 (Kling AI official API, 720p, 9:16).
- * "edit": the template video itself is edited — the people are replaced by the customer's photos,
- * everything else (scene, camera, motion, sound) stays. "reference": a new video following it.
+ * The template video is a feature reference: motion and scene stay, the people come from the photos.
+ * "edit" also keeps the location and background. "reference" follows movement, camera and timing.
  * (The provider key stays "seedance" for existing rows.)
  */
 export const SEEDANCE_MAX_PEOPLE = 5;
