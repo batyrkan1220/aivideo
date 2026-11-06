@@ -289,6 +289,26 @@ export async function templateShots(id: string) {
   }
 }
 
+/** Admin: the same scene view for a finished order's video, to compare it with its template's. */
+export async function orderShots(orderId: string) {
+  const user = await guard("templates.manage");
+  if (!user || !z.string().uuid().safeParse(orderId).success) return null;
+  const db = supabaseAdmin();
+  const { data: v } = await db.from("generated_videos").select("private_storage_path").eq("order_id", orderId).maybeSingle();
+  if (!v) return null;
+  const { data: signed } = await db.storage.from("generated-videos").createSignedUrl(v.private_storage_path, 600);
+  if (!signed) return null;
+  try {
+    const { previewShots } = await import("@/lib/media/scene-parts");
+    const r = await previewShots(signed.signedUrl);
+    console.log("[scenes] order", orderId, `total=${r.total.toFixed(2)} cuts=${r.cuts.map((c) => c.toFixed(2)).join(",") || "-"}`);
+    return r;
+  } catch (err) {
+    console.error("[scenes] order failed", err instanceof Error ? err.message.slice(0, 160) : "error");
+    return null;
+  }
+}
+
 /** Admin: show or hide templates with 2–3 people (one Kling run per person) to customers. */
 /** Changes one catalog switch and keeps the others. */
 async function setCatalogSwitch(key: "multiPeople" | "requireAnalysis", on: boolean, action: string): Promise<{ ok: boolean }> {

@@ -1,17 +1,17 @@
 "use client";
 import { useState } from "react";
-import { templateShots } from "./actions";
+import { orderShots, templateShots } from "./actions";
 
 type R = NonNullable<Awaited<ReturnType<typeof templateShots>>>;
 const sec = (n: number) => `${n.toFixed(1)} с`;
 
 /** Admin list: how an order of this template is cut into shots for Kling, with a frame of every scene. */
-export function ShotsButton({ id }: { id: string }) {
+export function ShotsButton({ id, order = false }: { id: string; order?: boolean }) {
   const [state, setState] = useState<"idle" | "busy" | "err">("idle");
   const [r, setR] = useState<R | null>(null);
   const load = async () => {
     setState("busy");
-    const res = await templateShots(id);
+    const res = await (order ? orderShots(id) : templateShots(id));
     if (res) { setR(res); setState("idle"); } else setState("err");
   };
   return (
@@ -25,8 +25,8 @@ export function ShotsButton({ id }: { id: string }) {
           <div className="max-h-[85dvh] w-full max-w-3xl overflow-auto rounded-2xl bg-white p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-lg font-bold">Сцен: {r.scenes.length} · частей для Kling: {r.parts.length}</p>
-                <p className="text-sm text-muted">Видео {sec(r.total)}. Сцены короче 3 с Kling получает вместе с соседней.</p>
+                <p className="text-lg font-bold">Сцен: {r.scenes.length}{order ? "" : ` · частей для Kling: ${r.parts.length}`}</p>
+                <p className="text-sm text-muted">Видео {sec(r.total)}. {order ? "Готовое видео заказа: сравните сцены с шаблоном." : "Каждая сцена — отдельная часть для Kling."}</p>
               </div>
               <button type="button" onClick={() => setR(null)} className="rounded-full border border-line px-3 py-1 text-sm">✕</button>
             </div>
@@ -38,7 +38,7 @@ export function ShotsButton({ id }: { id: string }) {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={s.jpg} alt={`Сцена ${i + 1}`} className="aspect-[9/16] w-full bg-mist object-cover" />
                     <figcaption className="p-2 text-xs">
-                      <b>Сцена {i + 1}</b> · {sec(s.start)}–{sec(s.start + s.len)}<br />часть {part + 1}
+                      <b>Сцена {i + 1}</b> · {sec(s.start)}–{sec(s.start + s.len)}{!order && <><br />часть {part + 1}</>}
                     </figcaption>
                   </figure>
                 );

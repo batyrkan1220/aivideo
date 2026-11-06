@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { ShotsButton } from "@/app/admin/templates/shots-button";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
@@ -91,7 +92,7 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
           {preview ? (isPhoto
             // eslint-disable-next-line @next/next/no-img-element
             ? <img src={preview} alt="" className="max-h-80 rounded-xl" />
-            : <video src={preview} controls playsInline className="max-h-80 rounded-xl bg-black" />)
+            : <div className="space-y-2"><video src={preview} controls playsInline className="max-h-80 rounded-xl bg-black" /><ShotsButton id={id} order /></div>)
             : <p className="text-sm text-muted">{video && !live ? "Файл удалён по сроку хранения" : (kids ?? []).length ? "Фото — в списке комбо ниже" : "Пока нет"}</p>}
         </section>
       </div>

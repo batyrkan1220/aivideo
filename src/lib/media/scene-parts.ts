@@ -114,6 +114,11 @@ export async function joinParts(partUrls: string[], lens: number[], soundUrl: st
     const first = await ffmpegLog([...q, "-i", files[0], "-f", "null", "-t", "0.01", "-"]).catch(() => "");
     const m = /Video:.*?(\d{2,5})x(\d{2,5})/.exec(first);
     const W = m ? Number(m[1]) : 720, H = m ? Number(m[2]) : 1280;
+    // What Kling returned, for the log: its length and the scene changes inside each part.
+    for (const [k, f] of files.entries()) {
+      const r = await findShots(f).catch(() => null);
+      if (r) console.log("[scenes] kling part", k + 1, `len=${r.total.toFixed(2)} want=${lens[k].toFixed(2)} cuts=${r.cuts.map((c) => c.toFixed(2)).join(",") || "-"}`);
+    }
     const fitted: string[] = [];
     for (const [k, f] of files.entries()) {
       const o = join(dir, `f${k}.mp4`);
