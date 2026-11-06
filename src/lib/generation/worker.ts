@@ -153,6 +153,19 @@ async function submitJob(job: Job) {
     const { data: signedVideo } = await db.storage.from("user-videos").createSignedUrl(snap.user_video_path, 24 * 3600);
     if (!signedVideo) return delay(job, backoffMs(job.attempt_count));
     templateVideoUrl = signedVideo.signedUrl;
+    // Under 700 px Kling refuses the video: send an upscaled copy (kept next to the original, removed with it).
+    try {
+      const { klingReadyCopy } = await import("@/lib/media/kling-video");
+      const copy = await klingReadyCopy(signedVideo.signedUrl);
+      if (copy) {
+        const copyPath = `${snap.user_video_path}.kling.mp4`;
+        const { error: upErr } = await db.storage.from("user-videos").upload(copyPath, copy, { contentType: "video/mp4", upsert: true });
+        const { data: signedCopy } = upErr ? { data: null } : await db.storage.from("user-videos").createSignedUrl(copyPath, 24 * 3600);
+        if (signedCopy) templateVideoUrl = signedCopy.signedUrl;
+      }
+    } catch (err) {
+      console.error("[worker] video copy failed", job.id, err instanceof Error ? err.message.slice(0, 120) : "error");
+    }
   }
   const quality = (snap.quality as { providerQuality?: string } | undefined)?.providerQuality ?? "standard";
   // Provider config of the paid version + what the order adds: reference length and the customer's wish.

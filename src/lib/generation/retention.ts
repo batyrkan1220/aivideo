@@ -41,7 +41,7 @@ export async function runRetention() {
     return !o || !ACTIVE.includes(o.generation_status ?? "");
   });
   if (srcDue.length) {
-    await db.storage.from("user-videos").remove(srcDue.map((v) => v.storage_path));
+    await db.storage.from("user-videos").remove(srcDue.flatMap((v) => [v.storage_path, `${v.storage_path}.kling.mp4`]));
     await db.from("order_videos").delete().in("id", srcDue.map((v) => v.id));
   }
 

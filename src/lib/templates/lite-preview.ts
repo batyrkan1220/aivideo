@@ -96,7 +96,8 @@ async function makeOne(templateId: string): Promise<boolean> {
     // such videos get an upscaled copy (short side 720) that only Kling uses.
     const px = await probeSize(inPath).catch(() => null);
     let klingPath: string | null = t?.kling_video_path ?? null;
-    if (px && Math.min(px.w, px.h) < 720 && !klingPath) {
+    // Kling also takes only MP4/MOV: a WebM template gets the same copy.
+    if (px && (Math.min(px.w, px.h) < 720 || /\.webm$/i.test(src)) && !klingPath) {
       const kOut = join(dir, "kling.mp4");
       try {
         await runFfmpeg(inPath, kOut, upscaleArgs);
@@ -212,7 +213,7 @@ const thumbArgs = (inPath: string, outPath: string) => [
 ];
 
 // Short side to 720 px (Kling needs 700+), same frames and sound, high quality, single-threaded.
-const upscaleArgs = (inPath: string, outPath: string) => [
+export const upscaleArgs = (inPath: string, outPath: string) => [
   "-hide_banner", "-loglevel", "error", "-y", "-threads", "1", "-i", inPath, "-threads", "1", "-filter_threads", "1",
   "-vf", "scale=w='if(gt(iw,ih),-2,720)':h='if(gt(iw,ih),720,-2)':flags=lanczos,setsar=1",
   "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",
@@ -220,7 +221,7 @@ const upscaleArgs = (inPath: string, outPath: string) => [
 ];
 
 /** Display size (rotation applied) of a video from ffmpeg's stream info. */
-async function probeSize(inPath: string): Promise<{ w: number; h: number } | null> {
+export async function probeSize(inPath: string): Promise<{ w: number; h: number } | null> {
   const bin = await ffmpegPath();
   const info = await new Promise<string>((resolve) => {
     const p = spawn(bin, ["-hide_banner", "-i", inPath], { stdio: ["ignore", "ignore", "pipe"] });
@@ -299,7 +300,16 @@ async function cleanupOrphans() {
   }
 }
 
-export async function runFfmpeg(inPath: string, outPath: string, build: (i: string, o: string) => string[]) {
+// One ffmpeg process on the server at a time (512 MB): every job waits for the previous one.
+let ffmpegChain: Promise<unknown> = Promise.resolve();
+
+export function runFfmpeg(inPath: string, outPath: string, build: (i: string, o: string) => string[]): Promise<void> {
+  const run = ffmpegChain.then(() => runFfmpegNow(inPath, outPath, build));
+  ffmpegChain = run.catch(() => {});
+  return run;
+}
+
+async function runFfmpegNow(inPath: string, outPath: string, build: (i: string, o: string) => string[]) {
   const bin = await ffmpegPath();
   const args = build(inPath, outPath);
   await new Promise<void>((resolve, reject) => {

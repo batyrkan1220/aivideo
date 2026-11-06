@@ -12,6 +12,7 @@ import { calculatePrice, formatKzt } from "@/lib/pricing";
 import { seedancePriceKzt, seedanceCostKzt, klingUnitLabel, SEEDANCE_QUALITY, type SeedancePricing } from "@/lib/pricing-seedance";
 import { FaceMap } from "@/components/face-map";
 import { applyAnalysis, cutoutRect, type Box } from "@/lib/templates/analysis";
+import { aspectAllowed } from "@/lib/custom-video/aspect";
 import { saveTemplate, changeStatus, createUploadUrl, detectTemplateElements } from "./actions";
 import { DeleteTemplateButton } from "./delete-button";
 import { parsePhotoConfig, photoSlots, PHOTO_ASPECTS, PHOTO_MAX_PEOPLE, PHOTO_PROVIDER, PHOTO_QUALITY, type PhotoConfig } from "@/lib/templates/photo-config";
@@ -413,7 +414,7 @@ export function TemplateEditor({
                   </span>
                 )}
               </Field>
-              <p className={`text-xs sm:col-span-2 ${(duration !== null && (duration < 2.5 || duration > 30.5)) || (frame && (frame.w < 700 || frame.h < 700)) ? "font-semibold text-danger" : "text-muted"}`}>
+              <p className={`text-xs sm:col-span-2 ${(duration !== null && (duration < 2.5 || duration > 30.5)) ? "font-semibold text-danger" : "text-muted"}`}>
                 {e.seedance.durationHint}{duration !== null ? ` · ${Math.round(duration * 10) / 10} сек` : ""}{frame ? ` · ${frame.w}×${frame.h}` : ""}
               </p>
             </div>
@@ -730,6 +731,8 @@ function VideoField({
     if (!VIDEO_TYPES.includes(file.type) || file.size > VIDEO_MAX) { setUploadErr(e.badFile); return; }
     const meta = await readVideoMeta(file);
     if (meta && (meta.duration < SEEDANCE_MIN_SEC - 0.5 || meta.duration > SEEDANCE_MAX_SEC + 0.5)) { setUploadErr(e.durationBad); return; }
+    // Kling takes 2:5–5:2 only. Size is fixed by the server (a 720 px copy), shape cannot be.
+    if (meta?.aspect && !aspectAllowed(meta.aspect)) { setUploadErr(e.aspectBad); return; }
     setBusy(true);
     try {
       const r = await createUploadUrl({ kind: "preview", contentType: file.type, size: file.size });
