@@ -3,11 +3,11 @@ import { seedanceConfigSchema, SEEDANCE_MAX_OBJECTS, SEEDANCE_MAX_PEOPLE, SEEDAN
 import { seedanceCostUsd } from "@/lib/pricing-seedance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { type GenerationProvider, type ProviderState } from "./types";
-import { buildKlingDirectPrompt, createKlingElement, getKlingElement, getKlingTask, klingElementTag, submitKlingOmni } from "./kling";
+import { buildKlingDirectPrompt, getKlingElement, getKlingTask, submitKlingOmni } from "./kling";
 
 /**
  * The video provider (key "seedance" for existing rows): Kling 4.0 via Kling's official API.
- * The template video is a feature reference. The people in it are replaced by the customer's photos.
+ * Edit mode edits the template video (base_video); the people in it are replaced by the customer's photos (@image_N).
  * 720p, 9:16 by default.
  */
 
@@ -58,22 +58,20 @@ export const seedanceProvider: GenerationProvider = {
     const durationSec = Number(extra.durationSec);
     const photos = input.faces.map((f) => f.imageUrl).slice(0, SEEDANCE_MAX_REFS);
     // People first (img_1…img_n), then the things to swap (car, horse, outfit…).
-    // The element sent to the video is created from the client photo. How many people is the number set on the template.
+    // How many people is the number set on the template.
     // Only photos that were actually uploaded count, so a car slot is never sent as a person.
     const declaredPeople = Math.min(SEEDANCE_MAX_PEOPLE, Math.max(1, cfg.people));
     const objects = cfg.objects.slice(0, Math.min(SEEDANCE_MAX_OBJECTS, Math.max(0, photos.length - declaredPeople)));
     const people = Math.min(declaredPeople, Math.max(1, photos.length - objects.length));
     const prompt = buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : "", people, cfg.positions, objects);
     const resolution = input.quality === "1080p" ? "1080p" : "720p";
-    // Each uploaded photo becomes its own element, in order: people (o_102), then things (animal, prop, clothing).
+    // Photos go straight to the video call as reference images, people first, then things.
     const usedPhotos = photos.slice(0, people + objects.length);
-    const tags = [...Array.from({ length: people }, () => "o_102"), ...objects.map((o) => klingElementTag(o.what))];
-    const elementTaskId = await createKlingElement(usedPhotos[0], tags[0] ?? "o_102", personNote(tags[0], 0, people));
-    const state: ProviderState = {
-      stage: "element", videoUrl: input.templateVideoUrl, photoUrls: usedPhotos, people, tags,
-      elementIds: [], prompt, durationSec, aspectRatio: cfg.aspectRatio, resolution, mode: cfg.klingMode,
-    };
-    return { providerJobId: elementTaskId, cost: seedanceCostUsd(durationSec, await seedancePricingSettings(), {}, resolution), state };
+    const providerJobId = await submitKlingOmni({
+      videoUrl: input.templateVideoUrl, photoUrls: usedPhotos, mode: cfg.klingMode,
+      prompt, durationSec, aspectRatio: cfg.aspectRatio, resolution,
+    });
+    return { providerJobId, cost: seedanceCostUsd(durationSec, await seedancePricingSettings(), {}, resolution), state: { stage: "klingd" } };
   },
 
   async getStatus(providerJobId, ctx) {
@@ -82,19 +80,11 @@ export const seedanceProvider: GenerationProvider = {
     const el = await getKlingElement(providerJobId);
     if (el.state === "processing") return { state: "processing" };
     if (el.state === "failed") return { state: "failed", errorCode: el.errorCode, retryable: false };
-    const elementIds = [...lock.elementIds, el.elementId];
-    const total = lock.tags?.length ? Math.min(lock.tags.length, lock.photoUrls.length) : lock.people;
-    if (elementIds.length < total) {
-      const nextPhoto = lock.photoUrls[elementIds.length];
-      if (typeof nextPhoto !== "string" || !nextPhoto) return { state: "failed", errorCode: "missing_inputs", retryable: false };
-      const nextTag = lock.tags?.[elementIds.length] ?? "o_102";
-      const taskId = await createKlingElement(nextPhoto, nextTag, personNote(nextTag, elementIds.length, lock.people));
-      return { state: "processing", next: { providerJobId: taskId, state: { ...lock, elementIds } as ProviderState } };
-    }
+    // Jobs started before elements were dropped: send the photos as reference images.
     const id = await submitKlingOmni({
-      videoUrl: lock.videoUrl, elementIds,
+      videoUrl: lock.videoUrl, photoUrls: lock.photoUrls,
       mode: lock.mode === "reference" ? "reference" : "edit",
-      prompt: lock.prompt, durationSec: lock.durationSec, aspectRatio: lock.aspectRatio, resolution: lock.resolution,
+      prompt: lock.prompt.replace(/@element_(\d+)/g, "@image_$1"), durationSec: lock.durationSec, aspectRatio: lock.aspectRatio, resolution: lock.resolution,
     });
     return { state: "processing", next: { providerJobId: id, state: { stage: "klingd" } } };
   },
@@ -114,11 +104,6 @@ type FaceLockState = {
   resolution: "720p" | "1080p";
   mode?: "edit" | "reference";
 };
-
-/** Two people must stay two identities. The note is only for a character element. */
-function personNote(tag: string | undefined, index: number, people: number): string | undefined {
-  return tag === "o_102" && people > 1 ? `Person ${index + 1} of ${people}.` : undefined;
-}
 
 function faceLockState(s: ProviderState): FaceLockState | null {
   if (!s || String(s.stage) !== "element" || !Array.isArray(s.photoUrls) || typeof s.videoUrl !== "string" || typeof s.prompt !== "string") return null;

@@ -42,9 +42,9 @@ describe("config", () => {
   });
   it("prompt: edit keeps the scene, maps several people by position", () => {
     const p = buildKlingDirectPrompt("edit", "photo", "", "", 2, ["the biggest one in the frame", "in the background"]);
-    expect(p).toContain("Reference only the camera, movement, timing");
-    expect(p).toContain("the person the biggest one in the frame with the person from @element_1");
-    expect(p).toContain("@element_2");
+    expect(p.startsWith("Edit @video_1.")).toBe(true);
+    expect(p).toContain("the person the biggest one in the frame with the person from @image_1");
+    expect(p).toContain("the person in the background with the person from @image_2");
   });
 });
 
@@ -57,12 +57,9 @@ describe("provider (Kling official API)", () => {
     expect(seedanceProvider.validateInputs({ ...base, faces, config: { durationSec: 40 } })).toContain("bad_duration");
   });
 
-  it("locks the face as an element, then generates the video", async () => {
+  it("edits the template with the photo as a reference image in one call", async () => {
     const calls: { url: string; init?: RequestInit; body?: unknown }[] = [];
     const replies = [
-      { code: 0, data: { task_id: "el-1", task_status: "submitted" } },
-      { code: 0, data: { task_status: "processing" } },
-      { code: 0, data: { task_status: "succeed", task_result: { elements: [{ element_id: 308 }] } } },
       { code: 0, data: { id: "kt-1", status: "submitted" } },
       { code: 0, data: [{ id: "kt-1", status: "succeeded", outputs: [{ type: "video", url: "https://kling.cdn/out.mp4" }], billing: [{ charge_type: "unit", amount: "9.6" }] }] },
       { code: 0, data: [{ id: "kt-1", status: "failed", message: "risk control" }] },
@@ -72,24 +69,36 @@ describe("provider (Kling official API)", () => {
       return new Response(JSON.stringify(replies.shift()), { status: 200 });
     }));
     const r = await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { durationSec: 8.1, wish: "night city", allowWish: true } });
-    expect(calls[0].url).toBe("https://api-singapore.klingai.com/v1/general/advanced-custom-elements");
+    expect(calls[0].url).toBe("https://api-singapore.klingai.com/omni-video/kling-4.0");
     expect((calls[0].init?.headers as Record<string, string>).Authorization).toBe(`Bearer ${"g".repeat(20)}`);
-    expect(r.providerJobId).toBe("el-1");
+    expect(r.providerJobId).toBe("kt-1");
     expect(r.cost).toBeCloseTo(klingUnits(8.1, S) * 0.14, 4);
-    expect(await seedanceProvider.getStatus("el-1", { startedAt: null, state: r.state ?? null })).toEqual({ state: "processing" });
-    const advanced = await seedanceProvider.getStatus("el-1", { startedAt: null, state: r.state ?? null });
-    expect(advanced).toMatchObject({ state: "processing", next: { providerJobId: "kt-1", state: { stage: "klingd" } } });
-    const video = calls.find((c) => c.url.endsWith("/omni-video/kling-4.0"));
-    const body = video?.body as { contents: { type: string; url?: string; id?: string; text?: string; element_id?: string }[]; settings: Record<string, unknown> };
-    expect(body.contents.map((c) => c.type)).toEqual(["prompt", "feature_video", "element"]);
-    expect(body.contents[2]).toMatchObject({ type: "element", element_id: "308", id: "element_1" });
-    expect(body.contents.some((c) => c.type === "refer_image")).toBe(false);
+    const body = calls[0].body as { contents: { type: string; url?: string; id?: string; text?: string }[]; settings: Record<string, unknown> };
+    expect(body.contents.map((c) => c.type)).toEqual(["prompt", "base_video", "refer_image"]);
+    expect(body.contents[2]).toMatchObject({ url: "https://s/1.jpg", id: "image_1" });
+    expect(body.contents[0].text?.startsWith("Edit @video_1.")).toBe(true);
     expect(body.contents[0].text).toContain("night city");
-    expect(body.contents[0].text).toContain("@element_1");
     expect(body.settings).toMatchObject({ resolution: "720p", duration: 8, aspect_ratio: "9:16", audio: "original" });
-    const videoState = advanced.state === "processing" ? advanced.next?.state ?? null : null;
-    expect(await seedanceProvider.getStatus("kt-1", { startedAt: null, state: videoState })).toEqual({ state: "succeeded", outputUrl: "https://kling.cdn/out.mp4" });
-    expect(await seedanceProvider.getStatus("kt-1", { startedAt: null, state: videoState })).toMatchObject({ state: "failed", errorCode: "provider_content_rejected" });
+    expect(await seedanceProvider.getStatus("kt-1", { startedAt: null, state: r.state ?? null })).toEqual({ state: "succeeded", outputUrl: "https://kling.cdn/out.mp4" });
+    expect(await seedanceProvider.getStatus("kt-1", { startedAt: null, state: r.state ?? null })).toMatchObject({ state: "failed", errorCode: "provider_content_rejected" });
+    vi.unstubAllGlobals();
+  });
+
+  it("finishes a job that was waiting for an element by sending the photos instead", async () => {
+    const calls: { url: string; body?: { contents: { type: string; id?: string; text?: string }[] } }[] = [];
+    const replies = [
+      { code: 0, data: { task_status: "succeed", task_result: { elements: [{ element_id: 5 }] } } },
+      { code: 0, data: { id: "kt-9", status: "submitted" } },
+    ];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      return new Response(JSON.stringify(replies.shift()), { status: 200 });
+    }));
+    const state = { stage: "element", videoUrl: "https://cdn/v.mp4", photoUrls: ["https://s/1.jpg"], people: 1, elementIds: [], prompt: "replace with @element_1", durationSec: 8, aspectRatio: "9:16", resolution: "720p", mode: "edit" };
+    expect(await seedanceProvider.getStatus("el-1", { startedAt: null, state })).toMatchObject({ state: "processing", next: { providerJobId: "kt-9", state: { stage: "klingd" } } });
+    const body = calls[1].body!;
+    expect(body.contents.map((c) => c.type)).toEqual(["prompt", "base_video", "refer_image"]);
+    expect(body.contents[0].text).toBe("replace with @image_1");
     vi.unstubAllGlobals();
   });
 
@@ -105,62 +114,32 @@ describe("provider (Kling official API)", () => {
     vi.unstubAllGlobals();
   });
 
-  it("locks two people and the car as elements, with clothing from their photos", async () => {
+  it("two people and the car go as images in order, clothing from their photos", async () => {
     const group = [
       { slotKey: "face_1", providerInput: "img_1", imageUrl: "https://s/1.jpg" },
       { slotKey: "face_2", providerInput: "img_2", imageUrl: "https://s/2.jpg" },
       { slotKey: "obj_1", providerInput: "img_3", imageUrl: "https://s/car.jpg" },
     ];
-    const calls: { url: string; body?: { tag_list?: { tag_id?: string }[] } }[] = [];
-    const replies = [
-      { code: 0, data: { task_id: "el-1", task_status: "submitted" } },
-      { code: 0, data: { task_status: "succeed", task_result: { elements: [{ element_id: 11 }] } } },
-      { code: 0, data: { task_id: "el-2", task_status: "submitted" } },
-      { code: 0, data: { task_status: "succeed", task_result: { elements: [{ element_id: 22 }] } } },
-      { code: 0, data: { task_id: "el-3", task_status: "submitted" } },
-      { code: 0, data: { task_status: "succeed", task_result: { elements: [{ element_id: 33 }] } } },
-      { code: 0, data: { id: "kt-2", status: "submitted" } },
-    ];
+    const calls: { url: string; body?: { contents: { type: string; id?: string; url?: string; text?: string }[] } }[] = [];
     vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
       calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
-      return new Response(JSON.stringify(replies.shift()), { status: 200 });
+      return new Response(JSON.stringify({ code: 0, data: { id: "kt-2" } }), { status: 200 });
     }));
     const r = await seedanceProvider.submit({
       jobId: "j", ...base, faces: group,
       config: { durationSec: 10, people: 2, outfit: "photo", objects: [{ what: "car", label: "Фото машины" }] },
     });
-    const second = await seedanceProvider.getStatus(r.providerJobId, { startedAt: null, state: r.state ?? null });
-    expect(second).toMatchObject({ state: "processing", next: { providerJobId: "el-2" } });
-    const secondState = second.state === "processing" ? second.next?.state ?? null : null;
-    const third = await seedanceProvider.getStatus("el-2", { startedAt: null, state: secondState });
-    expect(third).toMatchObject({ state: "processing", next: { providerJobId: "el-3" } });
-    const thirdState = third.state === "processing" ? third.next?.state ?? null : null;
-    const video = await seedanceProvider.getStatus("el-3", { startedAt: null, state: thirdState });
-    expect(video).toMatchObject({ state: "processing", next: { providerJobId: "kt-2" } });
-    const created = calls.filter((c) => c.url.endsWith("/advanced-custom-elements"));
-    expect(created.map((c) => c.body?.tag_list?.[0]?.tag_id)).toEqual(["o_102", "o_102", "o_104"]);
-    expect(created.map((c) => (c.body as { element_description?: string } | undefined)?.element_description)).toEqual([
-      expect.stringContaining("Person 1 of 2."),
-      expect.stringContaining("Person 2 of 2."),
-      expect.not.stringContaining("Person"),
+    expect(r.providerJobId).toBe("kt-2");
+    expect(calls).toHaveLength(1);
+    const body = calls[0].body!;
+    expect(body.contents.filter((c) => c.type === "refer_image").map((c) => [c.id, c.url])).toEqual([
+      ["image_1", "https://s/1.jpg"], ["image_2", "https://s/2.jpg"], ["image_3", "https://s/car.jpg"],
     ]);
-    const body = calls.find((c) => c.url.endsWith("/omni-video/kling-4.0"))?.body as {
-      contents: { type: string; id?: string; url?: string; element_id?: string; text?: string }[];
-    };
-    const elements = body.contents.filter((c) => c.type === "element");
-    expect(elements).toEqual([
-      expect.objectContaining({ element_id: "11", id: "element_1" }),
-      expect.objectContaining({ element_id: "22", id: "element_2" }),
-      expect.objectContaining({ element_id: "33", id: "element_3" }),
-    ]);
-    expect(body.contents.some((c) => c.type === "refer_image")).toBe(false);
-    expect(body.contents.find((c) => c.type === "base_video" || c.type === "feature_video")?.type).toBe("feature_video");
-    expect(body.contents.some((c) => c.type === "base_video")).toBe(false);
-    expect(body.contents[0].text).toContain("Do not use the clothing from @video_1");
-    expect(body.contents[0].text).toContain("@element_3 is the car, not a person");
-    expect(body.contents[0].text).toContain("@element_1 is one separate person");
-    expect(body.contents[0].text).toContain("Do not swap their faces");
-    expect(body.contents[0].text).not.toContain("Clothing follows @video_1");
+    expect(body.contents.some((c) => c.type === "element")).toBe(false);
+    const text = body.contents[0].text!;
+    expect(text).toContain("Use the clothing of the people in @image_1, @image_2");
+    expect(text).toContain("@image_3 is a photo of a car, not a person");
+    expect(text).toContain("do not swap, blend or mix their faces");
     vi.unstubAllGlobals();
   });
 });
