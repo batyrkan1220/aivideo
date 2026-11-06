@@ -8,7 +8,8 @@ vi.mock("@/lib/media/scene-parts", () => ({
   joinParts: async (urls: string[]) => { sceneMock.joined.push(urls); return new Uint8Array([1, 2, 3]); },
 }));
 const storage = vi.hoisted(() => ({ removed: [] as string[] }));
-vi.mock("@/lib/supabase/server", () => ({ supabaseAdmin: () => ({ storage: { from: () => ({
+const chain = { select: () => chain, eq: () => chain, update: () => chain, maybeSingle: async () => ({ data: null }), then: (r: (v: unknown) => void) => r({}) };
+vi.mock("@/lib/supabase/server", () => ({ supabaseAdmin: () => ({ from: () => chain, storage: { from: () => ({
   upload: async () => ({ error: null }),
   createSignedUrl: async (path: string) => ({ data: { signedUrl: `https://sb.test/signed/${path}` } }),
   remove: async (paths: string[]) => { storage.removed.push(...paths); return {}; },

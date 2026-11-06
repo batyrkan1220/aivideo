@@ -33,8 +33,18 @@ const THUMB_DIR = "covers/thumb1/";
 const queue: string[] = [];
 let running = false;
 
-/** True while preview copies are being made (other ffmpeg jobs wait: the server has 512 MB). */
-export const liteBusy = () => running;
+// A paid order's video work (cutting/joining shots) in progress: background jobs wait for it.
+let held = 0;
+/** Marks paid-order video work; returns the release function. */
+export function holdMedia(): () => void {
+  held++;
+  let done = false;
+  return () => { if (!done) { done = true; held--; } };
+}
+const waitForOrders = async () => { while (held > 0) await new Promise((r) => setTimeout(r, 3000)); };
+
+/** True while preview copies or order video work are running (other ffmpeg jobs wait: the server has 512 MB). */
+export const liteBusy = () => running || held > 0;
 
 /** Queue a template for a (re)made light preview. Safe to call many times. */
 export function queueLitePreview(templateId: string) {
@@ -59,6 +69,7 @@ async function drain() {
   let ok = 0, failed = 0;
   try {
     while (queue.length) {
+      await waitForOrders();
       const id = queue.shift()!;
       try { if (await makeOne(id)) ok++; else failed++; } catch (err) {
         failed++;

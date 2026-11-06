@@ -187,11 +187,22 @@ function shotsOf(state: ProviderState): ShotRun | null {
 
 /** Cuts the template into shots and stores them privately for Kling; null = one shot (or it could not be cut). */
 async function prepareShots(jobId: string, videoUrl: string): Promise<Shot[] | null> {
+  const shots = await cutShots(jobId, videoUrl);
+  // Finished without a crash: a normal retry may cut again.
+  await supabaseAdmin().from("generation_jobs").update({ provider_state: null }).eq("id", jobId);
+  return shots;
+}
+
+async function cutShots(jobId: string, videoUrl: string): Promise<Shot[] | null> {
+  const db = supabaseAdmin();
+  // Once per job: if the server went down while cutting (out of memory), the retry sends the video whole.
+  const { data: job } = await db.from("generation_jobs").select("provider_state").eq("id", jobId).maybeSingle();
+  if ((job?.provider_state as { shotsTried?: boolean } | null)?.shotsTried) { console.log("[kling] shots tried before; video sent whole"); return null; }
+  await db.from("generation_jobs").update({ provider_state: { shotsTried: true } }).eq("id", jobId);
   try {
     const { splitAtCuts } = await import("@/lib/media/scene-parts");
     const split = await splitAtCuts(videoUrl);
     if (!split) return null;
-    const db = supabaseAdmin();
     const shots: Shot[] = [];
     for (const [k, p] of split.parts.entries()) {
       const path = `kling-shots/${jobId}/p${k}.mp4`;

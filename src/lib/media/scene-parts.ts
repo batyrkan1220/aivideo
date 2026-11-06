@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as WebReadableStream } from "node:stream/web";
-import { ffmpegLog } from "@/lib/templates/lite-preview";
+import { ffmpegLog, holdMedia } from "@/lib/templates/lite-preview";
 import { planParts, type Part } from "./scene-plan";
 
 /*
@@ -26,9 +26,13 @@ async function download(url: string, path: string) {
 }
 
 const q = ["-hide_banner", "-y", "-threads", "1"];
+// Low-memory H.264 (no lookahead, no B-frames): the server has 512 MB, and the first version of this
+// was killed while encoding a 720×1280 shot (TM-100035).
+const x264 = ["-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency", "-x264-params", "ref=1", "-threads", "1"];
 
 /** Shots of the video (start/length in seconds), or null when it is one shot. */
 export async function splitAtCuts(videoUrl: string): Promise<{ parts: (Part & { file: Buffer })[] } | null> {
+  const release = holdMedia();
   const dir = await mkdtemp(join(tmpdir(), "sp-"));
   try {
     const inPath = join(dir, "in");
@@ -47,12 +51,13 @@ export async function splitAtCuts(videoUrl: string): Promise<{ parts: (Part & { 
       const o = join(dir, `p${k}.mp4`);
       // Exact cut points: re-encoded (stream copy would snap to keyframes), sound kept.
       await ffmpegLog([...q, "-loglevel", "error", "-ss", p.start.toFixed(3), "-i", inPath, "-t", p.len.toFixed(3),
-        "-filter_threads", "1", "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", "-pix_fmt", "yuv420p",
+        "-filter_threads", "1", ...x264, "-crf", "17", "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", o]);
       out.push({ ...p, file: await readFile(o) });
     }
     return { parts: out };
   } finally {
+    release();
     await rm(dir, { recursive: true, force: true }).catch(() => {});
   }
 }
@@ -63,6 +68,7 @@ export async function splitAtCuts(videoUrl: string): Promise<{ parts: (Part & { 
  * template's sound goes over the whole video.
  */
 export async function joinParts(partUrls: string[], lens: number[], soundUrl: string): Promise<Uint8Array> {
+  const release = holdMedia();
   const dir = await mkdtemp(join(tmpdir(), "sj-"));
   try {
     const files: string[] = [];
@@ -79,7 +85,7 @@ export async function joinParts(partUrls: string[], lens: number[], soundUrl: st
       const o = join(dir, `f${k}.mp4`);
       await ffmpegLog([...q, "-loglevel", "error", "-i", f, "-an", "-filter_threads", "1",
         "-vf", `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,tpad=stop_mode=clone:stop_duration=2,trim=duration=${lens[k].toFixed(3)},setpts=PTS-STARTPTS`,
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "17", "-pix_fmt", "yuv420p", o]);
+        ...x264, "-crf", "18", "-pix_fmt", "yuv420p", o]);
       fitted.push(o);
     }
     const list = join(dir, "list.txt");
@@ -93,6 +99,7 @@ export async function joinParts(partUrls: string[], lens: number[], soundUrl: st
       "-c:v", "copy", "-c:a", "aac", "-b:a", "160k", "-t", total.toFixed(3), "-movflags", "+faststart", out]);
     return new Uint8Array(await readFile(out));
   } finally {
+    release();
     await rm(dir, { recursive: true, force: true }).catch(() => {});
   }
 }
