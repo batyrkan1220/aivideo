@@ -42,6 +42,8 @@ async function loadPublishedVersion(templateId: string) {
     .select("id,configuration_snapshot").eq("id", t.current_version_id).single();
   if (!v) return null;
   const snap = v.configuration_snapshot as Record<string, unknown>;
+  // Catalog video templates are orderable only after the AI analysis (people, cut-outs, scene).
+  if (t.kind === "catalog" && snap.provider_key === "seedance" && !(snap.provider_config_json as { analyzedAt?: unknown } | null)?.analyzedAt) return null;
   const slots = z.array(faceSlotSchema).safeParse(snap.face_slots_json);
   const qualities = z.array(qualitySchema).safeParse(snap.supported_qualities_json);
   const pricing = pricingConfigSchema.safeParse(snap.pricing_config_json);

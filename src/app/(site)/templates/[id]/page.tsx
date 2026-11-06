@@ -1,3 +1,4 @@
+import { TemplateUnavailable } from "@/components/template-unavailable";
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -49,11 +50,11 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
       t={t}
       combo={combo}
       staffUnits={staffUnits}
-      cta={
+      cta={t.available ? (
         <Suspense fallback={<div className="h-64 animate-pulse rounded-card bg-line" />}>
           <CreateSection t={t} />
         </Suspense>
-      }
+      ) : <TemplateUnavailable />}
     />
     </>
   );

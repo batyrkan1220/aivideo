@@ -65,17 +65,19 @@ export type TemplateDetail = TemplateCard & {
   media: "video" | "photo";
   /** Photo combo: the photo templates it makes (one selfie → all of them); null otherwise. */
   comboIds: string[] | null;
+  /** false = a catalog video template without the AI analysis: shown as unavailable, cannot be ordered. */
+  available: boolean;
 };
 
 const CARD_COLUMNS =
-  "id,title_kk,description_kk,required_face_count,cover_asset_path,cover_thumb_path,preview_video_path,preview_lite_path,preview_anim_path,video_aspect,supported_qualities_json,pricing_config_json,face_slots_json,max_upload_bytes,is_trending,provider_key,video_duration_sec,photo_framing:provider_config_json->>framing,allow_wish:provider_config_json->>allowWish,outfit:provider_config_json->>outfit,seedance_mode:provider_config_json->>mode,seedance_prepare:provider_config_json->>prepare,seedance_faceswap:provider_config_json->>faceSwap,combo_ids:provider_config_json->templateIds,categories(id,title_kk,slug)";
+  "id,title_kk,description_kk,required_face_count,cover_asset_path,cover_thumb_path,preview_video_path,preview_lite_path,preview_anim_path,video_aspect,supported_qualities_json,pricing_config_json,face_slots_json,max_upload_bytes,is_trending,provider_key,video_duration_sec,photo_framing:provider_config_json->>framing,allow_wish:provider_config_json->>allowWish,outfit:provider_config_json->>outfit,seedance_mode:provider_config_json->>mode,seedance_prepare:provider_config_json->>prepare,seedance_faceswap:provider_config_json->>faceSwap,combo_ids:provider_config_json->templateIds,ai_ready,categories(id,title_kk,slug)";
 
 type Row = {
   id: string; title_kk: string; description_kk: string; required_face_count: number;
   cover_asset_path: string | null; cover_thumb_path?: string | null; preview_video_path: string | null; preview_lite_path?: string | null; preview_anim_path?: string | null; video_aspect?: number | null;
   supported_qualities_json: unknown; pricing_config_json: unknown; face_slots_json: unknown;
   max_upload_bytes: number; is_trending: boolean;
-  provider_key?: string | null; video_duration_sec?: number | string | null; photo_framing?: string | null; allow_wish?: string | null; outfit?: string | null; seedance_mode?: string | null; seedance_prepare?: string | null; seedance_faceswap?: string | null; combo_ids?: unknown[] | null;
+  provider_key?: string | null; video_duration_sec?: number | string | null; photo_framing?: string | null; allow_wish?: string | null; outfit?: string | null; seedance_mode?: string | null; seedance_prepare?: string | null; seedance_faceswap?: string | null; combo_ids?: unknown[] | null; ai_ready?: boolean | null;
   categories: { id: string; title_kk: string; slug: string } | { id: string; title_kk: string; slug: string }[] | null;
 };
 
@@ -144,6 +146,7 @@ export function parseRow(r: Row, seedancePricing: SeedancePricing = DEFAULT_SEED
     seedanceMode: parseSeedanceMode(r.seedance_mode),
     media: r.provider_key === PHOTO_PROVIDER || r.provider_key === "combo" ? "photo" : "video",
     comboIds: r.provider_key === "combo" ? (r.combo_ids ?? []).filter((x): x is string => typeof x === "string") : null,
+    available: r.ai_ready !== false,
   };
 }
 
@@ -193,7 +196,7 @@ async function loadTemplates(opts: { q?: string; category?: string; sort?: Catal
   const page = Math.max(1, opts.page ?? 1);
   const from = (page - 1) * PAGE_SIZE;
   const cols = opts.category ? CARD_COLUMNS.replace("categories(", "categories!inner(") : CARD_COLUMNS;
-  let query = supabasePublic().from("templates").select(cols, { count: "exact" }).eq("status", "published").eq("kind", "catalog");
+  let query = supabasePublic().from("templates").select(cols, { count: "exact" }).eq("status", "published").eq("kind", "catalog").eq("ai_ready", true);
 
   query = opts.media === "photo" ? query.eq("provider_key", PHOTO_PROVIDER) : query.neq("provider_key", PHOTO_PROVIDER);
   if (opts.category) query = query.eq("categories.slug", opts.category);
@@ -213,7 +216,7 @@ export async function listTrending(limit = 8) {
   await connection(); // request-time only: never run during prerender
   return memo(`cat:trending:${limit}`, 60_000, async () => {
   const { data } = await supabasePublic().from("templates").select(CARD_COLUMNS)
-    .eq("status", "published").eq("kind", "catalog").neq("provider_key", PHOTO_PROVIDER).eq("is_trending", true).order("sort_order").limit(limit);
+    .eq("status", "published").eq("kind", "catalog").eq("ai_ready", true).neq("provider_key", PHOTO_PROVIDER).eq("is_trending", true).order("sort_order").limit(limit);
   return await toCards(data as unknown as Row[]);
   });
 }
@@ -222,7 +225,7 @@ export async function listNewest(limit = 8) {
   await connection(); // request-time only: never run during prerender
   return memo(`cat:newest:${limit}`, 60_000, async () => {
   const { data } = await supabasePublic().from("templates").select(CARD_COLUMNS)
-    .eq("status", "published").eq("kind", "catalog").neq("provider_key", PHOTO_PROVIDER).order("published_at", { ascending: false, nullsFirst: false }).limit(limit);
+    .eq("status", "published").eq("kind", "catalog").eq("ai_ready", true).neq("provider_key", PHOTO_PROVIDER).order("published_at", { ascending: false, nullsFirst: false }).limit(limit);
   return await toCards(data as unknown as Row[]);
   });
 }

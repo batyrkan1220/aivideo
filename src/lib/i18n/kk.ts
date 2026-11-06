@@ -396,6 +396,9 @@ export const kk = {
   },
   template: {
     sampleNote: "Это пример видео. В вашем видео будут люди с загруженных фото.",
+    unavailableTitle: "Шаблон недоступен",
+    unavailableText: "Мы улучшаем этот шаблон. Скоро он снова будет доступен — посмотрите пока другие тренды.",
+    unavailableCta: "Смотреть другие тренды",
     faceCount: "Нужно фото",
     facesTitle: "Кто где стоит",
     qualitiesTitle: "Выбор качества",

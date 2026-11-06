@@ -1,3 +1,4 @@
+import { TemplateUnavailable } from "@/components/template-unavailable";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { kk } from "@/lib/i18n/kk";
@@ -43,6 +44,7 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const t = await getTemplate(id);
   if (!t || t.comboIds) notFound();
+  if (!t.available) return <div className="pt-10"><TemplateUnavailable /></div>;
   void track("template_viewed", { templateId: t.id, props: { landing: true } });
   const a = t.videoAspect ?? 9 / 16;
   const photo = t.media === "photo";
