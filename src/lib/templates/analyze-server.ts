@@ -12,7 +12,7 @@ import { clearMemo } from "@/lib/cache/memo";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { mediaUrl } from "./queries";
 import { parseSeedanceConfig, seedanceSlots } from "./seedance-config";
-import { analysisHint, applyAnalysis, cutoutRect, isAnalyzed, type Box } from "./analysis";
+import { analysisHint, applyAnalysis, cutoutRect, faceInCutout, needsReanalysis, type Box } from "./analysis";
 import { describeTemplateFrames, VisionError } from "./vision";
 import { liteBusy, runFfmpeg } from "./lite-preview";
 import { snapshotVersion } from "./versions";
@@ -37,7 +37,7 @@ export async function backfillAnalysis(): Promise<number> {
   const { data } = await supabaseAdmin().from("templates")
     .select("id,provider_config_json").eq("kind", "catalog").eq("provider_key", "seedance")
     .not("preview_video_path", "is", null).is("deleted_at", null).order("sort_order").limit(500);
-  const todo = (data ?? []).filter((r) => !isAnalyzed(parseSeedanceConfig(r.provider_config_json)));
+  const todo = (data ?? []).filter((r) => needsReanalysis(parseSeedanceConfig(r.provider_config_json)));
   for (const r of todo) queueAnalysis(r.id);
   return todo.length;
 }
@@ -101,15 +101,21 @@ export async function analyzeTemplate(templateId: string, keep = true): Promise<
 
     const a = await describeTemplateFrames(frames, analysisHint(cfg, keep));
 
-    const cut = async (x: { frame: number; box: Box | null }): Promise<string> => {
+    // hideFace: the copy for Kling, with the original face pixelated so Kling cannot take it.
+    const cut = async (x: { frame: number; box: Box | null; face?: Box | null }, hideFace = false): Promise<string> => {
       const fp = framePaths[x.frame] ?? framePaths[0];
       if (!x.box || !fp) return "";
       const dim = imageSize(await readFile(fp));
       const r = dim.width && dim.height ? cutoutRect(dim.width, dim.height, x.box) : null;
       if (!r) return "";
+      const f = hideFace ? (x.face && dim.width && dim.height ? faceInCutout(dim.width, dim.height, x.box, x.face) : null) : null;
+      if (hideFace && !f) return "";
       const out = join(dir, `c${randomUUID()}.jpg`);
-      await runFfmpeg(fp, out, (inp, o) => ["-hide_banner", "-loglevel", "error", "-y", "-i", inp,
-        "-vf", `crop=${r.sw}:${r.sh}:${r.sx}:${r.sy},scale=${r.outW}:${r.outH}:flags=lanczos`, "-q:v", "3", o]);
+      const base = `crop=${r.sw}:${r.sh}:${r.sx}:${r.sy},scale=${r.outW}:${r.outH}:flags=lanczos`;
+      const vf = f
+        ? ["-filter_complex", `[0]${base},split[a][b];[b]crop=${f.w}:${f.h}:${f.x}:${f.y},scale=6:6,scale=${f.w}:${f.h}:flags=neighbor[f];[a][f]overlay=${f.x}:${f.y}`]
+        : ["-vf", base];
+      await runFfmpeg(fp, out, (inp, o) => ["-hide_banner", "-loglevel", "error", "-y", "-i", inp, ...vf, "-q:v", "3", o]);
       const path = `targets/${randomUUID()}.jpg`;
       const { error } = await db.storage.from("template-media").upload(path, await readFile(out), { contentType: "image/jpeg", cacheControl: "31536000", upsert: false });
       if (error) return "";
@@ -117,11 +123,15 @@ export async function analyzeTemplate(templateId: string, keep = true): Promise<
       return path;
     };
     const people: string[] = [];
-    for (const p of a.people) people.push(await cut(p).catch(() => ""));
+    const peopleKling: string[] = [];
+    for (const p of a.people) {
+      people.push(await cut(p).catch(() => ""));
+      peopleKling.push(await cut(p, true).catch(() => ""));
+    }
     const objects: string[] = [];
     for (const o of a.objects) objects.push(await cut(o).catch(() => ""));
 
-    const next = applyAnalysis(cfg, a, { people, objects }, keep);
+    const next = applyAnalysis(cfg, a, { people, objects, peopleKling }, keep);
     const slots = seedanceSlots(next.people, "face_", next.labels, next.objects, next.targets);
     // Only if the template still has the same video (the admin may have replaced it meanwhile).
     const { data: updated } = await db.from("templates")

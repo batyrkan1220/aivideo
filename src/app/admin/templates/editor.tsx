@@ -11,7 +11,7 @@ import { OBJECT_PRESETS, parseSeedanceConfig, seedanceSlots, SEEDANCE_MAX_OBJECT
 import { calculatePrice, formatKzt } from "@/lib/pricing";
 import { seedancePriceKzt, seedanceCostKzt, klingUnitLabel, SEEDANCE_QUALITY, type SeedancePricing } from "@/lib/pricing-seedance";
 import { FaceMap } from "@/components/face-map";
-import { applyAnalysis, cutoutRect, type Box } from "@/lib/templates/analysis";
+import { ANALYSIS_VERSION, applyAnalysis, cutoutRect, faceInCutout, type Box } from "@/lib/templates/analysis";
 import { aspectAllowed } from "@/lib/custom-video/aspect";
 import { saveTemplate, changeStatus, createUploadUrl, detectTemplateElements } from "./actions";
 import { DeleteTemplateButton } from "./delete-button";
@@ -136,13 +136,17 @@ export function TemplateEditor({
     if (!frames?.length) { setAi({ busy: false, err: true, text: e.seedance.aiFailed }); return; }
     const r = await detectTemplateElements(frames);
     if (!r.ok) { setAi({ busy: false, err: true, text: r.error === "not_configured" ? e.seedance.aiNoKey : r.error === "forbidden" ? ru.admin.forbidden : e.seedance.aiFailed }); return; }
-    const cut = async (x: { frame: number; box: Box | null }) => {
-      const blob = x.box ? await cropFrame(frames[x.frame] ?? frames[0], x.box) : null;
+    // hideFace: the copy Kling gets, with the original face pixelated so it cannot borrow that face.
+    const cut = async (x: { frame: number; box: Box | null; face?: Box | null }, hideFace = false) => {
+      if (hideFace && !x.face) return "";
+      const blob = x.box ? await cropFrame(frames[x.frame] ?? frames[0], x.box, hideFace ? x.face : null) : null;
       return blob ? (await uploadTarget(blob)) ?? "" : "";
     };
-    const people = await Promise.all(r.people.slice(0, SEEDANCE_MAX_PEOPLE).map(cut));
-    const objects = await Promise.all(r.objects.slice(0, SEEDANCE_MAX_OBJECTS).map(cut));
-    const next = applyAnalysis(sd, r, { people, objects });
+    const found = r.people.slice(0, SEEDANCE_MAX_PEOPLE);
+    const people = await Promise.all(found.map((p) => cut(p)));
+    const peopleKling = await Promise.all(found.map((p) => cut(p, true)));
+    const objects = await Promise.all(r.objects.slice(0, SEEDANCE_MAX_OBJECTS).map((o) => cut(o)));
+    const next = applyAnalysis(sd, r, { people, objects, peopleKling });
     // A whole new analysis is a new start: edit mode keeps the template video 1:1.
     setSd({ ...next, klingMode: "edit" });
     const scene = r.scene ? `Keep the video 1:1: ${r.scene}` : "";
@@ -267,7 +271,7 @@ export function TemplateEditor({
           : <VideoField error={err("preview")} path={t.previewVideoPath} mediaBase={mediaBase} onUploaded={(p, meta) => {
               set("previewVideoPath", p); setDuration(meta?.duration ?? null); setAspect(meta?.aspect ?? null);
               // Cut-outs and the analysis belong to the old video.
-              setSd({ targets: [], objects: sd.objects.map(({ target: _t, ...o }) => o), showTargets: false, analyzedAt: undefined });
+              setSd({ targets: [], targetsKling: [], objects: sd.objects.map(({ target: _t, ...o }) => o), showTargets: false, analyzedAt: undefined });
             }} onCover={(p) => set("coverAssetPath", p)} />}
       </Section>
 
@@ -317,7 +321,7 @@ export function TemplateEditor({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-semibold">{e.seedance.step1}</span>
                 <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${sd.analyzedAt ? "bg-brand text-night" : "bg-[#f0c36d] text-night"}`}>
-                  {sd.analyzedAt ? e.seedance.analyzed(new Date(sd.analyzedAt).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" })) : e.seedance.notAnalyzed}
+                  {sd.analyzedAt ? e.seedance.analyzed(new Date(sd.analyzedAt).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" })) : e.seedance.notAnalyzed}{sd.analyzedAt && (sd.analysisVersion ?? 1) < ANALYSIS_VERSION ? ` · ${e.seedance.oldAnalysis}` : ""}
                 </span>
               </div>
               <p className="mt-1 text-xs text-muted">{e.seedance.step1Hint}</p>
@@ -609,7 +613,7 @@ function Cutout({ path, mediaBase, label }: { path?: string; mediaBase: string; 
 }
 
 /** Cut-out of a template person or thing (box in 0–1000 of the frame): 1:2–2:1, 320–720 px. */
-async function cropFrame(b64: string, box: Box): Promise<Blob | null> {
+async function cropFrame(b64: string, box: Box, face: Box | null = null): Promise<Blob | null> {
   try {
     const img = new Image();
     img.src = `data:image/jpeg;base64,${b64}`;
@@ -618,7 +622,18 @@ async function cropFrame(b64: string, box: Box): Promise<Blob | null> {
     if (!r) return null;
     const c = document.createElement("canvas");
     c.width = r.outW; c.height = r.outH;
-    c.getContext("2d")?.drawImage(img, r.sx, r.sy, r.sw, r.sh, 0, 0, c.width, c.height);
+    const ctx = c.getContext("2d");
+    ctx?.drawImage(img, r.sx, r.sy, r.sw, r.sh, 0, 0, c.width, c.height);
+    const f = face ? faceInCutout(img.naturalWidth, img.naturalHeight, box, face) : null;
+    if (face && !f) return null;
+    if (ctx && f) {
+      // Pixelate the face: draw it 6×6 and blow it back up without smoothing.
+      const tiny = document.createElement("canvas");
+      tiny.width = 6; tiny.height = 6;
+      tiny.getContext("2d")?.drawImage(c, f.x, f.y, f.w, f.h, 0, 0, 6, 6);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(tiny, 0, 0, 6, 6, f.x, f.y, f.w, f.h);
+    }
     return await new Promise<Blob | null>((res) => c.toBlob((b) => res(b), "image/jpeg", 0.85));
   } catch {
     return null;

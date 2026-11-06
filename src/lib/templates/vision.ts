@@ -22,6 +22,7 @@ const resultSchema = z.object({
     ru: z.string().max(160).catch(""),
     frame: z.number().int().min(0).max(20).catch(0),
     box: z.array(z.number()).length(4).nullable().catch(null),
+    face: z.array(z.number()).length(4).nullable().optional().catch(null),
   })).catch([]),
   objects: z.array(z.object({
     what: z.string().max(40).catch(""),
@@ -41,6 +42,7 @@ For each person give:
 - ru: the same position and description in Russian, for the admin.
 - frame: the 0-based index of the frame where this person is seen best (large, face visible).
 - box: [ymin, xmin, ymax, xmax] of this person in that frame, from 0 to 1000 (head to at least the waist).
+- face: [ymin, xmin, ymax, xmax] of this person's face and hair in the same frame, from 0 to 1000.
 Also list up to ${SEEDANCE_MAX_OBJECTS} large, prominent things a customer might want to swap for their own, only of these kinds: ${kinds.join(", ")}. Skip small props.
 A thing must be separate from every listed person: never list a person's worn clothes, hair or body as a thing. Never list the same person or thing twice. If nothing fits, return objects: [].
 For each thing:
@@ -54,7 +56,7 @@ Reply with JSON only.`;
 const responseSchema = {
   type: "OBJECT",
   properties: {
-    people: { type: "ARRAY", items: { type: "OBJECT", properties: { where: { type: "STRING" }, look: { type: "STRING" }, ru: { type: "STRING" }, frame: { type: "INTEGER" }, box: { type: "ARRAY", items: { type: "INTEGER" } } }, required: ["where", "look", "ru", "frame", "box"] } },
+    people: { type: "ARRAY", items: { type: "OBJECT", properties: { where: { type: "STRING" }, look: { type: "STRING" }, ru: { type: "STRING" }, frame: { type: "INTEGER" }, box: { type: "ARRAY", items: { type: "INTEGER" } }, face: { type: "ARRAY", items: { type: "INTEGER" } } }, required: ["where", "look", "ru", "frame", "box", "face"] } },
     objects: { type: "ARRAY", items: { type: "OBJECT", properties: { what: { type: "STRING", enum: KINDS }, look: { type: "STRING" }, ru: { type: "STRING" }, frame: { type: "INTEGER" }, box: { type: "ARRAY", items: { type: "INTEGER" } } }, required: ["what", "look", "ru", "frame", "box"] } },
     scene: { type: "STRING" },
   },
@@ -148,7 +150,7 @@ export async function describeTemplateFrames(frames: string[], hint?: { people: 
   try { raw = JSON.parse(text); } catch { throw new VisionError("failed"); }
   const parsed = resultSchema.parse(raw);
   const clean = (s: string, n: number) => s.replace(/[@<>{}\[\]\\]/g, " ").replace(/\s+/g, " ").trim().slice(0, n);
-  const people = dedupe(parsed.people.map((p) => ({ where: clean(p.where, 50), look: clean(p.look, 110), ru: clean(p.ru, 160), frame: Math.min(p.frame, frames.length - 1), box: cleanBox(p.box) })))
+  const people = dedupe(parsed.people.map((p) => ({ where: clean(p.where, 50), look: clean(p.look, 110), ru: clean(p.ru, 160), frame: Math.min(p.frame, frames.length - 1), box: cleanBox(p.box), face: cleanBox(p.face ?? null) })))
     .slice(0, SEEDANCE_MAX_PEOPLE);
   const objects = dedupe(parsed.objects
     .map((o) => ({ what: o.what.trim().toLowerCase(), look: clean(o.look, 110), ru: clean(o.ru, 160), frame: Math.min(o.frame, frames.length - 1), box: cleanBox(o.box) }))

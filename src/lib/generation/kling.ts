@@ -86,7 +86,7 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   }
   const cutouts = targetRefs.filter(Boolean);
   if (cutouts.length) {
-    parts.push(`${cutouts.join(", ")} ${cutouts.length === 1 ? "is a cut-out" : "are cut-outs"} from @video_1 that only show${cutouts.length === 1 ? "s" : ""} which one to replace. Never copy their faces, hair or look into the result.`);
+    parts.push(`${cutouts.join(", ")} ${cutouts.length === 1 ? "is a cut-out" : "are cut-outs"} from @video_1 that only show${cutouts.length === 1 ? "s" : ""} which one to replace; faces in them are hidden on purpose. The faces come only from the customer photos ${refs.join(", ")}. Never copy anything else from the cut-outs into the result.`);
   }
   parts.push("Photorealistic, natural, sharp face, no text, no watermark.");
   if (adminPrompt) parts.push(`Mandatory template instruction: ${adminPrompt}`);

@@ -61,6 +61,9 @@ export const seedanceConfigSchema = z.object({
   targets: z.array(z.string().trim().max(300)).max(SEEDANCE_MAX_PEOPLE).catch([]).default([]),
   /** Also send those cut-outs to Kling, so it sees which one to replace. */
   showTargets: z.boolean().catch(false).default(false),
+  /** Person cut-outs for Kling, with the original face hidden (same order as targets). */
+  targetsKling: z.array(z.string().trim().max(300)).max(SEEDANCE_MAX_PEOPLE).catch([]).default([]),
+  analysisVersion: z.number().int().optional(),
   /** When the AI analysis (people, things, cut-outs, scene) was applied. Catalog video templates need it to be ordered. */
   analyzedAt: z.string().max(40).optional(),
 });

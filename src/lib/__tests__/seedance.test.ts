@@ -90,13 +90,24 @@ describe("provider (Kling official API)", () => {
       bodies.push(JSON.parse(String(init?.body)));
       return new Response(JSON.stringify({ code: 0, data: { id: "kt-3" } }), { status: 200 });
     }));
-    await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { durationSec: 8, targets: ["targets/a.jpg"], showTargets: true } });
-    await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { durationSec: 8, targets: ["targets/a.jpg"] } });
+    await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { durationSec: 8, targets: ["targets/clear.jpg"], targetsKling: ["targets/a.jpg"], showTargets: true } });
+    await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { durationSec: 8, targets: ["targets/clear.jpg"], targetsKling: ["targets/a.jpg"] } });
     const imgs = (b: (typeof bodies)[number]) => b.contents.filter((c) => c.type === "refer_image").map((c) => c.url);
     expect(imgs(bodies[0])).toEqual(["https://s/1.jpg", "https://sb.test/storage/v1/object/public/template-media/targets/a.jpg"]);
     expect(bodies[0].contents[0].text).toContain("shown in @image_2");
     expect(imgs(bodies[1])).toEqual(["https://s/1.jpg"]);
     expect(bodies[1].contents[0].text).not.toContain("cut-out");
+    vi.unstubAllGlobals();
+  });
+
+  it("a person's plain cut-out (original face visible) is never sent to Kling", async () => {
+    let body: { contents: { type: string; url?: string }[] } | null = null;
+    vi.stubGlobal("fetch", vi.fn(async (_u: string, init?: RequestInit) => {
+      body = JSON.parse(String(init?.body));
+      return new Response(JSON.stringify({ code: 0, data: { id: "kt-7" } }), { status: 200 });
+    }));
+    await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { durationSec: 8, targets: ["targets/clear.jpg"], showTargets: true } });
+    expect(body!.contents.filter((c) => c.type === "refer_image").map((c) => c.url)).toEqual(["https://s/1.jpg"]);
     vi.unstubAllGlobals();
   });
 
@@ -131,7 +142,7 @@ describe("provider (Kling official API)", () => {
       if (init?.body) bodies.push(JSON.parse(String(init.body)));
       return new Response(JSON.stringify(replies.shift()), { status: 200 });
     }));
-    const r = await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { durationSec: 8, targets: ["targets/a.jpg"], showTargets: true } });
+    const r = await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { durationSec: 8, targetsKling: ["targets/a.jpg"], showTargets: true } });
     const st = await seedanceProvider.getStatus("kt-5", { startedAt: null, state: r.state ?? null });
     expect(st).toMatchObject({ state: "processing", next: { providerJobId: "kt-6", state: { stage: "klingd" } } });
     expect(bodies[1].contents.filter((c) => c.type === "refer_image").map((c) => c.url)).toEqual(["https://s/1.jpg"]);

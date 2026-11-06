@@ -6,9 +6,25 @@ import { OBJECT_PRESETS, SEEDANCE_MAX_OBJECTS, SEEDANCE_MAX_PEOPLE, type Seedanc
  * order it. Pure helpers shared by the admin editor (browser) and the server backfill.
  */
 export type Box = [number, number, number, number]; // ymin, xmin, ymax, xmax in 0–1000
-export type FoundPerson = { where: string; look: string; ru: string; frame: number; box: Box | null };
+export type FoundPerson = { where: string; look: string; ru: string; frame: number; box: Box | null; face?: Box | null };
 export type FoundObject = { what: string; look: string; ru: string; frame: number; box: Box | null };
 export type Analysis = { people: FoundPerson[]; objects: FoundObject[]; scene: string };
+
+/** Version of the analysis: 2 = person cut-outs for Kling have the original face hidden. */
+export const ANALYSIS_VERSION = 2;
+
+/** The face box inside a cut-out made by cutoutRect, in the cut-out's own pixels (with a little room). */
+export function faceInCutout(W: number, H: number, box: Box, face: Box): { x: number; y: number; w: number; h: number } | null {
+  const r = cutoutRect(W, H, box);
+  if (!r) return null;
+  const k = r.outW / r.sw;
+  const [y0, x0, y1, x1] = face.map((v) => v / 1000);
+  const fw = (x1 - x0) * W, fh = (y1 - y0) * H;
+  const fx = x0 * W - fw * 0.15, fy = y0 * H - fh * 0.15;
+  const x = Math.max(0, Math.round((fx - r.sx) * k)), y = Math.max(0, Math.round((fy - r.sy) * k));
+  const w = Math.min(r.outW - x, Math.round(fw * 1.3 * k)), h = Math.min(r.outH - y, Math.round(fh * 1.3 * k));
+  return w > 4 && h > 4 ? { x, y, w, h } : null;
+}
 
 /** Kling's image rules: sides 300 px or more, shape between 2:5 and 5:2. Cut-outs stay inside them. */
 export function cutoutRect(W: number, H: number, box: Box): { sx: number; sy: number; sw: number; sh: number; outW: number; outH: number } | null {
@@ -25,12 +41,14 @@ export function cutoutRect(W: number, H: number, box: Box): { sx: number; sy: nu
 }
 
 export const isAnalyzed = (cfg: Pick<SeedanceConfig, "analyzedAt">) => !!cfg.analyzedAt;
+/** Analysed with an older version (person cut-outs for Kling still show the original face). */
+export const needsReanalysis = (cfg: Pick<SeedanceConfig, "analyzedAt" | "analysisVersion">) => !cfg.analyzedAt || (cfg.analysisVersion ?? 1) < ANALYSIS_VERSION;
 
 /**
  * New template config from an analysis. cuts = storage paths of the cut-outs (people, then things; "" if none).
  * keep: the admin's people count and things stay as they are (only descriptions and cut-outs are added).
  */
-export function applyAnalysis(cfg: SeedanceConfig, a: Analysis, cuts: { people: string[]; objects: string[] }, keep = false, now = new Date()): SeedanceConfig {
+export function applyAnalysis(cfg: SeedanceConfig, a: Analysis, cuts: { people: string[]; objects: string[]; peopleKling?: string[] }, keep = false, now = new Date()): SeedanceConfig {
   const n = keep ? cfg.people : Math.max(1, Math.min(SEEDANCE_MAX_PEOPLE, a.people.length));
   const positions = Array.from({ length: n }, (_, i) => {
     const p = a.people[i];
@@ -58,11 +76,14 @@ export function applyAnalysis(cfg: SeedanceConfig, a: Analysis, cuts: { people: 
     people: n,
     positions,
     targets: Array.from({ length: n }, (_, i) => cuts.people[i] ?? ""),
+    // What Kling sees: the same cut-out with the original face hidden, so it cannot borrow that face.
+    targetsKling: Array.from({ length: n }, (_, i) => cuts.peopleKling?.[i] ?? ""),
     objects,
     // The scene note only fills an empty prompt; the admin's own text is never replaced here.
     prompt: cfg.prompt.trim() ? cfg.prompt : scene,
     showTargets: cuts.people.some(Boolean) || cuts.objects.some(Boolean) ? true : cfg.showTargets,
     analyzedAt: now.toISOString(),
+    analysisVersion: ANALYSIS_VERSION,
   };
 }
 

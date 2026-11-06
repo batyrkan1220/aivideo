@@ -69,7 +69,8 @@ export const seedanceProvider: GenerationProvider = {
     const usedPhotos = photos.slice(0, people + objects.length);
     // Optional cut-outs from the template, after the customer's photos, while Kling's 10 images last.
     const cutouts: string[] = [];
-    const targetPaths = [...cfg.targets.slice(0, people), ...Array(Math.max(0, people - cfg.targets.length)).fill(""), ...objects.map((o) => o.target ?? "")];
+    // People: only the cut-outs with the original face hidden (the plain ones would lend Kling that face).
+    const targetPaths = [...Array.from({ length: people }, (_, i) => cfg.targetsKling[i] ?? ""), ...objects.map((o) => o.target ?? "")];
     const targetRefs = targetPaths.map((path) => {
       const url = cfg.showTargets ? mediaUrl(path?.trim() || null) : null;
       if (!url || usedPhotos.length + cutouts.length >= KLING_MAX_IMAGES) return "";
