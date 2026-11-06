@@ -55,6 +55,10 @@ export const seedanceConfigSchema = z.object({
   positions: z.array(z.string().trim().max(120)).max(5).default([]),
   /** Things in the video to replace with the customer's photos (after the people). */
   objects: z.array(objectSchema).max(SEEDANCE_MAX_OBJECTS).catch([]).default([]),
+  /** Cut-outs of each person, then each thing, from the template video (storage paths), shown next to the customer's upload slots. */
+  targets: z.array(z.string().trim().max(300)).max(SEEDANCE_MAX_PEOPLE + SEEDANCE_MAX_OBJECTS).catch([]).default([]),
+  /** Also send those cut-outs to Kling, so it sees which one to replace. */
+  showTargets: z.boolean().catch(false).default(false),
 });
 export type SeedanceConfig = z.infer<typeof seedanceConfigSchema>;
 export type SeedanceMode = "kd";
@@ -73,13 +77,15 @@ export function seedanceSlotLabel(i: number, n: number) {
 }
 
 /** Customer upload slots. providerInput = `img_<n>` (= @image_<n> in the prompt). People first, then objects. */
-export function seedanceSlots(n: number, keyPrefix = "face_", labels: string[] = [], objects: SwapObject[] = []): FaceSlot[] {
+export function seedanceSlots(n: number, keyPrefix = "face_", labels: string[] = [], objects: SwapObject[] = [], targets: string[] = []): FaceSlot[] {
+  const target = (i: number) => (targets[i]?.trim() ? { previewImagePath: targets[i].trim() } : {});
   const people: FaceSlot[] = Array.from({ length: n }, (_, i) => ({
     key: `${keyPrefix}${i + 1}`,
     labelKk: labels[i]?.trim() || seedanceSlotLabel(i, n),
     position: { x: (i + 1) / (n + 1), y: 0.42 },
     providerInput: `img_${i + 1}`,
     order: i,
+    ...target(i),
   }));
   const things: FaceSlot[] = objects.slice(0, SEEDANCE_MAX_OBJECTS).map((o, j) => ({
     key: `obj_${j + 1}`,
@@ -88,6 +94,7 @@ export function seedanceSlots(n: number, keyPrefix = "face_", labels: string[] =
     providerInput: `img_${n + j + 1}`,
     order: n + j,
     kind: "object" as const,
+    ...target(n + j),
   }));
   return [...people, ...things];
 }

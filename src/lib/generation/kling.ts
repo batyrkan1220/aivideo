@@ -47,13 +47,15 @@ export type KlingMode = "edit" | "reference";
  * with the new person given as a reference image (@image_N). "Reference @video_1" makes a new video instead.
  * Customer photos are plain refer_image inputs: people first (@image_1…), then the things to swap.
  */
-export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "template", adminPrompt: string, wish: string, people = 1, positions: string[] = [], objects: { what: string; look?: string }[] = []): string {
+export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "template", adminPrompt: string, wish: string, people = 1, positions: string[] = [], objects: { what: string; look?: string }[] = [], targetRefs: string[] = []): string {
+  // Optional cut-outs from the template (@image_k) that show which person or thing is meant: people first, then things.
+  const shown = (i: number) => (targetRefs[i] ? ` shown in ${targetRefs[i]}` : "");
   const refs = Array.from({ length: people }, (_, i) => `@image_${i + 1}`);
-  const things = objects.map((o, j) => ({ what: o.what.trim().toLowerCase(), look: o.look?.trim() ?? "", ref: `@image_${people + j + 1}` }));
+  const things = objects.map((o, j) => ({ what: o.what.trim().toLowerCase(), look: o.look?.trim() ?? "", ref: `@image_${people + j + 1}`, shown: shown(people + j) }));
   const outfitRef = things.find((t) => ["outfit", "clothes", "clothing"].includes(t.what))?.ref;
-  const spot = (i: number) => positions[i]?.trim() || `number ${i + 1} from the left`;
+  const spot = (i: number) => `${positions[i]?.trim() || `number ${i + 1} from the left`}${shown(i)}`;
   const who = people === 1
-    ? `Replace the main person${positions[0]?.trim() ? ` (${positions[0].trim()})` : ""} in @video_1 with the person from @image_1.`
+    ? `Replace the main person${positions[0]?.trim() ? ` (${positions[0].trim()})` : ""}${shown(0)} in @video_1 with the person from @image_1.`
     : `Replace ${refs.map((r, i) => `the person ${spot(i)} with the person from ${r}`).join(", and ")}. Each image is a different person: do not swap, blend or mix their faces.`;
   const same = [
     `The new ${people === 1 ? "person" : "people"} must look 100% identical to ${refs.join(", ")} in every frame, from the first frame to the very last: the same face shape, eyes, eyebrows, nose, lips, jaw, ears, moles, hairstyle, hair color, skin tone and age.`,
@@ -80,7 +82,11 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
       ];
   for (const t of things) {
     if (t.ref === outfitRef) continue;
-    parts.push(`${t.ref} is a photo of a ${t.what}, not a person. Replace the ${t.what}${t.look ? ` (${t.look})` : ""} in @video_1 with the ${t.what} from ${t.ref}: the same type, model or breed, color, shape, markings and details, in the same place, size, angle and movement, matching the scene's lighting and shadows in every frame.`);
+    parts.push(`${t.ref} is a photo of a ${t.what}, not a person. Replace the ${t.what}${t.look ? ` (${t.look})` : ""}${t.shown} in @video_1 with the ${t.what} from ${t.ref}: the same type, model or breed, color, shape, markings and details, in the same place, size, angle and movement, matching the scene's lighting and shadows in every frame.`);
+  }
+  const cutouts = targetRefs.filter(Boolean);
+  if (cutouts.length) {
+    parts.push(`${cutouts.join(", ")} ${cutouts.length === 1 ? "is a cut-out" : "are cut-outs"} from @video_1 that only show${cutouts.length === 1 ? "s" : ""} which one to replace. Never copy their faces, hair or look into the result.`);
   }
   parts.push("Photorealistic, natural, sharp face, no text, no watermark.");
   if (adminPrompt) parts.push(`Mandatory template instruction: ${adminPrompt}`);
@@ -93,12 +99,15 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   return parts.join(" ");
 }
 
+/** Kling 4.0 takes up to 10 images in one task. */
+export const KLING_MAX_IMAGES = 10;
+
 export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: string[]; mode: KlingMode; prompt: string; durationSec: number; aspectRatio: string; resolution?: "720p" | "1080p" }): Promise<string> {
   const duration = Math.min(30, Math.max(3, Math.round(opts.durationSec)));
   // Edit: the template itself is edited (base_video), so place and motion stay 1:1. Reference: a new video following it.
   const videoType = opts.mode === "edit" ? "base_video" : "feature_video";
   const aspect = ["21:9", "16:9", "9:16", "1:1", "adaptive"].includes(opts.aspectRatio) ? opts.aspectRatio : "adaptive";
-  const photos = opts.photoUrls.slice(0, 7);
+  const photos = opts.photoUrls.slice(0, KLING_MAX_IMAGES);
   const d = await call<{ data?: { id?: string } }>("/omni-video/kling-4.0", {
     method: "POST",
     body: JSON.stringify({

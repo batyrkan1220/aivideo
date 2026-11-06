@@ -9,8 +9,10 @@ import { OBJECT_PRESETS, SEEDANCE_MAX_OBJECTS, SEEDANCE_MAX_PEOPLE } from "./see
  * ("the person on the left, a woman in a red dress"); the Russian ones are shown to the admin.
  * Only small JPEG frames made in the admin's browser are sent; the video itself never is.
  */
-export type VisionPerson = { where: string; look: string; ru: string };
-export type VisionObject = { what: string; look: string; ru: string };
+/** frame: index of the frame where it is seen best; box: [ymin, xmin, ymax, xmax] in 0–1000 of that frame. */
+export type VisionBox = { frame: number; box: [number, number, number, number] | null };
+export type VisionPerson = { where: string; look: string; ru: string } & VisionBox;
+export type VisionObject = { what: string; look: string; ru: string } & VisionBox;
 export type VisionResult = { people: VisionPerson[]; objects: VisionObject[]; scene: string };
 
 const KINDS = Object.values(OBJECT_PRESETS).map((p) => p.en);
@@ -20,11 +22,15 @@ const resultSchema = z.object({
     where: z.string().max(80).catch(""),
     look: z.string().max(120).catch(""),
     ru: z.string().max(160).catch(""),
+    frame: z.number().int().min(0).max(20).catch(0),
+    box: z.array(z.number()).length(4).nullable().catch(null),
   })).catch([]),
   objects: z.array(z.object({
     what: z.string().max(40).catch(""),
     look: z.string().max(120).catch(""),
     ru: z.string().max(160).catch(""),
+    frame: z.number().int().min(0).max(20).catch(0),
+    box: z.array(z.number()).length(4).nullable().catch(null),
   })).catch([]),
   scene: z.string().max(600).catch(""),
 });
@@ -35,18 +41,21 @@ For each person give:
 - where: short English position, e.g. "on the left", "in the center", "on the right", "in the foreground", "in the background". Use "" if there is only one person.
 - look: short English description that tells this person apart in every frame: gender, approximate age, clothing and color, hair, what they hold or do. Max 12 words. No names.
 - ru: the same position and description in Russian, for the admin.
+- frame: the 0-based index of the frame where this person is seen best (large, face visible).
+- box: [ymin, xmin, ymax, xmax] of this person in that frame, from 0 to 1000 (head to at least the waist).
 Also list up to ${SEEDANCE_MAX_OBJECTS} large, prominent things a customer might want to swap for their own, only of these kinds: ${KINDS.join(", ")}. "outfit" only if the clothing itself is the main subject. Skip small props. For each:
 - what: exactly one of ${KINDS.join(", ")}
 - look: short English description and position, e.g. "the white sedan on the right". Max 12 words.
 - ru: the same in Russian.
+- frame and box: as for people, around the whole thing.
 Finally write scene: 1–3 short English sentences (max 50 words) for the video model that lock everything that must stay exactly as in this video, 1:1: the location and background, lighting and colors, camera movement and framing, and what each person does and when (gestures, moves, turns, timing). Only describe what is there; do not suggest any change and do not describe faces.
 Reply with JSON only.`;
 
 const responseSchema = {
   type: "OBJECT",
   properties: {
-    people: { type: "ARRAY", items: { type: "OBJECT", properties: { where: { type: "STRING" }, look: { type: "STRING" }, ru: { type: "STRING" } }, required: ["where", "look", "ru"] } },
-    objects: { type: "ARRAY", items: { type: "OBJECT", properties: { what: { type: "STRING", enum: KINDS }, look: { type: "STRING" }, ru: { type: "STRING" } }, required: ["what", "look", "ru"] } },
+    people: { type: "ARRAY", items: { type: "OBJECT", properties: { where: { type: "STRING" }, look: { type: "STRING" }, ru: { type: "STRING" }, frame: { type: "INTEGER" }, box: { type: "ARRAY", items: { type: "INTEGER" } } }, required: ["where", "look", "ru", "frame", "box"] } },
+    objects: { type: "ARRAY", items: { type: "OBJECT", properties: { what: { type: "STRING", enum: KINDS }, look: { type: "STRING" }, ru: { type: "STRING" }, frame: { type: "INTEGER" }, box: { type: "ARRAY", items: { type: "INTEGER" } } }, required: ["what", "look", "ru", "frame", "box"] } },
     scene: { type: "STRING" },
   },
   required: ["people", "objects", "scene"],
@@ -79,6 +88,13 @@ export class VisionError extends Error {
 }
 
 /** frames: base64 JPEG without the data: prefix. */
+/** A usable box: inside 0–1000, not empty. */
+function cleanBox(b: number[] | null): VisionBox["box"] {
+  if (!b) return null;
+  const [y0, x0, y1, x1] = b.map((v) => Math.min(1000, Math.max(0, Math.round(v))));
+  return y1 - y0 >= 20 && x1 - x0 >= 20 ? [y0, x0, y1, x1] : null;
+}
+
 export async function describeTemplateFrames(frames: string[]): Promise<VisionResult> {
   const { GEMINI_API_KEY: key, GEMINI_MODEL: model } = env();
   if (!key) throw new VisionError("not_configured");
@@ -105,9 +121,9 @@ export async function describeTemplateFrames(frames: string[]): Promise<VisionRe
   const parsed = resultSchema.parse(raw);
   const clean = (s: string, n: number) => s.replace(/[@<>{}\[\]\\]/g, " ").replace(/\s+/g, " ").trim().slice(0, n);
   return {
-    people: parsed.people.slice(0, SEEDANCE_MAX_PEOPLE).map((p) => ({ where: clean(p.where, 50), look: clean(p.look, 110), ru: clean(p.ru, 160) })),
+    people: parsed.people.slice(0, SEEDANCE_MAX_PEOPLE).map((p) => ({ where: clean(p.where, 50), look: clean(p.look, 110), ru: clean(p.ru, 160), frame: Math.min(p.frame, frames.length - 1), box: cleanBox(p.box) })),
     objects: parsed.objects
-      .map((o) => ({ what: o.what.trim().toLowerCase(), look: clean(o.look, 110), ru: clean(o.ru, 160) }))
+      .map((o) => ({ what: o.what.trim().toLowerCase(), look: clean(o.look, 110), ru: clean(o.ru, 160), frame: Math.min(o.frame, frames.length - 1), box: cleanBox(o.box) }))
       .filter((o) => KINDS.includes(o.what as (typeof KINDS)[number]))
       .slice(0, SEEDANCE_MAX_OBJECTS),
     scene: clean(parsed.scene, 500),

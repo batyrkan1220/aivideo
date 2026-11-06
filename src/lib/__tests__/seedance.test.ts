@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/env", () => ({ env: () => ({ KLING_API_KEY: "g".repeat(20) }) }));
+vi.mock("@/lib/env", () => ({ env: () => ({ KLING_API_KEY: "g".repeat(20), NEXT_PUBLIC_SUPABASE_URL: "https://sb.test" }) }));
 vi.mock("@/lib/pricing-seedance/settings", async () => ({ seedancePricingSettings: async () => (await import("@/lib/pricing-seedance")).DEFAULT_SEEDANCE_PRICING }));
 
 import { seedanceProvider, cleanWish } from "@/lib/generation/seedance";
@@ -81,6 +81,22 @@ describe("provider (Kling official API)", () => {
     expect(body.settings).toMatchObject({ resolution: "720p", duration: 8, aspect_ratio: "9:16", audio: "original" });
     expect(await seedanceProvider.getStatus("kt-1", { startedAt: null, state: r.state ?? null })).toEqual({ state: "succeeded", outputUrl: "https://kling.cdn/out.mp4" });
     expect(await seedanceProvider.getStatus("kt-1", { startedAt: null, state: r.state ?? null })).toMatchObject({ state: "failed", errorCode: "provider_content_rejected" });
+    vi.unstubAllGlobals();
+  });
+
+  it("adds the template cut-out after the customer's photo only when the toggle is on", async () => {
+    const bodies: { contents: { type: string; url?: string; text?: string }[] }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({ code: 0, data: { id: "kt-3" } }), { status: 200 });
+    }));
+    await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { durationSec: 8, targets: ["targets/a.jpg"], showTargets: true } });
+    await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { durationSec: 8, targets: ["targets/a.jpg"] } });
+    const imgs = (b: (typeof bodies)[number]) => b.contents.filter((c) => c.type === "refer_image").map((c) => c.url);
+    expect(imgs(bodies[0])).toEqual(["https://s/1.jpg", "https://sb.test/storage/v1/object/public/template-media/targets/a.jpg"]);
+    expect(bodies[0].contents[0].text).toContain("shown in @image_2");
+    expect(imgs(bodies[1])).toEqual(["https://s/1.jpg"]);
+    expect(bodies[1].contents[0].text).not.toContain("cut-out");
     vi.unstubAllGlobals();
   });
 

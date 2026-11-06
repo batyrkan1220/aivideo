@@ -224,11 +224,11 @@ export async function deleteTemplate(id: string): Promise<DeleteResult> {
 }
 
 const uploadSchema = z.object({
-  kind: z.enum(["cover", "preview"]),
+  kind: z.enum(["cover", "preview", "target"]),
   contentType: z.enum(["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm"]),
   size: z.number().int().positive(),
 });
-const LIMITS = { cover: 5 * 1024 * 1024, preview: 50 * 1024 * 1024 } as const;
+const LIMITS = { cover: 5 * 1024 * 1024, preview: 50 * 1024 * 1024, target: 1024 * 1024 } as const;
 const EXT: Record<string, string> = {
   "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "video/mp4": "mp4", "video/webm": "webm",
 };
@@ -244,16 +244,16 @@ export async function createUploadUrl(raw: unknown) {
   if (!p.success) return { ok: false as const };
   const { kind, contentType, size } = p.data;
   const isImage = contentType.startsWith("image/");
-  if ((kind === "cover") !== isImage || size > LIMITS[kind]) return { ok: false as const };
+  if ((kind !== "preview") !== isImage || size > LIMITS[kind]) return { ok: false as const };
 
-  const path = `${kind === "cover" ? "covers" : "previews"}/${randomUUID()}.${EXT[contentType]}`;
+  const path = `${kind === "cover" ? "covers" : kind === "target" ? "targets" : "previews"}/${randomUUID()}.${EXT[contentType]}`;
   const { data, error } = await supabaseAdmin().storage.from("template-media").createSignedUploadUrl(path);
   if (error) { console.error("[admin.upload]", error.message); return { ok: false as const }; }
   return { ok: true as const, path: data.path, token: data.token };
 }
 
 export type DetectResult =
-  | { ok: true; people: { where: string; look: string; ru: string }[]; objects: { what: string; look: string; ru: string }[]; scene: string }
+  | ({ ok: true } & import("@/lib/templates/vision").VisionResult)
   | { ok: false; error: "forbidden" | "not_configured" | "failed" | "invalid" };
 
 /** Template editor: Gemini lists the people and things in a few frames the browser cut from the video. */

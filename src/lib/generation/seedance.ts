@@ -3,7 +3,8 @@ import { seedanceConfigSchema, SEEDANCE_MAX_OBJECTS, SEEDANCE_MAX_PEOPLE, SEEDAN
 import { seedanceCostUsd } from "@/lib/pricing-seedance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { type GenerationProvider } from "./types";
-import { buildKlingDirectPrompt, getKlingTask, submitKlingOmni } from "./kling";
+import { buildKlingDirectPrompt, getKlingTask, KLING_MAX_IMAGES, submitKlingOmni } from "./kling";
+import { mediaUrl } from "@/lib/templates/queries";
 
 /**
  * The video provider (key "seedance" for existing rows): Kling 4.0 via Kling's official API.
@@ -63,12 +64,20 @@ export const seedanceProvider: GenerationProvider = {
     const declaredPeople = Math.min(SEEDANCE_MAX_PEOPLE, Math.max(1, cfg.people));
     const objects = cfg.objects.slice(0, Math.min(SEEDANCE_MAX_OBJECTS, Math.max(0, photos.length - declaredPeople)));
     const people = Math.min(declaredPeople, Math.max(1, photos.length - objects.length));
-    const prompt = buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : "", people, cfg.positions, objects);
     const resolution = input.quality === "1080p" ? "1080p" : "720p";
     // Photos go straight to the video call as reference images, people first, then things.
     const usedPhotos = photos.slice(0, people + objects.length);
+    // Optional cut-outs from the template, after the customer's photos, while Kling's 10 images last.
+    const cutouts: string[] = [];
+    const targetRefs = Array.from({ length: people + objects.length }, (_, i) => {
+      const url = cfg.showTargets ? mediaUrl(cfg.targets[i]?.trim() || null) : null;
+      if (!url || usedPhotos.length + cutouts.length >= KLING_MAX_IMAGES) return "";
+      cutouts.push(url);
+      return `@image_${usedPhotos.length + cutouts.length}`;
+    });
+    const prompt = buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : "", people, cfg.positions, objects, targetRefs);
     const providerJobId = await submitKlingOmni({
-      videoUrl: input.templateVideoUrl, photoUrls: usedPhotos, mode: cfg.klingMode,
+      videoUrl: input.templateVideoUrl, photoUrls: [...usedPhotos, ...cutouts], mode: cfg.klingMode,
       prompt, durationSec, aspectRatio: cfg.aspectRatio, resolution,
     });
     return { providerJobId, cost: seedanceCostUsd(durationSec, await seedancePricingSettings(), {}, resolution), state: { stage: "klingd" } };

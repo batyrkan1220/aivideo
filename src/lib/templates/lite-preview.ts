@@ -232,6 +232,19 @@ async function cleanupOrphans() {
         if (!error) removed += Math.min(100, stale.length - i);
       }
     }
+    // Cut-outs of template people/things: kept while a template points to them; unsaved ones go after a day.
+    const { data: cfgs } = await db.from("templates").select("provider_config_json");
+    const targets = new Set((cfgs ?? []).flatMap((r) => {
+      const t = (r.provider_config_json as { targets?: unknown } | null)?.targets;
+      return Array.isArray(t) ? t.filter((x): x is string => typeof x === "string") : [];
+    }));
+    const { data: cut } = await db.storage.from("template-media").list("targets", { limit: 1000 });
+    const dayAgo = Date.now() - 24 * 3600_000;
+    const staleCut = (cut ?? []).filter((f) => f.id && !targets.has(`targets/${f.name}`) && Date.parse(f.created_at ?? "") < dayAgo).map((f) => `targets/${f.name}`);
+    for (let i = 0; i < staleCut.length; i += 100) {
+      const { error } = await db.storage.from("template-media").remove(staleCut.slice(i, i + 100));
+      if (!error) removed += Math.min(100, staleCut.length - i);
+    }
     if (removed) console.log(`[lite-preview] removed ${removed} unused files`);
   } catch (err) {
     console.error("[lite-preview] cleanup failed", err instanceof Error ? err.message.slice(0, 200) : "error");

@@ -836,8 +836,8 @@ function SlotCard({
         // Which person in the video this photo replaces (when the slot has a preview).
         <div className="mb-2 flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={slotPreviewSrc(slot.previewImagePath, mediaBase)!} alt={kk.upload.personInVideo(index + 1)} className="h-12 w-10 rounded-lg border border-line object-cover" />
-          <span className="text-xs leading-tight text-muted">{kk.upload.replacesPerson}</span>
+          <img src={slotPreviewSrc(slot.previewImagePath, mediaBase)!} alt={kk.upload.personInVideo(index + 1)} className="h-16 w-12 rounded-lg border border-line object-cover" />
+          <span className="text-xs leading-tight text-muted">{slot.kind === "object" ? kk.upload.replacesThing : kk.upload.replacesPerson}</span>
         </div>
       )}
       <button

@@ -163,7 +163,13 @@ export function TemplateEditor({
     });
     // The scene note goes into the template prompt; the template is edited (edit mode), so the video stays 1:1.
     const scene = r.scene ? `Keep the video 1:1: ${r.scene}` : "";
-    setSd({ people: n, positions, objects, klingMode: "edit", ...(scene && !sd.prompt.trim() ? { prompt: scene.slice(0, 1500) } : {}) });
+    // Cut each one out of its best frame: the customer sees who/what their photo replaces.
+    const found = [...r.people.slice(0, n), ...r.objects.slice(0, objects.length)];
+    const targets = await Promise.all(found.map(async (x) => {
+      const blob = x.box ? await cropFrame(frames[x.frame] ?? frames[0], x.box) : null;
+      return blob ? (await uploadTarget(blob)) ?? "" : "";
+    }));
+    setSd({ people: n, positions, objects, targets, klingMode: "edit", ...(scene && !sd.prompt.trim() ? { prompt: scene.slice(0, 1500) } : {}) });
     setSceneTip(scene && sd.prompt.trim() ? scene : null);
     const lines = [
       ...r.people.slice(0, n).map((p, i) => `${i + 1}. ${p.ru}`),
@@ -173,7 +179,7 @@ export function TemplateEditor({
   };
 
   // Customer photo slots = the number of people the admin set, left → right (the server derives them too).
-  const slots = isPhoto ? photoSlots(ph.people, ph.labels) : seedanceSlots(sd.people, "face_", sd.labels, sd.objects);
+  const slots = isPhoto ? photoSlots(ph.people, ph.labels) : seedanceSlots(sd.people, "face_", sd.labels, sd.objects, sd.targets);
 
   /** Client check first (shows red fields), then the authoritative server save. */
   const persist = async (forPublish: boolean): Promise<string | null> => {
@@ -357,6 +363,16 @@ export function TemplateEditor({
                 {ai.busy ? e.seedance.aiBusy : e.seedance.aiDetect}
               </button>
               {ai.text && <span className={`mt-1 block text-xs font-medium ${ai.err ? "text-danger" : ""}`}>{ai.text}</span>}
+              {sd.targets.some(Boolean) && (
+                <span className="mt-2 block text-xs">
+                  <label className="inline-flex items-center gap-2 font-medium">
+                    <input type="checkbox" checked={sd.showTargets} onChange={(ev) => setSd({ showTargets: ev.target.checked })} />
+                    {e.seedance.showTargets}
+                  </label>
+                  <span className="block text-muted">{e.seedance.showTargetsHint}</span>
+                  <button type="button" onClick={() => setSd({ targets: [], showTargets: false })} className="mt-1 font-semibold text-muted underline hover:text-danger">{e.seedance.clearTargets}</button>
+                </span>
+              )}
             </Field>
             <Field label={e.seedance.aspect}>
               <select className={inputCls()} value={sd.aspectRatio} onChange={(ev) => setSd({ aspectRatio: ev.target.value as SeedanceConfig["aspectRatio"] })}>
@@ -589,6 +605,36 @@ async function captureCover(source: File | string, maxWidth = 540): Promise<Blob
   } finally {
     if (objectUrl) URL.revokeObjectURL(objectUrl);
   }
+}
+
+/** Cut-out of a template person or thing (box in 0–1000 of the frame), with some room around it, ≤480 px. */
+async function cropFrame(b64: string, box: [number, number, number, number]): Promise<Blob | null> {
+  try {
+    const img = new Image();
+    img.src = `data:image/jpeg;base64,${b64}`;
+    await img.decode();
+    const W = img.naturalWidth, H = img.naturalHeight;
+    const [y0, x0, y1, x1] = box.map((v) => v / 1000);
+    const padX = (x1 - x0) * 0.15, padY = (y1 - y0) * 0.1;
+    const sx = Math.max(0, (x0 - padX) * W), sy = Math.max(0, (y0 - padY) * H);
+    const sw = Math.min(W, (x1 + padX) * W) - sx, sh = Math.min(H, (y1 + padY) * H) - sy;
+    if (sw < 24 || sh < 24) return null;
+    const k = Math.min(1, 480 / Math.max(sw, sh));
+    const c = document.createElement("canvas");
+    c.width = Math.round(sw * k); c.height = Math.round(sh * k);
+    c.getContext("2d")?.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
+    return await new Promise<Blob | null>((res) => c.toBlob((b) => res(b), "image/jpeg", 0.85));
+  } catch {
+    return null;
+  }
+}
+
+async function uploadTarget(blob: Blob): Promise<string | null> {
+  const r = await createUploadUrl({ kind: "target", contentType: "image/jpeg", size: blob.size });
+  if (!r.ok) return null;
+  const { error } = await supabaseBrowser().storage.from("template-media")
+    .uploadToSignedUrl(r.path, r.token, blob, { contentType: "image/jpeg" });
+  return error ? null : r.path;
 }
 
 async function uploadCover(blob: Blob): Promise<string | null> {
