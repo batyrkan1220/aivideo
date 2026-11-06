@@ -1,3 +1,6 @@
+import { ChevronRight, Sparkles } from "lucide-react";
+import { ButtonLink } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/states";
 import Link from "next/link";
 import { kk } from "@/lib/i18n/kk";
 import { supabaseServer, supabaseAdmin } from "@/lib/supabase/server";
@@ -25,12 +28,8 @@ export async function OrderList({ limit = 50, day }: { limit?: number; day?: str
   const all = (data ?? []) as unknown as Row[];
   if (!all.length) {
     return (
-      <div className="rounded-[28px] bg-surface px-6 py-14 text-center ring-1 ring-line">
-        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand text-2xl" aria-hidden>✨</span>
-        <p className="mt-4 text-lg font-bold">{kk.gallery.emptyTitle}</p>
-        <p className="mx-auto mt-1 max-w-xs text-sm text-muted">{kk.account.ordersEmpty}</p>
-        <Link href="/" className="btn-glow mt-5 inline-flex h-11 items-center rounded-full px-6 text-sm font-bold">{kk.myVideos.browse}</Link>
-      </div>
+      <EmptyState icon={<Sparkles size={26} strokeWidth={1.8} aria-hidden />} title={kk.gallery.emptyTitle} text={kk.account.ordersEmpty}
+        action={<ButtonLink href="/" size="lg">{kk.myVideos.browse}</ButtonLink>} />
     );
   }
 
@@ -93,15 +92,16 @@ export async function OrderList({ limit = 50, day }: { limit?: number; day?: str
   };
   const groups = (active ? [active] : days).map((k) => ({ k, items: orders.filter((o) => keyOf(o) === k) })).filter((g) => g.items.length);
 
-  const chipCls = { ok: "bg-brand-soft text-night", work: "bg-peach text-night", pay: "bg-cobalt text-white", bad: "bg-rose text-night", muted: "bg-line text-night" };
+  // Status colours from the design system (AAA text on soft backgrounds).
+  const chipCls = { ok: "bg-success-soft text-success", work: "bg-warning-soft text-warning", pay: "bg-info-soft text-info", bad: "bg-danger-soft text-danger", muted: "bg-mist text-muted" };
 
   return (
     <>
       {groups.map((g) => (
         <section key={g.k} className="mb-5">
-          <h2 className="mb-2 px-1 text-[13px] font-bold text-muted first-letter:uppercase">{head.format(noon(g.k))}</h2>
+          <h2 className="t-eyebrow mb-3 px-1 text-muted">{head.format(noon(g.k))}</h2>
           {/* Phone-first list: one row per work, the whole row is the button */}
-          <ul className="divide-y divide-line overflow-hidden rounded-[20px] bg-surface ring-1 ring-line">
+          <ul className="divide-y divide-line overflow-hidden rounded-card border border-line/80 bg-surface">
             {g.items.map((o) => {
               const st = state(o);
               const t = Array.isArray(o.templates) ? o.templates[0] : o.templates;
@@ -111,7 +111,7 @@ export async function OrderList({ limit = 50, day }: { limit?: number; day?: str
               const combo = comboInfo.get(o.id);
               return (
                 <li key={o.id}>
-                  <Link href={`/orders/${o.id}`} className="flex items-center gap-3 px-3 py-2.5 transition-colors active:bg-paper">
+                  <Link href={`/orders/${o.id}`} className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-mist/60 active:bg-mist">
                     <span className="relative block h-[64px] w-[48px] shrink-0 overflow-hidden rounded-[12px] bg-night">
                       {thumb ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -131,7 +131,7 @@ export async function OrderList({ limit = 50, day }: { limit?: number; day?: str
                         {st.tone === "pay" ? st.action : st.text}
                       </span>
                     </span>
-                    <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 text-muted" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden><path d="m9 6 6 6-6 6" /></svg>
+                    <ChevronRight size={20} className="shrink-0 text-faint" aria-hidden />
                   </Link>
                 </li>
               );

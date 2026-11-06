@@ -1,68 +1,47 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Clapperboard, Image as ImageIcon, LayoutGrid, Plus, UserRound } from "lucide-react";
 import { kk } from "@/lib/i18n/kk";
 import { PHOTOS_SOON } from "@/lib/features";
 
-type Item = { href: string; label: string; icon: React.ReactNode; match: (p: string) => boolean; soon?: boolean };
+type Item = { href: string; label: string; icon: React.ReactNode; match: (p: string) => boolean; soon?: boolean; primary?: boolean };
 
-const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round" } as const;
-
+const I = { size: 22, strokeWidth: 1.8, "aria-hidden": true } as const;
 const items: Item[] = [
-  {
-    href: "/", label: kk.nav.tabHome, match: (p) => p === "/" || p.startsWith("/templates"),
-    icon: <svg viewBox="0 0 24 24" {...stroke}><rect x="4" y="3" width="16" height="18" rx="4" /><path d="m10 9 5 3-5 3z" fill="currentColor" /></svg>,
-  },
-  {
-    href: "/photos", label: kk.nav.tabPhoto, match: (p) => p.startsWith("/photos"), soon: PHOTOS_SOON,
-    icon: <svg viewBox="0 0 24 24" {...stroke}><rect x="3" y="4" width="18" height="16" rx="4" /><circle cx="9" cy="10" r="2" /><path d="m21 16-5-5-8 8" /></svg>,
-  },
-  {
-    href: "/create", label: kk.nav.tabCreate, match: (p) => p.startsWith("/create"),
-    icon: <svg viewBox="0 0 24 24" {...stroke} strokeWidth={2.2}><rect x="3" y="3" width="18" height="18" rx="6" /><path d="M12 8v8M8 12h8" /></svg>,
-  },
-  {
-    href: "/orders", label: kk.nav.tabGallery, match: (p) => p.startsWith("/orders"),
-    icon: <svg viewBox="0 0 24 24" {...stroke}><rect x="3" y="3" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="3" width="7.5" height="7.5" rx="2" /><rect x="3" y="13.5" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2" /></svg>,
-  },
-  {
-    href: "/account", label: kk.nav.tabAccount, match: (p) => p.startsWith("/account"),
-    icon: <svg viewBox="0 0 24 24" {...stroke}><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>,
-  },
+  { href: "/", label: kk.nav.tabHome, match: (p) => p === "/" || p.startsWith("/templates"), icon: <Clapperboard {...I} /> },
+  { href: "/photos", label: kk.nav.tabPhoto, match: (p) => p.startsWith("/photos"), soon: PHOTOS_SOON, icon: <ImageIcon {...I} /> },
+  { href: "/create", label: kk.nav.tabCreate, match: (p) => p.startsWith("/create"), primary: true, icon: <Plus {...I} strokeWidth={2.4} /> },
+  { href: "/orders", label: kk.nav.tabGallery, match: (p) => p.startsWith("/orders"), icon: <LayoutGrid {...I} /> },
+  { href: "/account", label: kk.nav.tabAccount, match: (p) => p.startsWith("/account"), icon: <UserRound {...I} /> },
 ];
 
-/** Floating white dock on phones: 5 tabs, the active icon sits in a dark capsule. Hidden from sm up. */
+/**
+ * Floating frosted dock on phones. The active tab gets an obsidian capsule; "Создать" is always
+ * a chartreuse button in the middle. Sections not open yet are not shown. Hidden from sm up.
+ */
 export function MobileNav() {
   const path = usePathname();
+  const shown = items.filter((i) => !i.soon);
   return (
     <nav
       aria-label={kk.nav.home}
-      className="tg-dock fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] z-40 rounded-[2rem] border border-line bg-white shadow-[0_16px_40px_-18px_rgba(60,40,20,0.35)] sm:hidden"
+      className="tg-dock glass fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] z-40 rounded-[2rem] border border-white/70 elev-lg sm:hidden"
     >
-      <ul className={`grid h-[4.25rem] items-center px-1 ${items.some((i) => i.soon) ? "grid-cols-4" : "grid-cols-5"}`}>
-        {/* Sections that are not open yet are not shown (a dead "Скоро" tab only takes room). */}
-        {items.filter((i) => !i.soon).map((it) => {
+      <ul className="grid h-[4.5rem] items-center px-1" style={{ gridTemplateColumns: `repeat(${shown.length}, minmax(0, 1fr))` }}>
+        {shown.map((it) => {
           const on = it.match(path);
-          if (it.soon) return (
-            <li key={it.href} className="flex justify-center">
-              <span aria-disabled className="relative flex min-w-0 cursor-default flex-col items-center gap-1 text-[10px] font-semibold leading-none text-muted/60">
-                <span className="flex h-9 w-12 items-center justify-center rounded-full text-ink/30">
-                  <span className="h-[22px] w-[22px] [&>svg]:h-full [&>svg]:w-full" aria-hidden>{it.icon}</span>
-                </span>
-                <span className="max-w-full truncate px-0.5">{it.label}</span>
-                <span className="absolute -right-2 -top-1 rounded-full bg-brand px-1.5 py-[3px] text-[8px] font-extrabold uppercase leading-none tracking-wide text-night">{kk.nav.soon}</span>
-              </span>
-            </li>
-          );
           return (
             <li key={it.href} className="flex justify-center">
               <Link
                 href={it.href}
                 aria-current={on ? "page" : undefined}
-                className={`flex min-w-0 flex-col items-center gap-1 text-[10px] font-semibold leading-none transition-colors ${on ? "text-ink" : "text-muted"}`}
+                className={`group flex min-w-0 flex-col items-center gap-1 text-[11px] font-semibold leading-none transition-colors duration-200 ${on ? "text-ink" : "text-muted"}`}
               >
-                <span className={`flex h-9 w-12 items-center justify-center rounded-full transition-all active:scale-95 ${on ? "bg-night text-white shadow-[0_8px_18px_-8px_rgba(22,22,22,0.6)]" : "text-ink/70"}`}>
-                  <span className="h-[22px] w-[22px] [&>svg]:h-full [&>svg]:w-full" aria-hidden>{it.icon}</span>
+                <span className={`flex h-10 w-14 items-center justify-center rounded-full transition-all duration-300 ease-[var(--ease-out)] group-active:scale-95 ${
+                  it.primary ? "bg-brand text-night shadow-[0_10px_22px_-10px_rgba(140,170,10,0.9)]" : on ? "bg-night text-white shadow-[0_8px_18px_-8px_rgba(22,22,22,0.6)]" : "text-ink/75 group-hover:bg-mist"
+                }`}>
+                  {it.icon}
                 </span>
                 <span className="max-w-full truncate px-0.5">{it.label}</span>
               </Link>

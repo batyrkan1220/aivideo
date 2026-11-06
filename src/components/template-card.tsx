@@ -1,4 +1,5 @@
 "use client";
+import { Flame } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { kk } from "@/lib/i18n/kk";
@@ -161,7 +162,7 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
     <Link
       ref={cardRef}
       href={`/templates/${t.id}`}
-      className="group block"
+      className="group block rounded-[1.25rem] focus-visible:outline-offset-4"
       // The tap itself starts the template's video with sound (see sound-handoff).
       onClick={(e) => {
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
@@ -173,7 +174,7 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
       onFocus={start}
       onBlur={stop}
     >
-      <div className="relative aspect-[3/4] overflow-hidden rounded-[14px] bg-night sm:rounded-[18px] ring-1 ring-black/5 transition-transform duration-200 group-active:scale-[0.97]">
+      <div className="relative aspect-[3/4] overflow-hidden rounded-[1rem] bg-night ring-1 ring-black/5 elev-sm transition-[transform,box-shadow] duration-300 ease-[var(--ease-out)] group-hover:-translate-y-0.5 group-hover:elev-md group-active:scale-[0.98] sm:rounded-[1.25rem]">
         {t.coverUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -205,10 +206,10 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
             className="absolute inset-0 h-full w-full object-cover"
           />
         )}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
         <div className="absolute left-2 top-2 flex flex-col items-start gap-1 sm:left-2.5 sm:top-2.5">
           {t.isTrending && (
-            <span className="rounded-full bg-brand px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-night sm:px-2.5 sm:py-1 sm:text-[11px]">{kk.catalog2.trendBadge}</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-brand px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-night shadow-[0_4px_12px_-4px_rgba(0,0,0,0.35)] sm:px-2.5 sm:py-1 sm:text-[11px]"><Flame size={11} strokeWidth={2.6} aria-hidden />{kk.catalog2.trendBadge}</span>
           )}
           {/* People in the template (only worth showing for 2+). */}
           {t.faceCount > 1 && (

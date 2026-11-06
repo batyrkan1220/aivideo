@@ -512,7 +512,7 @@ export function CreateFlow({
 
       {/* Clothing: the customer picks (only on templates that allow it). */}
       {outfit === "choice" && media === "video" && (
-        <section className="rounded-card border border-line bg-surface p-4 sm:p-5">
+        <section className="rounded-card border border-line/80 bg-surface p-4 sm:p-6">
           <p className="text-[16px] font-extrabold tracking-tight">{c.outfit.title}</p>
           <div className="mt-3 grid grid-cols-2 gap-1 rounded-full border border-line bg-paper p-1" role="radiogroup" aria-label={c.outfit.title}>
             {(["template", "photo"] as const).map((k) => (
@@ -554,7 +554,7 @@ export function CreateFlow({
       })()}
 
       {/* Quality: two cards side by side (a dropdown cut the text on phones); the total updates at once. */}
-      {effQualities.length > 1 && <section className="rounded-card border border-line bg-surface p-4 sm:p-5">
+      {effQualities.length > 1 && <section className="rounded-card border border-line/80 bg-surface p-4 sm:p-6">
         <h2 className="text-[16px] font-extrabold tracking-tight">{c.qualityTitle}</h2>
         <div role="radiogroup" aria-label={c.qualityTitle} className="mt-3 grid grid-cols-2 gap-2.5">
           {effQualities.map((q) => {
@@ -600,7 +600,7 @@ export function CreateFlow({
 
       {/* Price breakdown only when there is more than one line; the total and pay button stick at the bottom. */}
       {price && (price.extraFacesKzt > 0 || price.platformFeeKzt > 0 || price.discountKzt > 0) && (
-        <section className="rounded-card border border-line bg-surface p-4 sm:p-5">
+        <section className="rounded-card border border-line/80 bg-surface p-4 sm:p-6">
             <dl className="space-y-1.5 text-sm">
               <Row label={`${kk.pricing.videoPrice}${selected ? ` · ${selected.labelKk}` : ""}`} value={formatKzt(price.basePriceKzt + price.qualitySurchargeKzt)} />
               {price.extraFacesKzt > 0 && <Row label={`${kk.pricing.extraFaces} (${price.extraFaces})`} value={`+${formatKzt(price.extraFacesKzt)}`} />}
@@ -611,7 +611,7 @@ export function CreateFlow({
       )}
 
       {(price || waitingForVideo) && (
-        <div className={`sticky ${noTabBar ? "bottom-[calc(0.75rem+env(safe-area-inset-bottom))]" : "bottom-[calc(5.25rem+env(safe-area-inset-bottom))]"} z-20 -mx-1 rounded-[28px] border border-line bg-white px-4 pb-2.5 pt-2.5 shadow-[0_16px_40px_-18px_rgba(60,40,20,0.35)] sm:static sm:mx-0 sm:rounded-card sm:p-4`}>
+        <div className={`sticky ${noTabBar ? "bottom-[calc(0.75rem+env(safe-area-inset-bottom))]" : "bottom-[calc(5.25rem+env(safe-area-inset-bottom))]"} z-20 -mx-1 rounded-[28px] border border-white/70 glass px-4 pb-3 pt-3 elev-lg sm:static sm:mx-0 sm:rounded-card sm:border-line sm:bg-surface sm:p-6 sm:elev-sm`}>
           <p className="mb-2 text-[11px] leading-snug text-muted">
             {customVideo ? cv.consentByButton : kk.consent.byButton}{" "}
             <a href="/terms" target="_blank" rel="noopener" className="underline underline-offset-2">{kk.consent.terms}</a>.

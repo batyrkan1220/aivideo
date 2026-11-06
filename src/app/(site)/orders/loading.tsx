@@ -1,9 +1,11 @@
+import { Skeleton } from "@/components/ui/states";
+
 export default function Loading() {
   return (
-    <main className="mx-auto max-w-6xl px-4 pt-4" aria-busy="true">
-      <div className="h-8 w-32 animate-pulse rounded-full bg-surface" />
-      <ul className="mt-4 space-y-2">
-        {Array.from({ length: 5 }, (_, i) => <li key={i} className="h-[84px] animate-pulse rounded-[20px] bg-surface" />)}
+    <main className="mx-auto max-w-3xl px-4 pt-6 sm:px-6" aria-busy="true">
+      <Skeleton className="h-8 w-36 rounded-full" />
+      <ul className="mt-6 grid gap-3">
+        {Array.from({ length: 5 }, (_, i) => <li key={i}><Skeleton className="h-24 rounded-card" /></li>)}
       </ul>
     </main>
   );

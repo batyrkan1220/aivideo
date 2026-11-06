@@ -40,6 +40,17 @@
   --color-rose: #fcd3d3;
   --color-lavender: #e3e6fd;
   --color-cobalt: #2f65f6;
+  /* Declared here so Tailwind makes the utilities; .theme-app sets the site values. */
+  --color-mist: #f4f3f8;
+  --color-line-strong: #d6d3e0;
+  --color-faint: #8b88a0;
+  --color-brand-ink: #3d2bb0;
+  --color-success-soft: #e3f5ea;
+  --color-warning: #7c3a0b;
+  --color-warning-soft: #fdf0d5;
+  --color-danger-soft: #fde7e5;
+  --color-info: #1e40af;
+  --color-info-soft: #e6edff;
 
   --font-sans: "Inter Variable", system-ui, sans-serif;
   --font-display: "Unbounded Variable", "Inter Variable", system-ui, sans-serif;
@@ -86,25 +97,45 @@ html[data-tg] .under-header { top: 0; }
    (#D7F443) accents, pastel peach / rose / lavender tags, cobalt for secondary actions.
    Scoped to .theme-app (the admin keeps its own look). */
 .theme-app {
+  /* Neutrals: warm cream canvas, white cards, a second surface for insets, two border strengths. */
   --color-paper: #faf5f1;
   --color-surface: #ffffff;
-  --color-night: #161616;
-  --color-ink: #161616;
-  --color-muted: #8a847e;
+  --color-mist: #f4eee8;
   --color-line: #ece7e1;
+  --color-line-strong: #d9d1c8;
+  --color-night: #161616;
+  /* Text: ink and a secondary tone that still reaches WCAG AAA (7:1) on cream and white. */
+  --color-ink: #161616;
+  --color-muted: #57514b;
+  --color-faint: #8a847e;            /* decorative only: never for text people must read */
+  /* Brand: chartreuse fills; olive for brand text on light surfaces (AAA). */
   --color-brand: #d7f443;
   --color-brand-dark: #c6e42f;
-  --color-brand-soft: #ddf3a5;
+  --color-brand-soft: #eef9c4;
+  --color-brand-ink: #3f5600;
+  /* Status: text colours are AAA on white/cream, *-soft are their quiet backgrounds. */
+  --color-success: #0f5c32;
+  --color-success-soft: #e3f5ea;
+  --color-warning: #7c3a0b;
+  --color-warning-soft: #fdf0d5;
+  --color-danger: #9f1d13;
+  --color-danger-soft: #fde7e5;
+  --color-info: #1e40af;
+  --color-info-soft: #e6edff;
+  /* Pastel tags and accents. */
   --color-peach: #fde1c8;
   --color-rose: #fcd3d3;
   --color-lavender: #e3e6fd;
   --color-cobalt: #2f65f6;
   --color-coral: #f0564a;
-  --color-danger: #d93a32;
-  --color-success: #1f9d55;
-  /* Accent marks ("Тренд" and the like) use the chartreuse brand colour, not coral. */
   --color-flash: #d7f443;
+  /* Shape, depth and motion. */
   --radius-card: 1.5rem;
+  --shadow-xs: 0 1px 2px rgba(22, 22, 22, 0.04);
+  --shadow-sm: 0 1px 2px rgba(22, 22, 22, 0.03), 0 10px 28px -16px rgba(60, 40, 20, 0.14);
+  --shadow-md: 0 2px 4px rgba(22, 22, 22, 0.04), 0 18px 40px -18px rgba(60, 40, 20, 0.22);
+  --shadow-lg: 0 4px 10px rgba(22, 22, 22, 0.05), 0 28px 60px -24px rgba(60, 40, 20, 0.3);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --font-display: "Inter Variable", system-ui, -apple-system, "SF Pro Display", sans-serif;
   color-scheme: light;
 }
@@ -112,12 +143,12 @@ body:has(> .theme-app:not(.fixed)) { background: #faf5f1; }
 .theme-app ::selection { background: rgba(215, 244, 67, 0.7); color: #161616; }
 .theme-app :focus-visible { outline-color: #161616; }
 /* Brand-coloured text and borders on light surfaces: deep olive (chartreuse isn't readable on white). */
-.theme-app .text-brand { color: #4f6b00; }
+.theme-app .text-brand { color: var(--color-brand-ink); }
 .theme-app .border-brand { border-color: #9cbf12; }
 /* On dark cards and media the chartreuse stays. */
 .theme-app .text-lime { color: #d7f443; }
 /* White cards float on the cream canvas with a soft ambient shadow. */
-.theme-app .bg-surface { box-shadow: 0 1px 2px rgba(22, 22, 22, 0.03), 0 10px 28px -16px rgba(60, 40, 20, 0.14); }
+.theme-app .bg-surface { box-shadow: var(--shadow-sm); }
 /* Headings: bold geometric, tight tracking. */
 .theme-app h1, .theme-app h2 { letter-spacing: -0.02em; }
 
@@ -146,7 +177,7 @@ body:has(> .theme-app:not(.fixed)) { background: #faf5f1; }
 }
 
 /* Accent text. */
-.text-gradient { color: #4f6b00; }
+.text-gradient { color: var(--color-brand-ink); }
 
 /* Uppercase section titles. */
 .section-title { font-size: 0.8rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
@@ -156,4 +187,40 @@ body:has(> .theme-app:not(.fixed)) { background: #faf5f1; }
   background: color-mix(in srgb, var(--color-surface) 86%, transparent);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   backdrop-filter: blur(20px) saturate(180%);
+}
+
+
+/* ── Type scale (8pt rhythm: line-heights are multiples of 4/8 px) ───────────────────── */
+@utility t-display { font-family: var(--font-display); font-size: 2.5rem; line-height: 2.75rem; font-weight: 800; letter-spacing: -0.03em; }
+@utility t-h1 { font-family: var(--font-display); font-size: 2rem; line-height: 2.5rem; font-weight: 800; letter-spacing: -0.025em; }
+@utility t-h2 { font-family: var(--font-display); font-size: 1.5rem; line-height: 2rem; font-weight: 800; letter-spacing: -0.02em; }
+@utility t-h3 { font-size: 1.125rem; line-height: 1.5rem; font-weight: 700; letter-spacing: -0.01em; }
+@utility t-body { font-size: 1rem; line-height: 1.5rem; }
+@utility t-small { font-size: 0.875rem; line-height: 1.25rem; }
+@utility t-micro { font-size: 0.75rem; line-height: 1rem; font-weight: 600; letter-spacing: 0.01em; }
+@utility t-eyebrow { font-size: 0.75rem; line-height: 1rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+
+/* ── Elevation ─────────────────────────────────────────────────────────────────────── */
+@utility elev-xs { box-shadow: var(--shadow-xs); }
+@utility elev-sm { box-shadow: var(--shadow-sm); }
+@utility elev-md { box-shadow: var(--shadow-md); }
+@utility elev-lg { box-shadow: var(--shadow-lg); }
+/* Cards that react: lift a little on hover (pointer devices only), settle on press. */
+@utility lift {
+  transition: transform 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out);
+  @media (hover: hover) { &:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); } }
+  &:active { transform: translateY(0) scale(0.99); }
+}
+
+/* ── Motion ────────────────────────────────────────────────────────────────────────── */
+@keyframes tm-fade-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes tm-scale-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes tm-shimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+@utility animate-fade-up { animation: tm-fade-up 0.4s var(--ease-out) both; }
+@utility animate-scale-in { animation: tm-scale-in 0.25s var(--ease-out) both; }
+/* Loading placeholder with a soft moving highlight. */
+@utility skeleton {
+  background: linear-gradient(90deg, var(--color-mist) 0%, #fbf8f5 50%, var(--color-mist) 100%);
+  background-size: 200% 100%;
+  animation: tm-shimmer 1.4s linear infinite;
 }

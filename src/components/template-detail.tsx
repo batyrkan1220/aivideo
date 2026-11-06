@@ -1,3 +1,5 @@
+import { Flame } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { kk } from "@/lib/i18n/kk";
 import type { TemplateDetail } from "@/lib/templates/queries";
@@ -54,14 +56,14 @@ export function TemplateDetailView({ t, cta, combo, staffUnits }: { t: TemplateD
         {/* The box is sized from the stored video proportions before anything loads: no jump. */}
         <div
           style={{ "--a": String(t.videoAspect ?? 9 / 16), aspectRatio: String(t.videoAspect ?? 9 / 16) } as React.CSSProperties}
-          className="relative mx-auto w-[min(100%,calc(58svh*var(--a)))] overflow-hidden rounded-[1.75rem] bg-night shadow-[0_24px_60px_-24px_rgba(0,0,0,0.35)] ring-1 ring-black/5 md:w-[min(100%,calc(80vh*var(--a)))]">
+          className="relative mx-auto w-[min(100%,calc(58svh*var(--a)))] overflow-hidden rounded-[1.75rem] bg-night ring-1 ring-black/5 elev-lg md:w-[min(100%,calc(80vh*var(--a)))]">
           {t.previewUrl ? (
             <AutoVideo src={t.previewUrl} poster={t.coverUrl ?? undefined} soundToggle preferSound className="block h-full w-full object-cover" />
           ) : t.coverUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={t.coverUrl} alt="" className="block h-full w-full object-cover" />
           ) : null}
-          <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-night">
+          <span className="glass t-micro absolute left-3 top-3 rounded-full px-3 py-1.5 text-night">
             {t.media === "photo" ? kk.photos.sample : kk.catalog.sample}
           </span>
         </div>
@@ -77,29 +79,25 @@ export function TemplateDetailView({ t, cta, combo, staffUnits }: { t: TemplateD
               {t.category.title}
             </Link>
           )}
-          <h1 className="mt-2 font-display text-4xl font-bold tracking-tight">{t.title}</h1>
-          <div className="mt-4 flex flex-wrap gap-2 text-sm">
-            {t.startingPriceKzt !== null && (
-              <span className="rounded-full bg-ink px-3 py-1.5 font-semibold text-paper">
-                {formatKzt(t.startingPriceKzt)} {kk.catalog.from}
-              </span>
-            )}
-            {t.isTrending && <span className="rounded-full bg-brand px-3 py-1.5 font-bold text-night">{kk.catalog2.trendBadge}</span>}
-            {staffUnits && <span className="rounded-full bg-brand px-3 py-1.5 font-semibold text-night">{staffUnits}</span>}
+          <h1 className="t-display mt-2">{t.title}</h1>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {t.startingPriceKzt !== null && <Badge tone="dark" className="!text-sm !px-3.5 !py-1.5">{formatKzt(t.startingPriceKzt)} {kk.catalog.from}</Badge>}
+            {t.isTrending && <Badge tone="brand" icon={<Flame size={13} strokeWidth={2.6} aria-hidden />} className="!text-sm !px-3.5 !py-1.5">{kk.catalog2.trendBadge}</Badge>}
+            {staffUnits && <Badge tone="neutral">{staffUnits}</Badge>}
           </div>
         </div>
         {/* Phones: title, facts and how it works, right under the sample */}
         <div className="md:hidden">
           <div className="flex items-start justify-between gap-3">
-            <h1 className="text-[26px] font-extrabold leading-tight tracking-tight">{t.title}</h1>
-            {t.startingPriceKzt !== null && <span className="mt-1 shrink-0 rounded-full bg-ink px-3 py-1.5 text-sm font-extrabold text-paper">{formatKzt(t.startingPriceKzt)}</span>}
+            <h1 className="t-h1">{t.title}</h1>
+            {t.startingPriceKzt !== null && <span className="mt-1 shrink-0 rounded-full bg-night px-3.5 py-1.5 text-sm font-extrabold text-white elev-sm">{formatKzt(t.startingPriceKzt)}</span>}
           </div>
           {staffUnits && <p className="mt-2 text-sm font-semibold text-night">{staffUnits}</p>}
-          {t.description && <p className="mt-1 text-sm text-muted">{t.description}</p>}
+          {t.description && <p className="t-small mt-2 text-muted">{t.description}</p>}
           {(combo || t.isTrending) && (
             <ul className="mt-3 flex flex-wrap gap-1.5 text-[12px] font-semibold">
               {combo && <li className="rounded-full bg-brand px-2.5 py-1 text-night">{kk.combo.badge(combo.length)}</li>}
-              {t.isTrending && <li className="rounded-full bg-brand px-2.5 py-1 text-night">🔥 {kk.catalog2.trendBadge}</li>}
+              {t.isTrending && <li><Badge tone="brand" icon={<Flame size={12} strokeWidth={2.6} aria-hidden />}>{kk.catalog2.trendBadge}</Badge></li>}
             </ul>
           )}
         </div>

@@ -1,12 +1,12 @@
+import { CardGridSkeleton, Skeleton } from "@/components/ui/states";
+
 /** Shown instantly on navigation while the next page loads (taps feel immediate). */
 export default function Loading() {
   return (
-    <main className="mx-auto max-w-6xl px-4 pt-4" aria-busy="true">
-      <div className="h-8 w-40 animate-pulse rounded-full bg-surface" />
-      <div className="mt-4 h-48 animate-pulse rounded-[24px] bg-surface" />
-      <ul className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-        {Array.from({ length: 4 }, (_, i) => <li key={i} className="aspect-[3/4] animate-pulse rounded-[14px] bg-surface" />)}
-      </ul>
+    <main className="mx-auto max-w-6xl px-4 pt-6 sm:px-6" aria-busy="true">
+      <Skeleton className="h-8 w-48 rounded-full" />
+      <Skeleton className="mt-4 h-48 rounded-card" />
+      <div className="mt-6"><CardGridSkeleton count={8} /></div>
     </main>
   );
 }
