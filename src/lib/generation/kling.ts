@@ -62,17 +62,19 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
         `All ${people} must be replaced; none of them may keep the face or look of the original person.`,
         `${refs.join(", ")} are ${people} different people: each one goes only to their own place. Do not swap, blend or mix their faces.`,
       ].join("\n");
+  const hasOutfitPhoto = things.some((t) => ["outfit", "clothes", "clothing"].includes(t.what));
   const same = [
     `The new ${people === 1 ? "person" : "people"} must look 100% identical to ${refs.join(", ")} in every frame, from the first frame to the very last: the same face shape, eyes, eyebrows, nose, lips, jaw, ears, moles, hairstyle, hair color, skin tone and age.`,
-    `Replace the whole person, not only the face: head, hair, neck, arms, hands, legs and feet, with the skin color and skin tone of ${refs.join(", ")} everywhere on the body, and their body build and proportions. No part of the original person's body or skin may remain.`,
+    `Replace the whole person, not only the face: head, hair, neck, arms, hands, legs and feet, with the skin color and skin tone of ${refs.join(", ")} everywhere on the body, and their body build and proportions. No part of the original person's body or skin may remain${outfit === "template" && !hasOutfitPhoto ? " (their clothing is the only thing that stays, see below)" : ""}.`,
     "Keep the identity the same from every angle: front, three-quarter, profile, looking up and looking down. Never return to the original face from @video_1, also not in the last seconds.",
     "Natural, realistic skin. Do not beautify, slim, smooth or stylize the faces.",
   ].join(" ");
   const look = outfitRef
     ? `Dress the ${people === 1 ? "person" : "people"} in the outfit from ${outfitRef}: the same garments, colors and fabric. ${outfitRef} is a photo of clothing, not a person.`
     : outfit === "template"
-    ? "Keep the clothing from @video_1."
-    : `Use the clothing of the people in ${refs.join(", ")}.`;
+    // A short "Keep the clothing" lost to the whole-body rule above: Kling dressed the person as in the photo.
+    ? `Clothing: keep exactly the clothing of the original person in @video_1 — the same garments, cut, colors, fabric, shoes and accessories, in every frame. Put these clothes on the new person. Never take clothing from ${refs.join(", ")}: use those photos only for the face, hair, skin and body.`
+    : `Clothing: dress the new ${people === 1 ? "person" : "people"} in the clothing they wear in ${refs.join(", ")} — the same garments, colors and fabric — not in the clothes from @video_1.`;
   const parts = mode === "edit"
     ? [
         `Edit @video_1. ${who}`,

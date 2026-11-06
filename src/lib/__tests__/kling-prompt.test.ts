@@ -6,7 +6,9 @@ describe("Kling prompt priorities", () => {
   it("starts with the official edit instruction and keeps the wish lower priority", () => {
     const p = buildKlingDirectPrompt("edit", "template", "national costume", "red dress, smiling");
     expect(p.startsWith("Edit @video_1. Replace the main person in @video_1 with the person from @image_1.")).toBe(true);
-    expect(p).toContain("Keep the clothing from @video_1");
+    expect(p).toContain("keep exactly the clothing of the original person in @video_1");
+    expect(p).toContain("Never take clothing from @image_1");
+    expect(p).toContain("their clothing is the only thing that stays");
     expect(p).toContain("any person mentioned in it is still replaced as described above): national costume");
     expect(p.indexOf("Scene and motion to keep")).toBeLessThan(p.indexOf("Optional customer wish"));
     expect(p).toContain("The original person from @video_1 must not appear in any frame. Do not return @video_1 unchanged.");
@@ -21,7 +23,8 @@ describe("Kling prompt priorities", () => {
   it("adds no wish section when the customer wrote nothing", () => {
     const p = buildKlingDirectPrompt("edit", "photo", "", "");
     expect(p).not.toContain("customer wish");
-    expect(p).toContain("Use the clothing of the people in @image_1");
+    expect(p).toContain("in the clothing they wear in @image_1");
+    expect(p).not.toContain("only thing that stays");
   });
 
   it("reference mode makes a new video that follows the template", () => {
@@ -81,7 +84,7 @@ describe("Kling prompt with things to swap", () => {
     expect(p).toContain("@image_1, @image_2, @image_3 are 3 different people: each one goes only to their own place");
     expect(p).toContain("@image_4 is a photo of a horse");
     expect(p).toContain("Dress the people in the outfit from @image_5");
-    expect(p).not.toContain("Keep the clothing from @video_1");
+    expect(p).not.toContain("keep exactly the clothing of the original person");
   });
   it("slots: people first, then objects", async () => {
     const { seedanceSlots } = await import("@/lib/templates/seedance-config");
