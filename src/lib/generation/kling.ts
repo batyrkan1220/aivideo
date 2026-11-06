@@ -54,10 +54,14 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
     : outfit === "template"
     ? `Keep only the clothing from @video_1: the same garments, colors and fabric, worn by ${faces.join(" and ")}. Clothing only. Do not keep the original person's face, head, hair, skin or body.`
     : `Clothing follows ${faces.join(" and ")}. Do not use the clothing from @video_1.`;
+  const spot = (i: number) => positions[i]?.trim() || (people === 1 ? "the main person" : `number ${i + 1} from the left`);
   const who = people === 1
     ? "replace the main person with the person from @element_1"
-    : `replace ${faces.map((r, i) => `the person ${positions[i]?.trim() || `number ${i + 1} from the left`} with the person from ${r}`).join(", and ")}`;
-  const appearance = `The person visible in every frame must be ${faces.join(" and ")}: the same face, head, eyes, nose, lips, jaw, skin, moles, hairstyle and age, from the front, from the left and from the right, until the last frame. Do not keep the original face, head, hair, skin or body from @video_1.`;
+    : `replace ${faces.map((r, i) => `the person ${spot(i)} with the person from ${r}`).join(", and ")}`;
+  const match = (r: string) => `${r} in every frame: the same face, head, eyes, nose, lips, jaw, skin, moles, hairstyle and age, a 1:1 match from the front, from the left and from the right, until the last frame`;
+  const appearance = people === 1
+    ? `@element_1 is one person. The main person must match ${match("@element_1")}. Do not keep the original face, head, hair, skin or body from @video_1.`
+    : `${faces.map((r, i) => `${r} is one separate person, ${spot(i)}. That person must match ${match(r)}.`).join(" ")} These are ${people} different people. Do not swap their faces, blend them, or give one person's face to another. Do not keep any original face from @video_1.`;
   const lead = mode === "edit"
     ? `Edit @video_1. ${who[0].toUpperCase()}${who.slice(1)}. Keep only the camera, movement, timing, location, background, lighting, framing and cuts of @video_1.`
     : `Follow only the movement, camera and timing of @video_1. Do not copy the face, head, hair, skin or body from @video_1. ${who[0].toUpperCase()}${who.slice(1)}.`;
@@ -86,19 +90,21 @@ export function klingElementTag(what: string): string {
   return "o_108";
 }
 
-const elementDescription = (tagId: string) =>
-  tagId === "o_102" ? "This exact face and head. Use it instead of the person in the video."
-  : tagId === "o_103" ? "Exact animal, 1:1 from every angle, every frame until the end."
-  : tagId === "o_105" ? "Exact clothing, 1:1, every frame until the end."
-  : "Exact object, 1:1 from every angle, every frame until the end.";
+const elementDescription = (tagId: string, note?: string) => {
+  const base = tagId === "o_102" ? "This exact face and head. Use it for that one person only."
+    : tagId === "o_103" ? "Exact animal, 1:1 from every angle, every frame until the end."
+    : tagId === "o_105" ? "Exact clothing, 1:1, every frame until the end."
+    : "Exact object, 1:1 from every angle, every frame until the end.";
+  return (note ? `${note} ${base}` : base).slice(0, 100);
+};
 
 /** Register one customer photo as an element. image_refer needs a front view and 1–3 extra views; one upload fills both. */
-export async function createKlingElement(photoUrl: string, tagId = "o_102"): Promise<string> {
+export async function createKlingElement(photoUrl: string, tagId = "o_102", note?: string): Promise<string> {
   const d = await call<{ data?: { task_id?: string; id?: string } }>("/v1/general/advanced-custom-elements", {
     method: "POST",
     body: JSON.stringify({
       element_name: `e${Math.random().toString(36).slice(2, 10)}`.slice(0, 20),
-      element_description: elementDescription(tagId),
+      element_description: elementDescription(tagId, note),
       reference_type: "image_refer",
       element_image_list: { frontal_image: photoUrl, refer_images: [{ image_url: photoUrl }] },
       tag_list: [{ tag_id: tagId }],

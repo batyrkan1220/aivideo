@@ -140,6 +140,11 @@ describe("provider (Kling official API)", () => {
     expect(video).toMatchObject({ state: "processing", next: { providerJobId: "kt-2" } });
     const created = calls.filter((c) => c.url.endsWith("/advanced-custom-elements"));
     expect(created.map((c) => c.body?.tag_list?.[0]?.tag_id)).toEqual(["o_102", "o_102", "o_104"]);
+    expect(created.map((c) => (c.body as { element_description?: string } | undefined)?.element_description)).toEqual([
+      expect.stringContaining("Person 1 of 2."),
+      expect.stringContaining("Person 2 of 2."),
+      expect.not.stringContaining("Person"),
+    ]);
     const body = calls.find((c) => c.url.endsWith("/omni-video/kling-4.0"))?.body as {
       contents: { type: string; id?: string; url?: string; element_id?: string; text?: string }[];
     };
@@ -153,6 +158,8 @@ describe("provider (Kling official API)", () => {
     expect(body.contents.find((c) => c.type === "base_video" || c.type === "feature_video")?.type).toBe("base_video");
     expect(body.contents[0].text).toContain("Do not use the clothing from @video_1");
     expect(body.contents[0].text).toContain("@element_3 is the car, not a person");
+    expect(body.contents[0].text).toContain("@element_1 is one separate person");
+    expect(body.contents[0].text).toContain("Do not swap their faces");
     expect(body.contents[0].text).not.toContain("Clothing follows @video_1");
     vi.unstubAllGlobals();
   });

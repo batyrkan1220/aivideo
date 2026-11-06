@@ -68,7 +68,7 @@ export const seedanceProvider: GenerationProvider = {
     // Each uploaded photo becomes its own element, in order: people (o_102), then things (animal, prop, clothing).
     const usedPhotos = photos.slice(0, people + objects.length);
     const tags = [...Array.from({ length: people }, () => "o_102"), ...objects.map((o) => klingElementTag(o.what))];
-    const elementTaskId = await createKlingElement(usedPhotos[0], tags[0] ?? "o_102");
+    const elementTaskId = await createKlingElement(usedPhotos[0], tags[0] ?? "o_102", personNote(tags[0], 0, people));
     const state: ProviderState = {
       stage: "element", videoUrl: input.templateVideoUrl, photoUrls: usedPhotos, people, tags,
       elementIds: [], prompt, durationSec, aspectRatio: cfg.aspectRatio, resolution, mode: cfg.klingMode,
@@ -87,7 +87,8 @@ export const seedanceProvider: GenerationProvider = {
     if (elementIds.length < total) {
       const nextPhoto = lock.photoUrls[elementIds.length];
       if (typeof nextPhoto !== "string" || !nextPhoto) return { state: "failed", errorCode: "missing_inputs", retryable: false };
-      const taskId = await createKlingElement(nextPhoto, lock.tags?.[elementIds.length] ?? "o_102");
+      const nextTag = lock.tags?.[elementIds.length] ?? "o_102";
+      const taskId = await createKlingElement(nextPhoto, nextTag, personNote(nextTag, elementIds.length, lock.people));
       return { state: "processing", next: { providerJobId: taskId, state: { ...lock, elementIds } as ProviderState } };
     }
     const id = await submitKlingOmni({
@@ -113,6 +114,11 @@ type FaceLockState = {
   resolution: "720p" | "1080p";
   mode?: "edit" | "reference";
 };
+
+/** Two people must stay two identities. The note is only for a character element. */
+function personNote(tag: string | undefined, index: number, people: number): string | undefined {
+  return tag === "o_102" && people > 1 ? `Person ${index + 1} of ${people}.` : undefined;
+}
 
 function faceLockState(s: ProviderState): FaceLockState | null {
   if (!s || String(s.stage) !== "element" || !Array.isArray(s.photoUrls) || typeof s.videoUrl !== "string" || typeof s.prompt !== "string") return null;

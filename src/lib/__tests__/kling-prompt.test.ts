@@ -14,9 +14,9 @@ describe("Kling prompt priorities", () => {
     expect(p).toContain("the person from @element_1");
     expect(p).not.toContain("@image_1");
     expect(p).toContain("Keep only the camera, movement, timing");
-    expect(p).toContain("The person visible in every frame must be @element_1");
+    expect(p).toContain("@element_1 is one person");
     expect(p).toContain("Do not keep the original face, head, hair, skin or body from @video_1");
-    expect(p.indexOf("The person visible")).toBeLessThan(p.indexOf("Edit @video_1"));
+    expect(p.indexOf("@element_1 is one person")).toBeLessThan(p.indexOf("Edit @video_1"));
   });
 
   it("adds no wish section when the customer wrote nothing", () => {
@@ -67,7 +67,7 @@ describe("Kling prompt with things to swap", () => {
     const p = buildKlingDirectPrompt("edit", "photo", "", "", 1, [], [{ what: "car" }]);
     expect(p).toContain("@element_2 is the car, not a person");
     expect(p).toContain("Replace the car in @video_1 with the car from @element_2");
-    expect(p).toContain("The person visible in every frame must be @element_1");
+    expect(p).toContain("@element_1 is one person");
     expect(p).toContain("from the left and from the right");
     expect(p).toContain("until the last frame");
     expect(p).not.toContain("@image_1");
@@ -77,6 +77,9 @@ describe("Kling prompt with things to swap", () => {
     expect(p).toContain("Edit @video_1");
     expect(p).toContain("the person on the left with the person from @element_1");
     expect(p).toContain("the person on the right with the person from @element_3");
+    expect(p).toContain("@element_1 is one separate person, on the left");
+    expect(p).toContain("@element_2 is one separate person, in the center");
+    expect(p).toContain("Do not swap their faces");
     expect(p).toContain("@element_4 is the horse, not a person");
     expect(p).toContain("Dress the people in the outfit shown in @element_5");
     expect(p).not.toContain("Keep the clothing from @video_1");
