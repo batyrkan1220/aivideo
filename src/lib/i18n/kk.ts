@@ -860,6 +860,11 @@ export const kk = {
   },
   result: {
     ready: "Видео готово!",
+    readyPhoto: "Фото готово!",
+    badge: "Готово",
+    readyLead: "Посмотрите, сохраните и поделитесь — друзья точно оценят.",
+    share: "Поделиться",
+    again: "Сделать ещё видео",
     watch: "Смотреть видео",
     download: "Скачать видео",
     sendToChat: "Отправить в чат Telegram",

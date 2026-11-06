@@ -1,10 +1,11 @@
 "use client";
+import { Download, Send, Share2 } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import { kk } from "@/lib/i18n/kk";
 import { haptic, launchInitData, telegramApp } from "@/lib/telegram/client";
 
 const r = kk.result;
-const btn = "inline-flex h-12 items-center justify-center gap-2 rounded-full px-6 font-semibold transition-transform active:scale-[0.98]";
+const btn = "inline-flex h-13 items-center justify-center gap-2 rounded-full px-6 font-semibold transition-[transform,background-color] duration-200 active:scale-[0.98]";
 
 /**
  * Video download that also works inside the Telegram Mini App, where a plain download link does nothing:
@@ -19,7 +20,7 @@ export function DownloadVideo({ orderId, photo = false }: { orderId: string; pho
   const href = `/api/orders/${orderId}/video?download=1`;
 
   if (!inTg) {
-    return <a href={href} className={`${btn} btn-glow text-night`}>{label}</a>;
+    return <a href={href} className={`${btn} btn-glow w-full`}><Download size={18} strokeWidth={2.2} aria-hidden />{label}</a>;
   }
 
   const sendToChat = async () => {
@@ -55,14 +56,14 @@ export function DownloadVideo({ orderId, photo = false }: { orderId: string; pho
     <div className="w-full space-y-2">
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={sendToChat} disabled={state === "sending"}
-          className={`${btn} flex-1 bg-cobalt text-white shadow-[0_10px_24px_-12px_rgba(47,101,246,0.7)] disabled:opacity-70`}>
-          {state === "sending" ? <><span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden />{r.sending}</> : <>✈️ {r.sendToChat}</>}
+          className={`${btn} flex-1 bg-[#2AABEE] text-white shadow-[0_12px_28px_-12px_rgba(42,171,238,0.9)] hover:bg-[#229ED9] disabled:opacity-70`}>
+          {state === "sending" ? <><span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden />{r.sending}</> : <><Send size={18} aria-hidden />{r.sendToChat}</>}
         </button>
-        <button type="button" onClick={nativeDownload} className={`${btn} flex-1 border border-line bg-surface text-ink`}>
-          ⬇️ {label}
+        <button type="button" onClick={nativeDownload} className={`${btn} flex-1 border border-line bg-surface text-ink elev-xs hover:bg-mist`}>
+          <Download size={18} aria-hidden />{label}
         </button>
       </div>
-      <p className={`text-sm ${state === "sent" ? "font-medium text-success" : state === "error" || state === "too_large" ? "text-danger" : "text-muted"}`} aria-live="polite">
+      <p className={`t-small ${state === "sent" ? "font-medium text-success" : state === "error" || state === "too_large" ? "text-danger" : "text-muted"}`} aria-live="polite">
         {state === "sent" ? r.sentToChat : state === "error" ? r.sendFailed : state === "too_large" ? r.tooLarge : r.tgDownloadHint}
       </p>
     </div>
@@ -91,12 +92,37 @@ export function SendComboToChat({ orderId }: { orderId: string }) {
   return (
     <div className="space-y-2">
       <button type="button" onClick={send} disabled={state === "sending"}
-        className={`${btn} w-full bg-cobalt text-white shadow-[0_10px_24px_-12px_rgba(47,101,246,0.7)] disabled:opacity-70`}>
-        {state === "sending" ? <><span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden />{r.sending}</> : <>✈️ {kk.combo.sendAll}</>}
+        className={`${btn} w-full bg-[#2AABEE] text-white shadow-[0_12px_28px_-12px_rgba(42,171,238,0.9)] hover:bg-[#229ED9] disabled:opacity-70`}>
+        {state === "sending" ? <><span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden />{r.sending}</> : <><Send size={18} aria-hidden />{kk.combo.sendAll}</>}
       </button>
       <p className={`text-center text-sm ${state === "sent" ? "font-medium text-success" : state === "error" ? "text-danger" : "text-muted"}`} aria-live="polite">
         {state === "sent" ? kk.combo.sentAll : state === "error" ? r.sendFailed : ""}
       </p>
     </div>
+  );
+}
+
+/** Phones: share the finished video file straight to Instagram, TikTok, WhatsApp… (Web Share with files). */
+export function ShareVideo({ orderId, title, photo = false }: { orderId: string; title: string; photo?: boolean }) {
+  const can = useSyncExternalStore(() => () => {}, () => typeof navigator !== "undefined" && "canShare" in navigator && !launchInitData(), () => false);
+  const [busy, setBusy] = useState(false);
+  if (!can) return null;
+  const share = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/orders/${orderId}/video?download=1`, { credentials: "same-origin" });
+      const blob = await res.blob();
+      const file = new File([blob], photo ? "trendme.jpg" : "trendme.mp4", { type: blob.type || (photo ? "image/jpeg" : "video/mp4") });
+      if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title });
+      else await navigator.share({ title, url: location.href });
+    } catch { /* closed or not supported */ } finally { setBusy(false); }
+  };
+  return (
+    <button type="button" onClick={() => void share()} disabled={busy}
+      className={`${btn} w-full border border-line bg-surface text-ink elev-xs hover:bg-mist disabled:opacity-70`}>
+      {busy ? <span className="h-5 w-5 animate-spin rounded-full border-2 border-black/15 border-t-black" aria-hidden /> : <Share2 size={18} aria-hidden />}
+      {r.share}
+    </button>
   );
 }

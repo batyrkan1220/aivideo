@@ -1,8 +1,8 @@
-import { ChevronDown, LifeBuoy, RotateCcw } from "lucide-react";
+import { Check, ChevronDown, CircleCheck, Clock, LifeBuoy, Pin, Send, Sparkles } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { Alert, Skeleton } from "@/components/ui/states";
 import { Suspense } from "react";
-import { DownloadVideo, SendComboToChat } from "@/components/download-video";
+import { DownloadVideo, SendComboToChat, ShareVideo } from "@/components/download-video";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
@@ -184,42 +184,70 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
       )}
 
       {done && !isCombo && (
-        <section className="rounded-card border border-line/80 bg-surface p-4 sm:p-6">
+        <section className="relative overflow-hidden rounded-card border border-line/80 bg-surface p-4 sm:p-8">
+          <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-brand/35 blur-3xl" aria-hidden />
+          <div className="pointer-events-none absolute -bottom-24 -right-20 h-64 w-64 rounded-full bg-lavender blur-3xl" aria-hidden />
           {video && notExpired(video.expires_at) ? (
-            <>
-              {isPhoto ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={`/api/orders/${o.id}/video`} alt={kk.photos.watch} className="mx-auto max-h-[56svh] w-auto max-w-full rounded-[1.25rem] bg-night object-contain elev-md sm:max-h-none sm:max-w-sm" />
-              ) : (
-                <video src={`/api/orders/${o.id}/video`} controls playsInline preload="metadata" aria-label={kk.result.watch}
-                  className="mx-auto aspect-[9/16] w-full max-w-[min(100%,calc(56svh*9/16))] rounded-[1.25rem] bg-night elev-md sm:max-w-sm" />
-              )}
-              <div className="mx-auto mt-4 max-w-sm">
-                <DownloadVideo orderId={o.id} photo={isPhoto} />
-                <p className="mt-3 text-center text-xs text-muted">{kk.result.keptUntil(dateFmt.format(new Date(video.expires_at)))}</p>
+            <div className="relative grid items-center gap-6 md:grid-cols-[minmax(0,340px)_1fr] md:gap-10">
+              {/* The result, framed like the template sample. */}
+              <div className="mx-auto w-full max-w-[min(100%,calc(56svh*9/16))] md:max-w-none">
+                {isPhoto ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={`/api/orders/${o.id}/video`} alt={kk.photos.watch} className="mx-auto max-h-[56svh] w-auto max-w-full rounded-[1.5rem] bg-night object-contain ring-1 ring-black/5 elev-lg md:max-h-[70vh]" />
+                ) : (
+                  <video src={`/api/orders/${o.id}/video`} controls playsInline preload="metadata" aria-label={kk.result.watch}
+                    className="aspect-[9/16] w-full rounded-[1.5rem] bg-night object-cover ring-1 ring-black/5 elev-lg" />
+                )}
               </div>
-            </>
+              <div className="min-w-0 text-center md:text-left">
+                <span className="t-micro inline-flex items-center gap-1.5 rounded-full bg-success-soft px-3 py-1.5 text-success">
+                  <CircleCheck size={14} strokeWidth={2.4} aria-hidden />{kk.result.badge}
+                </span>
+                <h2 className="t-h1 mt-3">{isPhoto ? kk.result.readyPhoto : kk.result.ready}</h2>
+                <p className="t-body mt-2 text-muted">{kk.result.readyLead}</p>
+                <div className="mx-auto mt-6 grid max-w-sm gap-3 md:mx-0">
+                  <DownloadVideo orderId={o.id} photo={isPhoto} />
+                  <ShareVideo orderId={o.id} title={snap.title_kk ?? "TrendMe"} photo={isPhoto} />
+                </div>
+                <p className="t-small mx-auto mt-4 flex max-w-sm items-center justify-center gap-2 text-muted md:mx-0 md:justify-start">
+                  <Clock size={15} className="shrink-0" aria-hidden />{kk.result.keptUntil(dateFmt.format(new Date(video.expires_at)))}
+                </p>
+                <div className="mx-auto mt-6 flex max-w-sm flex-wrap justify-center gap-2 border-t border-line pt-6 md:mx-0 md:justify-start">
+                  <ButtonLink href={regenHref} variant="lime" icon={<Sparkles size={16} aria-hidden />}>{kk.result.again}</ButtonLink>
+                  <ButtonLink href="/support" variant="ghost" icon={<LifeBuoy size={16} aria-hidden />}>{kk.nav.support}</ButtonLink>
+                </div>
+              </div>
+            </div>
           ) : (
-            <p className="text-sm text-muted">{video ? kk.result.expired : kk.result.videoDeleted}</p>
+            <div className="relative py-6 text-center">
+              <p className="t-body text-muted">{video ? kk.result.expired : kk.result.videoDeleted}</p>
+              <div className="mt-6 flex flex-wrap justify-center gap-2">
+                <ButtonLink href={regenHref} variant="lime" icon={<Sparkles size={16} aria-hidden />}>{kk.result.again}</ButtonLink>
+                <ButtonLink href="/support" variant="secondary" icon={<LifeBuoy size={16} aria-hidden />}>{kk.nav.support}</ButtonLink>
+              </div>
+            </div>
           )}
-          <div className="mx-auto mt-4 grid max-w-sm grid-cols-2 gap-2">
-            <ButtonLink href={regenHref} icon={<RotateCcw size={16} aria-hidden />}>{kk.result.regenerate}</ButtonLink>
-            <ButtonLink href="/support" variant="secondary" icon={<LifeBuoy size={16} aria-hidden />}>{kk.nav.support}</ButtonLink>
-          </div>
         </section>
       )}
 
       {/* Guests (paid without signing in): one tap links Telegram — the video is sent there and the order is never lost. */}
       {guest && (
-        <section className="relative overflow-hidden rounded-card bg-[#2AABEE]/10 p-4 ring-1 ring-[#2AABEE]/30 sm:p-6">
-          <span className="absolute right-3 top-3 rounded-full bg-brand px-2.5 py-1 text-xs font-extrabold text-night">🎁 −20%</span>
-          <p className="pr-16 text-[16px] font-extrabold">{kk.order.tgTitle}</p>
-          <ul className="mb-3 mt-2 space-y-1 text-sm">
-            {kk.order.tgPoints.map((t) => <li key={t} className="flex gap-2"><span className="text-[#229ED9]" aria-hidden>✓</span>{t}</li>)}
-          </ul>
-          <TelegramBotLogin next={`/orders/${o.id}`} compact />
+        <section className="relative overflow-hidden rounded-card border border-line/80 bg-surface p-4 sm:p-6">
+          <div className="flex items-start gap-4">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#2AABEE] text-white shadow-[0_10px_22px_-10px_rgba(42,171,238,0.9)]"><Send size={22} aria-hidden /></span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="t-h3">{kk.order.tgTitle}</h2>
+                <span className="t-micro rounded-full bg-brand px-2.5 py-1 text-night">−20%</span>
+              </div>
+              <ul className="t-small mt-3 grid gap-2">
+                {kk.order.tgPoints.map((t) => <li key={t} className="flex items-start gap-2"><Check size={16} strokeWidth={2.6} className="mt-0.5 shrink-0 text-success" aria-hidden />{t}</li>)}
+              </ul>
+            </div>
+          </div>
+          <div className="mt-5"><TelegramBotLogin next={`/orders/${o.id}`} compact /></div>
           {accessLink && (
-            <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-white/70 px-3 py-2.5 text-xs">
+            <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-mist px-4 py-3 text-xs">
               <span className="min-w-0 text-muted">{kk.order.linkNote}</span>
               <CopyLink url={accessLink} label={kk.order.copyLink} />
             </div>
@@ -310,20 +338,20 @@ async function NextVideo({ orderId, templateId, saved }: { orderId: string; temp
   if (!picks.length) return null;
   const N = kk.nextVideo;
   return (
-    <section className="rounded-[24px] bg-surface p-4 ring-1 ring-line sm:p-6">
-      <h2 className="text-[17px] font-extrabold tracking-tight">{N.title}</h2>
-      <p className="mt-0.5 text-sm text-muted">{N.text}</p>
-      <ul className="mt-3 grid grid-cols-2 gap-2.5">
+    <section className="rounded-card border border-line/80 bg-surface p-4 sm:p-6">
+      <h2 className="t-h3">{N.title}</h2>
+      <p className="t-small mt-1 text-muted">{N.text}</p>
+      <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {picks.map((t) => (
           <li key={t.id}>
-            <Link href={`/templates/${t.id}`} className="relative block aspect-[3/4] overflow-hidden rounded-[16px] bg-night ring-1 ring-black/5">
+            <Link href={`/templates/${t.id}`} className="lift relative block aspect-[3/4] overflow-hidden rounded-[1rem] bg-night ring-1 ring-black/5">
               {(t.coverThumbUrl ?? t.coverUrl) && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={t.coverThumbUrl ?? t.coverUrl ?? ""} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
               )}
               <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2.5 pt-8 text-white">
                 <span className="line-clamp-2 block text-[13px] font-bold leading-tight">{t.title}</span>
-                {t.startingPriceKzt !== null && <span className="mt-0.5 block text-[12px] font-extrabold text-brand">{formatKzt(t.startingPriceKzt)}</span>}
+                {t.startingPriceKzt !== null && <span className="mt-0.5 block text-[12px] font-extrabold text-lime">{formatKzt(t.startingPriceKzt)}</span>}
               </span>
             </Link>
           </li>
@@ -334,7 +362,7 @@ async function NextVideo({ orderId, templateId, saved }: { orderId: string; temp
       ) : (
         <form action={keepOrderPhotos} className="mt-3">
           <input type="hidden" name="orderId" value={orderId} />
-          <button className="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-paper text-sm font-bold ring-1 ring-line hover:ring-ink">📌 {N.keep}</button>
+          <button className="flex h-12 w-full items-center justify-center gap-2 rounded-full border border-line bg-surface text-sm font-semibold elev-xs hover:bg-mist"><Pin size={16} aria-hidden />{N.keep}</button>
           <p className="mt-1.5 text-center text-[11px] text-muted">{N.keepHint}</p>
         </form>
       )}
