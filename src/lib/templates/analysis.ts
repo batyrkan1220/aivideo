@@ -87,6 +87,22 @@ export function applyAnalysis(cfg: SeedanceConfig, a: Analysis, cuts: { people: 
   };
 }
 
+/**
+ * People the prompt cannot tell apart: with several people each needs its own description
+ * (where + how they look), and no two may be the same. Kling mixes such people up.
+ */
+export function unclearPeople(cfg: Pick<SeedanceConfig, "people" | "positions">): number[] {
+  if (cfg.people < 2) return [];
+  const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+  const bad: number[] = [];
+  for (let i = 0; i < cfg.people; i++) {
+    const p = norm(cfg.positions[i] ?? "");
+    const words = p.split(/[ ,]+/).filter(Boolean).length;
+    if (words < 4 || cfg.positions.some((q, j) => j !== i && norm(q ?? "") === p)) bad.push(i);
+  }
+  return bad;
+}
+
 /** What Gemini should look for when the admin's counts are kept. */
 export function analysisHint(cfg: SeedanceConfig, keep: boolean): { people: number; objects: string[] } | undefined {
   return keep ? { people: cfg.people, objects: cfg.objects.map((o) => o.what) } : undefined;

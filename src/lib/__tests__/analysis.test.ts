@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analysisHint, applyAnalysis, cutoutRect } from "@/lib/templates/analysis";
+import { analysisHint, applyAnalysis, cutoutRect, unclearPeople } from "@/lib/templates/analysis";
 import { parseSeedanceConfig } from "@/lib/templates/seedance-config";
 
 const a = {
@@ -36,5 +36,11 @@ describe("AI analysis", () => {
     expect(Math.min(r.outW, r.outH)).toBeGreaterThanOrEqual(320);
     expect(r.sx).toBeGreaterThanOrEqual(0);
     expect(r.sy + r.sh).toBeLessThanOrEqual(640);
+  });
+  it("flags people Kling could mix up", () => {
+    expect(unclearPeople({ people: 2, positions: ["on the right, bald man in a black suit", "on the right"] })).toEqual([1]);
+    expect(unclearPeople({ people: 2, positions: ["in the center, woman in red", "in the center, woman in red"] })).toEqual([0, 1]);
+    expect(unclearPeople({ people: 2, positions: ["on the left, woman in red dress", "on the right, man in a white shirt"] })).toEqual([]);
+    expect(unclearPeople({ people: 1, positions: [""] })).toEqual([]);
   });
 });

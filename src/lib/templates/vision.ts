@@ -38,7 +38,7 @@ const promptFor = (kinds: string[]) => `These are frames, in time order, from on
 List the people who are clearly visible and important in the video (ignore tiny background passers-by), ordered from left to right as they mainly appear. At most ${SEEDANCE_MAX_PEOPLE}.
 For each person give:
 - where: short English position, e.g. "on the left", "in the center", "on the right", "in the foreground", "in the background". Use "" if there is only one person.
-- look: short English description that tells this person apart in every frame: gender, approximate age, clothing and color, hair, what they hold or do. Max 12 words. No names.
+- look: short English description that tells this person apart in every frame: gender, approximate age, clothing and color, hair, what they hold or do. Max 12 words. No names. It must differ from every other person's look, and "where" must differ too when they stand in different places.
 - ru: the same position and description in Russian, for the admin.
 - frame: the 0-based index of the frame where this person is seen best (large, face visible).
 - box: [ymin, xmin, ymax, xmax] of this person in that frame, from 0 to 1000 (head to at least the waist).

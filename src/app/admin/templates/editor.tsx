@@ -11,7 +11,7 @@ import { OBJECT_PRESETS, parseSeedanceConfig, seedanceSlots, SEEDANCE_MAX_OBJECT
 import { calculatePrice, formatKzt } from "@/lib/pricing";
 import { seedancePriceKzt, seedanceCostKzt, klingUnitLabel, SEEDANCE_QUALITY, type SeedancePricing } from "@/lib/pricing-seedance";
 import { FaceMap } from "@/components/face-map";
-import { ANALYSIS_VERSION, applyAnalysis, cutoutRect, faceInCutout, type Box } from "@/lib/templates/analysis";
+import { ANALYSIS_VERSION, applyAnalysis, cutoutRect, faceInCutout, unclearPeople, type Box } from "@/lib/templates/analysis";
 import { aspectAllowed } from "@/lib/custom-video/aspect";
 import { saveTemplate, changeStatus, createUploadUrl, detectTemplateElements } from "./actions";
 import { DeleteTemplateButton } from "./delete-button";
@@ -337,8 +337,9 @@ export function TemplateEditor({
               {sd.analyzedAt && (
                 <div className="mt-4 grid gap-3">
                   <datalist id="kling-positions">{Object.entries(e.seedance.positionOptions).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</datalist>
+                  {unclearPeople(sd).length > 0 && <p className="rounded-xl bg-[#fff1f0] p-2 text-xs font-medium text-danger">{e.seedance.unclearPeople}</p>}
                   {Array.from({ length: sd.people }, (_, i) => (
-                    <div key={`p${i}`} className="grid gap-3 rounded-xl bg-white p-3 ring-1 ring-line sm:grid-cols-[72px_1fr]">
+                    <div key={`p${i}`} className={`grid gap-3 rounded-xl bg-white p-3 ring-1 sm:grid-cols-[72px_1fr] ${unclearPeople(sd).includes(i) ? "ring-danger" : "ring-line"}`}>
                       <Cutout path={sd.targets[i]} mediaBase={mediaBase} label={`${i + 1}`} />
                       <div className="grid gap-2">
                         <span className="text-sm font-semibold">{e.seedance.personN(i + 1)}</span>

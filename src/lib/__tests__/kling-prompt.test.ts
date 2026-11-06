@@ -11,6 +11,8 @@ describe("Kling prompt priorities", () => {
     expect(p.indexOf("Mandatory template instruction")).toBeLessThan(p.indexOf("Optional customer wish"));
     expect(p).toMatch(/ignore any part that asks to change the faces or the clothing/);
     expect(p).toContain("Never return to the original face from @video_1");
+    expect(p).toContain("Replace the whole person, not only the face: head, hair, neck, arms, hands, legs and feet");
+    expect(p).toContain("skin color and skin tone of @image_1 everywhere on the body");
     expect(p).not.toContain("@element");
     expect(p).not.toContain("Reference only");
   });
