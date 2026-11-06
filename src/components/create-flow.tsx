@@ -144,7 +144,8 @@ export function CreateFlow({
     Object.fromEntries(baseSlots.map((s) => [s.key, { phase: "empty" } as SlotState])));
   const available = qualities.filter((q) => q.available);
   const [quality, setQuality] = useState(available[0]?.key ?? "");
-  const [consent, setConsent] = useState(false);
+  // Consent is given by pressing the button (the line above it says so), not by an extra checkbox.
+  const consent = true;
   const [phone, setPhone] = useSavedPhone();
   const needPhone = askPhone && !freeOrders;
   const phoneOk = !needPhone || !!normalizeKzPhone(phone);
@@ -611,10 +612,10 @@ export function CreateFlow({
 
       {(price || waitingForVideo) && (
         <div className={`sticky ${noTabBar ? "bottom-[calc(0.75rem+env(safe-area-inset-bottom))]" : "bottom-[calc(5.25rem+env(safe-area-inset-bottom))]"} z-20 -mx-1 rounded-[28px] border border-line bg-white px-4 pb-2.5 pt-2.5 shadow-[0_16px_40px_-18px_rgba(60,40,20,0.35)] sm:static sm:mx-0 sm:rounded-card sm:p-4`}>
-          <label ref={consentRef} className={`-mx-1 mb-2 flex cursor-pointer items-start gap-2.5 rounded-lg px-1 py-1 text-xs leading-snug transition-colors ${nudge === "consent" ? "bg-peach ring-2 ring-peach" : ""}`}>
-            <input type="checkbox" className="mt-px h-[18px] w-[18px] shrink-0 accent-[#161616]" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-            <span className="text-muted">{customVideo ? cv.consent : kk.consent.combined}</span>
-          </label>
+          <p className="mb-2 text-[11px] leading-snug text-muted">
+            {customVideo ? cv.consentByButton : kk.consent.byButton}{" "}
+            <a href="/terms" target="_blank" rel="noopener" className="underline underline-offset-2">{kk.consent.terms}</a>.
+          </p>
           <div className="flex items-center gap-3">
             <div className="min-w-0 shrink-0">
               <p className="text-xs text-muted">{c.total}</p>

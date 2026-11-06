@@ -17,6 +17,8 @@ import { botUsername } from "@/lib/partners";
 import { env } from "@/lib/env";
 import { Badge, Chips, PageHead, nowMs } from "../ui";
 import { ReanalyzeButton } from "./reanalyze-button";
+import { MultiPeopleToggle } from "./multi-people-toggle";
+import { catalogSettings } from "@/lib/catalog/settings";
 import { unclearPeople } from "@/lib/templates/analysis";
 
 type SP = { s?: string; q?: string; sort?: string };
@@ -32,6 +34,7 @@ export default function TemplatesAdminPage({ searchParams }: { searchParams: Pro
   return (
     <div>
       <PageHead title="Шаблоны" lead="Видео-шаблоны каталога. Статистика — за 30 дней.">
+        <Suspense fallback={null}><MultiPeople /></Suspense>
         <Link href="/admin/categories" className="rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold hover:border-ink">🗂 Категории</Link>
         <Link href="/admin/templates/new" className="rounded-full bg-night px-4 py-2 text-sm font-semibold text-white">+ Новый шаблон</Link>
       </PageHead>
@@ -151,4 +154,9 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
       )}
     </>
   );
+}
+
+async function MultiPeople() {
+  await connection(); // request-time only
+  return <MultiPeopleToggle on={(await catalogSettings()).multiPeople} />;
 }

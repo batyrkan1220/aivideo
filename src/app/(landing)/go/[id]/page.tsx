@@ -82,7 +82,7 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
         {L.title1} <span className="rounded-lg bg-brand px-1.5">{L.titleAccent}</span>
       </h1>
       <p className="mt-2 text-center text-[15px] text-muted">{photo ? L.leadPhoto(t.title, n) : L.lead(t.title, n)}</p>
-      {t.description && <p className="mx-auto mt-3 max-w-sm whitespace-pre-line rounded-2xl bg-surface px-4 py-3 text-center text-sm leading-relaxed ring-1 ring-line">{t.description}</p>}
+      {t.description && <p className="mx-auto mt-2 max-w-sm whitespace-pre-line text-center text-sm leading-relaxed text-muted">{t.description}</p>}
 
       {/* Three trust points */}
       <ul className="mt-4 grid grid-cols-3 gap-2 text-center">

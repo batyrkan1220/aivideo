@@ -14,6 +14,8 @@ export function CreateTabs() {
 }
 
 export function TabsView({ type }: { type: "video" | "photo" }) {
+  // Photos not open yet: no switch with a dead "Скоро" half.
+  if (PHOTOS_SOON) return null;
   return (
     <div className="grid grid-cols-2 gap-1 rounded-full border border-line bg-surface p-1" role="tablist" aria-label={H.title}>
       {(["video", "photo"] as const).map((k) => k === "photo" && PHOTOS_SOON ? (

@@ -39,8 +39,9 @@ export function MobileNav() {
       aria-label={kk.nav.home}
       className="tg-dock fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] z-40 rounded-[2rem] border border-line bg-white shadow-[0_16px_40px_-18px_rgba(60,40,20,0.35)] sm:hidden"
     >
-      <ul className="grid h-[4.25rem] grid-cols-5 items-center px-1">
-        {items.map((it) => {
+      <ul className={`grid h-[4.25rem] items-center px-1 ${items.some((i) => i.soon) ? "grid-cols-4" : "grid-cols-5"}`}>
+        {/* Sections that are not open yet are not shown (a dead "Скоро" tab only takes room). */}
+        {items.filter((i) => !i.soon).map((it) => {
           const on = it.match(path);
           if (it.soon) return (
             <li key={it.href} className="flex justify-center">

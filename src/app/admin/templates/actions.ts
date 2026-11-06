@@ -268,3 +268,18 @@ export async function reanalyzeTemplate(id: string): Promise<{ ok: boolean }> {
   await audit(user.id, "template.reanalyze", "template", id, {});
   return { ok: true };
 }
+
+/** Admin: show or hide templates with 2–3 people (one Kling run per person) to customers. */
+export async function setMultiPeople(on: boolean): Promise<{ ok: boolean }> {
+  const user = await guard("templates.manage");
+  if (!user) return { ok: false };
+  const { CATALOG_KEY } = await import("@/lib/catalog/settings");
+  const { error } = await supabaseAdmin().from("site_settings").upsert({
+    key: CATALOG_KEY, value: { multiPeople: !!on }, updated_by: user.id, updated_at: new Date().toISOString(),
+  });
+  if (error) return { ok: false };
+  await audit(user.id, "catalog.multi_people", "site_settings", null, { on: !!on });
+  clearMemo();
+  revalidatePath("/admin/templates");
+  return { ok: true };
+}

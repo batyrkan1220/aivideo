@@ -1,4 +1,5 @@
 "use server";
+import { catalogSettings } from "@/lib/catalog/settings";
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
 import { imageSize } from "image-size";
@@ -44,6 +45,8 @@ async function loadPublishedVersion(templateId: string) {
   const snap = v.configuration_snapshot as Record<string, unknown>;
   // Catalog video templates are orderable only after the AI analysis (people, cut-outs, scene).
   if (t.kind === "catalog" && snap.provider_key === "seedance" && !(snap.provider_config_json as { analyzedAt?: unknown } | null)?.analyzedAt) return null;
+  // 2–3 people only when the admin switched them on.
+  if (t.kind === "catalog" && Number((snap.provider_config_json as { people?: unknown } | null)?.people ?? 1) > 1 && !(await catalogSettings()).multiPeople) return null;
   const slots = z.array(faceSlotSchema).safeParse(snap.face_slots_json);
   const qualities = z.array(qualitySchema).safeParse(snap.supported_qualities_json);
   const pricing = pricingConfigSchema.safeParse(snap.pricing_config_json);
