@@ -214,6 +214,8 @@ export const kk = {
   auth: {
     loginTitle: "Вход в аккаунт",
     toCatalog: "К трендам",
+    createLoginTitle: "Войдите через Telegram, чтобы создать видео",
+    createLoginText: "Одно нажатие — без почты и пароля. Готовое видео тоже придёт в Telegram.",
     badge: "Вход за пару секунд",
     safeNote: "Только Telegram: без почты и пароля. Мы не пишем вам без спроса.",
     signupTitle: "Регистрация",

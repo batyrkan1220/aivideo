@@ -1,3 +1,4 @@
+import { LoginToCreate } from "@/components/login-to-create";
 import { Suspense } from "react";
 import { connection } from "next/server";
 import { kk } from "@/lib/i18n/kk";
@@ -93,6 +94,7 @@ function common() {
 async function VideoFlow() {
   const [user, s, t, ap] = await Promise.all([getSessionUser(), customVideoSettings(), customFlowTemplate("custom"), seedancePricingSettings()]);
   if (!s.enabled || !t) return <Disabled />;
+  if (!user || isGuestEmail(user.email)) return <LoginToCreate next="/create?type=video" />;
   const c = common();
   return (
     <CreateFlow
@@ -112,6 +114,7 @@ async function VideoFlow() {
 async function PhotoFlow() {
   const [user, s, t] = await Promise.all([getSessionUser(), customVideoSettings(), customFlowTemplate("custom_photo")]);
   if (!t) return <Disabled />;
+  if (!user || isGuestEmail(user.email)) return <LoginToCreate next="/create?type=photo" />;
   const c = common();
   return (
     <CreateFlow

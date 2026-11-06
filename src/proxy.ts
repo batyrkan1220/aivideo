@@ -67,6 +67,12 @@ export async function proxy(request: NextRequest) {
     response.cookies.set("tm_offer", `${ts}.${await sign(ts)}`, { maxAge: 86400, path: "/", sameSite: "lax", secure });
   }
 
+  // Ad landing (/go/…): only there may a visitor order without signing in (a guest account). Signed, 7 days.
+  if (request.nextUrl.pathname.startsWith("/go/")) {
+    const ts = String(Date.now());
+    response.cookies.set("tm_land", `${ts}.${await sign(`land${ts}`)}`, { maxAge: 7 * 86400, path: "/", httpOnly: true, sameSite: "lax", secure });
+  }
+
   // Ad click ids (TikTok ttclid, Meta fbclid): kept so the purchase can be attributed server-side.
   const ttclid = request.nextUrl.searchParams.get("ttclid");
   if (ttclid && /^[A-Za-z0-9._-]{8,300}$/.test(ttclid)) {
@@ -77,7 +83,7 @@ export async function proxy(request: NextRequest) {
     response.cookies.set("_fbc", `fb.1.${Date.now()}.${fbclid}`, { maxAge: 90 * 86400, path: "/", sameSite: "lax", secure: process.env.NODE_ENV === "production" });
   }
   // Cookies set just now must be visible to this very request too (first ad visit: offer, source).
-  const fresh = ["tm_vid", "tm_src", "tm_offer", "tm_ttclid", "_fbc"].filter((n) => response.cookies.get(n) && request.cookies.get(n)?.value !== response.cookies.get(n)?.value);
+  const fresh = ["tm_vid", "tm_src", "tm_offer", "tm_land", "tm_ttclid", "_fbc"].filter((n) => response.cookies.get(n) && request.cookies.get(n)?.value !== response.cookies.get(n)?.value);
   if (fresh.length) {
     for (const n of fresh) request.cookies.set(n, response.cookies.get(n)!.value);
     const out = NextResponse.next({ request });

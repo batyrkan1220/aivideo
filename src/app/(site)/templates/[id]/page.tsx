@@ -1,3 +1,4 @@
+import { LoginToCreate } from "@/components/login-to-create";
 import { TemplateUnavailable } from "@/components/template-unavailable";
 import { Suspense } from "react";
 import Link from "next/link";
@@ -69,6 +70,8 @@ async function CreateSection({ t }: { t: TemplateDetail }) {
   if (!t.priced) {
     return <p className="rounded-card border border-line bg-surface p-5 text-sm text-muted">{kk.template.pricePending}</p>;
   }
+  // On the site a video is made only after a Telegram sign-in (guests come only through the ad landing).
+  if (!user || isGuestEmail(user.email)) return <LoginToCreate next={`/templates/${t.id}`} />;
   const e = env();
   return (
     <CreateFlow
