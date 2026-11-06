@@ -1,18 +1,6 @@
-import { kk } from "@/lib/i18n/kk";
-import { updatePasswordAction } from "../actions";
-import { AuthForm } from "../auth-form";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: kk.auth.resetTitle };
-
-export default function ResetPasswordPage() {
-  return (
-    <>
-      <h1 className="mb-6 font-display text-2xl font-bold">{kk.auth.resetTitle}</h1>
-      <AuthForm
-        action={updatePasswordAction}
-        submitLabel={kk.auth.setPassword}
-        fields={[{ name: "password", label: kk.auth.newPassword, type: "password", autoComplete: "new-password", minLength: 8 }]}
-      />
-    </>
-  );
+/** No email or password on the platform: sign-in is Telegram only. */
+export default function Page() {
+  redirect("/login");
 }
