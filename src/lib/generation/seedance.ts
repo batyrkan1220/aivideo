@@ -2,7 +2,7 @@ import "server-only";
 import { seedanceConfigSchema, SEEDANCE_MAX_OBJECTS, SEEDANCE_MAX_PEOPLE, SEEDANCE_MAX_REFS, SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC } from "@/lib/templates/seedance-config";
 import { seedanceCostUsd } from "@/lib/pricing-seedance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
-import { type GenerationProvider } from "./types";
+import { type GenerationProvider, type ProviderState } from "./types";
 import { buildKlingDirectPrompt, getKlingTask, KLING_MAX_IMAGES, submitKlingOmni } from "./kling";
 import { mediaUrl } from "@/lib/templates/queries";
 
@@ -64,26 +64,42 @@ export const seedanceProvider: GenerationProvider = {
     const declaredPeople = Math.min(SEEDANCE_MAX_PEOPLE, Math.max(1, cfg.people));
     const objects = cfg.objects.slice(0, Math.min(SEEDANCE_MAX_OBJECTS, Math.max(0, photos.length - declaredPeople)));
     const people = Math.min(declaredPeople, Math.max(1, photos.length - objects.length));
-    const resolution = input.quality === "1080p" ? "1080p" : "720p";
+    const resolution: "720p" | "1080p" = input.quality === "1080p" ? "1080p" : "720p";
     // Photos go straight to the video call as reference images, people first, then things.
     const usedPhotos = photos.slice(0, people + objects.length);
     // Optional cut-outs from the template, after the customer's photos, while Kling's 10 images last.
     const cutouts: string[] = [];
-    const targetRefs = Array.from({ length: people + objects.length }, (_, i) => {
-      const url = cfg.showTargets ? mediaUrl(cfg.targets[i]?.trim() || null) : null;
+    const targetPaths = [...cfg.targets.slice(0, people), ...Array(Math.max(0, people - cfg.targets.length)).fill(""), ...objects.map((o) => o.target ?? "")];
+    const targetRefs = targetPaths.map((path) => {
+      const url = cfg.showTargets ? mediaUrl(path?.trim() || null) : null;
       if (!url || usedPhotos.length + cutouts.length >= KLING_MAX_IMAGES) return "";
       cutouts.push(url);
       return `@image_${usedPhotos.length + cutouts.length}`;
     });
     const prompt = buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : "", people, cfg.positions, objects, targetRefs);
-    const providerJobId = await submitKlingOmni({
-      videoUrl: input.templateVideoUrl, photoUrls: [...usedPhotos, ...cutouts], mode: cfg.klingMode,
-      prompt, durationSec, aspectRatio: cfg.aspectRatio, resolution,
-    });
-    return { providerJobId, cost: seedanceCostUsd(durationSec, await seedancePricingSettings(), {}, resolution), state: { stage: "klingd" } };
+    const plain = { videoUrl: input.templateVideoUrl, photoUrls: usedPhotos, mode: cfg.klingMode, durationSec, aspectRatio: cfg.aspectRatio, resolution };
+    const providerJobId = await submitKlingOmni({ ...plain, photoUrls: [...usedPhotos, ...cutouts], prompt });
+    // If Kling refuses the task because of a cut-out (it charges nothing then), the same order goes again without them.
+    const fallback = cutouts.length
+      ? { ...plain, prompt: buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, cfg.allowWish ? cleanWish(extra.wish) : "", people, cfg.positions, objects) }
+      : null;
+    return { providerJobId, cost: seedanceCostUsd(durationSec, await seedancePricingSettings(), {}, resolution), state: { stage: "klingd", ...(fallback ? { fallback } : {}) } };
   },
 
-  getStatus(providerJobId) {
-    return getKlingTask(providerJobId);
+  async getStatus(providerJobId, ctx) {
+    const st = await getKlingTask(providerJobId);
+    const fb = fallbackOf(ctx.state);
+    if (st.state !== "failed" || st.errorCode === "provider_content_rejected" || !fb) return st;
+    console.log("[kling] task", providerJobId, "failed with template cut-outs; sending again without them");
+    const id = await submitKlingOmni(fb);
+    return { state: "processing", next: { providerJobId: id, state: { stage: "klingd" } } };
   },
 };
+
+type Fallback = Parameters<typeof submitKlingOmni>[0];
+function fallbackOf(state: ProviderState): Fallback | null {
+  const f = (state as { fallback?: Partial<Fallback> } | null)?.fallback;
+  if (!f || typeof f.videoUrl !== "string" || !Array.isArray(f.photoUrls) || typeof f.prompt !== "string" || typeof f.durationSec !== "number") return null;
+  return { videoUrl: f.videoUrl, photoUrls: f.photoUrls.filter((u): u is string => typeof u === "string"), prompt: f.prompt, durationSec: f.durationSec,
+    mode: f.mode === "reference" ? "reference" : "edit", aspectRatio: typeof f.aspectRatio === "string" ? f.aspectRatio : "adaptive", resolution: f.resolution === "1080p" ? "1080p" : "720p" };
+}

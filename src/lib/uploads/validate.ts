@@ -4,7 +4,7 @@ export const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 export type PhotoType = (typeof PHOTO_TYPES)[number];
 export const PHOTO_EXT: Record<PhotoType, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 
-export type PhotoError = "bad_type" | "too_large" | "too_small" | "too_big_dimensions" | "unreadable";
+export type PhotoError = "bad_type" | "too_large" | "too_small" | "too_big_dimensions" | "bad_aspect" | "unreadable";
 
 export type PhotoLimits = { maxBytes: number; minDimension: number; maxDimension: number };
 
@@ -17,6 +17,9 @@ export function validatePhotoMeta(
   if (meta.size <= 0 || !meta.width || !meta.height) return "unreadable";
   if (Math.min(meta.width, meta.height) < limits.minDimension) return "too_small";
   if (Math.max(meta.width, meta.height) > limits.maxDimension) return "too_big_dimensions";
+  // Kling takes images between 2:5 and 5:2 only; a longer strip would fail the paid video.
+  const ratio = meta.width / meta.height;
+  if (ratio < 0.4 || ratio > 2.5) return "bad_aspect";
   return null;
 }
 

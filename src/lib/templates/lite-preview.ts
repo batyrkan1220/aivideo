@@ -235,8 +235,10 @@ async function cleanupOrphans() {
     // Cut-outs of template people/things: kept while a template points to them; unsaved ones go after a day.
     const { data: cfgs } = await db.from("templates").select("provider_config_json");
     const targets = new Set((cfgs ?? []).flatMap((r) => {
-      const t = (r.provider_config_json as { targets?: unknown } | null)?.targets;
-      return Array.isArray(t) ? t.filter((x): x is string => typeof x === "string") : [];
+      const c = r.provider_config_json as { targets?: unknown; objects?: { target?: unknown }[] } | null;
+      const people = Array.isArray(c?.targets) ? c.targets : [];
+      const things = Array.isArray(c?.objects) ? c.objects.map((o) => o?.target) : [];
+      return [...people, ...things].filter((x): x is string => typeof x === "string");
     }));
     const { data: cut } = await db.storage.from("template-media").list("targets", { limit: 1000 });
     const dayAgo = Date.now() - 24 * 3600_000;

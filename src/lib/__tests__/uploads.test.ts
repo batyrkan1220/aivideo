@@ -12,6 +12,8 @@ describe("validatePhotoMeta", () => {
     expect(validatePhotoMeta({ contentType: "image/png", size: 11e6, width: 500, height: 500 }, limits)).toBe("too_large");
     expect(validatePhotoMeta({ contentType: "image/png", size: 1e5, width: 200, height: 900 }, limits)).toBe("too_small");
     expect(validatePhotoMeta({ contentType: "image/png", size: 1e5, width: 9000, height: 900 }, limits)).toBe("too_big_dimensions");
+    expect(validatePhotoMeta({ contentType: "image/png", size: 1e5, width: 400, height: 1200 }, limits)).toBe("bad_aspect");
+    expect(validatePhotoMeta({ contentType: "image/png", size: 1e5, width: 1170, height: 2532 }, limits)).toBeNull();
     expect(validatePhotoMeta({ contentType: "image/webp", size: 1e5 }, limits)).toBe("unreadable");
   });
 });

@@ -164,12 +164,14 @@ export function TemplateEditor({
     // The scene note goes into the template prompt; the template is edited (edit mode), so the video stays 1:1.
     const scene = r.scene ? `Keep the video 1:1: ${r.scene}` : "";
     // Cut each one out of its best frame: the customer sees who/what their photo replaces.
-    const found = [...r.people.slice(0, n), ...r.objects.slice(0, objects.length)];
-    const targets = await Promise.all(found.map(async (x) => {
+    const cut = async (x: { frame: number; box: [number, number, number, number] | null }) => {
       const blob = x.box ? await cropFrame(frames[x.frame] ?? frames[0], x.box) : null;
       return blob ? (await uploadTarget(blob)) ?? "" : "";
-    }));
-    setSd({ people: n, positions, objects, targets, klingMode: "edit", ...(scene && !sd.prompt.trim() ? { prompt: scene.slice(0, 1500) } : {}) });
+    };
+    const targets = await Promise.all(r.people.slice(0, n).map(cut));
+    const objectCuts = await Promise.all(r.objects.slice(0, objects.length).map(cut));
+    const withCuts = objects.map((o, j) => (objectCuts[j] ? { ...o, target: objectCuts[j] } : o));
+    setSd({ people: n, positions, objects: withCuts, targets, klingMode: "edit", ...(scene && !sd.prompt.trim() ? { prompt: scene.slice(0, 1500) } : {}) });
     setSceneTip(scene && sd.prompt.trim() ? scene : null);
     const lines = [
       ...r.people.slice(0, n).map((p, i) => `${i + 1}. ${p.ru}`),
@@ -292,7 +294,12 @@ export function TemplateEditor({
       <Section title={e.sections.media}>
         {isPhoto
           ? <PhotoExampleField error={err("cover")} path={t.coverAssetPath} mediaBase={mediaBase} onUploaded={(p) => set("coverAssetPath", p)} />
-          : <VideoField error={err("preview")} path={t.previewVideoPath} mediaBase={mediaBase} onUploaded={(p, meta) => { set("previewVideoPath", p); setDuration(meta?.duration ?? null); setAspect(meta?.aspect ?? null); void detectPeople(p); }} onCover={(p) => set("coverAssetPath", p)} />}
+          : <VideoField error={err("preview")} path={t.previewVideoPath} mediaBase={mediaBase} onUploaded={(p, meta) => {
+              set("previewVideoPath", p); setDuration(meta?.duration ?? null); setAspect(meta?.aspect ?? null);
+              // Cut-outs belong to the old video.
+              setSd({ targets: [], objects: sd.objects.map(({ target: _t, ...o }) => o), showTargets: false });
+              void detectPeople(p);
+            }} onCover={(p) => set("coverAssetPath", p)} />}
       </Section>
 
       {isPhoto ? (
@@ -363,14 +370,14 @@ export function TemplateEditor({
                 {ai.busy ? e.seedance.aiBusy : e.seedance.aiDetect}
               </button>
               {ai.text && <span className={`mt-1 block text-xs font-medium ${ai.err ? "text-danger" : ""}`}>{ai.text}</span>}
-              {sd.targets.some(Boolean) && (
+              {(sd.targets.some(Boolean) || sd.objects.some((o) => o.target)) && (
                 <span className="mt-2 block text-xs">
                   <label className="inline-flex items-center gap-2 font-medium">
                     <input type="checkbox" checked={sd.showTargets} onChange={(ev) => setSd({ showTargets: ev.target.checked })} />
                     {e.seedance.showTargets}
                   </label>
                   <span className="block text-muted">{e.seedance.showTargetsHint}</span>
-                  <button type="button" onClick={() => setSd({ targets: [], showTargets: false })} className="mt-1 font-semibold text-muted underline hover:text-danger">{e.seedance.clearTargets}</button>
+                  <button type="button" onClick={() => setSd({ targets: [], objects: sd.objects.map(({ target: _t, ...o }) => o), showTargets: false })} className="mt-1 font-semibold text-muted underline hover:text-danger">{e.seedance.clearTargets}</button>
                 </span>
               )}
             </Field>
@@ -607,7 +614,7 @@ async function captureCover(source: File | string, maxWidth = 540): Promise<Blob
   }
 }
 
-/** Cut-out of a template person or thing (box in 0–1000 of the frame), with some room around it, ≤480 px. */
+/** Cut-out of a template person or thing (box in 0–1000 of the frame): 1:2–2:1, 320–720 px. */
 async function cropFrame(b64: string, box: [number, number, number, number]): Promise<Blob | null> {
   try {
     const img = new Image();
@@ -615,11 +622,16 @@ async function cropFrame(b64: string, box: [number, number, number, number]): Pr
     await img.decode();
     const W = img.naturalWidth, H = img.naturalHeight;
     const [y0, x0, y1, x1] = box.map((v) => v / 1000);
-    const padX = (x1 - x0) * 0.15, padY = (y1 - y0) * 0.1;
-    const sx = Math.max(0, (x0 - padX) * W), sy = Math.max(0, (y0 - padY) * H);
-    const sw = Math.min(W, (x1 + padX) * W) - sx, sh = Math.min(H, (y1 + padY) * H) - sy;
-    if (sw < 24 || sh < 24) return null;
-    const k = Math.min(1, 480 / Math.max(sw, sh));
+    // Some room around it, then widen or heighten to between 1:2 and 2:1 (Kling takes 2:5–5:2 only).
+    let cx = ((x0 + x1) / 2) * W, cy = ((y0 + y1) / 2) * H;
+    let w = (x1 - x0) * W * 1.3, h = (y1 - y0) * H * 1.2;
+    if (w < 24 || h < 24) return null;
+    if (h > w * 2) w = h / 2; else if (w > h * 2) h = w / 2;
+    w = Math.min(w, W); h = Math.min(h, H);
+    cx = Math.min(Math.max(cx, w / 2), W - w / 2); cy = Math.min(Math.max(cy, h / 2), H - h / 2);
+    const sx = cx - w / 2, sy = cy - h / 2, sw = w, sh = h;
+    // Kling wants at least 300 px on each side: small cut-outs are scaled up, large ones down to 720.
+    const k = Math.min(720 / Math.max(sw, sh), Math.max(1, 320 / Math.min(sw, sh)));
     const c = document.createElement("canvas");
     c.width = Math.round(sw * k); c.height = Math.round(sh * k);
     c.getContext("2d")?.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
@@ -803,7 +815,7 @@ async function videoFrames(url: string): Promise<string[] | null> {
       out.push(c.toDataURL("image/jpeg", 0.72).split(",")[1] ?? "");
     }
     const frames = out.filter(Boolean);
-    while (frames.length > 3 && frames.reduce((n, f) => n + f.length, 0) > 900_000) frames.splice(Math.floor(frames.length / 2), 1);
+    while (frames.length > 3 && frames.reduce((n, f) => n + f.length, 0) > 800_000) frames.splice(Math.floor(frames.length / 2), 1);
     return frames;
   } catch {
     return null;

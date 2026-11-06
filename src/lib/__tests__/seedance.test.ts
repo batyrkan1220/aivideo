@@ -100,6 +100,45 @@ describe("provider (Kling official API)", () => {
     vi.unstubAllGlobals();
   });
 
+  it("a thing's cut-out stays with the thing, even with fewer people cut out", async () => {
+    const group = [
+      { slotKey: "face_1", providerInput: "img_1", imageUrl: "https://s/1.jpg" },
+      { slotKey: "obj_1", providerInput: "img_2", imageUrl: "https://s/car.jpg" },
+    ];
+    let body: { contents: { type: string; url?: string; text?: string }[] } | null = null;
+    vi.stubGlobal("fetch", vi.fn(async (_u: string, init?: RequestInit) => {
+      body = JSON.parse(String(init?.body));
+      return new Response(JSON.stringify({ code: 0, data: { id: "kt-4" } }), { status: 200 });
+    }));
+    await seedanceProvider.submit({ jobId: "j", ...base, faces: group, config: {
+      durationSec: 8, showTargets: true, targets: [], objects: [{ what: "car", label: "Фото машины", target: "targets/car.jpg" }],
+    } });
+    const urls = body!.contents.filter((c) => c.type === "refer_image").map((c) => c.url);
+    expect(urls).toEqual(["https://s/1.jpg", "https://s/car.jpg", "https://sb.test/storage/v1/object/public/template-media/targets/car.jpg"]);
+    expect(body!.contents[0].text).toContain("Replace the car shown in @image_3");
+    expect(body!.contents[0].text).not.toContain("main person shown");
+    vi.unstubAllGlobals();
+  });
+
+  it("a task refused because of a cut-out goes again without it", async () => {
+    const bodies: { contents: { type: string; url?: string; text?: string }[] }[] = [];
+    const replies = [
+      { code: 0, data: { id: "kt-5" } },
+      { code: 0, data: [{ id: "kt-5", status: "failed", message: "Image pixel is invalid" }] },
+      { code: 0, data: { id: "kt-6" } },
+    ];
+    vi.stubGlobal("fetch", vi.fn(async (_u: string, init?: RequestInit) => {
+      if (init?.body) bodies.push(JSON.parse(String(init.body)));
+      return new Response(JSON.stringify(replies.shift()), { status: 200 });
+    }));
+    const r = await seedanceProvider.submit({ jobId: "j", ...base, faces, config: { durationSec: 8, targets: ["targets/a.jpg"], showTargets: true } });
+    const st = await seedanceProvider.getStatus("kt-5", { startedAt: null, state: r.state ?? null });
+    expect(st).toMatchObject({ state: "processing", next: { providerJobId: "kt-6", state: { stage: "klingd" } } });
+    expect(bodies[1].contents.filter((c) => c.type === "refer_image").map((c) => c.url)).toEqual(["https://s/1.jpg"]);
+    expect(bodies[1].contents[0].text).not.toContain("cut-out");
+    vi.unstubAllGlobals();
+  });
+
   it("maps errors (auth / no balance sent as 429 / busy)", async () => {
     for (const [status, msg, code, retry] of [
       [401, "bad key", "provider_auth", false],
@@ -137,7 +176,7 @@ describe("provider (Kling official API)", () => {
     const text = body.contents[0].text!;
     expect(text).toContain("Use the clothing of the people in @image_1, @image_2");
     expect(text).toContain("@image_3 is a photo of a car, not a person");
-    expect(text).toContain("do not swap, blend or mix their faces");
+    expect(text).toContain("@image_1, @image_2 are 2 different people");
     vi.unstubAllGlobals();
   });
 });

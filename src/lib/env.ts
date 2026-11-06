@@ -34,7 +34,8 @@ const schema = z.object({
   GEMINI_MODEL: z.string().trim().min(3).max(60).default("gemini-3.6-flash"),
   REPLICATE_API_TOKEN: z.string().transform((v) => v.trim().replace(/^["']|["']$/g, "").trim()).pipe(z.string().min(10)).optional(),
   UPLOAD_MAX_BYTES: z.coerce.number().int().positive().default(10 * 1024 * 1024),
-  UPLOAD_MIN_DIMENSION: z.coerce.number().int().positive().default(256),
+  // Kling refuses images under 300 px ("Image pixel is invalid").
+  UPLOAD_MIN_DIMENSION: z.coerce.number().int().positive().default(300),
   UPLOAD_MAX_DIMENSION: z.coerce.number().int().positive().default(8192),
   UPLOAD_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
   VIDEO_RETENTION_DAYS: z.coerce.number().int().positive().default(30),

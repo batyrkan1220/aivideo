@@ -29,6 +29,8 @@ export const objectSchema = z.object({
   label: z.string().trim().min(1).max(40),
   /** Optional: which one in the video and how it looks, in English ("the white sedan on the right"). */
   look: z.string().trim().max(120).optional(),
+  /** Optional cut-out of this thing from the template video (storage path). */
+  target: z.string().trim().max(300).optional(),
 });
 export type SwapObject = z.infer<typeof objectSchema>;
 export const SEEDANCE_MIN_SEC = 3;
@@ -55,8 +57,8 @@ export const seedanceConfigSchema = z.object({
   positions: z.array(z.string().trim().max(120)).max(5).default([]),
   /** Things in the video to replace with the customer's photos (after the people). */
   objects: z.array(objectSchema).max(SEEDANCE_MAX_OBJECTS).catch([]).default([]),
-  /** Cut-outs of each person, then each thing, from the template video (storage paths), shown next to the customer's upload slots. */
-  targets: z.array(z.string().trim().max(300)).max(SEEDANCE_MAX_PEOPLE + SEEDANCE_MAX_OBJECTS).catch([]).default([]),
+  /** Cut-out of each person from the template video (storage paths, same order as people), shown next to the customer's upload slots. Things keep theirs on the object. */
+  targets: z.array(z.string().trim().max(300)).max(SEEDANCE_MAX_PEOPLE).catch([]).default([]),
   /** Also send those cut-outs to Kling, so it sees which one to replace. */
   showTargets: z.boolean().catch(false).default(false),
 });
@@ -94,7 +96,7 @@ export function seedanceSlots(n: number, keyPrefix = "face_", labels: string[] =
     providerInput: `img_${n + j + 1}`,
     order: n + j,
     kind: "object" as const,
-    ...target(n + j),
+    ...(o.target?.trim() ? { previewImagePath: o.target.trim() } : {}),
   }));
   return [...people, ...things];
 }
