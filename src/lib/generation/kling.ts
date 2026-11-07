@@ -52,15 +52,35 @@ export type KlingMode = "edit" | "reference";
  * note describes the whole video, so it is left out (Kling put scenes from it into the wrong shot,
  * TM-100039), and a person may be missing from a shot: then the shot stays as it is.
  */
+/**
+ * Where a person is and what they wear, from the analysis ("on the left, woman in black top and shorts
+ * with long dark hair"), without the original person's own looks: hair, beard, face, age. Kling read
+ * "long dark hair" as part of the person to keep, and the girl did not look like her photo even in the
+ * first run (TM-100041); the clothing and the place are enough to find her.
+ */
+export function findBy(pos?: string): string {
+  let t = ` ${(pos ?? "").trim()} `;
+  if (!t.trim()) return "";
+  const hairy = "(hair|beard|mustache|moustache|ponytail|braids?|bun|glasses|tattoos?|freckles|makeup|eyes|skin)";
+  // "with long dark hair", "with beard and short hair" (up to the next comma or "wearing / in / holding …")
+  t = t.replace(new RegExp(`\\bwith\\b(?:(?!,|\\bwearing\\b|\\bholding\\b|\\bin\\b).)*?\\b${hairy}\\b((?:\\s+and\\s+\\w+)*\\s+${hairy}\\b)?`, "gi"), " ");
+  // "short dark hair", "a beard" left on their own
+  t = t.replace(new RegExp(`\\b(?:and\\s+)?(?:(?:short|long|dark|light|blonde?|brown|black|red|grey|gray|wet|curly|wavy|straight|thick)\\s+)*${hairy}\\b`, "gi"), " ");
+  // the person's own looks and age
+  t = t.replace(/\b(bald|bearded|young|old|elderly|teenage|middle-aged|blonde?|brunette|redhead|[a-z]+-haired)\b/gi, " ");
+  return t.split(",").map((p) => p.replace(/\s+/g, " ").replace(/^(and|with|a|an)\s+|\s+(and|with)$/gi, "").trim()).filter(Boolean).join(", ");
+}
+
 export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "template", adminPrompt: string, wish: string, people = 1, positions: string[] = [], objects: { what: string; look?: string }[] = [], targetRefs: string[] = [], shot = false): string {
   // Optional cut-outs from the template (@image_k) that show which person or thing is meant: people first, then things.
   const shown = (i: number) => (targetRefs[i] ? ` shown in ${targetRefs[i]}` : "");
   const refs = Array.from({ length: people }, (_, i) => `@image_${i + 1}`);
   const things = objects.map((o, j) => ({ what: o.what.trim().toLowerCase(), look: o.look?.trim() ?? "", ref: `@image_${people + j + 1}`, shown: shown(people + j) }));
   const outfitRef = things.find((t) => ["outfit", "clothes", "clothing"].includes(t.what))?.ref;
-  const spot = (i: number) => `${positions[i]?.trim() || `number ${i + 1} from the left`}${shown(i)}`;
+  const spot = (i: number) => `${findBy(positions[i]) || `number ${i + 1} from the left`}${shown(i)}`;
   const who = people === 1
-    ? `Replace ${positions[0]?.trim() ? `the person ${positions[0].trim()}` : "the main person"}${shown(0)} in @video_1 with the person from @image_1.`
+    ? `Replace ${findBy(positions[0]) ? `the person ${findBy(positions[0])}` : "the main person"}${shown(0)} in @video_1 with the person from @image_1. ` +
+      "That description only tells which person in @video_1 to replace; their face, hair and body all become the person from @image_1."
     : [
         `There are ${people} people to replace in @video_1. Replace every one of them, in every frame:`,
         ...refs.map((r, i) => `- The person ${spot(i)} becomes the person from ${r}.`),

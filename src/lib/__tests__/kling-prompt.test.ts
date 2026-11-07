@@ -107,3 +107,16 @@ describe("prompt for one shot of a cut template", () => {
     expect(p).toContain("Do not return @video_1 unchanged");
   });
 });
+
+import { findBy } from "@/lib/generation/kling";
+describe("findBy: where and what they wear, not the original person's looks", () => {
+  it.each([
+    ["on the left, woman in black top and shorts with long dark hair", "on the left, woman in black top and shorts"],
+    ["on the right, man with beard and short hair wearing white shirt", "on the right, man wearing white shirt"],
+    ["on the right, bald, bearded man in black suit crying while driving", "on the right, man in black suit crying while driving"],
+    ["in the center, young woman with long blonde hair wearing a bright red outfit", "in the center, woman wearing a bright red outfit"],
+    ["in the center, woman in white tank top in bathroom doing hair and makeup", "in the center, woman in white tank top in bathroom doing"],
+    ["on the left", "on the left"],
+    ["", ""],
+  ])("%s", (inp, out) => expect(findBy(inp)).toBe(out));
+});
