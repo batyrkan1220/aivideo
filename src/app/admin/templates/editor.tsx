@@ -130,6 +130,8 @@ export function TemplateEditor({
   const [ai, setAi] = useState<{ busy: boolean; text?: string; err?: boolean; found?: string[] }>({ busy: false });
   // The prompt already had text: the scene note is offered, not written over it.
   const [sceneTip, setSceneTip] = useState<string | null>(null);
+  // AI name/text when the admin had already typed one: offered with a button, not written over it.
+  const [aiText, setAiText] = useState<{ title?: string; description?: string }>({});
   const analyze = async () => {
     if (!t.previewVideoPath) return;
     setAi({ busy: true });
@@ -153,6 +155,10 @@ export function TemplateEditor({
     // Name and text for customers from the AI, only where the admin left them empty.
     if (!t.titleKk.trim() && r.title) set("titleKk", r.title);
     if (!t.descriptionKk.trim() && r.description) set("descriptionKk", r.description);
+    setAiText({
+      title: t.titleKk.trim() && r.title && r.title !== t.titleKk.trim() ? r.title : undefined,
+      description: t.descriptionKk.trim() && r.description && r.description !== t.descriptionKk.trim() ? r.description : undefined,
+    });
     const scene = r.scene ? `Keep the video 1:1: ${r.scene}` : "";
     setSceneTip(scene && sd.prompt.trim() ? scene : null);
     setAi({ busy: false, text: r.people.length || r.objects.length ? e.seedance.aiDone : e.seedance.detectNone, found: [...r.people.map((x) => x.ru), ...r.objects.map((x) => x.ru)] });
@@ -246,9 +252,23 @@ export function TemplateEditor({
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={e.title} field="titleKk" required error={err("titleKk")} className="sm:col-span-2">
             <input className={inputCls(err("titleKk"))} aria-invalid={!!err("titleKk")} value={t.titleKk} maxLength={120} onChange={(ev) => set("titleKk", ev.target.value)} />
+            {aiText.title && (
+              <p className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted">
+                <span>✨ ИИ предлагает: «{aiText.title}»</span>
+                <button type="button" className="rounded-full border border-line px-2.5 py-0.5 font-semibold text-ink hover:border-ink"
+                  onClick={() => { set("titleKk", aiText.title!); setAiText((x) => ({ ...x, title: undefined })); }}>Поставить</button>
+              </p>
+            )}
           </Field>
           <Field label={e.description} field="descriptionKk" error={err("descriptionKk")} className="sm:col-span-2">
             <textarea className={`${inputCls(err("descriptionKk"))} min-h-24`} value={t.descriptionKk} maxLength={1000} onChange={(ev) => set("descriptionKk", ev.target.value)} />
+            {aiText.description && (
+              <p className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted">
+                <span>✨ ИИ предлагает: «{aiText.description}»</span>
+                <button type="button" className="rounded-full border border-line px-2.5 py-0.5 font-semibold text-ink hover:border-ink"
+                  onClick={() => { set("descriptionKk", aiText.description!); setAiText((x) => ({ ...x, description: undefined })); }}>Поставить</button>
+              </p>
+            )}
           </Field>
           <Field label={e.category}>
             <select className={inputCls()} value={t.categoryId ?? ""} onChange={(ev) => set("categoryId", ev.target.value || null)}>
