@@ -17,7 +17,7 @@ import { PaymentProviderNotConfigured } from "./types";
 import { allow } from "@/lib/security/rate-limit";
 import { normalizeKzPhone } from "./phone";
 
-export type CheckoutState = { error?: "unauthorized" | "not_payable" | "price_changed" | "provider_unavailable" | "rate_limited" | "phone_invalid" | "generic" };
+export type CheckoutState = { error?: "unauthorized" | "not_payable" | "price_changed" | "provider_unavailable" | "rate_limited" | "phone_invalid" | "generation_busy" | "generic" };
 
 
 /**
@@ -54,6 +54,13 @@ export async function startCheckout(_: CheckoutState, fd: FormData): Promise<Che
   if (recomputed !== o.amount_kzt || o.currency !== "KZT") {
     console.error("[checkout] amount mismatch", o.id, recomputed, o.amount_kzt);
     return { error: "price_changed" };
+  }
+
+  // No payment for a video Kling cannot make now (not enough units in the Kling packs).
+  if (snap.provider_key === "seedance") {
+    const { klingCanTake } = await import("@/lib/generation/kling-capacity");
+    const cap = await klingCanTake(snap as never).catch(() => ({ ok: true }));
+    if (!cap.ok) return { error: "generation_busy" };
   }
 
   const provider = activePaymentProvider();
