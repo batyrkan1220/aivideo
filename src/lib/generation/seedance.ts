@@ -3,7 +3,7 @@ import { seedanceConfigSchema, SEEDANCE_MAX_OBJECTS, SEEDANCE_MAX_PEOPLE, SEEDAN
 import { seedanceCostUsd } from "@/lib/pricing-seedance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { ProviderError, type GenerationProvider, type ProviderState } from "./types";
-import { buildKlingDirectPrompt, getKlingTask, KLING_MAX_IMAGES, submitKlingOmni } from "./kling";
+import { buildKlingDirectPrompt, findBy, getKlingTask, KLING_MAX_IMAGES, submitKlingOmni } from "./kling";
 import { mediaUrl } from "@/lib/templates/queries";
 import { klingShotSec } from "@/lib/media/scene-plan";
 import { supabaseAdmin } from "@/lib/supabase/server";
@@ -88,14 +88,22 @@ export const seedanceProvider: GenerationProvider = {
       const objectPhotos = usedPhotos.slice(people);
       const passesFor = (shot: boolean): Pass[] => Array.from({ length: people }, (_, k) => {
         const last = k === people - 1;
-        const where = cfg.positions[k]?.trim() || `number ${k + 1} from the left`;
+        // A place shared with someone replaced before ("on the right" twice, TM-100042: the woman was
+        // never replaced) or no place at all: name this one as the person not replaced yet.
+        const mine = findBy(cfg.positions[k]).toLowerCase();
+        const place = (t: string) => findBy(t).toLowerCase().split(",")[0].trim();
+        const clash = !mine || Array.from({ length: k }, (_, j) => findBy(cfg.positions[j]).toLowerCase())
+          .some((o) => o === mine || (!mine.includes(",") && place(o) === mine));
+        const where = clash
+          ? `who has not been replaced yet${mine ? ` (${mine})` : ""} — not the person already replaced in an earlier step`
+          : cfg.positions[k]?.trim() || `number ${k + 1} from the left`;
         return {
           photoUrls: [usedPhotos[k], ...(last ? objectPhotos : [])],
           prompt: buildKlingDirectPrompt("edit", outfit, cfg.prompt, last ? wish : "", 1, [where], last ? objects : [], [], shot),
           who: cfg.positions[k]?.trim() || "",
           person: k,
           // The people replaced in earlier runs: their photos go along (see withKeep).
-          keep: Array.from({ length: k }, (_, j) => ({ person: j, url: usedPhotos[j], where: cfg.positions[j]?.trim() || `number ${j + 1} from the left` })),
+          keep: Array.from({ length: k }, (_, j) => ({ person: j, url: usedPhotos[j], where: findBy(cfg.positions[j]) || `number ${j + 1} from the left` })),
         };
       });
       const passes = passesFor(false);

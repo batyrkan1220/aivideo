@@ -302,3 +302,23 @@ describe("shot helpers", () => {
     expect(pickAnchor([{ len: 3, runs: [] }])).toBeNull();
   });
 });
+
+describe("two people in the same place (TM-100042)", () => {
+  it("the second run names the person not replaced yet, and keeps the first", async () => {
+    const bodies: { contents: { type: string; url?: string; text?: string }[] }[] = [];
+    const replies = [{ code: 0, data: { id: "m1" } }, { code: 0, data: [{ status: "succeeded", outputs: [{ type: "video", url: "https://k/m1.mp4" }] }] }, { code: 0, data: { id: "m2" } }];
+    vi.stubGlobal("fetch", vi.fn(async (_u: string, init?: RequestInit) => {
+      if (init?.body) bodies.push(JSON.parse(String(init.body)));
+      return new Response(JSON.stringify(replies.shift()), { status: 200 });
+    }));
+    const faces = [{ slotKey: "face_1", providerInput: "img_1", imageUrl: "https://s/man.jpg" }, { slotKey: "face_2", providerInput: "img_2", imageUrl: "https://s/woman.jpg" }];
+    const r = await seedanceProvider.submit({ jobId: "jt", templateVideoUrl: "https://t/v.mp4", templateFrameUrl: null, quality: "720p", faces,
+      config: { durationSec: 12, people: 2, positions: ["on the right, bald, bearded man in black suit crying while driving", "on the right"] } });
+    await seedanceProvider.getStatus("m1", { startedAt: null, state: r.state ?? null });
+    const second = bodies[1].contents[0].text ?? "";
+    expect(second).toContain("Replace the person who has not been replaced yet (on the right) — not the person already replaced in an earlier step in @video_1 with the person from @image_1.");
+    expect(second).toContain("@image_2 is the person on the right, man in black suit crying while driving, already replaced");
+    vi.unstubAllGlobals();
+  });
+});
+
