@@ -6,7 +6,7 @@
 */
 const STATIC = "tm-static-v1";
 const IMAGES = "tm-img-v1";
-const KEEP = [STATIC, IMAGES];
+const KEEP = [STATIC, IMAGES, "tm-video-v1"]; // tm-video-v1: hero videos kept by the page itself
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => {

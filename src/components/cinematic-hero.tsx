@@ -22,30 +22,36 @@ export function CinematicHero({ stack, newVideoHref }: { stack: React.ReactNode;
       <Atmosphere />
       {/* Phones and tablets: one centred column (text, then the cards).
           Desktop: two columns that fit the first screen: text and actions on the left, cards on the right. */}
-      <div className="mx-auto grid max-w-6xl items-center gap-4 px-4 pb-2 pt-6 sm:px-6 md:pb-10 md:pt-16 lg:min-h-[min(calc(100svh-4rem),46rem)] lg:grid-cols-[1.08fr_0.92fr] lg:gap-10 lg:px-8 lg:py-10">
+      <div className="mx-auto grid max-w-6xl items-center gap-4 px-4 pb-2 pt-5 sm:px-6 md:pb-10 md:pt-16 lg:min-h-[min(calc(100svh-4rem),46rem)] lg:grid-cols-[1.08fr_0.92fr] lg:gap-10 lg:px-8 lg:py-10">
         <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
           <span style={delay(0)} className="hero-rise inline-flex items-center gap-2 rounded-full border border-line bg-surface/80 px-3 py-1.5 text-xs font-medium text-muted backdrop-blur-xl sm:text-[13px]">
             <span className="hero-blink h-1.5 w-1.5 rounded-full bg-ink" aria-hidden />
             {h.hxBadge}
           </span>
 
-          <h1 className="mt-4 max-w-4xl text-[1.9rem] leading-[1.12] text-ink sm:text-5xl md:mt-6 lg:text-[3.6rem] lg:leading-[1.06] xl:text-[4rem]">
+          <h1 className="mt-3.5 max-w-4xl text-[clamp(1.75rem,8.2vw,2.15rem)] leading-[1.12] text-ink sm:text-5xl md:mt-6 lg:text-[3.6rem] lg:leading-[1.06] xl:text-[4rem]">
             <span style={delay(80)} className="hero-rise block">{h.hxLine1} {h.hxLine2a}</span>
             <span style={delay(160)} className="hero-rise block">
               <span className="font-accent">{h.hxAccent}</span>{" "}{h.hxLine2b}
             </span>
           </h1>
 
-          <p style={delay(260)} className="hero-rise mt-4 max-w-xl text-[15px] leading-[1.6] text-muted sm:text-base md:mt-6 md:text-lg">{h.hxLead}</p>
+          <p style={delay(260)} className="hero-rise mt-3 max-w-[22rem] text-[15px] leading-[1.55] text-muted sm:max-w-xl sm:text-base md:mt-6 md:text-lg">{h.hxLead}</p>
 
-          <div style={delay(340)} className="hero-rise mt-5 flex flex-wrap items-center justify-center gap-2.5 md:mt-8 md:gap-3 lg:justify-start">
-            <Link href={newVideoHref} className="cta-neon inline-flex h-11 items-center gap-2 rounded-xl bg-ink px-5 text-[15px] font-semibold text-paper shadow-[0_12px_28px_-14px_rgb(0_0_0/0.6)] sm:h-12 sm:px-6">
+          <div style={delay(340)} className="hero-rise mt-5 grid w-full max-w-sm grid-cols-2 gap-2 sm:flex sm:w-auto sm:max-w-none sm:flex-wrap sm:items-center sm:justify-center sm:gap-2.5 md:mt-8 md:gap-3 lg:justify-start">
+            <Link href={newVideoHref} className="cta-neon inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-ink px-3 text-[15px] font-semibold text-paper shadow-[0_12px_28px_-14px_rgb(0_0_0/0.6)] sm:px-6">
               <Sparkles size={17} strokeWidth={2.2} aria-hidden />{kk.nav.createOwn}
             </Link>
-            <a href="#templates" className="inline-flex h-11 items-center gap-2 rounded-xl border border-line-strong bg-surface px-5 text-[15px] font-semibold text-ink transition-[background-color,border-color,transform] duration-300 hover:border-ink active:scale-[0.98] sm:h-12 sm:px-6">
+            <a href="#templates" className="inline-flex h-12 items-center justify-center gap-1.5 rounded-xl border border-line-strong bg-surface px-3 text-[15px] font-semibold text-ink transition-[background-color,border-color,transform] duration-300 hover:border-ink active:scale-[0.98] sm:gap-2 sm:px-6">
               {h.hxPick}<ArrowRight size={16} aria-hidden />
             </a>
           </div>
+
+          <p style={delay(400)} className="hero-rise mt-3 flex items-center justify-center gap-2 text-[12px] font-medium text-muted lg:hidden">
+            {h.hxData.map((d, i) => (
+              <span key={d.k} className="inline-flex items-center gap-2">{i > 0 && <span className="h-1 w-1 rounded-full bg-line-strong" aria-hidden />}{d.v}</span>
+            ))}
+          </p>
 
           <dl style={delay(420)} className="hero-rise mt-8 hidden w-full max-w-xl grid-cols-3 gap-3 lg:mt-10 lg:grid">
             {h.hxData.map((d) => (

@@ -32,6 +32,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ru" className="h-full antialiased" suppressHydrationWarning>
       <head>
+        {/* Covers and videos come from Supabase Storage: open the connection before they are needed. */}
+        {process.env.NEXT_PUBLIC_SUPABASE_URL && <link rel="preconnect" href={process.env.NEXT_PUBLIC_SUPABASE_URL} crossOrigin="" />}
+        {process.env.NEXT_PUBLIC_SUPABASE_URL && <link rel="dns-prefetch" href={process.env.NEXT_PUBLIC_SUPABASE_URL} />}
         {/* Mark the Telegram Mini App before the first paint, so it opens straight in the phone layout. */}
         <script dangerouslySetInnerHTML={{ __html: `try{if(location.hash.indexOf("tgWebAppData")>-1||sessionStorage.getItem("trendme.tgInitData"))document.documentElement.dataset.tg="1"}catch(e){}` }} />
       </head>
