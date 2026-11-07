@@ -500,13 +500,32 @@ export function CreateFlow({
             <SinglePhoto slot={slots[0]} st={state[slots[0].key] ?? EMPTY} onPick={(f) => pickPhoto(slots[0], f)} onRemove={() => onRemove(slots[0])} />
           </div>
         ) : (
-          <ol className={`mt-3 grid gap-3 ${gridCols} ${slots.length > 3 ? "sm:grid-cols-4" : ""}`}>
-            {slots.map((s, i) => (
-              <li key={s.key}>
-                <SlotCard index={i} slot={s} st={state[s.key] ?? EMPTY} mediaBase={`${supabaseUrl}/storage/v1/object/public/template-media`} onPick={(f) => pickPhoto(s, f)} onRemove={() => onRemove(s)} />
-              </li>
-            ))}
-          </ol>
+          <>
+            {/* What each photo replaces, in one row above the boxes: inside a box it pushed that box
+                down and the boxes no longer lined up (a car with 3 photos). */}
+            {slots.some((s) => s.previewImagePath) && (
+              <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl bg-paper p-3">
+                <span className="text-xs leading-tight text-muted">
+                  {slots.some((s) => s.previewImagePath && s.kind !== "object") ? kk.upload.replacesPerson : kk.upload.replacesThing}
+                </span>
+                {slots.map((s, i) => s.previewImagePath && (
+                  <figure key={s.key} className="flex items-center gap-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={slotPreviewSrc(s.previewImagePath, `${supabaseUrl}/storage/v1/object/public/template-media`)!} alt={kk.upload.personInVideo(i + 1)}
+                      className="h-16 w-12 rounded-lg border border-line object-cover" />
+                    <figcaption className="max-w-24 text-xs font-medium leading-tight">{s.labelKk.split(" — ")[0]}</figcaption>
+                  </figure>
+                ))}
+              </div>
+            )}
+            <ol className={`mt-3 grid items-start gap-3 ${gridCols} ${slots.length > 3 ? "sm:grid-cols-4" : ""}`}>
+              {slots.map((s, i) => (
+                <li key={s.key}>
+                  <SlotCard index={i} slot={{ ...s, previewImagePath: undefined }} st={state[s.key] ?? EMPTY} mediaBase={`${supabaseUrl}/storage/v1/object/public/template-media`} onPick={(f) => pickPhoto(s, f)} onRemove={() => onRemove(s)} />
+                </li>
+              ))}
+            </ol>
+          </>
         )}
       </section>
 
