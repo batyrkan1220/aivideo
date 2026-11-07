@@ -52,8 +52,8 @@
   --color-info: #1e40af;
   --color-info-soft: #e6edff;
 
-  --font-sans: "Inter Variable", system-ui, sans-serif;
-  --font-display: "Unbounded Variable", "Inter Variable", system-ui, sans-serif;
+  --font-sans: "Onest Variable", system-ui, sans-serif;
+  --font-display: "Unbounded Variable", "Onest Variable", system-ui, sans-serif;
 
   --radius-card: 1.25rem;
 }
@@ -136,7 +136,7 @@ html[data-tg] .under-header { top: 0; }
   --shadow-md: 0 2px 4px rgba(22, 22, 22, 0.04), 0 18px 40px -18px rgba(60, 40, 20, 0.22);
   --shadow-lg: 0 4px 10px rgba(22, 22, 22, 0.05), 0 28px 60px -24px rgba(60, 40, 20, 0.3);
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --font-display: "Inter Variable", system-ui, -apple-system, "SF Pro Display", sans-serif;
+  --font-display: "Onest Variable", system-ui, -apple-system, "SF Pro Display", sans-serif;
   color-scheme: light;
 }
 body:has(> .theme-app:not(.fixed)) { background: #faf5f1; }
@@ -272,7 +272,7 @@ body:has(> .theme-app:not(.fixed)) { background: #faf5f1; }
   --logo-ink: #0e0e0e;
   --logo-accent: #ffffff;
   --logo-spark: #0e0e0e;
-  --font-display: "Unbounded Variable", "Inter Variable", system-ui, sans-serif;
+  --font-display: "Unbounded Variable", "Onest Variable", system-ui, sans-serif;
   color-scheme: light;
 }
 body:has(> .theme-app.theme-mono) { background: #f5f4f1; }

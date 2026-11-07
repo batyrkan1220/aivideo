@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import "@fontsource-variable/inter";
+import "@fontsource-variable/onest";
 import "@fontsource-variable/unbounded";
 import "./globals.css";
 import { Suspense } from "react";
@@ -9,7 +9,7 @@ import { PixelsLoader } from "@/components/pixels-loader";
 import { SwRegister } from "@/components/sw-register";
 import { PauseHiddenVideos } from "@/components/pause-hidden-videos";
 
-// Self-hosted Inter (body) + Unbounded (display); cyrillic-ext covers Kazakh letters Ә Ғ Қ Ң Ө Ұ Ү Һ І
+// Self-hosted Onest (body) + Unbounded (display); cyrillic-ext covers Kazakh letters Ә Ғ Қ Ң Ө Ұ Ү Һ І
 
 export const metadata: Metadata = {
   metadataBase: new URL(`https://${kk.brand.domain}`),
