@@ -283,6 +283,8 @@ body:has(> .theme-app.theme-mono) { background: #f5f4f1; }
 /* Small badges and labels inside headings keep the body font. */
 .theme-app.theme-mono :is(h1, h2) :is(.t-micro, .t-small, .text-xs, .text-sm) { font-family: var(--font-sans); letter-spacing: normal; }
 .theme-app.theme-mono .font-display { font-weight: 400; }
+/* Prices and numbers in Unbounded keep some weight: hierarchy without shouting. */
+.theme-app.theme-mono .font-display:is(.font-bold, .font-extrabold) { font-weight: 600; }
 /* Template titles on cards: Unbounded, a little bolder so they read on video. */
 .theme-app.theme-mono :is(h3.font-display, .font-display.font-semibold) { font-weight: 600; }
 .theme-app.theme-mono .text-brand { color: var(--color-ink); }
@@ -309,6 +311,42 @@ body:has(> .theme-app.theme-mono) { background: #f5f4f1; }
 /* Admin charts and bars: black instead of lime. */
 .theme-app.theme-mono .bg-\[\#b5d420\] { background: #0e0e0e; }
 .theme-app.theme-mono .bg-flash\/20 { background: #ecebe7; }
+/* ── Mono design system polish ──────────────────────────────────────────────────────────
+   8pt rhythm, soft layered depth instead of hard borders, calm motion. */
+.theme-app.theme-mono {
+  --shadow-xs: 0 1px 2px rgb(14 14 14 / 0.04);
+  --shadow-sm: 0 1px 2px rgb(14 14 14 / 0.04), 0 4px 12px -6px rgb(14 14 14 / 0.08), 0 12px 32px -20px rgb(14 14 14 / 0.16);
+  --shadow-md: 0 1px 2px rgb(14 14 14 / 0.05), 0 8px 20px -10px rgb(14 14 14 / 0.14), 0 24px 48px -24px rgb(14 14 14 / 0.22);
+  --shadow-lg: 0 2px 4px rgb(14 14 14 / 0.05), 0 16px 32px -16px rgb(14 14 14 / 0.2), 0 40px 80px -32px rgb(14 14 14 / 0.3);
+  --radius-card: 1.5rem;
+}
+/* Body copy breathes a little more (base layer: any leading-* utility still wins). */
+@layer base {
+  .theme-app.theme-mono :where(p, li, dd) { line-height: 1.6; }
+}
+.theme-app.theme-mono .t-eyebrow, .theme-app.theme-mono .section-title { letter-spacing: 0.1em; }
+/* Focus: a crisp two-tone ring (page gap + ink), visible on any surface. */
+.theme-app.theme-mono :focus-visible { outline: 2px solid #0e0e0e; outline-offset: 3px; }
+/* Hairlines are softer; cards get depth from the layered shadow instead. */
+.theme-app.theme-mono .border-line\/80, .theme-app.theme-mono .border-line\/60 { border-color: rgb(228 226 221 / 0.7); }
+/* Frosted bars: more blur, a faint bottom hairline. */
+.theme-app.theme-mono .glass {
+  background: color-mix(in srgb, #ffffff 72%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+}
+/* Pages fade in (opacity only: a transform here would break fixed bars inside the page). */
+@keyframes tm-page-in { from { opacity: 0; } to { opacity: 1; } }
+.theme-app.theme-mono main { animation: tm-page-in 0.35s var(--ease-out) both; }
+/* Primary buttons: black with a soft top highlight; lift a hair on hover. */
+.theme-app.theme-mono .btn-glow {
+  background: linear-gradient(180deg, #2a2a2a 0%, #0e0e0e 100%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12), 0 1px 2px rgb(14 14 14 / 0.2), 0 8px 20px -10px rgb(14 14 14 / 0.55);
+}
+@media (hover: hover) {
+  .theme-app.theme-mono .btn-glow:hover { background: linear-gradient(180deg, #333 0%, #161616 100%); transform: translateY(-1px); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14), 0 2px 4px rgb(14 14 14 / 0.2), 0 14px 28px -12px rgb(14 14 14 / 0.6); }
+}
+.theme-app.theme-mono .btn-glow:active { transform: translateY(0) scale(0.98); }
 .theme-app.theme-mono .skeleton { background-image: linear-gradient(90deg, #ecebe7 0%, #f7f6f3 50%, #ecebe7 100%); }
 
 /* Hero atmosphere: slow drifting mesh light, scanner line, floating cards, CTA glow. */

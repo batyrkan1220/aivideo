@@ -186,7 +186,7 @@ export function TemplateCard({ t, priority = false, aspect = "aspect-[3/4]", wal
             src={t.coverUrl}
             alt=""
             loading={priority ? "eager" : "lazy"}
-            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${playing && !imgMode ? "opacity-0" : "opacity-100"}`}
+            className={`absolute inset-0 h-full w-full object-cover transition-[opacity,transform] duration-500 ease-[var(--ease-out)] ${wall ? "group-hover:scale-[1.03]" : ""} ${playing && !imgMode ? "opacity-0" : "opacity-100"}`}
           />
         )}
         {t.previewAnimUrl && near && imgMode && playing && (
@@ -208,7 +208,7 @@ export function TemplateCard({ t, priority = false, aspect = "aspect-[3/4]", wal
               const v = e.currentTarget;
               if (t.previewLiteUrl && t.previewUrl && !v.src.startsWith(t.previewUrl)) { v.src = t.previewUrl; play(); }
             }}
-            className="absolute inset-0 h-full w-full object-cover"
+            className={`absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-[var(--ease-out)] ${wall ? "group-hover:scale-[1.03]" : ""}`}
           />
         )}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />

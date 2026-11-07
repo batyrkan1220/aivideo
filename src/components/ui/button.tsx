@@ -2,9 +2,9 @@ import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 
 /**
- * Buttons. primary = obsidian pill (turns chartreuse on dark cards), lime = chartreuse,
- * secondary = white with a hairline, ghost = text only, danger = destructive.
- * Heights follow the 8pt grid: sm 32 · md 40 · lg 52 (thumb-friendly on phones).
+ * Buttons. primary = black pill with a soft highlight, lime = the same on the mono site,
+ * secondary = white with a hairline and a soft shadow, ghost = text only, danger = destructive.
+ * Heights follow the 8pt grid: sm 32 · md 40 · lg 48 (thumb-friendly on phones).
  */
 type Variant = "primary" | "lime" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg";
@@ -16,11 +16,11 @@ const base =
 const variants: Record<Variant, string> = {
   primary: "btn-glow",
   lime: "btn-lime",
-  secondary: "border border-line bg-surface text-ink elev-xs hover:border-line-strong hover:bg-mist",
-  ghost: "text-ink hover:bg-mist",
+  secondary: "border border-line bg-surface text-ink elev-xs hover:border-line-strong hover:elev-sm",
+  ghost: "text-ink hover:bg-ink/[0.05]",
   danger: "bg-danger text-white hover:brightness-110",
 };
-const sizes: Record<Size, string> = { sm: "h-8 px-4 text-sm", md: "h-10 px-5 text-sm", lg: "h-13 px-7 text-base" };
+const sizes: Record<Size, string> = { sm: "h-8 px-4 text-[13px]", md: "h-10 px-5 text-sm", lg: "h-12 px-6 text-[15px]" };
 
 export function buttonClass(variant: Variant = "primary", size: Size = "md", extra = "") {
   return `${base} ${variants[variant]} ${sizes[size]} ${extra}`;

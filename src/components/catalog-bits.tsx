@@ -53,8 +53,8 @@ export function CategoryChips({
     return `/${s ? `?${s}` : ""}`;
   };
   const chip = (isActive: boolean) =>
-    `shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition-[background-color,border-color,color,transform] duration-200 active:scale-95 ${
-      isActive ? "border-ink bg-ink text-paper elev-sm" : "border-line bg-surface text-ink/80 hover:border-line-strong hover:text-ink"
+    `inline-flex h-10 shrink-0 items-center rounded-full border px-4 text-sm font-semibold transition-[background-color,border-color,color,box-shadow,transform] duration-200 active:scale-95 ${
+      isActive ? "border-ink bg-ink text-paper shadow-[inset_0_1px_0_rgb(255_255_255/0.12),0_6px_16px_-8px_rgb(14_14_14/0.5)]" : "border-line bg-surface text-ink/80 elev-xs hover:border-line-strong hover:text-ink"
     }`;
   return (
     <nav aria-label={kk.nav.categories} className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
