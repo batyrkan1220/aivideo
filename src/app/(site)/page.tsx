@@ -90,11 +90,12 @@ async function Feed({ searchParams }: { searchParams: Promise<SP> }) {
   const first = await listTemplates({ page: 1, sort: "trending", category });
 
   return (
-    <div className="mx-auto max-w-6xl px-4 sm:px-6">
+    // The video wall runs wider than the rest of the page, with thin side margins.
+    <div className="mx-auto max-w-[1600px] px-1.5 sm:px-3">
       {/* Sticky category chips, like an app's filter bar */}
-      <h2 id="templates" className="section-title mt-5 scroll-mt-20 text-muted md:hidden">{kk.home.templatesTitle}</h2>
+      <h2 id="templates" className="section-title mt-5 scroll-mt-20 px-2.5 text-muted md:hidden">{kk.home.templatesTitle}</h2>
       {categories.length > 0 && (
-        <div className="under-header sticky z-20 -mx-4 bg-paper/90 px-4 py-2.5 backdrop-blur-xl sm:py-3">
+        <div className="under-header sticky z-20 -mx-1.5 bg-paper/90 px-4 py-2.5 backdrop-blur-xl sm:-mx-3 sm:py-3">
           <CategoryChips categories={categories} active={category} />
         </div>
       )}
@@ -106,7 +107,8 @@ async function Feed({ searchParams }: { searchParams: Promise<SP> }) {
           category={category}
           initial={first.items.map(pickCard)}
           initialHasMore={first.items.length < first.total}
-          priorityCount={4}
+          priorityCount={6}
+          wall
         />
       )}
     </div>

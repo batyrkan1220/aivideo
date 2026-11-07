@@ -4,12 +4,13 @@ import { kk } from "@/lib/i18n/kk";
 import { TemplateCard, type CardData } from "./template-card";
 import { loadMoreVideos } from "@/app/(site)/home-actions";
 import { saveFeed } from "./cached-feed";
+import { MasonryFeed } from "./masonry-feed";
 
 /**
  * Endless video feed: shows the first page, then loads the next page automatically when the
  * end of the list comes into view. Cards themselves load video lazily (see TemplateCard).
  */
-export function VideoFeed({ title, category, initial, initialHasMore, exclude = [], priorityCount = 0, media = "video" }: { title?: string; category?: string; initial: CardData[]; initialHasMore: boolean; exclude?: string[]; priorityCount?: number; media?: "video" | "photo" }) {
+export function VideoFeed({ title, category, initial, initialHasMore, exclude = [], priorityCount = 0, media = "video", wall = false }: { title?: string; category?: string; initial: CardData[]; initialHasMore: boolean; exclude?: string[]; priorityCount?: number; media?: "video" | "photo"; wall?: boolean }) {
   const [items, setItems] = useState(initial);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(initialHasMore);
@@ -49,11 +50,13 @@ export function VideoFeed({ title, category, initial, initialHasMore, exclude = 
   return (
     <>
       {title && <h2 className="mb-5 font-display text-xl font-bold tracking-tight sm:text-2xl">{title}</h2>}
-      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 lg:grid-cols-6">
-        {shown.map((t, i) => (
-          <li key={t.id}><TemplateCard t={t} priority={i < priorityCount} /></li>
-        ))}
-      </ul>
+      {wall ? <MasonryFeed items={shown} priorityCount={priorityCount} /> : (
+        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 lg:grid-cols-6">
+          {shown.map((t, i) => (
+            <li key={t.id}><TemplateCard t={t} priority={i < priorityCount} /></li>
+          ))}
+        </ul>
+      )}
       {hasMore && (
         <div ref={sentinel} className="flex h-20 items-center justify-center text-sm text-muted" aria-live="polite">
           {loading ? kk.common.loading : ""}

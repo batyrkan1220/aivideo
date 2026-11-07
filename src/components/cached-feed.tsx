@@ -1,7 +1,8 @@
 "use client";
 import { useMemo, useSyncExternalStore } from "react";
-import { TemplateCard, type CardData } from "./template-card";
+import type { CardData } from "./template-card";
 import { GridSkeleton } from "./catalog-bits";
+import { MasonryFeed } from "./masonry-feed";
 
 /*
   The last catalog the customer saw, kept on the phone (localStorage). While the server renders
@@ -40,9 +41,5 @@ export function CachedFeedFallback() {
   const raw = useSyncExternalStore(() => () => {}, rawFeed, () => null);
   const items = useMemo(() => parse(raw), [raw]);
   if (!items) return <GridSkeleton />;
-  return (
-    <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 lg:grid-cols-6">
-      {items.map((t, i) => <li key={t.id}><TemplateCard t={t} priority={i < 4} /></li>)}
-    </ul>
-  );
+  return <MasonryFeed items={items} priorityCount={4} />;
 }

@@ -1,6 +1,6 @@
 "use client";
 import { Flame } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { kk } from "@/lib/i18n/kk";
 import { formatKzt } from "@/lib/pricing";
@@ -73,13 +73,22 @@ function releasePlayback(v: HTMLVideoElement) {
  *  - the cover image is lazy-loaded; the video has NO src until the card is near the screen;
  *  - visible cards autoplay (muted, inline); off-screen videos are paused.
  */
-export function TemplateCard({ t, priority = false }: { t: CardData; priority?: boolean }) {
+/** True inside the Telegram Mini App (the bridge marks <html data-tg>). */
+const inTelegram = () => document.documentElement.hasAttribute("data-tg");
+const useInTelegram = () => useSyncExternalStore(() => () => {}, inTelegram, () => false);
+
+/**
+ * aspect: the card's shape (the home wall mixes several); wall: tight corners for the edge-to-edge feed.
+ * The website plays the light MP4; the Mini App shows the animated WebP (Telegram's WebView is weak at many videos).
+ */
+export function TemplateCard({ t, priority = false, aspect = "aspect-[3/4]", wall = false }: { t: CardData; priority?: boolean; aspect?: string; wall?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const cardRef = useRef<HTMLAnchorElement>(null);
   const [playing, setPlaying] = useState(false);
   const [near, setNear] = useState(false); // card is within ~1 screen: attach the video src
-  // Cards show the animated WebP preview; the light MP4 only until the WebP is ready.
-  const imgMode = useImgPreviews() || !!t.previewAnimUrl;
+  // Website: the light MP4. Mini App (or autoplay refused): the animated WebP, when there is one.
+  const tg = useInTelegram();
+  const imgMode = useImgPreviews() || (tg && !!t.previewAnimUrl);
   const imgModeRef = useRef(imgMode);
   const wantRef = useRef(false); // the card is on screen and should be playing
   useEffect(() => { imgModeRef.current = imgMode; }, [imgMode]);
@@ -162,7 +171,7 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
     <Link
       ref={cardRef}
       href={`/templates/${t.id}`}
-      className="group block rounded-[1.25rem] focus-visible:outline-offset-4"
+      className={`group block ${wall ? "rounded-xl" : "rounded-[1.25rem]"} focus-visible:outline-offset-4`}
       // The tap itself starts the template's video with sound (see sound-handoff).
       onClick={(e) => {
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
@@ -174,7 +183,7 @@ export function TemplateCard({ t, priority = false }: { t: CardData; priority?: 
       onFocus={start}
       onBlur={stop}
     >
-      <div className="relative aspect-[3/4] overflow-hidden rounded-[1rem] bg-night ring-1 ring-black/5 elev-sm transition-[transform,box-shadow] duration-300 ease-[var(--ease-out)] group-hover:-translate-y-0.5 group-hover:elev-md group-active:scale-[0.98] sm:rounded-[1.25rem]">
+      <div className={`relative ${aspect} overflow-hidden bg-night transition-[transform,box-shadow] duration-300 ease-[var(--ease-out)] group-active:scale-[0.98] ${wall ? "rounded-lg sm:rounded-xl group-hover:brightness-110" : "rounded-[1rem] ring-1 ring-black/5 elev-sm group-hover:-translate-y-0.5 group-hover:elev-md sm:rounded-[1.25rem]"}`}>
         {t.coverUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
