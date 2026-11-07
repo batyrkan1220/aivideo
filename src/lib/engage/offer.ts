@@ -2,6 +2,7 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { DISCOUNTS_ON } from "./price";
 
 /**
  * "First video −20%" for people who came from an ad: the proxy sets a signed tm_offer cookie on the
@@ -21,6 +22,7 @@ function verify(raw: string | undefined): number | null {
 }
 
 export async function adOffer(userId: string | null): Promise<{ percent: number; expiresAt: string } | null> {
+  if (!DISCOUNTS_ON) return null;
   try {
     const ts = verify((await cookies()).get("tm_offer")?.value);
     if (!ts || Date.now() - ts > TTL) return null;

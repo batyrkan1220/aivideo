@@ -1,4 +1,5 @@
 "use server";
+import { DISCOUNTS_ON } from "@/lib/engage/price";
 import { catalogSettings } from "@/lib/catalog/settings";
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
@@ -343,7 +344,7 @@ export async function createOrder(raw: unknown): Promise<
   // Price is computed here, from the version snapshot — never taken from the browser.
   const base = calculatePrice(pricing, quality, slots.length);
   // Personal discount (e.g. "second video −20%"): applied here, marked used when the order is paid.
-  const eligible = base.totalKzt > 0 && !(await isFreeOrderUser(user.id));
+  const eligible = DISCOUNTS_ON && base.totalKzt > 0 && !(await isFreeOrderUser(user.id));
   const disc = eligible ? await activeDiscount(user.id) : null;
   // Otherwise: the first-video offer for ad visitors (signed cookie, 24 h, until the first payment).
   const first = eligible && !disc ? await adOffer(user.id) : null;

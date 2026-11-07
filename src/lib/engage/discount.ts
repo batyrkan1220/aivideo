@@ -1,6 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { track } from "@/lib/analytics";
+import { DISCOUNTS_ON } from "./price";
 
 /** "Second video −20% until tomorrow": offered the day after the first video. */
 export const FOLLOWUP_DISCOUNT_PCT = 20;
@@ -10,6 +11,7 @@ export type ActiveDiscount = { id: string; percent: number; expiresAt: string };
 
 /** The customer's unused, unexpired personal discount (the newest one), if any. */
 export async function activeDiscount(userId: string): Promise<ActiveDiscount | null> {
+  if (!DISCOUNTS_ON) return null;
   const { data } = await supabaseAdmin().from("user_discounts").select("id,percent,expires_at")
     .eq("user_id", userId).is("used_at", null).gt("expires_at", new Date().toISOString())
     .order("percent", { ascending: false }).limit(1).maybeSingle();

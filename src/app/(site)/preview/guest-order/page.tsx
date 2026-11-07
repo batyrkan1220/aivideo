@@ -55,7 +55,7 @@ async function Body({ searchParams }: { searchParams: Promise<{ state?: string }
       </section>
 
       <section className="relative overflow-hidden rounded-[24px] bg-[#2AABEE]/10 p-4 ring-1 ring-[#2AABEE]/30">
-        <span className="absolute right-3 top-3 rounded-full bg-brand px-2.5 py-1 text-xs font-extrabold text-night">🎁 −20%</span>
+
         <p className="pr-16 text-[16px] font-extrabold">{O.tgTitle}</p>
         <ul className="mb-3 mt-2 space-y-1 text-sm">
           {O.tgPoints.map((p) => <li key={p} className="flex gap-2"><span className="text-[#229ED9]" aria-hidden>✓</span>{p}</li>)}

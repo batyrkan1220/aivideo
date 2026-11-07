@@ -1,4 +1,5 @@
 import "server-only";
+import { DISCOUNTS_ON } from "@/lib/engage/price";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { forgetProfile } from "@/lib/auth/session";
 import { attributeTelegramUser } from "@/lib/partners";
@@ -97,7 +98,7 @@ export async function finishLogin(row: Row): Promise<string> {
   await attributeTelegramUser(userId, tu.id, null);
   await track(guestId ? "telegram_linked" : "telegram_login", { userId, props: { via: "site", merged: !!(guestId && existing) } });
   // A guest who linked Telegram gets the promised bonus: −20% on the next video for 7 days.
-  if (guestId) {
+  if (guestId && DISCOUNTS_ON) {
     const { count } = await admin.from("user_discounts").select("id", { count: "exact", head: true })
       .eq("user_id", userId).eq("reason", "telegram_link");
     if (!count) {

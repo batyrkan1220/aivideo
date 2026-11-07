@@ -1,4 +1,5 @@
 import { Check, ChevronDown, CircleCheck, Clock, LifeBuoy, Pin, Send, Sparkles } from "lucide-react";
+import { DISCOUNTS_ON } from "@/lib/engage/price";
 import { ButtonLink } from "@/components/ui/button";
 import { Alert, Skeleton } from "@/components/ui/states";
 import { Suspense } from "react";
@@ -243,7 +244,7 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="t-h3">{kk.order.tgTitle}</h2>
-                <span className="t-micro rounded-full bg-brand px-2.5 py-1 text-night">−20%</span>
+                {DISCOUNTS_ON && <span className="t-micro rounded-full bg-brand px-2.5 py-1 text-night">−20%</span>}
               </div>
               <ul className="t-small mt-3 grid gap-2">
                 {kk.order.tgPoints.map((t) => <li key={t} className="flex items-start gap-2"><Check size={16} strokeWidth={2.6} className="mt-0.5 shrink-0 text-success" aria-hidden />{t}</li>)}

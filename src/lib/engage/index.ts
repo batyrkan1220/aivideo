@@ -5,6 +5,7 @@ import { listTemplates } from "@/lib/templates/queries";
 import { formatKzt } from "@/lib/pricing";
 import { track } from "@/lib/analytics";
 import { FOLLOWUP_DISCOUNT_HOURS, FOLLOWUP_DISCOUNT_PCT, discounted } from "./discount";
+import { DISCOUNTS_ON } from "./price";
 
 /*
   Every 10 minutes (pg_cron → /api/worker/engage), Telegram users only, one message of each kind per order:
@@ -16,7 +17,8 @@ const MIN = 60_000, HOUR = 3_600_000;
 
 export async function runEngage(now = Date.now()) {
   if (!botConfigured()) return { reminders: 0, offers: 0 };
-  return { reminders: await reminders(now), offers: await offers(now) };
+  // "Second video −20%" messages only while discounts are on.
+  return { reminders: await reminders(now), offers: DISCOUNTS_ON ? await offers(now) : 0 };
 }
 
 async function telegramIdOf(userId: string): Promise<number | null> {
