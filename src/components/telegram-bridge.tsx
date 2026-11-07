@@ -140,7 +140,7 @@ export function TelegramBridge() {
   }
   if (!(pending && tgOnAuthPage) || manual) return null;
   return (
-    <div className="theme-app theme-dark fixed inset-0 z-[100] flex flex-col items-center justify-center gap-4 bg-paper" role="status" aria-live="polite">
+    <div className="theme-app theme-mono fixed inset-0 z-[100] flex flex-col items-center justify-center gap-4 bg-paper" role="status" aria-live="polite">
       <span className="h-10 w-10 animate-spin rounded-full border-4 border-brand/20 border-t-brand" aria-hidden />
       <p className="text-sm font-medium text-muted">{kk.telegram.signingIn}</p>
     </div>

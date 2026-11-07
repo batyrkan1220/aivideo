@@ -214,7 +214,7 @@ export function TemplateCard({ t, priority = false, aspect = "aspect-[3/4]", wal
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
         <div className="absolute left-2 top-2 flex flex-col items-start gap-1 sm:left-2.5 sm:top-2.5">
           {t.isTrending && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-brand px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-night shadow-[0_4px_12px_-4px_rgba(0,0,0,0.35)] sm:px-2.5 sm:py-1 sm:text-[11px]"><Flame size={11} strokeWidth={2.6} aria-hidden />{kk.catalog2.trendBadge}</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-night shadow-[0_4px_12px_-4px_rgba(0,0,0,0.35)] sm:px-2.5 sm:py-1 sm:text-[11px]"><Flame size={11} strokeWidth={2.6} aria-hidden />{kk.catalog2.trendBadge}</span>
           )}
           {/* People in the template (only worth showing for 2+). */}
           {t.faceCount > 1 && (

@@ -8,7 +8,7 @@ const STEP_TINT = ["bg-peach", "bg-lavender", "bg-rose"];
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <main className="theme-app theme-dark relative min-h-dvh overflow-hidden bg-paper text-ink">
+    <main className="theme-app theme-mono relative min-h-dvh overflow-hidden bg-paper text-ink">
       {/* Soft colour behind the content, like the home hero. */}
       <div className="pointer-events-none absolute -left-32 -top-40 h-96 w-96 rounded-full bg-brand/35 blur-3xl" aria-hidden />
       <div className="pointer-events-none absolute -bottom-40 -right-24 h-96 w-96 rounded-full bg-lavender blur-3xl" aria-hidden />
