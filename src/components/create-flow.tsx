@@ -6,7 +6,7 @@ import { calculatePrice, formatKzt } from "@/lib/pricing";
 import { applySeedancePricing, seedanceAutoPriceKzt, type SeedancePricing } from "@/lib/pricing-seedance";
 import { slotPreviewSrc, type FaceSlot, type PricingConfig, type Quality } from "@/lib/templates/schema";
 import { PHOTO_TYPES, validatePhotoMeta, type PhotoError } from "@/lib/uploads/validate";
-import { requestPhotoUpload, confirmPhotoUpload, removePhotoUpload, createOrder, reusePhoto } from "@/lib/orders/actions";
+import { requestPhotoUpload, confirmPhotoUpload, removePhotoUpload, createOrder } from "@/lib/orders/actions";
 import { startCheckout } from "@/lib/payments/actions";
 import { normalizeKzPhone } from "@/lib/payments/phone";
 import { useSavedPhone, savePhone } from "@/lib/payments/saved-phone";
@@ -95,7 +95,7 @@ function readVideoMeta(url: string): Promise<{ durationSec: number; aspect: numb
 }
 
 export function CreateFlow({
-  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, freeOrders = false, signedIn = true, needTelegram = false, noTabBar = false, discount = null, savedPhotos = [], item, customVideo, seedancePricing, allowWish = false, seedanceMode = "wan", media = "video", wishRequired = false, outfit = "photo",
+  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, freeOrders = false, signedIn = true, needTelegram = false, noTabBar = false, discount = null, item, customVideo, seedancePricing, allowWish = false, seedanceMode = "wan", media = "video", wishRequired = false, outfit = "photo",
 }: {
   templateId: string;
   slots: FaceSlot[];
@@ -119,7 +119,6 @@ export function CreateFlow({
   /** Personal discount (e.g. "second video −20%"); the server applies it again when ordering. */
   discount?: { percent: number; expiresAt: string } | null;
   /** The customer's earlier photos still kept: one tap fills a slot ("another video with this photo"). */
-  savedPhotos?: { assetId: string; url: string }[];
   /** For ad pixels: what this form sells (template id, name, starting price). */
   item?: { id: string; name: string; price: number };
   /** "Өз видеом": the customer uploads their own video first. */
@@ -245,20 +244,6 @@ export function CreateFlow({
     setSlot(slot.key, { phase: "ready", preview, assetId });
     haptic("success");
     if (item) pixelEventOnce(`add.${templateId}.${assetId}`, { type: "add", item });
-  };
-
-  /** "Use this photo again": fills the first empty slot with a copy of an earlier photo. */
-  const onReuse = async (sp: { assetId: string; url: string }) => {
-    // Earlier photos are faces: never put one into a "car / horse / outfit" box.
-    const people = slots.filter((x) => x.kind !== "object");
-    const slot = people.find((x) => (state[x.key] ?? EMPTY).phase !== "ready") ?? people[0];
-    if (!slot) return;
-    setFormError(null);
-    setSlot(slot.key, { phase: "verifying", preview: sp.url });
-    const r = await reusePhoto({ templateId, slotKey: slot.key, sourceAssetId: sp.assetId });
-    if (!r.ok) { haptic("error"); setSlot(slot.key, { phase: "error", preview: sp.url, message: errText(r.error) }); return; }
-    setSlot(slot.key, { phase: "ready", preview: sp.url, assetId: r.assetId });
-    haptic("success");
   };
 
   /** Uploads the photo; returns the asset id or null (the slot then shows the error). */
@@ -460,21 +445,6 @@ export function CreateFlow({
       <section ref={photosRef} className={`rounded-card border bg-surface p-4 transition-shadow sm:p-5 ${nudge === "photo" ? "border-ink ring-4 ring-lavender" : "border-line"}`}>
         <StepTitle n={++step} done={missing === 0}>{refPhoto ? c.stepRefPhotos : slots.length > 1 ? c.stepPhotos(slots.length) : c.stepPhoto}</StepTitle>
         {slots.length > 1 && refPhoto && <p className="mt-1 text-sm text-muted">{c.refPhotosHint}</p>}
-        {!refPhoto && savedPhotos.length > 0 && missing > 0 && (
-          <div className="mt-3 rounded-2xl bg-brand-soft/60 p-3 ring-1 ring-[#d9ec8a]">
-            <p className="text-[13px] font-bold">{c.reuseTitle}</p>
-            <div className="mt-2 flex gap-2">
-              {savedPhotos.map((sp) => (
-                <button key={sp.assetId} type="button" onClick={() => onReuse(sp)} aria-label={c.reuseUse}
-                  className="relative h-16 w-12 shrink-0 overflow-hidden rounded-xl bg-surface ring-2 ring-white transition-transform active:scale-95">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={sp.url} alt="" className="h-full w-full object-cover" />
-                </button>
-              ))}
-              <span className="self-center text-xs text-muted">{c.reuseHint}</span>
-            </div>
-          </div>
-        )}
         {!refPhoto && <PhotoTips />}
         {customVideo && readyVideoId && !["kling", "wan", "k4", "kd"].includes(seedanceMode) && (
           <div className="mt-3">

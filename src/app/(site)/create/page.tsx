@@ -11,7 +11,6 @@ import { CreateTabs, TabsView } from "@/components/create-tabs";
 import { isFreeOrderUser } from "@/lib/orders/free";
 import { activeDiscount } from "@/lib/engage/discount";
 import { adOffer } from "@/lib/engage/offer";
-import { reusablePhotos } from "@/lib/orders/reusable";
 import { ButtonLink } from "@/components/ui/button";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { PHOTOS_SOON } from "@/lib/features";
@@ -104,7 +103,6 @@ async function VideoFlow() {
       supabaseUrl={c.supabaseUrl} anonKey={c.anonKey} askPhone={c.askPhone}
       freeOrders={user ? await isFreeOrderUser(user.id) : false}
       discount={(user ? await activeDiscount(user.id) : null) ?? (await adOffer(user?.id ?? null))}
-      savedPhotos={user ? await reusablePhotos(user.id) : []}
       signedIn={!!user} needTelegram={!user || isGuestEmail(user.email)}
       customVideo={{ maxSeconds: s.maxSeconds, maxMb: s.maxMb }}
     />
@@ -124,7 +122,6 @@ async function PhotoFlow() {
       supabaseUrl={c.supabaseUrl} anonKey={c.anonKey} askPhone={c.askPhone}
       freeOrders={user ? await isFreeOrderUser(user.id) : false}
       discount={(user ? await activeDiscount(user.id) : null) ?? (await adOffer(user?.id ?? null))}
-      savedPhotos={user ? await reusablePhotos(user.id) : []}
       signedIn={!!user} needTelegram={!user || isGuestEmail(user.email)}
     />
   );

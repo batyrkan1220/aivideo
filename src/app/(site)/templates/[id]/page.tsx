@@ -13,7 +13,6 @@ import { TrackView } from "@/components/pixel-events";
 import { isFreeOrderUser } from "@/lib/orders/free";
 import { activeDiscount } from "@/lib/engage/discount";
 import { adOffer } from "@/lib/engage/offer";
-import { reusablePhotos } from "@/lib/orders/reusable";
 import { getSessionUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { klingUnitLabel } from "@/lib/pricing-seedance";
@@ -87,7 +86,6 @@ async function CreateSection({ t }: { t: TemplateDetail }) {
       askPhone={e.PAYMENT_PROVIDER === "tole" || e.PAYMENT_PROVIDER === "tole_sandbox"}
       freeOrders={user ? await isFreeOrderUser(user.id) : false}
       discount={(user ? await activeDiscount(user.id) : null) ?? (await adOffer(user?.id ?? null))}
-      savedPhotos={user ? await reusablePhotos(user.id) : []}
       signedIn={!!user}
       needTelegram={!user || isGuestEmail(user.email)}
       framing={t.photoFraming}

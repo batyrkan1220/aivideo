@@ -492,9 +492,6 @@ export const kk = {
     },
     needWish: "Опишите фото",
     promptToggle: "Добавить пожелание для ИИ (необязательно)",
-    reuseTitle: "Ваше прошлое фото — одним нажатием",
-    reuseUse: "Использовать это фото",
-    reuseHint: "Нажмите на фото",
     discountTitle: (p: number) => `Ваша скидка −${p}% на это видео`,
     discountUntil: (d: string) => `Действует до ${d}`,
     tgConfirm: {

@@ -163,44 +163,6 @@ export async function removePhotoUpload(assetId: string): Promise<{ ok: boolean 
   return { ok: true };
 }
 
-// ---------------------------------------------------------------- reuse a photo
-
-/**
- * "Another video with this photo": copies one of the customer's own earlier photos (still kept,
- * not deleted) into a new, already verified upload for this template slot.
- */
-export async function reusePhoto(raw: unknown): Promise<{ ok: true; assetId: string } | Fail<"rate_limited" | "template_unavailable">> {
-  const user = await getSessionUser();
-  if (!user) return { ok: false, error: "unauthorized" };
-  const p = z.object({ templateId: z.string().uuid(), slotKey: z.string().regex(/^[a-z0-9_]+$/), sourceAssetId: z.string().uuid() }).safeParse(raw);
-  if (!p.success) return { ok: false, error: "generic" };
-  const tv = await loadPublishedVersion(p.data.templateId);
-  const customPersonSlot = tv?.template.kind === "custom" && new RegExp(`^p_[1-${SEEDANCE_MAX_PEOPLE}]$`).test(p.data.slotKey);
-  if (!tv || (!customPersonSlot && !tv.slots.some((s) => s.key === p.data.slotKey))) return { ok: false, error: "template_unavailable" };
-
-  const db = supabaseAdmin();
-  const { data: src } = await db.from("order_assets").select("private_storage_path,mime_type,file_size,width,height,expires_at,verified_at")
-    .eq("id", p.data.sourceAssetId).eq("user_id", user.id).maybeSingle();
-  if (!src?.verified_at || new Date(src.expires_at).getTime() < Date.now()) return { ok: false, error: "generic" };
-  const since = new Date(Date.now() - 3600_000).toISOString();
-  const { count } = await db.from("order_assets").select("id", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", since);
-  if ((count ?? 0) >= UPLOADS_PER_HOUR) return { ok: false, error: "rate_limited" };
-
-  const ext = src.private_storage_path.split(".").pop() ?? "jpg";
-  const path = `${user.id}/${randomUUID()}.${ext}`;
-  const { error: cErr } = await db.storage.from(BUCKET).copy(src.private_storage_path, path);
-  if (cErr) { console.error("[reuse.copy]", cErr.message); return { ok: false, error: "generic" }; }
-  const now = new Date();
-  const { data: asset, error } = await db.from("order_assets").insert({
-    user_id: user.id, template_id: tv.template.id, face_slot_key: p.data.slotKey,
-    private_storage_path: path, mime_type: src.mime_type, file_size: src.file_size, width: src.width, height: src.height,
-    expires_at: new Date(now.getTime() + env().UPLOAD_RETENTION_DAYS * 86400_000).toISOString(), verified_at: now.toISOString(),
-  }).select("id").single();
-  if (error || !asset) { await db.storage.from(BUCKET).remove([path]); return { ok: false, error: "generic" }; }
-  await track("upload_completed", { userId: user.id, templateId: tv.template.id, props: { reused: true } });
-  return { ok: true, assetId: asset.id };
-}
-
 /** Keeps the photos of one of the customer's orders for 30 days (so new videos take one tap). */
 export async function keepOrderPhotos(fd: FormData): Promise<void> {
   const user = await getSessionUser();
