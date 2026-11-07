@@ -83,8 +83,12 @@ function Atmosphere() {
   );
 }
 
-const glass = "border border-white/15 bg-black/45 backdrop-blur-xl";
-const chip = "border border-line bg-surface/90 shadow-[0_16px_32px_-16px_rgb(0_0_0/0.35)] backdrop-blur-xl";
+// Solid tint, no backdrop blur: a blur over a playing video is recomputed every frame (tablets slowed down).
+const glass = "border border-white/15 bg-black/60";
+// Motion over the video (scanner, blinking frame) and the 3D tilt run only on mouse screens
+// ([@media(hover:hover)_and_(pointer:fine)], written out in full so Tailwind sees it); on phones and
+// tablets the card is flat and still, so the video plays smoothly.
+const chip = "border border-line bg-surface shadow-[0_16px_32px_-16px_rgb(0_0_0/0.35)]";
 
 /** Three cards in 3D depth; the centre one plays, with a black rim, face frame and scanner line. */
 /** Same box as the cards, while they load. */
@@ -113,7 +117,7 @@ export function DepthStack({ items }: { items: Item[] }) {
         {side(right, "r")}
         <div className="relative z-10 [transform-style:preserve-3d]">
           <Link href={`/templates/${front.id}`}
-            className="relative block aspect-[9/16] h-[15rem] overflow-hidden rounded-[1.5rem] border-[3px] border-ink bg-ink shadow-[0_50px_90px_-30px_rgb(0_0_0/0.55)] [transform:rotateY(-7deg)_rotateX(3deg)] sm:h-[22rem] md:h-[27rem] md:rounded-[1.9rem]">
+            className="relative block aspect-[9/16] h-[15rem] overflow-hidden rounded-[1.5rem] border-[3px] border-ink bg-ink shadow-[0_50px_90px_-30px_rgb(0_0_0/0.55)] [@media(hover:hover)_and_(pointer:fine)]:[transform:rotateY(-7deg)_rotateX(3deg)] sm:h-[22rem] md:h-[27rem] md:rounded-[1.9rem]">
             {front.coverUrl && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={front.coverUrl} alt="" fetchPriority="high" loading="eager" className="absolute inset-0 h-full w-full object-cover" />
@@ -122,17 +126,17 @@ export function DepthStack({ items }: { items: Item[] }) {
 
             {/* AI scanner: a cyan line sweeping up and down with a soft trail. */}
             <span className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-              <span className="hero-scan absolute inset-x-0 top-0 h-full border-b-2 border-white bg-gradient-to-b from-transparent via-transparent to-white/20 shadow-[0_6px_18px_-2px_rgb(255_255_255/0.9)]" />
+              <span className={`absolute inset-x-0 top-0 hidden h-full border-b-2 border-white bg-gradient-to-b from-transparent via-transparent to-white/20 [@media(hover:hover)_and_(pointer:fine)]:block [@media(hover:hover)_and_(pointer:fine)]:animate-[tm-scan_3.2s_cubic-bezier(0.45,0,0.55,1)_infinite_alternate]`} />
             </span>
             {/* Face frame. */}
             <span className="pointer-events-none absolute left-1/2 top-[16%] aspect-square w-[46%] -translate-x-1/2" aria-hidden>
               {["left-0 top-0 border-l-2 border-t-2 rounded-tl-lg", "right-0 top-0 border-r-2 border-t-2 rounded-tr-lg", "left-0 bottom-0 border-l-2 border-b-2 rounded-bl-lg", "right-0 bottom-0 border-r-2 border-b-2 rounded-br-lg"].map((c) => (
-                <span key={c} className={`hero-blink absolute h-[22%] w-[22%] border-white ${c}`} />
+                <span key={c} className={`absolute h-[22%] w-[22%] border-white/90 ${c} [@media(hover:hover)_and_(pointer:fine)]:animate-[tm-blink_1.6s_ease-in-out_infinite]`} />
               ))}
             </span>
             {/* Status: generating, with a progress bar. */}
             <span className={`absolute left-2 top-2 inline-flex max-w-[calc(100%-1rem)] items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-[9px] font-semibold sm:left-3 sm:top-3 sm:gap-1.5 sm:px-2.5 sm:text-[11px] text-white ${glass}`}>
-              <span className="hero-blink h-1.5 w-1.5 rounded-full bg-white shadow-[0_0_8px_white]" aria-hidden />{h.hxScanning}
+              <span className="h-1.5 w-1.5 rounded-full bg-white" aria-hidden />{h.hxScanning}
             </span>
             <span className={`absolute inset-x-2.5 bottom-2.5 rounded-2xl p-2.5 sm:inset-x-3 sm:bottom-3 sm:p-3 ${glass}`}>
               <span className="flex items-center justify-between gap-2 text-[10px] font-semibold text-white sm:text-xs">
@@ -140,7 +144,7 @@ export function DepthStack({ items }: { items: Item[] }) {
                 <span className="hidden shrink-0 text-white/70 sm:inline">{h.hxSwap}</span>
               </span>
               <span className="mt-2 block h-1 overflow-hidden rounded-full bg-white/10">
-                <span className="hero-bar block h-full rounded-full bg-white" />
+                <span className="hero-bar block h-full w-full origin-left rounded-full bg-white" />
               </span>
             </span>
           </Link>

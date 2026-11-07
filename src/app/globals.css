@@ -353,7 +353,7 @@ body:has(> .theme-app.theme-mono) { background: #f5f4f1; }
 @keyframes tm-scan { 0% { transform: translateY(-100%); } 100% { transform: translateY(0); } }
 @keyframes tm-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 @keyframes tm-cta-glow { 0%, 100% { box-shadow: 0 0 0 0 rgb(0 0 0 / 0.25), 0 12px 28px -14px rgb(0 0 0 / 0.6); } 50% { box-shadow: 0 0 0 7px rgb(0 0 0 / 0), 0 16px 36px -14px rgb(0 0 0 / 0.7); } }
-@keyframes tm-bar { 0% { width: 6%; } 70% { width: 100%; } 100% { width: 100%; } }
+@keyframes tm-bar { 0% { transform: scaleX(0.06); } 70% { transform: scaleX(1); } 100% { transform: scaleX(1); } }
 @keyframes tm-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 /* No blur here: a filter on an ancestor flattens the 3D cards while it runs, and they jumped when it ended (tablets). */
 @keyframes tm-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
