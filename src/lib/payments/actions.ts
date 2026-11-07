@@ -1,4 +1,5 @@
 "use server";
+import { discounted } from "@/lib/engage/price";
 import { orderAccessLink } from "@/lib/orders/access";
 import { notifyOrderOwner } from "@/lib/telegram/bot";
 import { randomUUID } from "node:crypto";
@@ -44,7 +45,12 @@ export async function startCheckout(_: CheckoutState, fd: FormData): Promise<Che
   const pricing = pricingConfigSchema.safeParse(snap.pricing_config_json);
   const quality = qualitySchema.safeParse(snap.quality);
   if (!pricing.success || !quality.success) return { error: "generic" };
-  const recomputed = calculatePrice(pricing.data, quality.data, o.face_count, new Date(o.created_at)).totalKzt;
+  const base = calculatePrice(pricing.data, quality.data, o.face_count, new Date(o.created_at)).totalKzt;
+  // A discount the server put on the order (first video from an ad, personal "second video"), on that same base.
+  // Without this every discounted order failed here with "Не удалось проверить цену" (TM-100044).
+  const disc = (o.pricing_breakdown_json as { discount?: { percent?: unknown; beforeKzt?: unknown } } | null)?.discount;
+  const pct = Number(disc?.percent);
+  const recomputed = disc && Number(disc.beforeKzt) === base && pct > 0 && pct < 100 ? discounted(base, pct) : base;
   if (recomputed !== o.amount_kzt || o.currency !== "KZT") {
     console.error("[checkout] amount mismatch", o.id, recomputed, o.amount_kzt);
     return { error: "price_changed" };
