@@ -111,7 +111,8 @@ describe("provider (Kling official API)", () => {
     vi.unstubAllGlobals();
   });
 
-  it("a thing's cut-out stays with the thing, even with fewer people cut out", async () => {
+  // Cut-outs are not sent to Kling any more (TM-100051); kept for when they come back.
+  it.skip("a thing's cut-out stays with the thing, even with fewer people cut out", async () => {
     const group = [
       { slotKey: "face_1", providerInput: "img_1", imageUrl: "https://s/1.jpg" },
       { slotKey: "obj_1", providerInput: "img_2", imageUrl: "https://s/car.jpg" },
@@ -131,7 +132,8 @@ describe("provider (Kling official API)", () => {
     vi.unstubAllGlobals();
   });
 
-  it("a task refused because of a cut-out goes again without it", async () => {
+  // Cut-outs are not sent to Kling any more (TM-100051); kept for when they come back.
+  it.skip("a task refused because of a cut-out goes again without it", async () => {
     const bodies: { contents: { type: string; url?: string; text?: string }[] }[] = [];
     const replies = [
       { code: 0, data: { id: "kt-5" } },
@@ -366,3 +368,21 @@ describe("a thing with several photos (a car from 3 sides)", () => {
     expect(p).toContain("@image_2 and @image_3 are photos of the same car from different sides");
   });
 });
+
+describe("no cut-out of the original thing goes to Kling (TM-100051)", () => {
+  it("only the customer's photos are sent, even with showTargets", async () => {
+    const bodies: { contents: { type: string; url?: string; text?: string }[] }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_u: string, init?: RequestInit) => {
+      if (init?.body) bodies.push(JSON.parse(String(init.body)));
+      return new Response(JSON.stringify({ code: 0, data: { id: "n1" } }), { status: 200 });
+    }));
+    await seedanceProvider.submit({ jobId: "jn", templateVideoUrl: "https://t/v.mp4", templateFrameUrl: null, quality: "720p",
+      faces: [{ slotKey: "obj_1", providerInput: "img_1", imageUrl: "https://s/car.jpg" }],
+      config: { durationSec: 8, people: 0, showTargets: true, objects: [{ what: "car", label: "Фото машины", target: "targets/c.jpg" }] } });
+    expect(bodies[0].contents.filter((c) => c.type === "refer_image").map((c) => c.url)).toEqual(["https://s/car.jpg"]);
+    expect(bodies[0].contents[0].text).toContain("not the car from @video_1 and not a mix of the two");
+    expect(bodies[0].contents[0].text).toContain("it may be longer, taller or smaller than the original");
+    vi.unstubAllGlobals();
+  });
+});
+

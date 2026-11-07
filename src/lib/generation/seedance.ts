@@ -89,7 +89,9 @@ export const seedanceProvider: GenerationProvider = {
     // Only things (car, horse…) get their cut-out, so Kling knows which one to swap.
     const targetPaths = [...Array.from({ length: people }, () => ""), ...objects.map((o) => o.target ?? "")];
     const targetRefs = targetPaths.map((path) => {
-      const url = cfg.showTargets ? mediaUrl(path?.trim() || null) : null;
+      // Off: the cut-out shows the ORIGINAL thing, and Kling mixed it into the new one (TM-100051: another
+      // car model came out), as it did with people. The customer still sees it on the order form.
+      const url = SEND_CUTOUTS && cfg.showTargets ? mediaUrl(path?.trim() || null) : null;
       if (!url || usedPhotos.length + cutouts.length >= KLING_MAX_IMAGES) return "";
       cutouts.push(url);
       return `@image_${usedPhotos.length + cutouts.length}`;
@@ -225,6 +227,8 @@ function passOf(state: ProviderState): PassRun | null {
 */
 
 const SHOTS_BUCKET = "user-videos";
+/** Cut-outs of the template's own thing to Kling: off (see the provider). */
+const SEND_CUTOUTS = false;
 /**
  * runs = indexes into passes for the people in this shot ([] = keep the shot as it is);
  * k = position in runs; mid = the current run's input after the first run.
