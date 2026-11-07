@@ -9,6 +9,7 @@ import { can } from "@/lib/auth/permissions";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { formatKzt, type PriceBreakdown } from "@/lib/pricing";
 import { ActionForm } from "../action-form";
+import { KlingTasks } from "../kling-tasks";
 import { retryGeneration, cancelGeneration, refundPayment } from "../actions";
 import { unitsFromUsd } from "@/lib/pricing-seedance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
@@ -181,6 +182,14 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
             })}</tbody>
           </table></div>
         )}
+      </section>
+
+      <section className={card}>
+        <h2 className="mb-1 font-semibold">Задачи Kling</h2>
+        <p className="mb-3 text-sm text-muted">Что вернула каждая генерация: проход каждого человека, каждая сцена. Kling хранит видео около 30 дней.</p>
+        <KlingTasks tasks={(logs ?? []).filter((l) => l.action === "generation.kling_task").reverse()
+          .map((l) => { const m = l.metadata_json as { task?: string; step?: string } | null; return { task: String(m?.task ?? ""), step: String(m?.step ?? "задача") }; })
+          .filter((t) => t.task)} />
       </section>
 
       <section className={card}>

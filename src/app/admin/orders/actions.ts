@@ -144,3 +144,20 @@ export async function setFreeOrders(_: AdminState, fd: FormData): Promise<AdminS
   revalidatePath("/admin/users");
   return { ok: ru.admin.users.saved };
 }
+
+/**
+ * Support: the video a Kling task returned, also an in-between one (the first person's run before the
+ * second, or one shot). Kling keeps the files for about 30 days. The task ids are in the order's log.
+ */
+export async function klingTaskVideo(taskId: string): Promise<{ url?: string; error?: string }> {
+  if (!(await staff("orders.view"))) return { error: "Нет доступа" };
+  if (!/^\d{6,30}$/.test(taskId.trim())) return { error: "Неверный номер задачи" };
+  try {
+    const { getKlingTask } = await import("@/lib/generation/kling");
+    const st = await getKlingTask(taskId.trim());
+    if (st.state === "succeeded") return { url: st.outputUrl };
+    return { error: st.state === "failed" ? "Задача Kling завершилась с ошибкой" : "Задача ещё выполняется" };
+  } catch {
+    return { error: "Kling не ответил" };
+  }
+}

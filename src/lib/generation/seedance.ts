@@ -104,10 +104,11 @@ export const seedanceProvider: GenerationProvider = {
       if (shotRun) return shotRun;
       const providerJobId = await submitKlingOmni({ videoUrl: input.templateVideoUrl, mode: "edit", durationSec, aspectRatio: cfg.aspectRatio, resolution, ...withKeep(passes[0]) });
       console.log("[kling] person 1 of", people);
+      await noteTask(input.jobId, providerJobId, `человек 1 из ${people}`);
       return {
         providerJobId,
         cost: seedanceCostUsd(durationSec, pricing, {}, resolution),
-        state: { stage: "pass", k: 0, passes, durationSec, aspectRatio: cfg.aspectRatio, resolution },
+        state: { stage: "pass", k: 0, passes, durationSec, aspectRatio: cfg.aspectRatio, resolution, jobId: input.jobId },
       };
     }
     const prompt = buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, wish, people, cfg.positions, objects, targetRefs);
@@ -119,6 +120,7 @@ export const seedanceProvider: GenerationProvider = {
       if (shotRun) return shotRun;
     }
     const providerJobId = await submitKlingOmni({ ...plain, photoUrls: [...usedPhotos, ...cutouts], prompt });
+    await noteTask(input.jobId, providerJobId, "видео целиком");
     // If Kling refuses the task because of a cut-out (it charges nothing then), the same order goes again without them.
     const fallback = cutouts.length
       ? { ...plain, prompt: buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, wish, people, cfg.positions, objects) }
@@ -137,6 +139,7 @@ export const seedanceProvider: GenerationProvider = {
       const k = run.k + 1;
       const id = await submitKlingOmni({ videoUrl: st.outputUrl, mode: "edit", durationSec: run.durationSec, aspectRatio: run.aspectRatio, resolution: run.resolution, ...withKeep(run.passes[k]) });
       console.log("[kling] person", k + 1, "of", run.passes.length);
+      await noteTask(run.jobId, id, `человек ${k + 1} из ${run.passes.length}`);
       return {
         state: "processing",
         next: { providerJobId: id, state: { ...run, k } as ProviderState, cost: seedanceCostUsd(run.durationSec, await seedancePricingSettings(), {}, run.resolution) },
@@ -179,13 +182,13 @@ export function withKeep(pass: Pass, inShot?: number[]): { photoUrls: string[]; 
   });
   return { photoUrls: [...pass.photoUrls, ...keep.map((p) => p.url)], prompt: `${pass.prompt} ${notes.join(" ")}` };
 }
-type PassRun = { stage: "pass"; k: number; passes: Pass[]; durationSec: number; aspectRatio: string; resolution: "720p" | "1080p" };
+type PassRun = { stage: "pass"; k: number; passes: Pass[]; durationSec: number; aspectRatio: string; resolution: "720p" | "1080p"; jobId?: string };
 function passOf(state: ProviderState): PassRun | null {
   const s = state as Partial<PassRun> | null;
   if (!s || s.stage !== "pass" || typeof s.k !== "number" || !Array.isArray(s.passes) || typeof s.durationSec !== "number") return null;
   const passes = s.passes.filter((p): p is Pass => !!p && Array.isArray(p.photoUrls) && typeof p.prompt === "string");
   if (!passes.length || s.k >= passes.length) return null;
-  return { stage: "pass", k: s.k, passes, durationSec: s.durationSec, aspectRatio: typeof s.aspectRatio === "string" ? s.aspectRatio : "adaptive", resolution: s.resolution === "1080p" ? "1080p" : "720p" };
+  return { stage: "pass", k: s.k, passes, durationSec: s.durationSec, aspectRatio: typeof s.aspectRatio === "string" ? s.aspectRatio : "adaptive", resolution: s.resolution === "1080p" ? "1080p" : "720p", jobId: typeof s.jobId === "string" ? s.jobId : undefined };
 }
 
 // ---------------------------------------------------------------- shot by shot
@@ -322,8 +325,15 @@ async function cutShots(jobId: string, videoUrl: string): Promise<{ list: (Shot 
   }
 }
 
-/** Sends shot k's current run: the first run edits the cut shot, each later run the previous result. */
-const submitShot = (run: ShotRun, k: number) => {
+/** Sends shot k's current run (the first edits the cut shot, each later run the previous result) and logs the task. */
+async function submitShot(run: ShotRun, k: number): Promise<string> {
+  const id = await sendShot(run, k);
+  const s = run.shots[k], runs = s.runs ?? run.passes.map((_, i) => i);
+  await noteTask(run.jobId, id, `сцена ${k + 1}, человек ${(run.passes[runs[s.k ?? 0]].person ?? 0) + 1}${k === run.anchor ? " (первая)" : ""}`);
+  return id;
+}
+
+const sendShot = (run: ShotRun, k: number) => {
   const s = run.shots[k];
   const runs = s.runs ?? run.passes.map((_, i) => i);
   const inShot = runs.map((i) => run.passes[i].person ?? -1);
@@ -433,4 +443,14 @@ async function shotStatus(run: ShotRun): Promise<import("./types").ProviderJobSt
     progress: Math.round((done / steps) * 90),
     ...(changed ? { next: { providerJobId: firstId, state: cur as unknown as ProviderState, cost: added } } : {}),
   };
+}
+
+/** Writes a Kling task id into the order's log, so support can watch every run's result (admin order page). */
+async function noteTask(jobId: string | undefined, task: string, step: string) {
+  if (!jobId || !task) return;
+  try {
+    const db = supabaseAdmin();
+    const { data: job } = await db.from("generation_jobs").select("order_id").eq("id", jobId).maybeSingle();
+    if (job?.order_id) await db.from("audit_logs").insert({ actor_id: null, action: "generation.kling_task", resource_type: "order", resource_id: job.order_id, metadata_json: { task, step } });
+  } catch { /* the log is only a help */ }
 }
