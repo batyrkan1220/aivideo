@@ -74,7 +74,10 @@ const responseSchema = {
 /** Tried in order after GEMINI_MODEL when it is busy or not available. */
 const FALLBACK_MODELS = ["gemini-3.8-flash", "gemini-3.5-flash-lite"];
 
-type GeminiBody = { candidates?: { content?: { parts?: { text?: string }[] } }[]; error?: { status?: string } };
+type GeminiBody = {
+  candidates?: { content?: { parts?: { text?: string }[] } }[]; error?: { status?: string };
+  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number };
+};
 
 async function callGemini(key: string, model: string, payload: string): Promise<{ ok: true; body: GeminiBody } | { ok: false; status: number; reason: string; retry: boolean }> {
   try {
@@ -86,6 +89,12 @@ async function callGemini(key: string, model: string, payload: string): Promise<
       cache: "no-store",
     });
     const body = (await res.json().catch(() => ({}))) as GeminiBody;
+    // Every call goes into the spending report (admin → ИИ и расходы).
+    const u = body.usageMetadata;
+    void import("@/lib/ai/gemini-billing").then(({ logGeminiCall }) => logGeminiCall({
+      model, purpose: "template_analysis", ok: res.ok, status: res.status,
+      input: u?.promptTokenCount ?? 0, output: (u?.candidatesTokenCount ?? 0) + (u?.thoughtsTokenCount ?? 0),
+    }));
     if (res.ok) return { ok: true, body };
     return { ok: false, status: res.status, reason: String(body.error?.status ?? "").slice(0, 60), retry: res.status === 429 || res.status >= 500 };
   } catch {

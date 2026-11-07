@@ -13,13 +13,16 @@ import { customVideoSettings } from "@/lib/custom-video/settings";
 import { SeedancePricingForm } from "../seedance-pricing/form";
 import { CustomVideoForm } from "../custom-video/form";
 import { Badge, Card, PageHead, Stat, fmtDate, usd, nowMs } from "../ui";
+import { env } from "@/lib/env";
+import { geminiBilling } from "@/lib/ai/gemini-billing";
+import { GeminiBillingForm } from "./gemini-form";
 
 export const metadata = { title: "ИИ и расходы" };
 
 export default function ServicesPage() {
   return (
     <div>
-      <PageHead title="ИИ-сервисы и расходы" lead="Баланс Kling, сколько уходит на генерацию, цены и себестоимость." />
+      <PageHead title="ИИ-сервисы и расходы" lead="Баланс Kling и Gemini, сколько уходит на генерацию, цены и себестоимость." />
       <Suspense fallback={<p className="text-muted">{ru.common.loading}</p>}>
         <Body />
       </Suspense>
@@ -43,6 +46,11 @@ async function Body() {
   const d7 = new Date(now - 7 * 86400_000).toISOString();
   const today = new Date(`${new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Almaty" }).format(new Date())}T00:00:00+05:00`).toISOString();
 
+  const [gb, { data: gem30 }, { data: gemLast }] = await Promise.all([
+    geminiBilling(),
+    db.from("ai_usage").select("created_at,ok,http_status,cost_usd,input_tokens,output_tokens").eq("service", "gemini").gte("created_at", d30).order("created_at", { ascending: false }).limit(2000),
+    db.from("ai_usage").select("created_at,ok,http_status,model").eq("service", "gemini").order("created_at", { ascending: false }).limit(1).maybeSingle(),
+  ]);
   const [kling, ap, cv, { data: jobs30 }, { data: recent }, bal] = await Promise.all([
     klingStatus(), seedancePricingSettings(), customVideoSettings(),
     db.from("generation_jobs").select("provider,status,provider_cost,created_at").gte("created_at", d30).neq("provider", "combo"),
@@ -63,6 +71,20 @@ async function Body() {
   const perVideo = done.length ? sumUsd(done) / done.length : 0;
   const video = j.filter((x) => x.provider !== "kling_photo"), photo = j.filter((x) => x.provider === "kling_photo");
   const kz = (n: number) => formatKzt(Math.round(n * rate));
+  // Gemini: our own record of every call (Google gives no balance to an API key).
+  const g = gem30 ?? [];
+  const gSum = (xs: typeof g) => xs.reduce((n, x) => n + (Number(x.cost_usd) || 0), 0);
+  const gToday = gSum(g.filter((x) => x.created_at >= today)), g7 = gSum(g.filter((x) => x.created_at >= d7)), g30 = gSum(g);
+  const gOk = g.filter((x) => x.ok).length, gFail = g.length - gOk;
+  let gSince = 0;
+  if (gb.balanceUsd !== null && gb.balanceAt) {
+    const { data: since } = await db.from("ai_usage").select("cost_usd").eq("service", "gemini").gte("created_at", gb.balanceAt).limit(5000);
+    gSince = (since ?? []).reduce((n, x) => n + (Number(x.cost_usd) || 0), 0);
+  }
+  const gLeft = gb.balanceUsd !== null ? Math.max(0, gb.balanceUsd - gSince) : null;
+  const gNoMoney = gemLast && !gemLast.ok && gemLast.http_status === 402;
+  const gBusy = gemLast && !gemLast.ok && gemLast.http_status === 429;
+  const hasKey = !!env().GEMINI_API_KEY;
 
   return (
     <div className="space-y-6">
@@ -104,6 +126,23 @@ async function Body() {
           </p>
         )}
         <p className="mt-2 text-xs text-muted">Kling обновляет остаток с задержкой до 12 часов — реальный баланс может быть меньше.</p>
+      </Card>
+
+      <Card title={<>Gemini AI (анализ шаблонов) {!hasKey ? <Badge color="red">нет ключа</Badge> : gNoMoney ? <Badge color="red">баланс закончился</Badge> : gBusy ? <Badge color="amber">лимит запросов</Badge> : <Badge color="green">подключено</Badge>}</>}>
+        {gNoMoney && (
+          <p className="mb-3 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700 ring-1 ring-red-200">
+            ⛔ Google ответил «402 — оплата не прошла» ({fmtDate.format(new Date(gemLast!.created_at))}): ИИ-анализ шаблонов не работает. Пополните баланс в Google AI Studio → Billing и впишите его ниже.
+          </p>
+        )}
+        {!hasKey && <p className="mb-3 text-sm text-muted">Добавьте GEMINI_API_KEY в Render → Environment.</p>}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Stat tone="dark" label="Осталось (оценка)" value={gLeft !== null ? usd(gLeft) : "—"} sub={gb.balanceUsd !== null && gb.balanceAt ? `${usd(gb.balanceUsd)} с ${fmtDate.format(new Date(gb.balanceAt))} − ${usd(gSince)}` : "впишите баланс ниже"} />
+          <Stat label="Расход сегодня" value={usd(gToday)} sub={kz(gToday)} />
+          <Stat label="За 7 дней" value={usd(g7)} sub={kz(g7)} />
+          <Stat tone={gFail > 0 ? "warn" : "default"} label="За 30 дней" value={usd(g30)} sub={`${gOk} запросов · ${gFail} ошибок`} />
+        </div>
+        <p className="mt-2 text-xs text-muted">Google не даёт баланс по API-ключу: остаток = баланс, который вы вписали, минус расход с того момента (по токенам каждого запроса и ценам ниже). Точный баланс — в Google AI Studio → Billing.</p>
+        <GeminiBillingForm balanceUsd={gb.balanceUsd} inputUsdPer1M={gb.inputUsdPer1M} outputUsdPer1M={gb.outputUsdPer1M} />
       </Card>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
