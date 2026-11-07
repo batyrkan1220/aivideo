@@ -145,9 +145,9 @@ export function DepthStack({ items }: { items: Item[] }) {
             </span>
           </Link>
 
-          {/* Floating data chips (wide screens). */}
-          <span className={`absolute -left-[42%] top-[18%] hidden items-center gap-2 rounded-2xl px-3 py-2 text-xs font-semibold text-ink md:inline-flex [transform:translateZ(60px)] ${chip}`}>
-            <ScanFace size={16} className="text-ink" aria-hidden />{h.hxFace}
+          {/* Floating data chips: "Лицо найдено" on every screen (smaller on phones), "Готово" on wide ones. */}
+          <span className={`absolute -left-[46%] top-[20%] inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl px-2 py-1.5 text-[10px] font-semibold text-ink sm:-left-[42%] sm:top-[18%] sm:gap-2 sm:rounded-2xl sm:px-3 sm:py-2 sm:text-xs [transform:translateZ(60px)] ${chip}`}>
+            <ScanFace className="h-3.5 w-3.5 text-ink sm:h-4 sm:w-4" aria-hidden />{h.hxFace}
           </span>
           <span className={`absolute -right-[38%] bottom-[22%] hidden items-center gap-2 rounded-2xl px-3 py-2 text-xs font-semibold text-ink md:inline-flex [transform:translateZ(60px)] ${chip}`}>
             <Zap size={15} className="text-ink" aria-hidden />{h.hxReady}
