@@ -71,8 +71,31 @@ export function findBy(pos?: string): string {
   return t.split(",").map((p) => p.replace(/\s+/g, " ").replace(/^(and|with|a|an)\s+|\s+(and|with)$/gi, "").trim()).filter(Boolean).join(", ");
 }
 
+/**
+ * A template where only things are replaced (a car, a horse…), nobody's face: no person rules at all,
+ * and every person in the video stays exactly as they are.
+ */
+function thingsOnlyPrompt(mode: KlingMode, adminPrompt: string, wish: string, objects: { what: string; look?: string }[], targetRefs: string[], shot: boolean): string {
+  const things = objects.map((o, j) => ({ what: o.what.trim().toLowerCase(), look: o.look?.trim() ?? "", ref: `@image_${j + 1}`, shown: targetRefs[j] ? ` shown in ${targetRefs[j]}` : "" }));
+  const parts: string[] = [mode === "edit" ? "Edit @video_1." : "Follow the motion, actions, timing, camera movement, framing and cuts of @video_1, and recreate its location, background and lighting."];
+  for (const t of things) {
+    parts.push(`${t.ref} is a photo of a ${t.what}. Replace the ${t.what}${t.look ? ` (${t.look})` : ""}${t.shown} in @video_1 with the ${t.what} from ${t.ref}: the same type, model or breed, color, shape, markings, logos and details, in the same place, size, angle and movement, matching the scene's lighting, reflections and shadows in every frame.`);
+  }
+  parts.push(mode === "edit"
+    ? "Keep everything else in @video_1 unchanged: every person with their own face and body, background, location, other objects, lighting, camera movement, framing, cuts, motion and timing."
+    : "Keep every person as in @video_1.");
+  const cutouts = targetRefs.filter(Boolean);
+  if (cutouts.length) parts.push(`${cutouts.join(", ")} ${cutouts.length === 1 ? "is a cut-out" : "are cut-outs"} from @video_1 that only show${cutouts.length === 1 ? "s" : ""} which one to replace. Never copy anything else from them into the result.`);
+  parts.push("Photorealistic, natural, sharp, no text, no watermark.");
+  if (adminPrompt && !shot) parts.push(`Scene and motion to keep from @video_1: ${adminPrompt}`);
+  parts.push(`Final check: every replaced ${things.map((t) => t.what).join(", ")} in the result is the one from ${things.map((t) => t.ref).join(", ")} in every frame where it is seen.`);
+  if (wish) parts.push("Everything above is mandatory and has priority.", `Optional customer wish (lower priority): "${wish}". Apply it only where it does not contradict the mandatory rules above.`);
+  return parts.join(" ");
+}
+
 export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "template", adminPrompt: string, wish: string, people = 1, positions: string[] = [], objects: { what: string; look?: string }[] = [], targetRefs: string[] = [], shot = false): string {
   // Optional cut-outs from the template (@image_k) that show which person or thing is meant: people first, then things.
+  if (people === 0) return thingsOnlyPrompt(mode, adminPrompt, wish, objects, targetRefs, shot);
   const shown = (i: number) => (targetRefs[i] ? ` shown in ${targetRefs[i]}` : "");
   const refs = Array.from({ length: people }, (_, i) => `@image_${i + 1}`);
   const things = objects.map((o, j) => ({ what: o.what.trim().toLowerCase(), look: o.look?.trim() ?? "", ref: `@image_${people + j + 1}`, shown: shown(people + j) }));

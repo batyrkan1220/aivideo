@@ -322,3 +322,21 @@ describe("two people in the same place (TM-100042)", () => {
   });
 });
 
+
+describe("things only (0 people)", () => {
+  it("the customer's car photo goes as @image_1, no person run", async () => {
+    const bodies: { contents: { type: string; url?: string; text?: string }[] }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_u: string, init?: RequestInit) => {
+      if (init?.body) bodies.push(JSON.parse(String(init.body)));
+      return new Response(JSON.stringify({ code: 0, data: { id: "c1" } }), { status: 200 });
+    }));
+    const r = await seedanceProvider.submit({ jobId: "jc", templateVideoUrl: "https://t/v.mp4", templateFrameUrl: null, quality: "720p",
+      faces: [{ slotKey: "obj_1", providerInput: "img_1", imageUrl: "https://s/car.jpg" }],
+      config: { durationSec: 8, people: 0, objects: [{ what: "car", label: "Фото машины", look: "the red sports car" }] } });
+    expect(r.providerJobId).toBe("c1");
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0].contents.filter((c) => c.type === "refer_image").map((c) => c.url)).toEqual(["https://s/car.jpg"]);
+    expect(bodies[0].contents[0].text).toContain("Replace the car (the red sports car) in @video_1 with the car from @image_1");
+    vi.unstubAllGlobals();
+  });
+});

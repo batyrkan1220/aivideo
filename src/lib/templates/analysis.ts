@@ -51,7 +51,8 @@ export const needsReanalysis = (cfg: Pick<SeedanceConfig, "analyzedAt" | "analys
  * keep: the admin's people count and things stay as they are (only descriptions and cut-outs are added).
  */
 export function applyAnalysis(cfg: SeedanceConfig, a: Analysis, cuts: { people: string[]; objects: string[]; peopleKling?: string[] }, keep = false, now = new Date()): SeedanceConfig {
-  const n = keep ? cfg.people : Math.max(1, Math.min(SEEDANCE_MAX_PEOPLE, a.people.length));
+  // No people found but things (a car video): nobody to replace. Nothing found at all: one person, as before.
+  const n = keep ? cfg.people : a.people.length ? Math.min(SEEDANCE_MAX_PEOPLE, a.people.length) : a.objects.length ? 0 : 1;
   const positions = Array.from({ length: n }, (_, i) => {
     const p = a.people[i];
     return p ? [p.where, p.look].filter(Boolean).join(", ").slice(0, 120) : (cfg.positions[i] ?? "");

@@ -152,7 +152,7 @@ export function TemplateEditor({
     setSd({ ...next, klingMode: "edit" });
     const scene = r.scene ? `Keep the video 1:1: ${r.scene}` : "";
     setSceneTip(scene && sd.prompt.trim() ? scene : null);
-    setAi({ busy: false, text: r.people.length ? e.seedance.aiDone : e.seedance.detectNone, found: [...r.people.map((x) => x.ru), ...r.objects.map((x) => x.ru)] });
+    setAi({ busy: false, text: r.people.length || r.objects.length ? e.seedance.aiDone : e.seedance.detectNone, found: [...r.people.map((x) => x.ru), ...r.objects.map((x) => x.ru)] });
   };
 
   // Customer photo slots = the number of people the admin set, left → right (the server derives them too).
@@ -384,7 +384,7 @@ export function TemplateEditor({
                     <label className="inline-flex items-center gap-2">
                       <span className="text-muted">{e.seedance.people}:</span>
                       <select className="rounded-lg border border-line px-2 py-1" value={sd.people} onChange={(ev) => setSd({ people: Number(ev.target.value) })}>
-                        {Array.from({ length: SEEDANCE_MAX_PEOPLE }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
+                        {Array.from({ length: SEEDANCE_MAX_PEOPLE + 1 }, (_, i) => i).map((n) => <option key={n} value={n}>{n === 0 ? "0 — только предметы" : n}</option>)}
                       </select>
                     </label>
                     {sd.objects.length < SEEDANCE_MAX_OBJECTS && (

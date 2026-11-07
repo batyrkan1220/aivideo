@@ -128,3 +128,13 @@ describe("hands and skin (TM-100047)", () => {
     expect(p).toContain("skin color and tone of @image_1 (from the face and neck when only the face is shown)");
   });
 });
+
+describe("things only (0 people)", () => {
+  it("replaces the car, says nothing about faces, keeps the people", () => {
+    const p = buildKlingDirectPrompt("edit", "photo", "", "", 0, [], [{ what: "car", look: "the white sedan on the right" }]);
+    expect(p).toContain("@image_1 is a photo of a car. Replace the car (the white sedan on the right) in @video_1 with the car from @image_1");
+    expect(p).toContain("every person with their own face and body");
+    expect(p).not.toContain("100% identical");
+    expect(p).not.toContain("Hands and arms");
+  });
+});

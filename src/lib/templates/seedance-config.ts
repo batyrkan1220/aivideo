@@ -40,8 +40,8 @@ export const seedanceConfigSchema = z.object({
   /** Only Kling 4.0 (official API) now; any older value is read as it. */
   mode: z.literal("kd").catch("kd").default("kd"),
   klingMode: z.enum(["edit", "reference"]).catch("edit").default("edit"),
-  /** How many people in the video are replaced (one customer photo each). */
-  people: z.number().int().min(1).max(SEEDANCE_MAX_PEOPLE).default(1),
+  /** How many people in the video are replaced (one customer photo each). 0 = only things (a car…), nobody is replaced. */
+  people: z.number().int().min(0).max(SEEDANCE_MAX_PEOPLE).default(1),
   /** What photo the customer needs (shown on the order page). */
   framing: z.enum(["face", "half", "full"]).default("half"),
   aspectRatio: z.enum(["adaptive", "9:16", "16:9", "1:1", "3:4", "4:3"]).catch("9:16").default("9:16"),

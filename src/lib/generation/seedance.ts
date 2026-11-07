@@ -63,9 +63,11 @@ export const seedanceProvider: GenerationProvider = {
     // People first (img_1…img_n), then the things to swap (car, horse, outfit…).
     // How many people is the number set on the template.
     // Only photos that were actually uploaded count, so a car slot is never sent as a person.
-    const declaredPeople = Math.min(SEEDANCE_MAX_PEOPLE, Math.max(1, cfg.people));
+    // 0 people: a template where only things are replaced (a car…); every photo is a thing.
+    const declaredPeople = Math.min(SEEDANCE_MAX_PEOPLE, Math.max(0, cfg.people));
     const objects = cfg.objects.slice(0, Math.min(SEEDANCE_MAX_OBJECTS, Math.max(0, photos.length - declaredPeople)));
-    const people = Math.min(declaredPeople, Math.max(1, photos.length - objects.length));
+    const people = declaredPeople === 0 ? 0 : Math.min(declaredPeople, Math.max(1, photos.length - objects.length));
+    if (people === 0 && !objects.length) throw new ProviderError("provider_bad_params", false, "nothing to replace");
     const resolution: "720p" | "1080p" = input.quality === "1080p" ? "1080p" : "720p";
     // Photos go straight to the video call as reference images, people first, then things.
     const usedPhotos = photos.slice(0, people + objects.length);
