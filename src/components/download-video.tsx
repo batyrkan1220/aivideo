@@ -1,10 +1,17 @@
 "use client";
 import { Download, Send, Share2 } from "lucide-react";
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { kk } from "@/lib/i18n/kk";
 import { haptic, launchInitData, telegramApp } from "@/lib/telegram/client";
 
 const r = kk.result;
+
+/** iPhone / iPad (iPadOS reports itself as a Mac with touch). */
+const isIOS = () => typeof navigator !== "undefined" && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+/** Browsers inside Instagram, Facebook, TikTok…: downloads and the share sheet usually do not work there. */
+const isInApp = () => typeof navigator !== "undefined" && /Instagram|FBAN|FBAV|FB_IAB|musical_ly|BytedanceWebview|TikTok|Line\//i.test(navigator.userAgent);
+type Env = "ios" | "android" | "inapp" | "other";
+const envNow = (): Env => (isInApp() ? "inapp" : isIOS() ? "ios" : /Android/i.test(typeof navigator !== "undefined" ? navigator.userAgent : "") ? "android" : "other");
 const btn = "inline-flex h-13 items-center justify-center gap-2 rounded-full px-6 font-semibold transition-[transform,background-color] duration-200 active:scale-[0.98]";
 
 /**
@@ -19,9 +26,7 @@ export function DownloadVideo({ orderId, photo = false }: { orderId: string; pho
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error" | "too_large">("idle");
   const href = `/api/orders/${orderId}/video?download=1`;
 
-  if (!inTg) {
-    return <a href={href} className={`${btn} btn-glow w-full`}><Download size={18} strokeWidth={2.2} aria-hidden />{label}</a>;
-  }
+  if (!inTg) return <SaveToGallery href={href} photo={photo} label={label} />;
 
   const sendToChat = async () => {
     if (state === "sending") return;
@@ -104,7 +109,7 @@ export function SendComboToChat({ orderId }: { orderId: string }) {
 
 /** Phones: share the finished video file straight to Instagram, TikTok, WhatsApp… (Web Share with files). */
 export function ShareVideo({ orderId, title, photo = false }: { orderId: string; title: string; photo?: boolean }) {
-  const can = useSyncExternalStore(() => () => {}, () => typeof navigator !== "undefined" && "canShare" in navigator && !launchInitData(), () => false);
+  const can = useSyncExternalStore(() => () => {}, () => typeof navigator !== "undefined" && "canShare" in navigator && !launchInitData() && !isIOS() && !isInApp(), () => false);
   const [busy, setBusy] = useState(false);
   if (!can) return null;
   const share = async () => {
@@ -124,5 +129,69 @@ export function ShareVideo({ orderId, title, photo = false }: { orderId: string;
       {busy ? <span className="h-5 w-5 animate-spin rounded-full border-2 border-black/15 border-t-black" aria-hidden /> : <Share2 size={18} aria-hidden />}
       {r.share}
     </button>
+  );
+}
+
+/**
+ * Browser (not Telegram): straight into the phone's gallery where the phone allows it.
+ *  - iPhone: a site cannot write to Photos; the share sheet can ("Сохранить видео"). The file is loaded
+ *    in advance, so the sheet opens right on the tap (Safari needs the tap and the share together).
+ *  - Android: a normal download goes to Downloads, which the gallery shows.
+ *  - Instagram / TikTok in-app browsers: saving does not work there; say how to open the real browser.
+ */
+function SaveToGallery({ href, photo, label }: { href: string; photo: boolean; label: string }) {
+  const env = useSyncExternalStore(() => () => {}, envNow, () => "other" as Env);
+  const file = useRef<File | null>(null);
+  const [ready, setReady] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const canShareFiles = env === "ios" && typeof navigator !== "undefined" && "canShare" in navigator;
+
+  useEffect(() => {
+    if (!canShareFiles) return;
+    let stop = false;
+    fetch(href, { credentials: "same-origin" }).then((res) => (res.ok ? res.blob() : null)).then((blob) => {
+      if (stop || !blob) return;
+      const f = new File([blob], photo ? "trendme.jpg" : "trendme.mp4", { type: blob.type || (photo ? "image/jpeg" : "video/mp4") });
+      if (navigator.canShare?.({ files: [f] })) { file.current = f; setReady(true); }
+    }).catch(() => {});
+    return () => { stop = true; };
+  }, [canShareFiles, href, photo]);
+
+  const save = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (!file.current) {
+        // Not loaded yet: load now, then share (works while the tap still counts).
+        const blob = await (await fetch(href, { credentials: "same-origin" })).blob();
+        file.current = new File([blob], photo ? "trendme.jpg" : "trendme.mp4", { type: blob.type || (photo ? "image/jpeg" : "video/mp4") });
+      }
+      await navigator.share({ files: [file.current] });
+    } catch (e) {
+      // Closed by the user: nothing to do. Anything else: the plain download.
+      if (!(e instanceof DOMException && e.name === "AbortError")) location.href = href;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const galleryLabel = photo ? r.savePhotoToGallery : r.saveToGallery;
+  if (env === "ios" && canShareFiles) {
+    return (
+      <div className="w-full space-y-2">
+        <button type="button" onClick={() => void save()} disabled={busy} className={`${btn} btn-glow w-full disabled:opacity-70`}>
+          {busy || !ready ? <span className="h-5 w-5 animate-spin rounded-full border-2 border-black/15 border-t-black" aria-hidden /> : <Download size={18} strokeWidth={2.2} aria-hidden />}
+          {!ready && !busy ? r.preparing : galleryLabel}
+        </button>
+        <p className="t-small text-center text-muted">{photo ? r.iosPhotoHint : r.iosHint}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="w-full space-y-2">
+      <a href={href} className={`${btn} btn-glow w-full`}><Download size={18} strokeWidth={2.2} aria-hidden />{env === "android" ? galleryLabel : label}</a>
+      {env === "android" && !photo && <p className="t-small text-center text-muted">{r.androidHint}</p>}
+      {env === "inapp" && <p className="t-small text-center text-muted">{r.inAppHint}</p>}
+    </div>
   );
 }
