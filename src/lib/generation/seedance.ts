@@ -92,11 +92,13 @@ export const seedanceProvider: GenerationProvider = {
         return {
           photoUrls: [usedPhotos[k], ...(last ? objectPhotos : [])],
           prompt: buildKlingDirectPrompt("edit", outfit, cfg.prompt, last ? wish : "", 1, [where], last ? objects : [], [], shot),
+          who: cfg.positions[k]?.trim() || "",
+          person: k,
         };
       });
       const passes = passesFor(false);
       // With cuts: every shot goes through every person's run, then the shots are joined (TM-100038).
-      const shotRun = await startShots(input.jobId, input.templateVideoUrl, passesFor(true), cfg.aspectRatio, resolution, pricing);
+      const shotRun = await startShots(input.jobId, input.templateVideoUrl, passesFor(true), cfg.aspectRatio, resolution, pricing, cfg.shotMap);
       if (shotRun) return shotRun;
       const providerJobId = await submitKlingOmni({ videoUrl: input.templateVideoUrl, mode: "edit", durationSec, aspectRatio: cfg.aspectRatio, resolution, ...passes[0] });
       console.log("[kling] person 1 of", people);
@@ -111,7 +113,7 @@ export const seedanceProvider: GenerationProvider = {
     // A template with cuts: Kling loses the face after a cut, so each shot is edited on its own (TM-100034).
     if (cfg.klingMode === "edit") {
       const shotPrompt = buildKlingDirectPrompt("edit", outfit, cfg.prompt, wish, people, cfg.positions, objects, targetRefs, true);
-      const shotRun = await startShots(input.jobId, input.templateVideoUrl, [{ photoUrls: [...usedPhotos, ...cutouts], prompt: shotPrompt }], cfg.aspectRatio, resolution, pricing);
+      const shotRun = await startShots(input.jobId, input.templateVideoUrl, [{ photoUrls: [...usedPhotos, ...cutouts], prompt: shotPrompt, who: people === 1 ? cfg.positions[0]?.trim() ?? "" : "", person: people === 1 ? 0 : -1 }], cfg.aspectRatio, resolution, pricing, cfg.shotMap);
       if (shotRun) return shotRun;
     }
     const providerJobId = await submitKlingOmni({ ...plain, photoUrls: [...usedPhotos, ...cutouts], prompt });
@@ -154,7 +156,8 @@ function fallbackOf(state: ProviderState): Fallback | null {
     mode: f.mode === "reference" ? "reference" : "edit", aspectRatio: typeof f.aspectRatio === "string" ? f.aspectRatio : "adaptive", resolution: f.resolution === "1080p" ? "1080p" : "720p" };
 }
 
-type Pass = { photoUrls: string[]; prompt: string };
+/** who: where the person is (for the look reference); person: their index (-1 = all of them in one run). */
+type Pass = { photoUrls: string[]; prompt: string; who?: string; person?: number };
 type PassRun = { stage: "pass"; k: number; passes: Pass[]; durationSec: number; aspectRatio: string; resolution: "720p" | "1080p" };
 function passOf(state: ProviderState): PassRun | null {
   const s = state as Partial<PassRun> | null;
@@ -165,12 +168,29 @@ function passOf(state: ProviderState): PassRun | null {
 }
 
 // ---------------------------------------------------------------- shot by shot
+/*
+  A template with cuts, edited shot by shot (admin switch "По сценам"):
+  - who is in each shot comes from the admin's shot map; a shot with nobody to replace is kept exactly
+    as in the template, without Kling (Kling changed such shots and could put a person into them),
+    and a shot runs only for the people seen in it;
+  - Kling makes every task on its own, so the same person came out a little different in each shot
+    (TM-100040). The shot with the most people (the longest of those) is made first; two frames of its
+    result then go with every other shot as the look to copy: face, hair, skin, body, clothing.
+*/
 
 const SHOTS_BUCKET = "user-videos";
-/** k = the run (person) this shot is at; mid = that run's input after the first run. */
-type Shot = { path: string; url: string; len: number; frames?: number; id?: string | null; out?: string | null; k?: number; mid?: string | null };
-type ShotRun = { stage: "shots"; shots: Shot[]; passes: Pass[]; aspectRatio: string; resolution: "720p" | "1080p"; soundUrl: string; fps?: number };
+/**
+ * runs = indexes into passes for the people in this shot ([] = keep the shot as it is);
+ * k = position in runs; mid = the current run's input after the first run.
+ */
+type Shot = { path: string; url: string; len: number; frames?: number; runs?: number[]; id?: string | null; out?: string | null; k?: number; mid?: string | null };
+type ShotRun = {
+  stage: "shots"; shots: Shot[]; passes: Pass[]; aspectRatio: string; resolution: "720p" | "1080p"; soundUrl: string; fps?: number;
+  /** The shot made first; looks = frames of its result (signed URLs), once it is done. */
+  anchor?: number | null; looks?: string[] | null; jobId?: string;
+};
 type Pricing = Awaited<ReturnType<typeof seedancePricingSettings>>;
+type ShotMap = { starts: number[]; people: number[][] } | undefined;
 
 function shotsOf(state: ProviderState): ShotRun | null {
   const s = state as (Partial<ShotRun> & { photoUrls?: string[]; prompt?: string }) | null;
@@ -179,40 +199,84 @@ function shotsOf(state: ProviderState): ShotRun | null {
   const passes = Array.isArray(s.passes) ? s.passes.filter((p): p is Pass => !!p && Array.isArray(p.photoUrls) && typeof p.prompt === "string")
     : Array.isArray(s.photoUrls) && typeof s.prompt === "string" ? [{ photoUrls: s.photoUrls, prompt: s.prompt }] : [];
   if (!passes.length) return null;
-  return { stage: "shots", shots: s.shots as Shot[], passes, aspectRatio: typeof s.aspectRatio === "string" ? s.aspectRatio : "adaptive",
-    resolution: s.resolution === "1080p" ? "1080p" : "720p", soundUrl: typeof s.soundUrl === "string" ? s.soundUrl : "", fps: typeof s.fps === "number" ? s.fps : undefined };
+  return {
+    stage: "shots", shots: s.shots as Shot[], passes, aspectRatio: typeof s.aspectRatio === "string" ? s.aspectRatio : "adaptive",
+    resolution: s.resolution === "1080p" ? "1080p" : "720p", soundUrl: typeof s.soundUrl === "string" ? s.soundUrl : "", fps: typeof s.fps === "number" ? s.fps : undefined,
+    anchor: typeof s.anchor === "number" ? s.anchor : null, looks: Array.isArray(s.looks) ? s.looks.filter((u): u is string => typeof u === "string") : null,
+    jobId: typeof s.jobId === "string" ? s.jobId : undefined,
+  };
 }
 
-/** Cuts the template and sends every shot's first run; null = one shot (the caller sends the video whole). */
-async function startShots(jobId: string, videoUrl: string, passes: Pass[], aspectRatio: string, resolution: "720p" | "1080p", pricing: Pricing) {
+/** The runs of a shot (passes to apply), by who is in it. Without a usable map: everybody, everywhere. */
+export function shotRuns(passes: { person?: number }[], seen: number[] | null): number[] {
+  const all = passes.map((_, i) => i);
+  if (!seen) return all;
+  // One run for several people (person -1): it runs when any of them is in the shot.
+  return all.filter((i) => { const p = passes[i].person ?? -1; return p < 0 ? seen.length > 0 : seen.includes(p); });
+}
+
+/** The admin's map fits the shots found now when they begin at the same times (within two frames). */
+export function mapFor(map: ShotMap, starts: number[]): number[][] | null {
+  if (!map || map.starts.length !== starts.length || map.people.length !== starts.length) return null;
+  return map.starts.every((t, i) => Math.abs(t - starts[i]) < 0.08) ? map.people : null;
+}
+
+/** Shot made first: the one with the most runs (people), the longest of those. */
+export function pickAnchor(shots: { len: number; runs?: number[] }[]): number | null {
+  let best = -1;
+  shots.forEach((s, i) => {
+    const n = s.runs?.length ?? 0;
+    if (!n) return;
+    const bn = best < 0 ? 0 : shots[best].runs?.length ?? 0;
+    if (best < 0 || n > bn || (n === bn && s.len > shots[best].len)) best = i;
+  });
+  return best < 0 ? null : best;
+}
+
+/** Cuts the template and sends the first shot (or the only one); null = one shot (the caller sends the video whole). */
+async function startShots(jobId: string, videoUrl: string, passes: Pass[], aspectRatio: string, resolution: "720p" | "1080p", pricing: Pricing, map?: ShotMap) {
   // Off by default: the whole video goes to Kling at once (switch in the admin template list).
   const { catalogSettings } = await import("@/lib/catalog/settings");
   if (!(await catalogSettings()).splitShots) return null;
   const cut = await prepareShots(jobId, videoUrl);
   if (!cut) return null;
-  const shots = cut.list;
-  const run: ShotRun = { stage: "shots", shots, passes, aspectRatio, resolution, soundUrl: videoUrl, fps: cut.fps };
-  const first = await submitShot(run, 0);
-  shots[0].id = first;
-  let cost = seedanceCostUsd(klingShotSec(shots[0].len), pricing, {}, resolution);
-  for (let k = 1; k < shots.length; k++) {
-    // Busy or refused: tried again on the next poll, which also reports a real failure.
-    const id = await submitShot(run, k).catch(() => null);
-    if (id) { shots[k].id = id; cost += seedanceCostUsd(klingShotSec(shots[k].len), pricing, {}, resolution); }
+  const seen = mapFor(map, cut.list.map((s) => s.start));
+  const shots: Shot[] = cut.list.map(({ start: _start, ...s }, i) => {
+    const runs = shotRuns(passes, seen ? seen[i] : null);
+    // Nobody to replace here: the template's own shot, untouched.
+    return { ...s, runs, ...(runs.length ? {} : { out: s.url }) };
+  });
+  const work = shots.filter((s) => !s.out).length;
+  if (!work) {
+    console.log("[kling] shots: nobody to replace in any shot; video sent whole");
+    await supabaseAdmin().storage.from(SHOTS_BUCKET).remove(shots.map((s) => s.path)).catch(() => {});
+    return null;
   }
-  console.log("[kling] template in", shots.length, "shots ×", run.passes.length, passes.length > 1 ? "people" : "person");
+  const anchor = work > 1 ? pickAnchor(shots) : null;
+  const run: ShotRun = { stage: "shots", shots, passes, aspectRatio, resolution, soundUrl: videoUrl, fps: cut.fps, anchor, looks: null, jobId };
+  let first = "", cost = 0;
+  for (const [k, s] of shots.entries()) {
+    if (s.out || (anchor != null && k !== anchor)) continue;
+    // The first task must go (its error goes to the worker); later ones are retried on the next poll.
+    const id = first ? await submitShot(run, k).catch(() => null) : await submitShot(run, k);
+    if (!id) continue;
+    s.id = id;
+    first ||= id;
+    cost += seedanceCostUsd(klingShotSec(s.len), pricing, {}, resolution);
+  }
+  console.log("[kling] template in", shots.length, "shots, runs per shot:", shots.map((s) => s.runs?.length ?? 0).join(","),
+    seen ? "(admin map)" : "(no map: everyone in every shot)", anchor != null ? `· shot ${anchor + 1} first` : "");
   return { providerJobId: first, cost, state: run as unknown as ProviderState };
 }
 
-/** Cuts the template into shots and stores them privately for Kling; null = one shot (or it could not be cut). */
-async function prepareShots(jobId: string, videoUrl: string): Promise<{ list: Shot[]; fps: number } | null> {
+async function prepareShots(jobId: string, videoUrl: string): Promise<{ list: (Shot & { start: number })[]; fps: number } | null> {
   const shots = await cutShots(jobId, videoUrl);
   // Finished without a crash: a normal retry may cut again.
   await supabaseAdmin().from("generation_jobs").update({ provider_state: null }).eq("id", jobId);
   return shots;
 }
 
-async function cutShots(jobId: string, videoUrl: string): Promise<{ list: Shot[]; fps: number } | null> {
+async function cutShots(jobId: string, videoUrl: string): Promise<{ list: (Shot & { start: number })[]; fps: number } | null> {
   const db = supabaseAdmin();
   // Once per job: if the server went down while cutting (out of memory), the retry sends the video whole.
   const { data: job } = await db.from("generation_jobs").select("provider_state").eq("id", jobId).maybeSingle();
@@ -222,13 +286,13 @@ async function cutShots(jobId: string, videoUrl: string): Promise<{ list: Shot[]
     const { splitAtCuts } = await import("@/lib/media/scene-parts");
     const split = await splitAtCuts(videoUrl);
     if (!split) return null;
-    const shots: Shot[] = [];
+    const shots: (Shot & { start: number })[] = [];
     for (const [k, p] of split.parts.entries()) {
       const path = `kling-shots/${jobId}/p${k}.mp4`;
       const { error } = await db.storage.from(SHOTS_BUCKET).upload(path, p.file, { contentType: "video/mp4", upsert: true });
       const { data: signed } = error ? { data: null } : await db.storage.from(SHOTS_BUCKET).createSignedUrl(path, 48 * 3600);
       if (!signed) { console.error("[kling] shot upload failed", error?.message?.slice(0, 120)); return null; }
-      shots.push({ path, url: signed.signedUrl, len: p.len, frames: p.frames });
+      shots.push({ path, url: signed.signedUrl, len: p.len, frames: p.frames, start: p.start });
     }
     return { list: shots, fps: split.fps };
   } catch (err) {
@@ -239,15 +303,53 @@ async function cutShots(jobId: string, videoUrl: string): Promise<{ list: Shot[]
 
 /** Sends shot k's current run: the first run edits the cut shot, each later run the previous result. */
 const submitShot = (run: ShotRun, k: number) => {
-  const s = run.shots[k], pass = run.passes[s.k ?? 0];
+  const s = run.shots[k];
+  const runs = s.runs ?? run.passes.map((_, i) => i);
+  const pass = run.passes[runs[s.k ?? 0]];
+  // The look from the first finished shot goes with every other shot, while Kling's 10 images last,
+  // and only for a person who is in that first shot (else there is nothing of them to copy).
+  const anchorRuns = run.anchor != null ? run.shots[run.anchor]?.runs ?? run.passes.map((_, i) => i) : [];
+  const useLooks = k !== run.anchor && !!run.looks?.length && anchorRuns.includes(runs[s.k ?? 0]);
+  const looks = useLooks ? run.looks!.slice(0, Math.max(0, KLING_MAX_IMAGES - pass.photoUrls.length)) : [];
+  const lookRefs = looks.map((_, i) => `@image_${pass.photoUrls.length + i + 1}`);
   return submitKlingOmni({
-    videoUrl: (s.k ?? 0) > 0 && s.mid ? s.mid : s.url, photoUrls: pass.photoUrls, mode: "edit", prompt: pass.prompt,
+    videoUrl: (s.k ?? 0) > 0 && s.mid ? s.mid : s.url, photoUrls: [...pass.photoUrls, ...looks], mode: "edit",
+    prompt: lookRefs.length ? `${pass.prompt} ${lookNote(lookRefs, pass)}` : pass.prompt,
     durationSec: klingShotSec(s.len), aspectRatio: run.aspectRatio, resolution: run.resolution,
   });
 };
 
+/** Prompt part for the look reference: frames of another shot of this video, already made. */
+export function lookNote(refs: string[], pass: { who?: string; person?: number }): string {
+  const one = refs.length === 1;
+  const whom = (pass.person ?? 0) < 0 ? "the replaced people" : `the replaced person${pass.who ? ` (${pass.who})` : ""}`;
+  return `${refs.join(" and ")} ${one ? "is a frame" : "are frames"} from another shot of this same video, already edited. ` +
+    `Make ${whom} look exactly as in ${one ? "it" : "them"}: the same face, hair, skin, body and clothing, so the person is the same in every shot. ` +
+    `Take only the person's look from ${refs.join(" and ")}: not the background, pose, framing or anyone else.`;
+}
+
 async function removeShots(run: ShotRun) {
-  await supabaseAdmin().storage.from(SHOTS_BUCKET).remove(run.shots.map((s) => s.path)).catch(() => {});
+  const looks = run.jobId ? [0, 1].map((i) => `kling-shots/${run.jobId}/look${i}.jpg`) : [];
+  await supabaseAdmin().storage.from(SHOTS_BUCKET).remove([...run.shots.map((s) => s.path), ...looks]).catch(() => {});
+}
+
+/** Two frames of the first finished shot (inside its real length), stored for Kling; [] if they could not be made. */
+async function makeLooks(run: ShotRun, out: string, len: number): Promise<string[]> {
+  try {
+    const { grabFrames } = await import("@/lib/media/scene-parts");
+    const frames = await grabFrames(out, [len * 0.4, len * 0.75]);
+    const db = supabaseAdmin(), urls: string[] = [];
+    for (const [i, f] of frames.entries()) {
+      const path = `kling-shots/${run.jobId ?? "x"}/look${i}.jpg`;
+      const { error } = await db.storage.from(SHOTS_BUCKET).upload(path, f, { contentType: "image/jpeg", upsert: true });
+      const { data } = error ? { data: null } : await db.storage.from(SHOTS_BUCKET).createSignedUrl(path, 48 * 3600);
+      if (data) urls.push(data.signedUrl);
+    }
+    return urls;
+  } catch (err) {
+    console.error("[kling] look frames failed", err instanceof Error ? err.message.slice(0, 120) : "error");
+    return [];
+  }
 }
 
 async function shotStatus(run: ShotRun): Promise<import("./types").ProviderJobStatus> {
@@ -255,39 +357,55 @@ async function shotStatus(run: ShotRun): Promise<import("./types").ProviderJobSt
   const cur: ShotRun = { ...run, shots };
   const pricing = await seedancePricingSettings();
   let added = 0, changed = false;
+  const fail = async (err: unknown): Promise<import("./types").ProviderJobStatus> => {
+    await removeShots(run);
+    return { state: "failed", errorCode: err instanceof ProviderError ? err.code : "provider_failed", retryable: false };
+  };
+  // 1. Poll every running task; move a shot to its next person or mark it done.
   for (const [k, s] of shots.entries()) {
-    if (s.out) continue;
-    if (s.id) {
-      const st = await getKlingTask(s.id);
-      if (st.state === "failed") { await removeShots(run); return st; }
-      if (st.state !== "succeeded") continue;
-      changed = true;
-      const next = (s.k ?? 0) + 1;
-      if (next >= run.passes.length) { s.out = st.outputUrl; continue; }
+    if (s.out || !s.id) continue;
+    const runs = s.runs ?? run.passes.map((_, i) => i);
+    const st = await getKlingTask(s.id);
+    if (st.state === "failed") { await removeShots(run); return st; }
+    if (st.state !== "succeeded") continue;
+    changed = true;
+    const next = (s.k ?? 0) + 1;
+    if (next < runs.length) {
       // Next person in this shot, on the result so far.
       s.k = next; s.mid = st.outputUrl; s.id = null;
-      console.log("[kling] shot", k + 1, "person", next + 1, "of", run.passes.length);
+      console.log("[kling] shot", k + 1, "person", next + 1, "of", runs.length);
+      continue;
     }
+    s.out = st.outputUrl;
+    if (k === cur.anchor) {
+      // First shot done: its look goes with all the others.
+      cur.looks = await makeLooks(cur, st.outputUrl, s.len);
+      console.log("[kling] shot", k + 1, "done first;", cur.looks.length, "look frames for the other shots");
+    }
+  }
+  // 2. Send what is waiting: every shot once the first one is done (before that only the first one).
+  const anchorDone = cur.anchor == null || !!shots[cur.anchor].out;
+  for (const [k, s] of shots.entries()) {
+    if (s.out || s.id || (!anchorDone && k !== cur.anchor)) continue;
     try {
       s.id = await submitShot(cur, k);
       added += seedanceCostUsd(klingShotSec(s.len), pricing, {}, run.resolution);
       changed = true;
     } catch (err) {
-      if (err instanceof ProviderError && err.retryable) continue;
-      await removeShots(run);
-      return { state: "failed", errorCode: err instanceof ProviderError ? err.code : "provider_failed", retryable: false };
+      if (err instanceof ProviderError && err.retryable) continue; // busy: next poll
+      return fail(err);
     }
   }
-  const firstId = shots.find((s) => s.id)?.id ?? shots[0].id ?? "";
+  const firstId = shots.find((s) => s.id)?.id ?? "";
   if (shots.every((s) => s.out)) {
     const { joinParts } = await import("@/lib/media/scene-parts");
     const bytes = await joinParts(shots.map((s) => s.out!), shots.map((s) => s.len), run.soundUrl, run.fps ?? 30, shots.map((s) => s.frames));
     await removeShots(run);
-    console.log("[kling] shots joined", shots.length);
-    return { state: "succeeded", outputUrl: shots[0].out!, outputBytes: bytes };
+    console.log("[kling] shots joined", shots.length, "· kept as in the template:", shots.filter((s) => s.out === s.url).length);
+    return { state: "succeeded", outputUrl: shots.find((s) => s.out !== s.url)?.out ?? shots[0].out!, outputBytes: bytes };
   }
-  const steps = shots.length * run.passes.length;
-  const done = shots.reduce((n, s) => n + (s.out ? run.passes.length : (s.k ?? 0)), 0);
+  const steps = shots.reduce((n, s) => n + (s.runs ?? run.passes).length, 0) || 1;
+  const done = shots.reduce((n, s) => n + (s.out ? (s.runs ?? run.passes).length : (s.k ?? 0)), 0);
   return {
     state: "processing",
     progress: Math.round((done / steps) * 90),

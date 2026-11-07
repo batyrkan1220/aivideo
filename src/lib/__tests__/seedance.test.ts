@@ -6,6 +6,7 @@ vi.mock("@/lib/catalog/settings", () => ({ catalogSettings: async () => ({ multi
 const sceneMock = vi.hoisted(() => ({ split: null as null | { parts: { start: number; len: number; file: Buffer }[] }, joined: [] as string[][] }));
 vi.mock("@/lib/media/scene-parts", () => ({
   splitAtCuts: async () => sceneMock.split,
+  grabFrames: async (_u: string, times: number[]) => times.map(() => Buffer.from("jpg")),
   joinParts: async (urls: string[]) => { sceneMock.joined.push(urls); return new Uint8Array([1, 2, 3]); },
 }));
 const storage = vi.hoisted(() => ({ removed: [] as string[] }));
@@ -203,69 +204,99 @@ describe("provider (Kling official API)", () => {
 });
 
 describe("templates with cuts (shot by shot)", () => {
-  const faces = [{ slotKey: "face_1", providerInput: "img_1", imageUrl: "https://s/1.jpg" }];
   const base = { templateVideoUrl: "https://t/v.mp4", templateFrameUrl: null, quality: "720p" };
-  it("each shot is a Kling task with the same photo; the shots are joined at the end", async () => {
-    sceneMock.split = { parts: [{ start: 0, len: 4.04, file: Buffer.from("a") }, { start: 4.04, len: 9.12, file: Buffer.from("b") }] };
-    const bodies: { contents: { type: string; url?: string; text?: string }[]; settings: { duration: number } }[] = [];
-    const replies = [
-      { code: 0, data: { id: "s-1" } }, { code: 0, data: { id: "s-2" } },
-      { code: 0, data: [{ status: "succeeded", outputs: [{ type: "video", url: "https://k/1.mp4" }] }] },
-      { code: 0, data: [{ status: "processing" }] },
-      { code: 0, data: [{ status: "succeeded", outputs: [{ type: "video", url: "https://k/2.mp4" }] }] },
-    ];
+  const ok = (id: string) => ({ code: 0, data: { id } });
+  const done = (url: string) => ({ code: 0, data: [{ status: "succeeded", outputs: [{ type: "video", url }] }] });
+  const running = { code: 0, data: [{ status: "processing" }] };
+  type Body = { contents: { type: string; url?: string; text?: string }[]; settings: { duration: number } };
+  function kling(replies: unknown[]) {
+    const bodies: Body[] = [];
     vi.stubGlobal("fetch", vi.fn(async (_u: string, init?: RequestInit) => {
       if (init?.body) bodies.push(JSON.parse(String(init.body)));
       return new Response(JSON.stringify(replies.shift()), { status: 200 });
     }));
-    const r = await seedanceProvider.submit({ jobId: "j9", ...base, faces, config: { durationSec: 13.16 } });
-    expect(r.providerJobId).toBe("s-1");
-    expect(bodies).toHaveLength(2);
-    expect(bodies.map((b) => b.contents.find((c) => c.type === "base_video")?.url)).toEqual([
-      "https://sb.test/signed/kling-shots/j9/p0.mp4", "https://sb.test/signed/kling-shots/j9/p1.mp4"]);
-    expect(bodies.every((b) => b.contents.some((c) => c.type === "refer_image" && c.url === "https://s/1.jpg"))).toBe(true);
-    expect(bodies.map((b) => b.settings.duration)).toEqual([5, 10]); // whole seconds, rounded up: nothing of a shot is lost
+    return bodies;
+  }
+  const vid = (b: Body) => b.contents.find((c) => c.type === "base_video")?.url;
+  const imgs = (b: Body) => b.contents.filter((c) => c.type === "refer_image").map((c) => c.url);
+  const part = (start: number, len: number) => ({ start, len, frames: Math.round(len * 30), file: Buffer.from("x") });
+  const next = (r: unknown) => (r as { next?: { state: Record<string, unknown> } }).next!.state;
+
+  it("one person: the longest shot first, then the others with two look frames of it", async () => {
+    sceneMock.split = { fps: 30, parts: [part(0, 4.04), part(4.04, 9.12)] } as never;
+    const bodies = kling([ok("s2"), done("https://k/2.mp4"), ok("s1"), done("https://k/1.mp4")]);
+    const r = await seedanceProvider.submit({ jobId: "j9", ...base, faces: [{ slotKey: "face_1", providerInput: "img_1", imageUrl: "https://s/1.jpg" }], config: { durationSec: 13.16 } });
+    expect(r.providerJobId).toBe("s2");
+    expect(bodies.map(vid)).toEqual(["https://sb.test/signed/kling-shots/j9/p1.mp4"]); // the longest shot only
+    expect(bodies[0].settings.duration).toBe(10); // whole seconds, rounded up
     expect(bodies[0].contents[0].text).toContain("one shot of a longer video");
-    const p1 = await seedanceProvider.getStatus("s-1", { startedAt: null, state: r.state ?? null });
+    const p1 = await seedanceProvider.getStatus("s2", { startedAt: null, state: r.state ?? null });
     expect(p1.state).toBe("processing");
-    const state2 = (p1 as { next?: { state: Record<string, unknown> } }).next!.state;
-    const done = await seedanceProvider.getStatus("s-1", { startedAt: null, state: state2 });
-    expect(done).toMatchObject({ state: "succeeded", outputBytes: new Uint8Array([1, 2, 3]) });
-    expect(sceneMock.joined.at(-1)).toEqual(["https://k/1.mp4", "https://k/2.mp4"]);
-    expect(storage.removed).toEqual(["kling-shots/j9/p0.mp4", "kling-shots/j9/p1.mp4"]);
+    // The other shot: same photo + 2 look frames of the first, and the prompt says so.
+    expect(vid(bodies[1])).toBe("https://sb.test/signed/kling-shots/j9/p0.mp4");
+    expect(imgs(bodies[1])).toEqual(["https://s/1.jpg", "https://sb.test/signed/kling-shots/j9/look0.jpg", "https://sb.test/signed/kling-shots/j9/look1.jpg"]);
+    expect(bodies[1].contents[0].text).toContain("@image_2 and @image_3 are frames from another shot of this same video");
+    expect(bodies[1].settings.duration).toBe(5);
+    const fin = await seedanceProvider.getStatus("s2", { startedAt: null, state: next(p1) });
+    expect(fin).toMatchObject({ state: "succeeded", outputBytes: new Uint8Array([1, 2, 3]) });
+    expect(sceneMock.joined.at(-1)).toEqual(["https://k/1.mp4", "https://k/2.mp4"]); // in video order
+    expect(storage.removed).toEqual(expect.arrayContaining(["kling-shots/j9/p0.mp4", "kling-shots/j9/p1.mp4", "kling-shots/j9/look0.jpg"]));
     sceneMock.split = null;
     vi.unstubAllGlobals();
   });
-  it("two people with a cut: every shot gets both runs, the second on the first's result", async () => {
-    sceneMock.split = { parts: [{ start: 0, len: 5, file: Buffer.from("a") }, { start: 5, len: 10, file: Buffer.from("b") }] };
+
+  it("two people with the admin's shot map: a shot with nobody stays as in the template, a shot runs only its people", async () => {
+    // Shots: 0–2 s nobody · 2–6 s both · 6–9 s only the man (person 2).
+    sceneMock.split = { fps: 30, parts: [part(0, 2), part(2, 4), part(6, 3)] } as never;
     const faces2 = [{ slotKey: "face_1", providerInput: "img_1", imageUrl: "https://s/1.jpg" }, { slotKey: "face_2", providerInput: "img_2", imageUrl: "https://s/2.jpg" }];
-    const bodies: { contents: { type: string; url?: string; text?: string }[] }[] = [];
-    const replies = [
-      { code: 0, data: { id: "a1" } }, { code: 0, data: { id: "b1" } },                                   // submit: both shots, person 1
-      { code: 0, data: [{ status: "succeeded", outputs: [{ type: "video", url: "https://k/a1.mp4" }] }] }, // poll a1
-      { code: 0, data: { id: "a2" } },                                                                     // shot 1, person 2
-      { code: 0, data: [{ status: "succeeded", outputs: [{ type: "video", url: "https://k/b1.mp4" }] }] }, // poll b1
-      { code: 0, data: { id: "b2" } },                                                                     // shot 2, person 2
-      { code: 0, data: [{ status: "succeeded", outputs: [{ type: "video", url: "https://k/a2.mp4" }] }] },
-      { code: 0, data: [{ status: "succeeded", outputs: [{ type: "video", url: "https://k/b2.mp4" }] }] },
-    ];
-    vi.stubGlobal("fetch", vi.fn(async (_u: string, init?: RequestInit) => {
-      if (init?.body) bodies.push(JSON.parse(String(init.body)));
-      return new Response(JSON.stringify(replies.shift()), { status: 200 });
-    }));
-    const r = await seedanceProvider.submit({ jobId: "j2", ...base, faces: faces2, config: { durationSec: 15, people: 2, positions: ["on the left", "on the right"] } });
-    const p1 = await seedanceProvider.getStatus("a1", { startedAt: null, state: r.state ?? null });
-    expect(p1.state).toBe("processing");
-    const st2 = (p1 as { next?: { state: Record<string, unknown> } }).next!.state;
-    const done = await seedanceProvider.getStatus("a2", { startedAt: null, state: st2 });
-    expect(done).toMatchObject({ state: "succeeded" });
-    const vids = bodies.map((b) => b.contents.find((c) => c.type === "base_video")?.url);
-    const imgs = bodies.map((b) => b.contents.find((c) => c.type === "refer_image")?.url);
-    expect(vids).toEqual(["https://sb.test/signed/kling-shots/j2/p0.mp4", "https://sb.test/signed/kling-shots/j2/p1.mp4", "https://k/a1.mp4", "https://k/b1.mp4"]);
-    expect(imgs).toEqual(["https://s/1.jpg", "https://s/1.jpg", "https://s/2.jpg", "https://s/2.jpg"]);
-    expect(bodies[2].contents[0].text).toContain("on the right");
-    expect(sceneMock.joined.at(-1)).toEqual(["https://k/a2.mp4", "https://k/b2.mp4"]);
+    const bodies = kling([
+      ok("b1"),                                       // submit: shot 2 (both people) first, person 1
+      done("https://k/b1.mp4"), ok("b2"),             // poll: person 1 done → person 2 on its result
+      done("https://k/b2.mp4"), ok("c2"),             // poll: shot 2 done → shot 3, only person 2, with the look
+      done("https://k/c2.mp4"),
+    ]);
+    const shotMap = { starts: [0, 2, 6], people: [[], [0, 1], [1]] };
+    const r = await seedanceProvider.submit({ jobId: "jm", ...base, faces: faces2, config: { durationSec: 9, people: 2, positions: ["on the left", "on the right"], shotMap } });
+    expect(bodies.map(vid)).toEqual(["https://sb.test/signed/kling-shots/jm/p1.mp4"]);
+    expect(imgs(bodies[0])).toEqual(["https://s/1.jpg"]);
+    const p1 = await seedanceProvider.getStatus("b1", { startedAt: null, state: r.state ?? null });
+    expect(vid(bodies[1])).toBe("https://k/b1.mp4");
+    expect(imgs(bodies[1])).toEqual(["https://s/2.jpg"]);
+    const p2 = await seedanceProvider.getStatus("b2", { startedAt: null, state: next(p1) });
+    expect(vid(bodies[2])).toBe("https://sb.test/signed/kling-shots/jm/p2.mp4");
+    expect(imgs(bodies[2])).toEqual(["https://s/2.jpg", "https://sb.test/signed/kling-shots/jm/look0.jpg", "https://sb.test/signed/kling-shots/jm/look1.jpg"]);
+    expect(bodies[2].contents[0].text).toContain("the replaced person (on the right)");
+    const fin = await seedanceProvider.getStatus("c2", { startedAt: null, state: next(p2) });
+    expect(fin.state).toBe("succeeded");
+    expect(bodies).toHaveLength(3); // the shot with nobody never went to Kling
+    expect(sceneMock.joined.at(-1)).toEqual(["https://sb.test/signed/kling-shots/jm/p0.mp4", "https://k/b2.mp4", "https://k/c2.mp4"]);
     sceneMock.split = null;
     vi.unstubAllGlobals();
+  });
+
+  it("a map made for other shots is not used: everyone in every shot", async () => {
+    sceneMock.split = { fps: 30, parts: [part(0, 3), part(3, 5)] } as never;
+    const bodies = kling([ok("x1"), running]);
+    const shotMap = { starts: [0, 4], people: [[], [0]] };
+    await seedanceProvider.submit({ jobId: "jx", ...base, faces: [{ slotKey: "face_1", providerInput: "img_1", imageUrl: "https://s/1.jpg" }], config: { durationSec: 8, shotMap } });
+    expect(bodies.map(vid)).toEqual(["https://sb.test/signed/kling-shots/jx/p1.mp4"]); // both shots get Kling; the longer goes first
+    sceneMock.split = null;
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("shot helpers", () => {
+  it("runs only the people seen in a shot; nobody = keep the shot", async () => {
+    const { shotRuns, mapFor, pickAnchor } = await import("@/lib/generation/seedance");
+    const passes = [{ person: 0 }, { person: 1 }];
+    expect(shotRuns(passes, null)).toEqual([0, 1]);
+    expect(shotRuns(passes, [])).toEqual([]);
+    expect(shotRuns(passes, [1])).toEqual([1]);
+    expect(shotRuns([{ person: -1 }], [0])).toEqual([0]);
+    expect(mapFor({ starts: [0, 1.83], people: [[0], []] }, [0, 1.867])).toEqual([[0], []]);
+    expect(mapFor({ starts: [0, 1.83], people: [[0], []] }, [0, 2.5])).toBeNull();
+    expect(mapFor(undefined, [0])).toBeNull();
+    expect(pickAnchor([{ len: 9, runs: [1] }, { len: 3, runs: [0, 1] }, { len: 5, runs: [0, 1] }, { len: 9, runs: [] }])).toBe(2);
+    expect(pickAnchor([{ len: 3, runs: [] }])).toBeNull();
   });
 });

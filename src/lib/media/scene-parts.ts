@@ -71,6 +71,30 @@ export async function previewShots(videoUrl: string): Promise<{ total: number; c
 }
 
 /**
+ * JPEG frames at the given times of a video (for the "same look as this" reference of other shots).
+ * At least 320 px on the short side (Kling wants 300 or more).
+ */
+export async function grabFrames(videoUrl: string, times: number[]): Promise<Buffer[]> {
+  const release = holdMedia();
+  const dir = await mkdtemp(join(tmpdir(), "gf-"));
+  try {
+    const inPath = join(dir, "in");
+    await download(videoUrl, inPath);
+    const out: Buffer[] = [];
+    for (const [i, t] of times.entries()) {
+      const o = join(dir, `f${i}.jpg`);
+      await ffmpegLog([...q, "-loglevel", "error", "-ss", t.toFixed(3), "-i", inPath, "-frames:v", "1",
+        "-vf", "scale='if(lt(iw,ih),max(iw,320),-2)':'if(lt(iw,ih),-2,max(ih,320))'", "-q:v", "2", "-update", "1", o]);
+      out.push(await readFile(o));
+    }
+    return out;
+  } finally {
+    release();
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+/**
  * Shots of the video in whole frames, or null when it is one shot. Cut by frame number (not by time):
  * a time cut could leave the first frame of the next scene at the end of a shot, a one-frame cut
  * Kling then "smooths over". Each shot keeps the template's frame rate and its own sound.

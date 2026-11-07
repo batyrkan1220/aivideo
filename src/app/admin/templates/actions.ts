@@ -73,7 +73,8 @@ export async function saveTemplate(raw: unknown, id: string | null, metaRaw?: un
 
   // A new video needs a new AI analysis: the old cut-outs and descriptions belong to the old one.
   if (row.provider_key === "seedance" && row.preview_video_path !== before.preview_video_path && row.provider_config_json && typeof row.provider_config_json === "object") {
-    const { analyzedAt: _old, ...rest } = row.provider_config_json as Record<string, unknown>;
+    // A new video has other shots: the shot map goes too.
+    const { analyzedAt: _old, shotMap: _map, ...rest } = row.provider_config_json as Record<string, unknown>;
     row.provider_config_json = rest;
   }
   const { error } = await db.from("templates").update(row).eq("id", id);
@@ -274,19 +275,52 @@ export async function reanalyzeTemplate(id: string): Promise<{ ok: boolean }> {
 export async function templateShots(id: string) {
   const user = await guard("templates.manage");
   if (!user || !z.string().uuid().safeParse(id).success) return null;
-  const { data: t } = await supabaseAdmin().from("templates").select("preview_video_path,kling_video_path").eq("id", id).maybeSingle();
+  const { data: t } = await supabaseAdmin().from("templates").select("preview_video_path,kling_video_path,provider_config_json").eq("id", id).maybeSingle();
   const { mediaUrl } = await import("@/lib/templates/queries");
+  // The same file orders use (the Kling copy when there is one), so the shots match.
   const url = mediaUrl(t?.kling_video_path ?? t?.preview_video_path ?? null);
   if (!url) return null;
   try {
     const { previewShots } = await import("@/lib/media/scene-parts");
+    const { parseSeedanceConfig } = await import("@/lib/templates/seedance-config");
     const r = await previewShots(url);
+    const cfg = parseSeedanceConfig(t?.provider_config_json);
     console.log("[scenes] admin", id, `total=${r.total.toFixed(2)} cuts=${r.cuts.map((c) => c.toFixed(2)).join(",") || "-"} shots=${r.parts.map((p) => `${p.start.toFixed(2)}+${p.len.toFixed(2)}`).join(",")}`);
-    return r;
+    // The saved marks, if they were made for these same shots.
+    const fits = cfg.shotMap && cfg.shotMap.starts.length === r.parts.length && cfg.shotMap.starts.every((s, i) => Math.abs(s - r.parts[i].start) < 0.08);
+    return {
+      ...r,
+      people: Array.from({ length: cfg.people }, (_, i) => cfg.labels[i]?.trim() || cfg.positions[i]?.trim() || `Человек ${i + 1}`),
+      marks: fits ? cfg.shotMap!.people : null,
+    };
   } catch (err) {
     console.error("[scenes] admin failed", err instanceof Error ? err.message.slice(0, 160) : "error");
     return null;
   }
+}
+
+/** Admin: who is in each shot (for shot-by-shot editing). Saved on the template and its published version. */
+export async function saveShotMap(id: string, starts: number[], people: number[][]): Promise<{ ok: boolean }> {
+  const user = await guard("templates.manage");
+  const input = z.object({
+    id: z.string().uuid(),
+    starts: z.array(z.number().min(0).max(60)).min(1).max(12),
+    people: z.array(z.array(z.number().int().min(0).max(4)).max(5)).max(12),
+  }).safeParse({ id, starts, people });
+  if (!user || !input.success || input.data.starts.length !== input.data.people.length) return { ok: false };
+  const db = supabaseAdmin();
+  const { data: t } = await db.from("templates").select("status,provider_key,provider_config_json").eq("id", id).maybeSingle();
+  if (!t || t.provider_key !== "seedance") return { ok: false };
+  const cfg = (t.provider_config_json as Record<string, unknown> | null) ?? {};
+  const n = Number(cfg.people) || 1;
+  const shotMap = { starts: input.data.starts.map((v) => Math.round(v * 1000) / 1000), people: input.data.people.map((p) => [...new Set(p.filter((i) => i < n))].sort()) };
+  const { error } = await db.from("templates").update({ provider_config_json: { ...cfg, shotMap }, updated_at: new Date().toISOString() }).eq("id", id);
+  if (error) return { ok: false };
+  if (t.status === "published") await snapshotVersion(id);
+  await audit(user.id, "template.shot_map", "template", id, { shots: shotMap.starts.length });
+  clearMemo();
+  revalidatePath("/admin/templates");
+  return { ok: true };
 }
 
 /** Admin: the same scene view for a finished order's video, to compare it with its template's. */

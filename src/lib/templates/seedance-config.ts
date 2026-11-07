@@ -64,6 +64,16 @@ export const seedanceConfigSchema = z.object({
   /** Person cut-outs for Kling, with the original face hidden (same order as targets). */
   targetsKling: z.array(z.string().trim().max(300)).max(SEEDANCE_MAX_PEOPLE).catch([]).default([]),
   analysisVersion: z.number().int().optional(),
+  /**
+   * Who is in each shot of the video (admin marks it in "🎬 Кадры"), for shot-by-shot editing:
+   * starts = where each shot begins (s), people[i] = indexes of the people seen in shot i (0 = first
+   * person). A shot with nobody is left exactly as in the template, without Kling. Used only while
+   * the shots found in the video still begin at these times.
+   */
+  shotMap: z.object({
+    starts: z.array(z.number().min(0).max(60)).min(1).max(12),
+    people: z.array(z.array(z.number().int().min(0).max(SEEDANCE_MAX_PEOPLE - 1)).max(SEEDANCE_MAX_PEOPLE)).max(12),
+  }).optional().catch(undefined),
   /** When the AI analysis (people, things, cut-outs, scene) was applied. Catalog video templates need it to be ordered. */
   analyzedAt: z.string().max(40).optional(),
 });
