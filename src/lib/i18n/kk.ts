@@ -320,6 +320,7 @@ export const kk = {
     hxSwap: "Замена лица",
     hxReady: "Готово за 3–5 мин",
     templatesTitle: "Шаблоны",
+    count: (n: number) => `${n} видео`,
     promo: "Своё видео",
     newTitle: "Новые видео",
     seeAll: "Смотреть все",
