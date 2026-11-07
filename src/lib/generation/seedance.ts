@@ -94,13 +94,15 @@ export const seedanceProvider: GenerationProvider = {
           prompt: buildKlingDirectPrompt("edit", outfit, cfg.prompt, last ? wish : "", 1, [where], last ? objects : [], [], shot),
           who: cfg.positions[k]?.trim() || "",
           person: k,
+          // The people replaced in earlier runs: their photos go along (see withKeep).
+          keep: Array.from({ length: k }, (_, j) => ({ person: j, url: usedPhotos[j], where: cfg.positions[j]?.trim() || `number ${j + 1} from the left` })),
         };
       });
       const passes = passesFor(false);
       // With cuts: every shot goes through every person's run, then the shots are joined (TM-100038).
       const shotRun = await startShots(input.jobId, input.templateVideoUrl, passesFor(true), cfg.aspectRatio, resolution, pricing, cfg.shotMap);
       if (shotRun) return shotRun;
-      const providerJobId = await submitKlingOmni({ videoUrl: input.templateVideoUrl, mode: "edit", durationSec, aspectRatio: cfg.aspectRatio, resolution, ...passes[0] });
+      const providerJobId = await submitKlingOmni({ videoUrl: input.templateVideoUrl, mode: "edit", durationSec, aspectRatio: cfg.aspectRatio, resolution, ...withKeep(passes[0]) });
       console.log("[kling] person 1 of", people);
       return {
         providerJobId,
@@ -133,7 +135,7 @@ export const seedanceProvider: GenerationProvider = {
       // One person per run: the next run edits the previous result.
       if (st.state !== "succeeded" || run.k + 1 >= run.passes.length) return st;
       const k = run.k + 1;
-      const id = await submitKlingOmni({ videoUrl: st.outputUrl, mode: "edit", durationSec: run.durationSec, aspectRatio: run.aspectRatio, resolution: run.resolution, ...run.passes[k] });
+      const id = await submitKlingOmni({ videoUrl: st.outputUrl, mode: "edit", durationSec: run.durationSec, aspectRatio: run.aspectRatio, resolution: run.resolution, ...withKeep(run.passes[k]) });
       console.log("[kling] person", k + 1, "of", run.passes.length);
       return {
         state: "processing",
@@ -156,8 +158,27 @@ function fallbackOf(state: ProviderState): Fallback | null {
     mode: f.mode === "reference" ? "reference" : "edit", aspectRatio: typeof f.aspectRatio === "string" ? f.aspectRatio : "adaptive", resolution: f.resolution === "1080p" ? "1080p" : "720p" };
 }
 
-/** who: where the person is (for the look reference); person: their index (-1 = all of them in one run). */
-type Pass = { photoUrls: string[]; prompt: string; who?: string; person?: number };
+/**
+ * who: where the person is (for the look reference); person: their index (-1 = all of them in one run);
+ * keep: the people replaced in earlier runs.
+ */
+type Pass = { photoUrls: string[]; prompt: string; who?: string; person?: number; keep?: { person: number; url: string; where: string }[] };
+
+/**
+ * A run's photos and prompt. Every run makes the whole picture again, so a person replaced in an earlier
+ * run drifted away from their photo (TM-100041: the girl replaced first no longer looked like her). Their
+ * photos go along as "keep this person exactly as they are". inShot: only the people seen in this shot
+ * (a photo of someone who is not there could make Kling put them in).
+ */
+export function withKeep(pass: Pass, inShot?: number[]): { photoUrls: string[]; prompt: string } {
+  const keep = (pass.keep ?? []).filter((p) => !inShot || inShot.includes(p.person)).slice(0, Math.max(0, KLING_MAX_IMAGES - pass.photoUrls.length));
+  if (!keep.length) return { photoUrls: pass.photoUrls, prompt: pass.prompt };
+  const notes = keep.map((p, n) => {
+    const ref = `@image_${pass.photoUrls.length + n + 1}`;
+    return `${ref} is the person ${p.where}, already replaced: keep that person exactly as they are now, looking 100% like ${ref} in every frame. Do not change their face, hair, skin, body or clothing, and never give them the face from @image_1.`;
+  });
+  return { photoUrls: [...pass.photoUrls, ...keep.map((p) => p.url)], prompt: `${pass.prompt} ${notes.join(" ")}` };
+}
 type PassRun = { stage: "pass"; k: number; passes: Pass[]; durationSec: number; aspectRatio: string; resolution: "720p" | "1080p" };
 function passOf(state: ProviderState): PassRun | null {
   const s = state as Partial<PassRun> | null;
@@ -305,7 +326,8 @@ async function cutShots(jobId: string, videoUrl: string): Promise<{ list: (Shot 
 const submitShot = (run: ShotRun, k: number) => {
   const s = run.shots[k];
   const runs = s.runs ?? run.passes.map((_, i) => i);
-  const pass = run.passes[runs[s.k ?? 0]];
+  const inShot = runs.map((i) => run.passes[i].person ?? -1);
+  const pass = { ...run.passes[runs[s.k ?? 0]], ...withKeep(run.passes[runs[s.k ?? 0]], inShot) };
   // The look from the first finished shot goes with every other shot, while Kling's 10 images last,
   // and only for a person who is in that first shot (else there is nothing of them to copy).
   const anchorRuns = run.anchor != null ? run.shots[run.anchor]?.runs ?? run.passes.map((_, i) => i) : [];

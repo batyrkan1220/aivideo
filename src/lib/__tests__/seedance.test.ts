@@ -194,7 +194,9 @@ describe("provider (Kling official API)", () => {
     expect(step).toMatchObject({ state: "processing", next: { providerJobId: "kt-b", state: { stage: "pass", k: 1 } } });
     const second = calls[2].body!;
     expect(second.contents.find((c) => c.type === "base_video")?.url).toBe("https://kling.cdn/a.mp4");
-    expect(second.contents.filter((c) => c.type === "refer_image").map((c) => c.url)).toEqual(["https://s/2.jpg", "https://s/car.jpg"]);
+    // The person replaced in the first run goes along, to keep them as they are (TM-100041).
+    expect(second.contents.filter((c) => c.type === "refer_image").map((c) => c.url)).toEqual(["https://s/2.jpg", "https://s/car.jpg", "https://s/1.jpg"]);
+    expect(second.contents[0].text).toContain("@image_3 is the person on the left, woman in red, already replaced: keep that person exactly as they are now, looking 100% like @image_3");
     expect(second.contents[0].text).toContain("Replace the person on the right, man in white in @video_1 with the person from @image_1.");
     expect(second.contents[0].text).toContain("Replace the car in @video_1 with the car from @image_2");
     const done = await seedanceProvider.getStatus("kt-b", { startedAt: null, state: step.state === "processing" ? step.next?.state ?? null : null });
@@ -261,7 +263,7 @@ describe("templates with cuts (shot by shot)", () => {
     expect(imgs(bodies[0])).toEqual(["https://s/1.jpg"]);
     const p1 = await seedanceProvider.getStatus("b1", { startedAt: null, state: r.state ?? null });
     expect(vid(bodies[1])).toBe("https://k/b1.mp4");
-    expect(imgs(bodies[1])).toEqual(["https://s/2.jpg"]);
+    expect(imgs(bodies[1])).toEqual(["https://s/2.jpg", "https://s/1.jpg"]); // the girl, replaced first, kept as she is
     const p2 = await seedanceProvider.getStatus("b2", { startedAt: null, state: next(p1) });
     expect(vid(bodies[2])).toBe("https://sb.test/signed/kling-shots/jm/p2.mp4");
     expect(imgs(bodies[2])).toEqual(["https://s/2.jpg", "https://sb.test/signed/kling-shots/jm/look0.jpg", "https://sb.test/signed/kling-shots/jm/look1.jpg"]);
