@@ -138,3 +138,11 @@ describe("things only (0 people)", () => {
     expect(p).not.toContain("Hands and arms");
   });
 });
+
+describe("a day photo of a car in a night video", () => {
+  it("the car takes the video's light, not the photo's daylight", () => {
+    const p = buildKlingDirectPrompt("edit", "photo", "", "", 0, [], [{ what: "car", n: 2 }]);
+    expect(p).toContain("in daylight while the video is at night");
+    expect(p).toContain("Never bring the photos' daylight, sky or background into the video.");
+  });
+});

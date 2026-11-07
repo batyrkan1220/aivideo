@@ -79,6 +79,11 @@ function thingRefs(objects: { n?: number }[], start: number): string[][] {
   let at = start;
   return objects.map((o) => Array.from({ length: Math.max(1, o.n ?? 1) }, () => `@image_${++at}`));
 }
+/**
+ * Customers shoot their car in daylight, the template may be at night (or the other way): the thing keeps
+ * its own look but takes the video's light: night, street lamps, its own headlights, rain, sunset.
+ */
+const RELIGHT = (what: string) => `The photos of the ${what} may be taken in other light (for example in daylight while the video is at night): show it lit exactly like the scene in @video_1 — the same time of day, darkness, street lights, glare, wet reflections and colors of light, with its own lights (headlights, tail lights) on if the original has them on. Never bring the photos' daylight, sky or background into the video.`;
 const listRefs = (r: string[]) => (r.length < 2 ? r[0] ?? "" : `${r.slice(0, -1).join(", ")} and ${r[r.length - 1]}`);
 /** "@image_2 is a photo of a car" / "@image_2, @image_3 and @image_4 are photos of the same car from different sides (front, side, back)". */
 const thingIntro = (refs: string[], what: string, notPerson: boolean) => refs.length < 2
@@ -94,7 +99,7 @@ function thingsOnlyPrompt(mode: KlingMode, adminPrompt: string, wish: string, ob
   const things = objects.map((o, j) => ({ what: o.what.trim().toLowerCase(), look: o.look?.trim() ?? "", refs: tr[j], ref: listRefs(tr[j]), shown: targetRefs[j] ? ` shown in ${targetRefs[j]}` : "" }));
   const parts: string[] = [mode === "edit" ? "Edit @video_1." : "Follow the motion, actions, timing, camera movement, framing and cuts of @video_1, and recreate its location, background and lighting."];
   for (const t of things) {
-    parts.push(`${thingIntro(t.refs, t.what, false)} Replace the ${t.what}${t.look ? ` (${t.look})` : ""}${t.shown} in @video_1 with the ${t.what} from ${t.ref}, 1:1: exactly the same make and model or breed, body shape, color and shade, wheels or markings, logos, number plates, stickers and every detail, from every side; in the same place, size, angle and movement, matching the scene's lighting, reflections and shadows in every frame. Do not invent or change any of its details.`);
+    parts.push(`${thingIntro(t.refs, t.what, false)} Replace the ${t.what}${t.look ? ` (${t.look})` : ""}${t.shown} in @video_1 with the ${t.what} from ${t.ref}, 1:1: exactly the same make and model or breed, body shape, color and shade, wheels or markings, logos, number plates, stickers and every detail, from every side; in the same place, size, angle and movement, matching the scene's lighting, reflections and shadows in every frame. Do not invent or change any of its details. ${RELIGHT(t.what)}`);
   }
   parts.push(mode === "edit"
     ? "Keep everything else in @video_1 unchanged: every person with their own face and body, background, location, other objects, lighting, camera movement, framing, cuts, motion and timing."
@@ -159,7 +164,7 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
       ];
   for (const t of things) {
     if (t.ref === outfitRef) continue;
-    parts.push(`${thingIntro(t.refs, t.what, true)} Replace the ${t.what}${t.look ? ` (${t.look})` : ""}${t.shown} in @video_1 with the ${t.what} from ${t.ref}, 1:1: exactly the same make and model or breed, body shape, color and shade, wheels or markings, logos, number plates, stickers and every detail, from every side; in the same place, size, angle and movement, matching the scene's lighting, reflections and shadows in every frame. Do not invent or change any of its details.`);
+    parts.push(`${thingIntro(t.refs, t.what, true)} Replace the ${t.what}${t.look ? ` (${t.look})` : ""}${t.shown} in @video_1 with the ${t.what} from ${t.ref}, 1:1: exactly the same make and model or breed, body shape, color and shade, wheels or markings, logos, number plates, stickers and every detail, from every side; in the same place, size, angle and movement, matching the scene's lighting, reflections and shadows in every frame. Do not invent or change any of its details. ${RELIGHT(t.what)}`);
   }
   const cutouts = targetRefs.filter(Boolean);
   if (cutouts.length) {
