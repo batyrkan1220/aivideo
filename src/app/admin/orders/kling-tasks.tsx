@@ -17,10 +17,12 @@ export function KlingTasks({ tasks }: { tasks: Task[] }) {
   return (
     <div className="space-y-3">
       {list.length === 0 && <p className="text-sm text-muted">Задачи Kling этого заказа пока не записаны. Номер задачи можно взять из лога и ввести ниже.</p>}
-      {list.map((t) => {
+      {list.map((t, i) => {
+        // A shot kept as in the template: nothing went to Kling.
+        if (!t.task) return <p key={`i${i}`} className="rounded-xl bg-mist p-3 text-sm">{t.step}</p>;
         const r = open[t.task];
         return (
-          <div key={t.task} className="rounded-xl p-3 ring-1 ring-line">
+          <div key={`${t.task}-${i}`} className="rounded-xl p-3 ring-1 ring-line">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm"><b>{t.step}</b> · <span className="font-mono text-xs text-muted">{t.task}</span></p>
               <button type="button" onClick={() => void show(t.task)} disabled={r?.busy}

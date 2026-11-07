@@ -276,6 +276,7 @@ async function startShots(jobId: string, videoUrl: string, passes: Pass[], aspec
     await supabaseAdmin().storage.from(SHOTS_BUCKET).remove(shots.map((s) => s.path)).catch(() => {});
     return null;
   }
+  for (const [k, s] of shots.entries()) if (s.out) await noteTask(jobId, "", `сцена ${k + 1}: без людей, оставлена как в шаблоне (без Kling)`, true);
   const anchor = work > 1 ? pickAnchor(shots) : null;
   const run: ShotRun = { stage: "shots", shots, passes, aspectRatio, resolution, soundUrl: videoUrl, fps: cut.fps, anchor, looks: null, jobId };
   let first = "", cost = 0;
@@ -446,8 +447,8 @@ async function shotStatus(run: ShotRun): Promise<import("./types").ProviderJobSt
 }
 
 /** Writes a Kling task id into the order's log, so support can watch every run's result (admin order page). */
-async function noteTask(jobId: string | undefined, task: string, step: string) {
-  if (!jobId || !task) return;
+async function noteTask(jobId: string | undefined, task: string, step: string, info = false) {
+  if (!jobId || (!task && !info)) return;
   try {
     const db = supabaseAdmin();
     const { data: job } = await db.from("generation_jobs").select("order_id").eq("id", jobId).maybeSingle();
