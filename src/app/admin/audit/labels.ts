@@ -7,6 +7,11 @@ export const GROUPS: Record<Group, string> = {
 };
 
 export const EVENTS: Record<string, { label: string; group: Group; tone?: "good" | "bad" }> = {
+  "order.photos_viewed": { label: "Админ открыл фото клиента", group: "admin" },
+  "generation.kling_task": { label: "Задача Kling отправлена", group: "gen" },
+  "template.shot_map": { label: "Отметки сцен шаблона", group: "admin" },
+  "catalog.split_shots": { label: "Режим «по сценам»", group: "admin" },
+  "catalog.require_analysis": { label: "ИИ-анализ обязателен/нет", group: "admin" },
   // analytics_events (customers)
   template_viewed: { label: "Открыл шаблон", group: "client" },
   preview_played: { label: "Смотрел превью", group: "client" },

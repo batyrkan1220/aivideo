@@ -44,10 +44,19 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
     seedancePricingSettings(),
   ]);
   const prof = (Array.isArray(o.profiles) ? o.profiles[0] : o.profiles) as { email?: string; display_name?: string; telegram_username?: string | null; telegram_id?: number | null; phone?: string | null } | null;
-  // Result preview for support (10-minute signed link; the customer's photos stay private).
+  // Result preview for support (10-minute signed link).
   const live = video && new Date(video.expires_at).getTime() > nowMs();
   const preview = live ? (await db.storage.from("generated-videos").createSignedUrl(video.private_storage_path, 600)).data?.signedUrl ?? null : null;
   const isPhoto = !!video && /\.(jpe?g|png|webp)$/i.test(video.private_storage_path);
+  // The customer's uploaded photos, for support (10-minute signed links, private bucket). Gone after the
+  // photo retention period. Viewing is written to the order's log.
+  const { data: assets } = await db.from("order_assets").select("face_slot_key,private_storage_path,width,height").eq("order_id", id);
+  const slotNames = new Map(((o.template_snapshot_json as { face_slots_json?: { key: string; labelKk?: string }[] })?.face_slots_json ?? []).map((f) => [f.key, f.labelKk ?? f.key]));
+  const photos = o.photos_deleted_at ? [] : (await Promise.all((assets ?? []).sort((a, b) => a.face_slot_key.localeCompare(b.face_slot_key)).map(async (a) => {
+    const { data } = await db.storage.from("user-uploads").createSignedUrl(a.private_storage_path, 600);
+    return data ? { url: data.signedUrl, label: slotNames.get(a.face_slot_key) ?? a.face_slot_key, size: a.width && a.height ? `${a.width}×${a.height}` : "" } : null;
+  }))).filter((x): x is { url: string; label: string; size: string } => !!x);
+  if (photos.length) await db.from("audit_logs").insert({ actor_id: u.id, action: "order.photos_viewed", resource_type: "order", resource_id: id, metadata_json: { count: photos.length } });
   const kidCost = (kids ?? []).reduce((n, k) => n + ((Array.isArray(k.generation_jobs) ? k.generation_jobs : []) as { provider_cost: number | null }[]).reduce((m, j) => m + (Number(j.provider_cost) || 0), 0), 0);
   const costUsd = (jobs ?? []).filter((j) => j.provider !== "combo").reduce((n, j) => n + (Number(j.provider_cost) || 0), 0) + kidCost;
   const units = unitsFromUsd((jobs ?? []).filter((j) => j.provider === "seedance").reduce((n, j) => n + (Number(j.provider_cost) || 0), 0), ap);
@@ -87,6 +96,21 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
             <dt className="text-muted">Телефон</dt><dd>{prof?.phone ?? "—"}</dd>
             <dt className="text-muted">E-mail</dt><dd>{prof?.email ?? "—"}</dd>
           </dl>
+        </section>
+        <section className={card}>
+          <h2 className="mb-3 font-semibold">Фото клиента</h2>
+          {photos.length ? (
+            <div className="flex flex-wrap gap-3">
+              {photos.map((p) => (
+                <a key={p.url} href={p.url} target="_blank" rel="noreferrer" className="block w-32">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.url} alt={p.label} className="aspect-[3/4] w-32 rounded-xl bg-mist object-cover ring-1 ring-line" />
+                  <span className="mt-1 block text-xs font-semibold">{p.label}</span>
+                  {p.size && <span className="block text-[11px] text-muted">{p.size}</span>}
+                </a>
+              ))}
+            </div>
+          ) : <p className="text-sm text-muted">{o.photos_deleted_at ? "Фото удалены по сроку хранения" : "Нет фото"}</p>}
         </section>
         <section className={card}>
           <h2 className="mb-3 font-semibold">Результат</h2>
