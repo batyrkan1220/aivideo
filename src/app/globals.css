@@ -281,6 +281,8 @@ body:has(> .theme-app.theme-mono) { background: #f5f4f1; }
 .theme-app.theme-mono :is(h1, h2) { font-family: var(--font-display); font-weight: 400; letter-spacing: -0.02em; }
 .theme-app.theme-mono h1 { font-weight: 300; }
 .theme-app.theme-mono .section-title { font-family: var(--font-sans); font-weight: 700; }
+/* Small badges and labels inside headings keep the body font. */
+.theme-app.theme-mono :is(h1, h2) :is(.t-micro, .t-small, .text-xs, .text-sm) { font-family: var(--font-sans); letter-spacing: normal; }
 .theme-app.theme-mono .font-display { font-weight: 400; }
 .theme-app.theme-mono .text-brand { color: var(--color-ink); }
 .theme-app.theme-mono :is(.border-brand, .border-\[\#9cbf12\]) { border-color: #0e0e0e; }
@@ -303,6 +305,9 @@ body:has(> .theme-app.theme-mono) { background: #f5f4f1; }
 .theme-app.theme-mono .btn-lime { background: #0e0e0e; color: #ffffff !important; box-shadow: 0 10px 24px -14px rgb(0 0 0 / 0.6); }
 .theme-app.theme-mono .btn-lime:hover { background: #2a2a2a; }
 .theme-app.theme-mono .glass-dock .bg-brand { box-shadow: 0 10px 22px -10px rgb(0 0 0 / 0.55); }
+/* Admin charts and bars: black instead of lime. */
+.theme-app.theme-mono .bg-\[\#b5d420\] { background: #0e0e0e; }
+.theme-app.theme-mono .bg-flash\/20 { background: #ecebe7; }
 .theme-app.theme-mono .skeleton { background-image: linear-gradient(90deg, #ecebe7 0%, #f7f6f3 50%, #ecebe7 100%); }
 
 /* Hero atmosphere: slow drifting mesh light, scanner line, floating cards, CTA glow. */

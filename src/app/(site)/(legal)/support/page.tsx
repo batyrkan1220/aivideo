@@ -12,7 +12,7 @@ export default function SupportPage() {
   return (
     <main className="mx-auto max-w-xl px-4 pb-6 pt-4 sm:pt-12">
       <section className="rounded-[24px] bg-night p-5 text-white">
-        <span className="section-title text-lime">{S.eyebrow}</span>
+        <span className="section-title text-muted">{S.eyebrow}</span>
         <h1 className="mt-1.5 text-[26px] font-extrabold leading-tight tracking-tight">{S.title}</h1>
         <p className="mt-1.5 text-sm text-white/70">{kk.legal.supportText}</p>
         <Suspense fallback={<div className="mt-4 h-11" />}>

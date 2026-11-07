@@ -49,7 +49,7 @@ export function AdminNav({ groups }: { groups: NavGroup[] }) {
                   <li key={it.href}>
                     <Link href={it.href} aria-current={on ? "page" : undefined}
                       className={`group flex h-10 items-center gap-3 rounded-xl px-3 font-semibold transition-colors duration-200 ${on ? "bg-night text-white elev-sm" : "text-ink/80 hover:bg-surface hover:text-ink"}`}>
-                      <Icon name={it.icon} className={on ? "text-brand" : "text-muted group-hover:text-ink"} />{it.label}
+                      <Icon name={it.icon} className={on ? "text-white" : "text-muted group-hover:text-ink"} />{it.label}
                     </Link>
                   </li>
                 );

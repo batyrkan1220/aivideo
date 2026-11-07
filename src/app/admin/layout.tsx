@@ -12,7 +12,7 @@ export const metadata = { title: ru.admin.title };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div lang="ru" className="theme-app min-h-dvh bg-paper text-ink">
+    <div lang="ru" className="theme-app theme-mono min-h-dvh bg-paper text-ink">
       <header className="glass sticky top-0 z-30 border-b border-line/60">
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 pt-[env(safe-area-inset-top)] sm:px-6">
           <Link href="/admin" className="flex items-center gap-2.5"><Logo className="text-base" compact /><span className="font-extrabold">{ru.admin.title}</span></Link>
