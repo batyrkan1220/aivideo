@@ -284,6 +284,8 @@ body:has(> .theme-app.theme-mono) { background: #f5f4f1; }
 /* Small badges and labels inside headings keep the body font. */
 .theme-app.theme-mono :is(h1, h2) :is(.t-micro, .t-small, .text-xs, .text-sm) { font-family: var(--font-sans); letter-spacing: normal; }
 .theme-app.theme-mono .font-display { font-weight: 400; }
+/* Template titles on cards: Unbounded, a little bolder so they read on video. */
+.theme-app.theme-mono :is(h3.font-display, .font-display.font-semibold) { font-weight: 600; }
 .theme-app.theme-mono .text-brand { color: var(--color-ink); }
 .theme-app.theme-mono :is(.border-brand, .border-\[\#9cbf12\]) { border-color: #0e0e0e; }
 .theme-app.theme-mono .bg-\[\#9cbf12\] { background: #0e0e0e; }

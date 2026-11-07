@@ -356,7 +356,7 @@ async function NextVideo({ orderId, templateId, saved }: { orderId: string; temp
                 <img src={t.coverThumbUrl ?? t.coverUrl ?? ""} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
               )}
               <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2.5 pt-8 text-white">
-                <span className="line-clamp-2 block text-[13px] font-bold leading-tight">{t.title}</span>
+                <span className="line-clamp-2 block font-display text-[12px] font-semibold leading-tight">{t.title}</span>
                 {t.startingPriceKzt !== null && <span className="mt-0.5 block text-[12px] font-extrabold text-lime">{formatKzt(t.startingPriceKzt)}</span>}
               </span>
             </Link>

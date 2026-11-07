@@ -118,7 +118,7 @@ function DepthStack({ items }: { items: Item[] }) {
             </span>
             <span className={`absolute inset-x-2.5 bottom-2.5 rounded-2xl p-2.5 sm:inset-x-3 sm:bottom-3 sm:p-3 ${glass}`}>
               <span className="flex items-center justify-between gap-2 text-[10px] font-semibold text-white sm:text-xs">
-                <span className="truncate">{front.title}</span>
+                <span className="truncate font-display">{front.title}</span>
                 <span className="hidden shrink-0 text-white/70 sm:inline">{h.hxSwap}</span>
               </span>
               <span className="mt-2 block h-1 overflow-hidden rounded-full bg-white/10">

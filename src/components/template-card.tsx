@@ -230,7 +230,7 @@ export function TemplateCard({ t, priority = false, aspect = "aspect-[3/4]", wal
           )}
         </div>
         <div className="absolute inset-x-2.5 bottom-2.5 text-white sm:inset-x-3 sm:bottom-3">
-          <h3 className="line-clamp-2 text-[14px] font-bold leading-tight tracking-tight sm:text-[15px]">{t.title}</h3>
+          <h3 className="line-clamp-2 font-display text-[13px] font-semibold leading-tight tracking-tight sm:text-[14px]">{t.title}</h3>
           {t.startingPriceKzt !== null && (
             <p className="mt-0.5 text-[12px] font-semibold text-lime sm:mt-1 sm:text-sm">
               {formatKzt(t.startingPriceKzt)}<span className="hidden sm:inline"> {kk.catalog.from}</span>

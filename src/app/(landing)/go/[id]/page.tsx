@@ -181,8 +181,8 @@ async function More({ currentId }: { currentId: string }) {
                       <img src={x.coverThumbUrl ?? x.coverUrl ?? ""} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
                     )}
                     <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 pt-6 text-white">
-                      <span className="line-clamp-2 block text-[12px] font-bold leading-tight">{x.title}</span>
-                      {x.startingPriceKzt !== null && <span className="mt-0.5 block text-[11px] font-extrabold text-brand">{formatKzt(x.startingPriceKzt)}</span>}
+                      <span className="line-clamp-2 block font-display text-[11px] font-semibold leading-tight">{x.title}</span>
+                      {x.startingPriceKzt !== null && <span className="mt-0.5 block text-[11px] font-extrabold text-white">{formatKzt(x.startingPriceKzt)}</span>}
                     </span>
                   </span>
                 </a>
