@@ -72,14 +72,29 @@ export function findBy(pos?: string): string {
 }
 
 /**
+ * The @image refs of each thing, after `start` photos: a thing may have several photos (a car from
+ * the front, side and back: n = 3), which go one after another.
+ */
+function thingRefs(objects: { n?: number }[], start: number): string[][] {
+  let at = start;
+  return objects.map((o) => Array.from({ length: Math.max(1, o.n ?? 1) }, () => `@image_${++at}`));
+}
+const listRefs = (r: string[]) => (r.length < 2 ? r[0] ?? "" : `${r.slice(0, -1).join(", ")} and ${r[r.length - 1]}`);
+/** "@image_2 is a photo of a car" / "@image_2, @image_3 and @image_4 are photos of the same car from different sides (front, side, back)". */
+const thingIntro = (refs: string[], what: string, notPerson: boolean) => refs.length < 2
+  ? `${refs[0]} is a photo of a ${what}${notPerson ? ", not a person" : ""}.`
+  : `${listRefs(refs)} are photos of the same ${what} from different sides (front, side, back)${notPerson ? ", not a person" : ""}: together they show exactly how it looks all around, so every side of it in the video matches them.`;
+
+/**
  * A template where only things are replaced (a car, a horse…), nobody's face: no person rules at all,
  * and every person in the video stays exactly as they are.
  */
-function thingsOnlyPrompt(mode: KlingMode, adminPrompt: string, wish: string, objects: { what: string; look?: string }[], targetRefs: string[], shot: boolean): string {
-  const things = objects.map((o, j) => ({ what: o.what.trim().toLowerCase(), look: o.look?.trim() ?? "", ref: `@image_${j + 1}`, shown: targetRefs[j] ? ` shown in ${targetRefs[j]}` : "" }));
+function thingsOnlyPrompt(mode: KlingMode, adminPrompt: string, wish: string, objects: { what: string; look?: string; n?: number }[], targetRefs: string[], shot: boolean): string {
+  const tr = thingRefs(objects, 0);
+  const things = objects.map((o, j) => ({ what: o.what.trim().toLowerCase(), look: o.look?.trim() ?? "", refs: tr[j], ref: listRefs(tr[j]), shown: targetRefs[j] ? ` shown in ${targetRefs[j]}` : "" }));
   const parts: string[] = [mode === "edit" ? "Edit @video_1." : "Follow the motion, actions, timing, camera movement, framing and cuts of @video_1, and recreate its location, background and lighting."];
   for (const t of things) {
-    parts.push(`${t.ref} is a photo of a ${t.what}. Replace the ${t.what}${t.look ? ` (${t.look})` : ""}${t.shown} in @video_1 with the ${t.what} from ${t.ref}: the same type, model or breed, color, shape, markings, logos and details, in the same place, size, angle and movement, matching the scene's lighting, reflections and shadows in every frame.`);
+    parts.push(`${thingIntro(t.refs, t.what, false)} Replace the ${t.what}${t.look ? ` (${t.look})` : ""}${t.shown} in @video_1 with the ${t.what} from ${t.ref}, 1:1: exactly the same make and model or breed, body shape, color and shade, wheels or markings, logos, number plates, stickers and every detail, from every side; in the same place, size, angle and movement, matching the scene's lighting, reflections and shadows in every frame. Do not invent or change any of its details.`);
   }
   parts.push(mode === "edit"
     ? "Keep everything else in @video_1 unchanged: every person with their own face and body, background, location, other objects, lighting, camera movement, framing, cuts, motion and timing."
@@ -93,12 +108,13 @@ function thingsOnlyPrompt(mode: KlingMode, adminPrompt: string, wish: string, ob
   return parts.join(" ");
 }
 
-export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "template", adminPrompt: string, wish: string, people = 1, positions: string[] = [], objects: { what: string; look?: string }[] = [], targetRefs: string[] = [], shot = false): string {
+export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "template", adminPrompt: string, wish: string, people = 1, positions: string[] = [], objects: { what: string; look?: string; n?: number }[] = [], targetRefs: string[] = [], shot = false): string {
   // Optional cut-outs from the template (@image_k) that show which person or thing is meant: people first, then things.
   if (people === 0) return thingsOnlyPrompt(mode, adminPrompt, wish, objects, targetRefs, shot);
   const shown = (i: number) => (targetRefs[i] ? ` shown in ${targetRefs[i]}` : "");
   const refs = Array.from({ length: people }, (_, i) => `@image_${i + 1}`);
-  const things = objects.map((o, j) => ({ what: o.what.trim().toLowerCase(), look: o.look?.trim() ?? "", ref: `@image_${people + j + 1}`, shown: shown(people + j) }));
+  const tr = thingRefs(objects, people);
+  const things = objects.map((o, j) => ({ what: o.what.trim().toLowerCase(), look: o.look?.trim() ?? "", refs: tr[j], ref: listRefs(tr[j]), shown: shown(people + j) }));
   const outfitRef = things.find((t) => ["outfit", "clothes", "clothing"].includes(t.what))?.ref;
   const spot = (i: number) => `${findBy(positions[i]) || `number ${i + 1} from the left`}${shown(i)}`;
   const who = people === 1
@@ -143,7 +159,7 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
       ];
   for (const t of things) {
     if (t.ref === outfitRef) continue;
-    parts.push(`${t.ref} is a photo of a ${t.what}, not a person. Replace the ${t.what}${t.look ? ` (${t.look})` : ""}${t.shown} in @video_1 with the ${t.what} from ${t.ref}: the same type, model or breed, color, shape, markings and details, in the same place, size, angle and movement, matching the scene's lighting and shadows in every frame.`);
+    parts.push(`${thingIntro(t.refs, t.what, true)} Replace the ${t.what}${t.look ? ` (${t.look})` : ""}${t.shown} in @video_1 with the ${t.what} from ${t.ref}, 1:1: exactly the same make and model or breed, body shape, color and shade, wheels or markings, logos, number plates, stickers and every detail, from every side; in the same place, size, angle and movement, matching the scene's lighting, reflections and shadows in every frame. Do not invent or change any of its details.`);
   }
   const cutouts = targetRefs.filter(Boolean);
   if (cutouts.length) {

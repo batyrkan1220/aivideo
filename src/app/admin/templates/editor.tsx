@@ -8,7 +8,7 @@ import { supabaseBrowser } from "@/lib/supabase/client";
 import { autoFaceSlots } from "@/lib/templates/schema";
 import type { TemplateInput, PublishProblem } from "@/lib/templates/admin-schema";
 import { validateTemplateForm, firstErrorKey, type FieldErrors } from "@/lib/templates/editor-validation";
-import { OBJECT_PRESETS, parseSeedanceConfig, seedanceSlots, SEEDANCE_MAX_OBJECTS, SEEDANCE_MAX_PEOPLE, SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC, type SeedanceConfig } from "@/lib/templates/seedance-config";
+import { OBJECT_PRESETS, parseSeedanceConfig, seedanceSlots, SEEDANCE_MAX_OBJECTS, SEEDANCE_MAX_PEOPLE, SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC, SEEDANCE_MAX_THING_PHOTOS, THING_VIEWS, type SeedanceConfig } from "@/lib/templates/seedance-config";
 import { calculatePrice, formatKzt } from "@/lib/pricing";
 import { seedancePriceKzt, seedanceCostKzt, klingUnitLabel, SEEDANCE_QUALITY, type SeedancePricing } from "@/lib/pricing-seedance";
 import { FaceMap } from "@/components/face-map";
@@ -335,7 +335,8 @@ export function TemplateEditor({
               {ai.found && ai.found.length > 0 && <p className="mt-1 text-xs text-muted">{ai.found.join(" · ")}</p>}
 
               {/* What the AI found: each person and thing with its cut-out. Editable. */}
-              {sd.analyzedAt && (
+              {/* Always editable: by hand too, when the AI analysis is not available. */}
+              {(
                 <div className="mt-4 grid gap-3">
                   <datalist id="kling-positions">{Object.entries(e.seedance.positionOptions).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</datalist>
                   {unclearPeople(sd).length > 0 && <p className="rounded-xl bg-[#fff1f0] p-2 text-xs font-medium text-danger">{e.seedance.unclearPeople}</p>}
@@ -343,7 +344,14 @@ export function TemplateEditor({
                     <div key={`p${i}`} className={`grid gap-3 rounded-xl bg-white p-3 ring-1 sm:grid-cols-[72px_1fr] ${unclearPeople(sd).includes(i) ? "ring-danger" : "ring-line"}`}>
                       <Cutout path={sd.targets[i]} mediaBase={mediaBase} label={`${i + 1}`} />
                       <div className="grid gap-2">
-                        <span className="text-sm font-semibold">{e.seedance.personN(i + 1)}</span>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-semibold">{e.seedance.personN(i + 1)}</span>
+                          {/* Remove exactly this person (their description, label and cut-outs go with them). */}
+                          <button type="button" onClick={() => {
+                            const cut = <T,>(list: T[]) => list.filter((_, k) => k !== i);
+                            setSd({ people: sd.people - 1, positions: cut(sd.positions), labels: cut(sd.labels), targets: cut(sd.targets), targetsKling: cut(sd.targetsKling), shotMap: undefined });
+                          }} className="rounded-full px-3 text-sm font-medium text-muted hover:text-danger">Убрать</button>
+                        </div>
                         <input className={inputCls()} maxLength={120} list="kling-positions" placeholder={e.seedance.positionAuto(i + 1)} value={sd.positions[i] ?? ""}
                           onChange={(ev) => { const p = [...sd.positions]; while (p.length < sd.people) p.push(""); p[i] = ev.target.value; setSd({ positions: p.slice(0, sd.people) }); }} />
                         <input className={inputCls()} maxLength={40} placeholder={e.seedance.customerLabel(i + 1, sd.people)} value={sd.labels[i] ?? ""}
@@ -373,6 +381,18 @@ export function TemplateEditor({
                         </div>
                         <input className={inputCls()} maxLength={120} placeholder="Какой именно в видео, по-английски: the white car on the right" value={o.look ?? ""}
                           onChange={(ev) => { const list = [...sd.objects]; list[j] = { ...o, look: ev.target.value }; setSd({ objects: list }); }} />
+                        {/* Several photos of the same thing (a car from the front, side, back): Kling sees it from every side. */}
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <span className="text-muted">Фото от клиента:</span>
+                          <select className="rounded-lg border border-line px-2 py-1" value={o.photos ?? 1}
+                            onChange={(ev) => { const list = [...sd.objects]; list[j] = { ...o, photos: Number(ev.target.value) }; setSd({ objects: list }); }}>
+                            {Array.from({ length: SEEDANCE_MAX_THING_PHOTOS }, (_, k) => k + 1).map((n) => <option key={n} value={n}>{n}</option>)}
+                          </select>
+                          {(o.photos ?? 1) > 1 && Array.from({ length: o.photos ?? 1 }, (_, k) => (
+                            <input key={k} className="w-28 rounded-lg border border-line px-2 py-1" maxLength={30} placeholder={THING_VIEWS[k]} value={o.views?.[k] ?? ""}
+                              onChange={(ev) => { const v = [...(o.views ?? [])]; while (v.length <= k) v.push(""); v[k] = ev.target.value; const list = [...sd.objects]; list[j] = { ...o, views: v }; setSd({ objects: list }); }} />
+                          ))}
+                        </div>
                         {!Object.values(OBJECT_PRESETS).some((p) => p.en === o.what) && (
                           <input className={inputCls()} maxLength={40} placeholder="Что это по-английски (для ИИ), например: boat, guitar" value={o.what}
                             onChange={(ev) => { const list = [...sd.objects]; list[j] = { ...o, what: ev.target.value }; setSd({ objects: list }); }} />
@@ -388,7 +408,7 @@ export function TemplateEditor({
                       </select>
                     </label>
                     {sd.objects.length < SEEDANCE_MAX_OBJECTS && (
-                      <button type="button" onClick={() => setSd({ objects: [...sd.objects, { what: OBJECT_PRESETS.car.en, label: OBJECT_PRESETS.car.ru }] })}
+                      <button type="button" onClick={() => setSd({ objects: [...sd.objects, { what: OBJECT_PRESETS.car.en, label: OBJECT_PRESETS.car.ru, photos: 1, views: [] }] })}
                         className="rounded-full border border-line bg-white px-3 py-1.5 font-semibold hover:border-ink">{e.seedance.addThing}</button>
                     )}
                     <label className="inline-flex items-center gap-2 font-medium">

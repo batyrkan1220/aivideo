@@ -10,8 +10,12 @@ import type { FaceSlot } from "./schema";
 export const SEEDANCE_MAX_PEOPLE = 5;
 /** Besides people: up to 2 things to swap (car, horse, outfit…), one customer photo each. */
 export const SEEDANCE_MAX_OBJECTS = 2;
-/** Photos sent to Kling 4.0 as reference images: people plus things. */
-export const SEEDANCE_MAX_REFS = SEEDANCE_MAX_PEOPLE + SEEDANCE_MAX_OBJECTS;
+/** A thing may ask for several photos (a car from the front, side, back). */
+export const SEEDANCE_MAX_THING_PHOTOS = 3;
+/** Photos sent to Kling 4.0 as reference images: people plus things (Kling takes 10 at most). */
+export const SEEDANCE_MAX_REFS = 10;
+/** Default names of a thing's photos, shown to the customer: "Фото машины — спереди". */
+export const THING_VIEWS = ["спереди", "сбоку", "сзади"];
 
 /** Ready-made things to swap: Russian label for the customer, English word for the model. */
 export const OBJECT_PRESETS = {
@@ -31,6 +35,10 @@ export const objectSchema = z.object({
   look: z.string().trim().max(120).optional(),
   /** Optional cut-out of this thing from the template video (storage path). */
   target: z.string().trim().max(300).optional(),
+  /** How many photos the customer uploads of it (1–3, e.g. a car from the front, side and back). */
+  photos: z.number().int().min(1).max(SEEDANCE_MAX_THING_PHOTOS).catch(1).default(1),
+  /** Name of each photo for the customer ("спереди", "сбоку", "сзади"). */
+  views: z.array(z.string().trim().max(30)).max(SEEDANCE_MAX_THING_PHOTOS).catch([]).default([]),
 });
 export type SwapObject = z.infer<typeof objectSchema>;
 export const SEEDANCE_MIN_SEC = 3;
@@ -94,7 +102,7 @@ export function seedanceSlotLabel(i: number, n: number) {
 }
 
 /** Customer upload slots. providerInput = `img_<n>` (= @image_<n> in the prompt). People first, then objects. */
-export function seedanceSlots(n: number, keyPrefix = "face_", labels: string[] = [], objects: SwapObject[] = [], targets: string[] = []): FaceSlot[] {
+export function seedanceSlots(n: number, keyPrefix = "face_", labels: string[] = [], objects: (Pick<SwapObject, "label" | "target"> & { what?: string; photos?: number; views?: string[] })[] = [], targets: string[] = []): FaceSlot[] {
   const target = (i: number) => (targets[i]?.trim() ? { previewImagePath: targets[i].trim() } : {});
   const people: FaceSlot[] = Array.from({ length: n }, (_, i) => ({
     key: `${keyPrefix}${i + 1}`,
@@ -104,15 +112,23 @@ export function seedanceSlots(n: number, keyPrefix = "face_", labels: string[] =
     order: i,
     ...target(i),
   }));
-  const things: FaceSlot[] = objects.slice(0, SEEDANCE_MAX_OBJECTS).map((o, j) => ({
-    key: `obj_${j + 1}`,
-    labelKk: o.label,
-    position: { x: 0.5, y: 0.7 },
-    providerInput: `img_${n + j + 1}`,
-    order: n + j,
-    kind: "object" as const,
-    ...(o.target?.trim() ? { previewImagePath: o.target.trim() } : {}),
-  }));
+  // A thing with several photos gets a slot per photo: obj_1 (the first, as before), obj_1_2, obj_1_3.
+  const things: FaceSlot[] = [];
+  objects.slice(0, SEEDANCE_MAX_OBJECTS).forEach((o, j) => {
+    const count = Math.max(1, Math.min(SEEDANCE_MAX_THING_PHOTOS, o.photos ?? 1));
+    for (let k = 0; k < count; k++) {
+      const view = count > 1 ? (o.views?.[k]?.trim() || THING_VIEWS[k]) : "";
+      things.push({
+        key: k === 0 ? `obj_${j + 1}` : `obj_${j + 1}_${k + 1}`,
+        labelKk: view ? `${o.label} — ${view}`.slice(0, 60) : o.label,
+        position: { x: 0.5, y: 0.7 },
+        providerInput: `img_${n + things.length + 1}`,
+        order: n + things.length,
+        kind: "object" as const,
+        ...(k === 0 && o.target?.trim() ? { previewImagePath: o.target.trim() } : {}),
+      });
+    }
+  });
   return [...people, ...things];
 }
 

@@ -17,7 +17,7 @@ describe("AI analysis", () => {
     expect(next.people).toBe(2);
     expect(next.positions).toEqual(["on the left, woman in red", "on the right, man in black"]);
     expect(next.targets).toEqual(["targets/p1.jpg", ""]);
-    expect(next.objects).toEqual([{ what: "car", label: "Фото машины", look: "white sedan", target: "targets/c.jpg" }]);
+    expect(next.objects).toEqual([{ what: "car", label: "Фото машины", look: "white sedan", photos: 1, views: [], target: "targets/c.jpg" }]);
     expect(next.prompt).toBe("Keep the video 1:1: Evening street, slow push-in.");
     expect(next.showTargets).toBe(true);
     expect(next.analyzedAt).toBe("2026-11-06T13:00:00.000Z");
@@ -26,7 +26,7 @@ describe("AI analysis", () => {
     const cfg = parseSeedanceConfig({ people: 1, prompt: "national costume", objects: [{ what: "horse", label: "Фото лошади" }] });
     const next = applyAnalysis(cfg, a, { people: ["targets/p1.jpg"], objects: [""] }, true);
     expect(next.people).toBe(1);
-    expect(next.objects).toEqual([{ what: "horse", label: "Фото лошади" }]);
+    expect(next.objects).toEqual([{ what: "horse", label: "Фото лошади", photos: 1, views: [] }]);
     expect(next.prompt).toBe("national costume");
     expect(analysisHint(cfg, true)).toEqual({ people: 1, objects: ["horse"] });
   });

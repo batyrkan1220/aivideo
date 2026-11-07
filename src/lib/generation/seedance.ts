@@ -60,17 +60,29 @@ export const seedanceProvider: GenerationProvider = {
     const outfit = cfg.outfit === "choice" ? (extra.customerOutfit === "photo" ? "photo" : "template") : cfg.outfit;
     const durationSec = Number(extra.durationSec);
     const photos = input.faces.map((f) => f.imageUrl).slice(0, SEEDANCE_MAX_REFS);
+    const byKey = new Map(input.faces.map((f) => [f.slotKey, f.imageUrl]));
     // People first (img_1…img_n), then the things to swap (car, horse, outfit…).
     // How many people is the number set on the template.
     // Only photos that were actually uploaded count, so a car slot is never sent as a person.
     // 0 people: a template where only things are replaced (a car…); every photo is a thing.
     const declaredPeople = Math.min(SEEDANCE_MAX_PEOPLE, Math.max(0, cfg.people));
-    const objects = cfg.objects.slice(0, Math.min(SEEDANCE_MAX_OBJECTS, Math.max(0, photos.length - declaredPeople)));
-    const people = declaredPeople === 0 ? 0 : Math.min(declaredPeople, Math.max(1, photos.length - objects.length));
+    // Photos of each thing, by slot (obj_1, obj_1_2, obj_1_3…): a car from the front, side, back.
+    const groups = cfg.objects.slice(0, SEEDANCE_MAX_OBJECTS).map((_, j) =>
+      [`obj_${j + 1}`, `obj_${j + 1}_2`, `obj_${j + 1}_3`].map((k) => byKey.get(k)).filter((u): u is string => !!u));
+    const keyed = groups.some((g) => g.length);
+    const personKeyed = Array.from({ length: declaredPeople }, (_, i) => byKey.get(`face_${i + 1}`)).filter((u): u is string => !!u);
+    const objects = keyed
+      ? cfg.objects.slice(0, SEEDANCE_MAX_OBJECTS).filter((_, j) => groups[j].length).map((o, j) => ({ ...o, n: groups.filter((g) => g.length)[j].length }))
+      : cfg.objects.slice(0, Math.min(SEEDANCE_MAX_OBJECTS, Math.max(0, photos.length - declaredPeople))).map((o) => ({ ...o, n: 1 }));
+    const people = declaredPeople === 0 ? 0
+      : keyed && personKeyed.length ? personKeyed.length
+      : Math.min(declaredPeople, Math.max(1, photos.length - objects.length));
     if (people === 0 && !objects.length) throw new ProviderError("provider_bad_params", false, "nothing to replace");
     const resolution: "720p" | "1080p" = input.quality === "1080p" ? "1080p" : "720p";
-    // Photos go straight to the video call as reference images, people first, then things.
-    const usedPhotos = photos.slice(0, people + objects.length);
+    // Photos go straight to the video call as reference images, people first, then every photo of each thing.
+    const usedPhotos = keyed
+      ? [...(personKeyed.length ? personKeyed : photos.slice(0, people)), ...groups.flat()].slice(0, SEEDANCE_MAX_REFS)
+      : photos.slice(0, people + objects.length);
     // Optional cut-outs from the template, after the customer's photos, while Kling's 10 images last.
     const cutouts: string[] = [];
     // Person cut-outs are not sent: with them Kling mixed up or kept people (TM-100024, TM-100026).

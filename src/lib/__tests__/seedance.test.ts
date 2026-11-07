@@ -340,3 +340,29 @@ describe("things only (0 people)", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("a thing with several photos (a car from 3 sides)", () => {
+  it("3 slots for the car, all 3 photos go to Kling as one car", async () => {
+    const { seedanceSlots } = await import("@/lib/templates/seedance-config");
+    const slots = seedanceSlots(0, "face_", [], [{ what: "car", label: "Фото машины", photos: 3, views: [] }]);
+    expect(slots.map((s) => [s.key, s.labelKk, s.providerInput])).toEqual([
+      ["obj_1", "Фото машины — спереди", "img_1"], ["obj_1_2", "Фото машины — сбоку", "img_2"], ["obj_1_3", "Фото машины — сзади", "img_3"]]);
+    const bodies: { contents: { type: string; url?: string; text?: string }[] }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_u: string, init?: RequestInit) => {
+      if (init?.body) bodies.push(JSON.parse(String(init.body)));
+      return new Response(JSON.stringify({ code: 0, data: { id: "c3" } }), { status: 200 });
+    }));
+    await seedanceProvider.submit({ jobId: "j3", templateVideoUrl: "https://t/v.mp4", templateFrameUrl: null, quality: "720p",
+      faces: slots.map((s, i) => ({ slotKey: s.key, providerInput: s.providerInput, imageUrl: `https://s/car${i + 1}.jpg` })),
+      config: { durationSec: 8, people: 0, objects: [{ what: "car", label: "Фото машины", photos: 3, look: "the red car" }] } });
+    expect(bodies[0].contents.filter((c) => c.type === "refer_image").map((c) => c.url)).toEqual(["https://s/car1.jpg", "https://s/car2.jpg", "https://s/car3.jpg"]);
+    expect(bodies[0].contents[0].text).toContain("@image_1, @image_2 and @image_3 are photos of the same car from different sides");
+    expect(bodies[0].contents[0].text).toContain("with the car from @image_1, @image_2 and @image_3, 1:1");
+    vi.unstubAllGlobals();
+  });
+  it("a person and a car with 2 photos: person @image_1, car @image_2 and @image_3", async () => {
+    const { buildKlingDirectPrompt } = await import("@/lib/generation/kling");
+    const p = buildKlingDirectPrompt("edit", "photo", "", "", 1, ["on the left"], [{ what: "car", n: 2 }]);
+    expect(p).toContain("@image_2 and @image_3 are photos of the same car from different sides");
+  });
+});

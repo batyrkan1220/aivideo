@@ -70,7 +70,7 @@ export function applyAnalysis(cfg: SeedanceConfig, a: Analysis, cuts: { people: 
   } else {
     objects = a.objects.slice(0, SEEDANCE_MAX_OBJECTS).map((f, j) => {
       const preset = Object.values(OBJECT_PRESETS).find((p) => p.en === f.what);
-      return { what: f.what, label: preset?.ru ?? "Фото предмета", look: f.look.slice(0, 120), ...(cuts.objects[j] ? { target: cuts.objects[j] } : {}) };
+      return { what: f.what, label: preset?.ru ?? "Фото предмета", look: f.look.slice(0, 120), photos: 1, views: [], ...(cuts.objects[j] ? { target: cuts.objects[j] } : {}) };
     });
   }
   const scene = a.scene ? `${SCENE_PREFIX} ${a.scene}`.slice(0, 1500) : "";
