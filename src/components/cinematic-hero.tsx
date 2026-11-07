@@ -13,7 +13,10 @@ const delay = (ms: number) => ({ animationDelay: `${ms}ms` });
  * real trend templates in 3D depth, the front one playing with an AI scanner sweeping it.
  * Phones and the Mini App get the same pieces, a little smaller.
  */
-export function CinematicHero({ items, newVideoHref }: { items: Item[]; newVideoHref: string }) {
+/** The hero's text and actions need no data, so they are in the page's instant shell; only the cards
+ *  (`stack`) wait for the showcase. Going back to the home page then shows the hero at once, at its
+ *  final size, instead of a placeholder that later grows. */
+export function CinematicHero({ stack, newVideoHref }: { stack: React.ReactNode; newVideoHref: string }) {
   return (
     <section className="relative isolate overflow-hidden">
       <Atmosphere />
@@ -42,7 +45,7 @@ export function CinematicHero({ items, newVideoHref }: { items: Item[]; newVideo
         </div>
 
         <div style={delay(220)} className="hero-rise mt-4 w-full md:mt-10">
-          <DepthStack items={items} />
+          {stack}
         </div>
 
         <dl style={delay(420)} className="hero-rise mt-6 hidden w-full max-w-2xl grid-cols-3 gap-3 sm:grid">
@@ -74,8 +77,13 @@ const glass = "border border-white/15 bg-black/45 backdrop-blur-xl";
 const chip = "border border-line bg-surface/90 shadow-[0_16px_32px_-16px_rgb(0_0_0/0.35)] backdrop-blur-xl";
 
 /** Three cards in 3D depth; the centre one plays, with a black rim, face frame and scanner line. */
-function DepthStack({ items }: { items: Item[] }) {
-  if (!items.length) return <div className="h-[17rem] sm:h-[26rem] md:h-[34rem]" />;
+/** Same box as the cards, while they load. */
+export function DepthStackShell() {
+  return <div className="mx-auto h-[17rem] w-full max-w-lg sm:h-[26rem] md:h-[31rem]" aria-hidden />;
+}
+
+export function DepthStack({ items }: { items: Item[] }) {
+  if (!items.length) return <DepthStackShell />;
   const [front, left, right] = items;
   const side = (t: Item | undefined, pos: "l" | "r") => t && (
     <Link href={`/templates/${t.id}`} tabIndex={-1} aria-hidden

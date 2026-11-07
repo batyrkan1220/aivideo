@@ -1,12 +1,14 @@
-import { CardGridSkeleton, Skeleton } from "@/components/ui/states";
-
-/** Shown instantly on navigation while the next page loads (taps feel immediate). */
+/**
+ * Shown for a moment while a page without its own loading state opens. Deliberately plain: a thin
+ * progress line, no page-shaped skeleton (an old-style skeleton flashed before the new home page
+ * and then the size jumped). Pages show their own skeletons inside.
+ */
 export default function Loading() {
   return (
-    <main className="mx-auto max-w-6xl px-4 pt-6 sm:px-6" aria-busy="true">
-      <Skeleton className="h-8 w-48 rounded-full" />
-      <Skeleton className="mt-4 h-48 rounded-card" />
-      <div className="mt-6"><CardGridSkeleton count={8} /></div>
+    <main className="min-h-[70vh]" aria-busy="true">
+      <div className="h-0.5 w-full overflow-hidden bg-ink/[0.06]">
+        <div className="h-full w-1/3 animate-[tm-loading_1s_ease-in-out_infinite] bg-ink/40" />
+      </div>
     </main>
   );
 }

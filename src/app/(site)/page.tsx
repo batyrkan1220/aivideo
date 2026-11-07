@@ -6,7 +6,7 @@ import { kk } from "@/lib/i18n/kk";
 import { listCategories, listTemplates } from "@/lib/templates/queries";
 import { CategoryChips, pickCard } from "@/components/catalog-bits";
 import { VideoFeed } from "@/components/video-feed";
-import { CinematicHero } from "@/components/cinematic-hero";
+import { CinematicHero, DepthStack, DepthStackShell } from "@/components/cinematic-hero";
 import { Logo } from "@/components/logo";
 import { CachedFeedFallback } from "@/components/cached-feed";
 import { resolveShowcase } from "@/lib/templates/showcase";
@@ -29,25 +29,31 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
         <Logo className="text-base" />
       </div>
 
-      <Suspense fallback={<HeroFallback />}>
-        <Hero />
-      </Suspense>
+      <CinematicHero newVideoHref="/create" stack={<Suspense fallback={<DepthStackShell />}><HeroCards /></Suspense>} />
 
-      <Suspense fallback={<div className="mx-auto mt-4 max-w-[1600px] px-1.5 sm:px-3"><CachedFeedFallback /></div>}>
+      <Suspense fallback={<FeedFallback />}>
         <Feed searchParams={searchParams} />
       </Suspense>
     </main>
   );
 }
 
-async function Hero() {
+async function HeroCards() {
   const items = (await resolveShowcase()).map(({ id, title, coverUrl, coverThumbUrl, previewUrl, previewLiteUrl, previewAnimUrl }) => ({ id, title, coverUrl: coverThumbUrl ?? coverUrl, previewUrl: previewLiteUrl ?? previewUrl, animUrl: previewAnimUrl }));
-  return <CinematicHero items={items} newVideoHref="/create" />;
+  return <DepthStack items={items} />;
 }
 
-/** Same size as the hero while the showcase loads, so the feed below does not jump. */
-function HeroFallback() {
-  return <div className="h-[29rem] md:h-[40rem]" aria-hidden />;
+/** While the feed loads: the same heading and chip row as the real feed (no jump), then the saved cards. */
+function FeedFallback() {
+  return (
+    <div className="mx-auto max-w-[1600px] px-1.5 sm:px-3">
+      <h2 className="section-title mt-5 px-2.5 text-muted md:hidden">{kk.home.templatesTitle}</h2>
+      <div className="flex gap-2 px-2.5 py-2.5 sm:py-3" aria-hidden>
+        {[56, 88, 72, 96].map((w) => <span key={w} className="skeleton h-10 shrink-0 rounded-full" style={{ width: w }} />)}
+      </div>
+      <CachedFeedFallback />
+    </div>
+  );
 }
 
 async function Feed({ searchParams }: { searchParams: Promise<SP> }) {
