@@ -281,7 +281,14 @@ body:has(> .theme-app main[data-dark]) { background: #101014; }
 /* Light accent boxes (photo tips and the like) become quiet tinted panels. */
 .theme-app:has(main[data-dark]) .bg-\[\#fffbe6\] { background: rgb(212 255 0 / 0.07); }
 .theme-app:has(main[data-dark]) .ring-\[\#f0dc8a\] { --tw-ring-color: rgb(212 255 0 / 0.25); }
-.theme-app:has(main[data-dark]) .bg-white\/90 { background: rgb(26 26 32 / 0.9); }
+/* "Dark text" (text-night) only stays dark on lime and white chips; on dark surfaces it turns light. */
+.theme-app:has(main[data-dark]) :is(.bg-surface, .bg-brand-soft, .bg-mist, .glass).text-night,
+.theme-app:has(main[data-dark]) .bg-surface > .text-night,
+.theme-app:has(main[data-dark]) p.text-night { color: var(--color-ink); }
+/* Photo slots: a quiet dashed glass box instead of lavender. */
+.theme-app:has(main[data-dark]) .bg-lavender\/60 { background: rgb(255 255 255 / 0.04); }
+.theme-app:has(main[data-dark]) .border-\[\#c9cdf5\] { border-color: rgb(255 255 255 / 0.22); }
+.theme-app:has(main[data-dark]) .bg-ink > .bg-white { background: var(--color-paper); }
 .theme-app:has(main[data-dark]) :focus-visible { outline-color: #d4ff00; }
 .theme-app:has(main[data-dark]) .text-lime { color: #d4ff00; }
 .theme-app:has(main[data-dark]) .btn-glow,
