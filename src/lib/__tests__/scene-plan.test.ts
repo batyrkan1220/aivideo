@@ -22,3 +22,13 @@ describe("planParts", () => {
     expect(planParts(0, [2])).toEqual([]);
   });
 });
+
+import { toFrames } from "../media/scene-plan";
+describe("toFrames", () => {
+  it("every frame belongs to exactly one shot, cut on the scene's first frame", () => {
+    const f = toFrames(planParts(15, [1.83, 5.27, 7.93]), 15, 30);
+    expect(f.map((p) => [p.from, p.to])).toEqual([[0, 55], [55, 158], [158, 238], [238, null]]);
+    expect(f.reduce((n, p) => n + p.frames, 0)).toBe(450);
+    expect(f[0].len).toBeCloseTo(55 / 30);
+  });
+});

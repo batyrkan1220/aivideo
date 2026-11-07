@@ -40,3 +40,17 @@ export function planParts(total: number, cuts: number[], min = MIN_PART_SEC, max
  * last frame up to that length and the join cuts it back to its real length.
  */
 export const klingShotSec = (len: number) => Math.max(KLING_MIN_SEC, Math.ceil(len - 0.01));
+
+/** A shot in whole frames of the template: frames [from, to) at fps; the last one runs to the end. */
+export type FramePart = Part & { from: number; to: number | null; frames: number };
+
+/** Cut points snapped to whole frames, so every frame belongs to exactly one shot. */
+export function toFrames(parts: Part[], total: number, fps: number): FramePart[] {
+  const all = Math.max(1, Math.round(total * fps));
+  return parts.map((p, i) => {
+    const from = Math.round(p.start * fps);
+    const to = i === parts.length - 1 ? null : Math.round((p.start + p.len) * fps);
+    const frames = (to ?? all) - from;
+    return { ...p, from, to, frames, len: frames / fps };
+  });
+}

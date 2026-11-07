@@ -92,3 +92,18 @@ describe("Kling prompt with things to swap", () => {
     expect(s.map((x) => [x.key, x.providerInput, x.kind ?? "person"])).toEqual([["face_1", "img_1", "person"], ["obj_1", "img_2", "object"]]);
   });
 });
+
+describe("prompt for one shot of a cut template", () => {
+  it("leaves out the whole-video scene note and keeps a shot without the person as it is", () => {
+    const p = buildKlingDirectPrompt("edit", "photo", "Keep the video 1:1: two people kiss at the end.", "", 1, ["on the left"], [], [], true);
+    expect(p).not.toContain("kiss");
+    expect(p).toContain("one shot of a longer video");
+    expect(p).toContain("If that person is not in this shot at all, add no one");
+    expect(p).not.toContain("Do not return @video_1 unchanged");
+  });
+  it("the whole video still gets the scene note", () => {
+    const p = buildKlingDirectPrompt("edit", "photo", "Keep the video 1:1: two people kiss at the end.", "", 1, ["on the left"]);
+    expect(p).toContain("kiss");
+    expect(p).toContain("Do not return @video_1 unchanged");
+  });
+});

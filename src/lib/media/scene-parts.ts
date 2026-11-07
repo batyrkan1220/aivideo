@@ -7,13 +7,14 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as WebReadableStream } from "node:stream/web";
 import { ffmpegLog, holdMedia } from "@/lib/templates/lite-preview";
-import { klingShotSec, planParts, type Part } from "./scene-plan";
+import { klingShotSec, planParts, toFrames, type FramePart, type Part } from "./scene-plan";
 
 /*
   Kling keeps the customer's face only inside one continuous shot: after a cut in the template it
   falls back to the original person (TM-100034, from 4 s). So a template with cuts is edited shot by
   shot: one Kling task per shot, each with the same photo, then the shots are joined again and the
-  template's own sound is put back. Shots under 3 s (Kling's minimum) stay with their neighbour.
+  template's own sound is put back. Every scene is its own shot (flashes under 0.8 s stay with a
+  neighbour); a shot under 3 s, Kling's minimum, is held on its last frame and cut back after.
 */
 
 const MAX_BYTES = 200 * 1024 * 1024;
@@ -37,8 +38,11 @@ async function findShots(inPath: string) {
   const dur = /Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(log);
   const total = dur ? Number(dur[1]) * 3600 + Number(dur[2]) * 60 + Number(dur[3]) : 0;
   const cuts = [...log.matchAll(/pts_time:(\d+(?:\.\d+)?)/g)].map((m) => Number(m[1]));
-  return { total, cuts, parts: planParts(total, cuts) };
+  const f = /Video:[^\n]*?(\d+(?:\.\d+)?) fps/.exec(log);
+  const fps = f && Number(f[1]) >= 10 && Number(f[1]) <= 120 ? Number(f[1]) : 30;
+  return { total, cuts, fps, parts: planParts(total, cuts) };
 }
+
 
 /**
  * Admin view of how an order of this template is cut: every scene change ffmpeg finds, the shots
@@ -66,30 +70,37 @@ export async function previewShots(videoUrl: string): Promise<{ total: number; c
   }
 }
 
-/** Shots of the video (start/length in seconds), or null when it is one shot. */
-export async function splitAtCuts(videoUrl: string): Promise<{ parts: (Part & { file: Buffer })[] } | null> {
+/**
+ * Shots of the video in whole frames, or null when it is one shot. Cut by frame number (not by time):
+ * a time cut could leave the first frame of the next scene at the end of a shot, a one-frame cut
+ * Kling then "smooths over". Each shot keeps the template's frame rate and its own sound.
+ */
+export async function splitAtCuts(videoUrl: string): Promise<{ fps: number; parts: (FramePart & { file: Buffer })[] } | null> {
   const release = holdMedia();
   const dir = await mkdtemp(join(tmpdir(), "sp-"));
   try {
     const inPath = join(dir, "in");
     await download(videoUrl, inPath);
-    const { total, cuts, parts } = await findShots(inPath);
-    console.log("[scenes]", `total=${total.toFixed(2)} cuts=${cuts.map((c) => c.toFixed(2)).join(",") || "-"} parts=${parts.length}`);
+    const { total, cuts, fps, parts: plan } = await findShots(inPath);
+    const parts = toFrames(plan, total, fps);
+    console.log("[scenes]", `total=${total.toFixed(2)} fps=${fps} cuts=${cuts.map((c) => c.toFixed(2)).join(",") || "-"} parts=${parts.length}` +
+      (parts.length > 1 ? ` frames=${parts.map((p) => `${p.from}+${p.frames}`).join(",")}` : ""));
     if (parts.length < 2) return null;
-    const out: (Part & { file: Buffer })[] = [];
+    const out: (FramePart & { file: Buffer })[] = [];
     for (const [k, p] of parts.entries()) {
       const o = join(dir, `p${k}.mp4`);
-      // Exact cut points: re-encoded (stream copy would snap to keyframes), sound kept.
       // Held on the last frame (and silence) up to whole seconds (at least 3): Kling returns whole
-      // seconds only, so nothing of the shot is lost; the join cuts it back to its real length.
-      const hold = klingShotSec(p.len) + 0.05 - p.len;
-      await ffmpegLog([...q, "-loglevel", "error", "-ss", p.start.toFixed(3), "-t", p.len.toFixed(3), "-i", inPath,
-        ...(hold ? ["-vf", `tpad=stop_mode=clone:stop_duration=${hold.toFixed(3)}`, "-af", `apad=pad_dur=${hold.toFixed(3)}`] : []),
-        "-filter_threads", "1", ...x264, "-crf", "17", "-pix_fmt", "yuv420p",
+      // seconds only, so nothing of the shot is lost; the join cuts it back to its real frames.
+      const hold = (klingShotSec(p.len) + 0.05 - p.len).toFixed(3);
+      const t0 = (p.from / fps).toFixed(4), t1 = p.to == null ? "" : `:end=${(p.to / fps).toFixed(4)}`;
+      await ffmpegLog([...q, "-loglevel", "error", "-i", inPath, "-filter_threads", "1",
+        "-vf", `trim=start_frame=${p.from}${p.to == null ? "" : `:end_frame=${p.to}`},setpts=PTS-STARTPTS,fps=${fps},tpad=stop_mode=clone:stop_duration=${hold}`,
+        "-af", `atrim=start=${t0}${t1},asetpts=PTS-STARTPTS,apad=pad_dur=${hold}`,
+        "-r", String(fps), ...x264, "-crf", "17", "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", o]);
       out.push({ ...p, file: await readFile(o) });
     }
-    return { parts: out };
+    return { fps, parts: out };
   } finally {
     release();
     await rm(dir, { recursive: true, force: true }).catch(() => {});
@@ -97,11 +108,12 @@ export async function splitAtCuts(videoUrl: string): Promise<{ parts: (Part & { 
 }
 
 /**
- * Joins Kling's shots in order. Each is fitted to its shot's exact length (Kling rounds the length to
- * whole seconds: a short one holds its last frame for the rest), all to the first one's size; the
- * template's sound goes over the whole video.
+ * Joins Kling's shots in order. Each is brought to the template's frame rate and cut to exactly its
+ * shot's frames (Kling returns whole seconds; the extra held frames at the end are dropped, and a
+ * short return holds its last frame), all to the first one's size; the template's sound goes over
+ * the whole video. frames: per shot; without it (older jobs) the length in seconds is used.
  */
-export async function joinParts(partUrls: string[], lens: number[], soundUrl: string): Promise<Uint8Array> {
+export async function joinParts(partUrls: string[], lens: number[], soundUrl: string, fps = 30, frames?: (number | undefined)[]): Promise<Uint8Array> {
   const release = holdMedia();
   const dir = await mkdtemp(join(tmpdir(), "sj-"));
   try {
@@ -114,17 +126,18 @@ export async function joinParts(partUrls: string[], lens: number[], soundUrl: st
     const first = await ffmpegLog([...q, "-i", files[0], "-f", "null", "-t", "0.01", "-"]).catch(() => "");
     const m = /Video:.*?(\d{2,5})x(\d{2,5})/.exec(first);
     const W = m ? Number(m[1]) : 720, H = m ? Number(m[2]) : 1280;
+    const want = lens.map((len, k) => frames?.[k] ?? Math.round(len * fps));
     // What Kling returned, for the log: its length and the scene changes inside each part.
     for (const [k, f] of files.entries()) {
       const r = await findShots(f).catch(() => null);
-      if (r) console.log("[scenes] kling part", k + 1, `len=${r.total.toFixed(2)} want=${lens[k].toFixed(2)} cuts=${r.cuts.map((c) => c.toFixed(2)).join(",") || "-"}`);
+      if (r) console.log("[scenes] kling part", k + 1, `len=${r.total.toFixed(2)} want=${(want[k] / fps).toFixed(2)} cuts=${r.cuts.map((c) => c.toFixed(2)).join(",") || "-"}`);
     }
     const fitted: string[] = [];
     for (const [k, f] of files.entries()) {
       const o = join(dir, `f${k}.mp4`);
       await ffmpegLog([...q, "-loglevel", "error", "-i", f, "-an", "-filter_threads", "1",
-        "-vf", `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,tpad=stop_mode=clone:stop_duration=2,trim=duration=${lens[k].toFixed(3)},setpts=PTS-STARTPTS`,
-        ...x264, "-crf", "18", "-pix_fmt", "yuv420p", o]);
+        "-vf", `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps},tpad=stop_mode=clone:stop_duration=2,trim=end_frame=${want[k]},setpts=PTS-STARTPTS`,
+        "-r", String(fps), ...x264, "-crf", "18", "-pix_fmt", "yuv420p", o]);
       fitted.push(o);
     }
     const list = join(dir, "list.txt");
@@ -132,7 +145,7 @@ export async function joinParts(partUrls: string[], lens: number[], soundUrl: st
     const sound = join(dir, "sound");
     const haveSound = await download(soundUrl, sound).then(() => true, () => false);
     const out = join(dir, "out.mp4");
-    const total = lens.reduce((a, b) => a + b, 0);
+    const total = want.reduce((a, b) => a + b, 0) / fps;
     await ffmpegLog([...q, "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", list,
       ...(haveSound ? ["-i", sound, "-map", "0:v:0", "-map", "1:a:0?"] : []),
       "-c:v", "copy", "-c:a", "aac", "-b:a", "160k", "-t", total.toFixed(3), "-movflags", "+faststart", out]);

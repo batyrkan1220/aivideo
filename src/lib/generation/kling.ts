@@ -47,7 +47,12 @@ export type KlingMode = "edit" | "reference";
  * with the new person given as a reference image (@image_N). "Reference @video_1" makes a new video instead.
  * Customer photos are plain refer_image inputs: people first (@image_1…), then the things to swap.
  */
-export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "template", adminPrompt: string, wish: string, people = 1, positions: string[] = [], objects: { what: string; look?: string }[] = [], targetRefs: string[] = []): string {
+/**
+ * shot: @video_1 is one shot of a longer template (it was cut at its scene changes). The template's scene
+ * note describes the whole video, so it is left out (Kling put scenes from it into the wrong shot,
+ * TM-100039), and a person may be missing from a shot: then the shot stays as it is.
+ */
+export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "template", adminPrompt: string, wish: string, people = 1, positions: string[] = [], objects: { what: string; look?: string }[] = [], targetRefs: string[] = [], shot = false): string {
   // Optional cut-outs from the template (@image_k) that show which person or thing is meant: people first, then things.
   const shown = (i: number) => (targetRefs[i] ? ` shown in ${targetRefs[i]}` : "");
   const refs = Array.from({ length: people }, (_, i) => `@image_${i + 1}`);
@@ -81,7 +86,7 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
         same,
         look,
         people === 1
-          ? "Keep everything else in @video_1 unchanged: background, location, other people, objects, lighting, camera movement, framing, cuts, motion and timing."
+          ? "Keep everything else in @video_1 unchanged: background, location, other people (with their own faces, also anyone already replaced), objects, lighting, camera movement, framing, cuts, motion and timing."
           : `Apart from these ${people} people, keep everything in @video_1 unchanged: background, location, objects, lighting, camera movement, framing, cuts, motion and timing.`,
       ]
     : [
@@ -101,14 +106,22 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   parts.push("Photorealistic, natural, sharp face, no text, no watermark.");
   // The template note describes the ORIGINAL video (often "a young woman …"). Labelled plainly, Kling read it
   // as "keep this woman" and returned the template unchanged (TM-100020/21/31). It only fixes scene and motion.
-  if (adminPrompt) {
+  if (adminPrompt && !shot) {
     parts.push(`Scene and motion to keep from @video_1 (it describes the original video; any person mentioned in it is still replaced as described above): ${adminPrompt}`);
   }
   const photosRef = refs.join(", ");
-  parts.push(
-    `Final check: every replaced person in the result is the person from ${photosRef}, with their face, hair, skin and body. ` +
-    "The original person from @video_1 must not appear in any frame. Do not return @video_1 unchanged.",
-  );
+  if (shot) {
+    parts.push(
+      "@video_1 is one shot of a longer video. Edit only what is in this shot: do not add scenes, people, moves or frames that are not in it, keep its frames in the same order and its start and end exactly as they are.",
+      `Final check: if the person to replace is in this shot, they are the person from ${photosRef} in every frame, with their face, hair, skin and body, and the original person must not appear. ` +
+      "If that person is not in this shot at all, add no one and change no one: keep the shot exactly as it is. Never give the new face to a different person.",
+    );
+  } else {
+    parts.push(
+      `Final check: every replaced person in the result is the person from ${photosRef}, with their face, hair, skin and body. ` +
+      "The original person from @video_1 must not appear in any frame. Do not return @video_1 unchanged.",
+    );
+  }
   if (wish) {
     parts.push(
       "Everything above is mandatory and has priority.",
