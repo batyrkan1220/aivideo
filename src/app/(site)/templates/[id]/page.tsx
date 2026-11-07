@@ -24,7 +24,7 @@ import type { TemplateDetail } from "@/lib/templates/queries";
 
 export default function TemplatePage({ params }: { params: Promise<{ id: string }> }) {
   return (
-    <main data-dark="" className="mx-auto max-w-6xl px-4 pt-3 md:pt-8">
+    <main className="mx-auto max-w-6xl px-4 pt-3 md:pt-8">
       <Suspense fallback={<div className="mt-6 aspect-[9/16] max-w-sm animate-pulse rounded-card bg-line" />}>
         <Detail params={params} />
       </Suspense>

@@ -8,7 +8,7 @@ const STEP_TINT = ["bg-peach", "bg-lavender", "bg-rose"];
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <main className="theme-app relative min-h-dvh overflow-hidden bg-paper text-ink">
+    <main className="theme-app theme-dark relative min-h-dvh overflow-hidden bg-paper text-ink">
       {/* Soft colour behind the content, like the home hero. */}
       <div className="pointer-events-none absolute -left-32 -top-40 h-96 w-96 rounded-full bg-brand/35 blur-3xl" aria-hidden />
       <div className="pointer-events-none absolute -bottom-40 -right-24 h-96 w-96 rounded-full bg-lavender blur-3xl" aria-hidden />
@@ -23,7 +23,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         {/* What you get (tablet/desktop). */}
         <section className="hidden md:block">
           <span className="inline-flex items-center gap-2 rounded-full bg-surface px-3 py-1.5 text-xs font-semibold ring-1 ring-line">
-            <span className="h-2 w-2 rounded-full bg-[#9cbf12]" aria-hidden />{kk.auth.badge}
+            <span className="h-2 w-2 rounded-full bg-brand" aria-hidden />{kk.auth.badge}
           </span>
           <p className="mt-5 max-w-lg font-display text-5xl font-extrabold leading-[1.05] tracking-tight">{kk.home.title}</p>
           <ol className="mt-8 grid max-w-lg gap-3">

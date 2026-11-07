@@ -19,8 +19,7 @@ type SP = { account?: string; category?: string };
  */
 export default function HomePage({ searchParams }: { searchParams: Promise<SP> }) {
   return (
-    // data-dark: the cinematic dark theme for this page only (see globals.css).
-    <main data-dark="" className="pb-6">
+    <main className="pb-6">
       <Suspense fallback={null}>
         <Notice searchParams={searchParams} />
       </Suspense>

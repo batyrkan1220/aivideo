@@ -242,78 +242,101 @@ body:has(> .theme-app:not(.fixed)) { background: #faf5f1; }
   animation: tm-shimmer 1.4s linear infinite;
 }
 
-/* ── Cinematic dark theme (main[data-dark]) ─────────────────────────────────────────────
-   Soft graphite canvas (not pure black), lifted surfaces, neon lime for actions, cyan for AI signals.
-   The customer's path opts in: home, template, photo upload, order and result. Account, payment
-   and legal pages keep the light theme. */
-.theme-app:has(main[data-dark]) {
-  --color-paper: #101014;
-  --color-surface: #1a1a20;
-  --color-mist: #22222a;
-  --color-line: rgb(255 255 255 / 0.1);
-  --color-line-strong: rgb(255 255 255 / 0.18);
-  --color-night: #141418;
-  --color-ink: #f5f5f7;
-  --color-muted: #a1a1aa;
-  --color-faint: #71717a;
-  /* Status colours readable on graphite. */
-  --color-success: #4ade80;
-  --color-success-soft: rgb(74 222 128 / 0.12);
+/* ── TrendMe dark (Alterfx-inspired) ──────────────────────────────────────────────────────
+   Deep teal-black canvas, lifted teal-tinted surfaces, mint for actions, sky cyan for AI signals.
+   Headings: wide geometric Unbounded, light weight, with a bold mint keyword; body: Inter.
+   The whole customer site opts in with .theme-dark next to .theme-app (the admin stays light). */
+.theme-app.theme-dark {
+  --color-paper: #0a1316;
+  --color-surface: #0f1c20;
+  --color-mist: #152629;
+  --color-line: rgb(255 255 255 / 0.08);
+  --color-line-strong: rgb(255 255 255 / 0.16);
+  --color-night: #071013;
+  --color-ink: #eef6f5;
+  --color-muted: #93a7a9;
+  --color-faint: #62787b;
+  --color-success: #4ade9a;
+  --color-success-soft: rgb(74 222 154 / 0.12);
   --color-warning: #fbbf24;
   --color-warning-soft: rgb(251 191 36 / 0.12);
   --color-danger: #f87171;
   --color-danger-soft: rgb(248 113 113 / 0.12);
-  --color-info: #93c5fd;
-  --color-info-soft: rgb(147 197 253 / 0.12);
-  --color-brand: #d4ff00;
-  --color-brand-dark: #c3ec00;
-  --color-brand-soft: rgb(212 255 0 / 0.12);
-  --color-brand-ink: #d4ff00;
+  --color-info: #7dd3fc;
+  --color-info-soft: rgb(125 211 252 / 0.12);
+  --color-brand: #2ee6b6;
+  --color-brand-dark: #20cfa1;
+  --color-brand-soft: rgb(46 230 182 / 0.12);
+  --color-brand-ink: #2ee6b6;
+  --color-peach: rgb(255 170 120 / 0.14);
+  --color-rose: rgb(255 120 150 / 0.14);
+  --color-lavender: rgb(120 150 255 / 0.12);
+  --color-flash: #2ee6b6;
+  --hx-accent: #2ee6b6;
+  --hx-signal: #38c8f0;
+  --hx-grad: linear-gradient(135deg, #2ee6b6 0%, #22b8e8 100%);
   --shadow-xs: none;
   --shadow-sm: inset 0 1px 0 rgb(255 255 255 / 0.04);
   --shadow-md: 0 24px 48px -24px rgb(0 0 0 / 0.9);
   --shadow-lg: 0 32px 64px -24px rgb(0 0 0 / 0.95);
   --logo-ink: #ffffff;
+  --logo-accent: #2ee6b6;
+  --font-display: "Unbounded Variable", "Inter Variable", system-ui, sans-serif;
   color-scheme: dark;
+  /* A faint teal light from the top, like a lit stage. */
+  background-image: radial-gradient(120% 60% at 50% -10%, rgb(30 110 110 / 0.22), transparent 60%);
+  background-repeat: no-repeat;
 }
-body:has(> .theme-app main[data-dark]) { background: #101014; }
-.theme-app:has(main[data-dark]) ::selection { background: rgb(212 255 0 / 0.85); color: #101014; }
+body:has(> .theme-app.theme-dark) { background: #0a1316; }
+.theme-app.theme-dark ::selection { background: rgb(46 230 182 / 0.85); color: #04201a; }
+/* Headings: wide and light; a <b>/<strong> or .font-accent inside turns bold mint. */
+.theme-app.theme-dark :is(h1, h2) { font-family: var(--font-display); font-weight: 400; letter-spacing: -0.02em; }
+.theme-app.theme-dark h1 { font-weight: 300; }
+.theme-app.theme-dark .section-title { font-family: var(--font-sans); font-weight: 700; }
+.theme-app.theme-dark .font-display { font-weight: 400; }
+.theme-app.theme-dark .text-brand { color: var(--color-brand-ink); }
+.theme-app.theme-dark .border-brand, .theme-app.theme-dark .border-\[\#9cbf12\] { border-color: rgb(46 230 182 / 0.6); }
+.theme-app.theme-dark .bg-\[\#9cbf12\] { background: #2ee6b6; }
+.theme-app.theme-dark .ring-\[\#d9ec8a\] { --tw-ring-color: rgb(46 230 182 / 0.35); }
 /* Light accent boxes (photo tips and the like) become quiet tinted panels. */
-.theme-app:has(main[data-dark]) .bg-\[\#fffbe6\] { background: rgb(212 255 0 / 0.07); }
-.theme-app:has(main[data-dark]) .ring-\[\#f0dc8a\] { --tw-ring-color: rgb(212 255 0 / 0.25); }
-/* "Dark text" (text-night) only stays dark on lime and white chips; on dark surfaces it turns light. */
-.theme-app:has(main[data-dark]) :is(.bg-surface, .bg-brand-soft, .bg-mist, .glass).text-night,
-.theme-app:has(main[data-dark]) .bg-surface > .text-night,
-.theme-app:has(main[data-dark]) p.text-night { color: var(--color-ink); }
+.theme-app.theme-dark .bg-\[\#fffbe6\] { background: rgb(46 230 182 / 0.06); }
+.theme-app.theme-dark .ring-\[\#f0dc8a\] { --tw-ring-color: rgb(46 230 182 / 0.22); }
+/* "Dark text" (text-night) stays dark only on mint and white chips; on dark surfaces it turns light. */
+.theme-app.theme-dark :is(.bg-surface, .bg-brand-soft, .bg-mist, .glass, .bg-peach, .bg-rose, .bg-lavender).text-night,
+.theme-app.theme-dark .bg-surface > .text-night,
+.theme-app.theme-dark p.text-night { color: var(--color-ink); }
 /* Photo slots: a quiet dashed glass box instead of lavender. */
-.theme-app:has(main[data-dark]) .bg-lavender\/60 { background: rgb(255 255 255 / 0.04); }
-.theme-app:has(main[data-dark]) .border-\[\#c9cdf5\] { border-color: rgb(255 255 255 / 0.22); }
-.theme-app:has(main[data-dark]) .bg-ink > .bg-white { background: var(--color-paper); }
-.theme-app:has(main[data-dark]) :focus-visible { outline-color: #d4ff00; }
-.theme-app:has(main[data-dark]) .text-lime { color: #d4ff00; }
-.theme-app:has(main[data-dark]) .btn-glow,
-.theme-app:has(main[data-dark]) .btn-lime {
-  background: #d4ff00;
-  color: #101014 !important;
-  box-shadow: 0 10px 30px -12px rgb(212 255 0 / 0.55);
+.theme-app.theme-dark .bg-lavender\/60 { background: rgb(255 255 255 / 0.03); }
+.theme-app.theme-dark .border-\[\#c9cdf5\] { border-color: rgb(255 255 255 / 0.2); }
+.theme-app.theme-dark .bg-ink > .bg-white { background: var(--color-paper); }
+.theme-app.theme-dark :focus-visible { outline-color: #2ee6b6; }
+.theme-app.theme-dark .text-lime { color: #2ee6b6; }
+/* Primary action: mint→sky gradient with deep text; secondary stays glass. */
+.theme-app.theme-dark .btn-glow,
+.theme-app.theme-dark .btn-lime {
+  background: var(--hx-grad);
+  color: #04201a !important;
+  box-shadow: 0 10px 30px -12px rgb(46 230 182 / 0.55);
 }
-.theme-app:has(main[data-dark]) .btn-glow:hover,
-.theme-app:has(main[data-dark]) .btn-lime:hover { background: #e2ff4d; }
-.theme-app:has(main[data-dark]) .skeleton { background-image: linear-gradient(90deg, #1c1c22 0%, #26262e 50%, #1c1c22 100%); }
-.theme-app:has(main[data-dark]) .glass-dock {
-  background: rgb(26 26 32 / 0.66);
-  border-color: rgb(255 255 255 / 0.12);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08), 0 0 0 0.5px rgb(0 0 0 / 0.6), 0 12px 32px -12px rgb(0 0 0 / 0.8);
+.theme-app.theme-dark .btn-glow:hover,
+.theme-app.theme-dark .btn-lime:hover { filter: brightness(1.08); }
+.theme-app.theme-dark .bg-surface { background-image: linear-gradient(180deg, rgb(255 255 255 / 0.025), transparent); }
+.theme-app.theme-dark .skeleton { background-image: linear-gradient(90deg, #12201f 0%, #1a2c2e 50%, #12201f 100%); }
+.theme-app.theme-dark .glass-dock {
+  background: rgb(12 24 27 / 0.66);
+  border-color: rgb(255 255 255 / 0.1);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.07), 0 0 0 0.5px rgb(0 0 0 / 0.6), 0 12px 32px -12px rgb(0 0 0 / 0.8);
 }
-.theme-app:has(main[data-dark]) .glass-dock .text-\[\#3d3935\] { color: #9ca3af; }
-.theme-app:has(main[data-dark]) .glass-dock .bg-night { background: rgb(255 255 255 / 0.14); }
+.theme-app.theme-dark .glass-dock .text-\[\#3d3935\] { color: #93a7a9; }
+.theme-app.theme-dark .glass-dock .bg-night { background: rgb(255 255 255 / 0.12); }
+.theme-app.theme-dark .glass-dock .bg-brand { background: var(--hx-grad); color: #04201a; }
 
 /* Hero atmosphere: slow drifting mesh light, scanner line, floating cards, CTA glow. */
 @keyframes tm-drift-a { 0%, 100% { transform: translate3d(0, 0, 0) scale(1); } 50% { transform: translate3d(8%, 6%, 0) scale(1.12); } }
 @keyframes tm-drift-b { 0%, 100% { transform: translate3d(0, 0, 0) scale(1.05); } 50% { transform: translate3d(-10%, -4%, 0) scale(0.92); } }
 @keyframes tm-scan { 0% { transform: translateY(-100%); } 100% { transform: translateY(0); } }
 @keyframes tm-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-@keyframes tm-cta-glow { 0%, 100% { box-shadow: 0 0 0 0 rgb(212 255 0 / 0.45), 0 12px 32px -12px rgb(212 255 0 / 0.6); } 50% { box-shadow: 0 0 0 8px rgb(212 255 0 / 0), 0 16px 44px -10px rgb(212 255 0 / 0.75); } }
+@keyframes tm-cta-glow { 0%, 100% { box-shadow: 0 0 0 0 rgb(46 230 182 / 0.45), 0 12px 32px -12px rgb(46 230 182 / 0.6); } 50% { box-shadow: 0 0 0 8px rgb(46 230 182 / 0), 0 16px 44px -10px rgb(56 200 240 / 0.7); } }
 @keyframes tm-bar { 0% { width: 6%; } 70% { width: 100%; } 100% { width: 100%; } }
 @keyframes tm-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 @keyframes tm-rise { from { opacity: 0; transform: translateY(18px); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
@@ -327,4 +350,4 @@ body:has(> .theme-app main[data-dark]) { background: #101014; }
 .cta-neon { transition: transform 0.25s var(--ease-out), background-color 0.2s; }
 .cta-neon:hover { transform: scale(1.05); animation: tm-cta-glow 1.6s ease-in-out infinite; }
 .cta-neon:active { transform: scale(0.98); }
-.font-accent { font-family: "Playfair Display Variable", Georgia, serif; font-style: italic; font-weight: 600; letter-spacing: -0.01em; }
+.font-accent { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.03em; color: var(--hx-accent, #2ee6b6); }

@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/unbounded";
-import "@fontsource-variable/playfair-display/wght-italic.css";
 import "./globals.css";
 import { Suspense } from "react";
 import { kk } from "@/lib/i18n/kk";
