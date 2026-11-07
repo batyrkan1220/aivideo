@@ -20,6 +20,7 @@ import { ReanalyzeButton } from "./reanalyze-button";
 import { ShotsButton } from "./shots-button";
 import { MultiPeopleToggle } from "./multi-people-toggle";
 import { RequireAnalysisToggle } from "./require-analysis-toggle";
+import { SplitShotsToggle } from "./split-shots-toggle";
 import { catalogSettings } from "@/lib/catalog/settings";
 import { unclearPeople } from "@/lib/templates/analysis";
 
@@ -165,5 +166,5 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
 async function MultiPeople() {
   await connection(); // request-time only
   const cs = await catalogSettings();
-  return <><RequireAnalysisToggle on={cs.requireAnalysis} /><MultiPeopleToggle on={cs.multiPeople} /></>;
+  return <><RequireAnalysisToggle on={cs.requireAnalysis} /><SplitShotsToggle on={cs.splitShots} /><MultiPeopleToggle on={cs.multiPeople} /></>;
 }

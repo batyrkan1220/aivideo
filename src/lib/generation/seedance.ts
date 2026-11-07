@@ -185,6 +185,9 @@ function shotsOf(state: ProviderState): ShotRun | null {
 
 /** Cuts the template and sends every shot's first run; null = one shot (the caller sends the video whole). */
 async function startShots(jobId: string, videoUrl: string, passes: Pass[], aspectRatio: string, resolution: "720p" | "1080p", pricing: Pricing) {
+  // Off by default: the whole video goes to Kling at once (switch in the admin template list).
+  const { catalogSettings } = await import("@/lib/catalog/settings");
+  if (!(await catalogSettings()).splitShots) return null;
   const cut = await prepareShots(jobId, videoUrl);
   if (!cut) return null;
   const shots = cut.list;

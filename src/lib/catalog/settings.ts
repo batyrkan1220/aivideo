@@ -10,7 +10,9 @@ import { supabaseAdmin } from "@/lib/supabase/server";
  * off = they are open without it (while Gemini is not available).
  */
 export const CATALOG_KEY = "catalog";
-const schema = z.object({ multiPeople: z.boolean().default(false), requireAnalysis: z.boolean().default(true) });
+// splitShots: edit a template with cuts shot by shot (off: the whole video goes to Kling at once;
+// shot by shot kept the face after cuts but every shot came out a little different, TM-100040).
+const schema = z.object({ multiPeople: z.boolean().default(false), requireAnalysis: z.boolean().default(true), splitShots: z.boolean().default(false) });
 export type CatalogSettings = z.infer<typeof schema>;
 
 export function catalogSettings(): Promise<CatalogSettings> {

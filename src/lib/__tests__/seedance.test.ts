@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/env", () => ({ env: () => ({ KLING_API_KEY: "g".repeat(20), NEXT_PUBLIC_SUPABASE_URL: "https://sb.test" }) }));
+vi.mock("@/lib/catalog/settings", () => ({ catalogSettings: async () => ({ multiPeople: true, requireAnalysis: true, splitShots: true }) }));
 const sceneMock = vi.hoisted(() => ({ split: null as null | { parts: { start: number; len: number; file: Buffer }[] }, joined: [] as string[][] }));
 vi.mock("@/lib/media/scene-parts", () => ({
   splitAtCuts: async () => sceneMock.split,
