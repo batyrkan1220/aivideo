@@ -102,7 +102,8 @@ export function AutoVideo(props: { src: string; poster?: string; controls?: bool
 
   return (
     <>
-      <video ref={ref} src={props.src} poster={props.poster} controls={props.controls} muted={!props.preferSound} loop playsInline autoPlay preload="auto" className={props.className} />
+      <video ref={ref} src={props.src} poster={props.poster} controls={props.controls} muted={!props.preferSound} loop playsInline autoPlay preload="auto" className={props.className}
+        onEnded={(e) => { const v = e.currentTarget; v.currentTime = 0; void v.play().catch(() => {}); }} />
       {props.soundToggle && (
         <button
           type="button" onClick={toggle} data-sound-toggle aria-label={muted ? kk.video.soundOn : kk.video.soundOff}

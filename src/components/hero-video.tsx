@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { autoplayRefused, useImgPreviews, useInTelegram } from "@/lib/video-autoplay";
+import { videoShown } from "@/lib/sound-handoff";
 
 /*
   Hero's front card: muted autoplay loop; where autoplay is refused (and in the Mini App), the
@@ -70,7 +71,27 @@ export function HeroVideo({ src, poster, anim }: { src: string; poster?: string;
     tryPlay();
     // Neither playing nor refused after a few seconds (some iOS WebViews): use the animated image.
     const t = window.setTimeout(() => { if (v.paused && v.readyState >= 1) autoplayRefused({ name: "NotAllowedError" }); }, 3500);
-    return () => window.clearTimeout(t);
+    // iOS Safari and Telegram sometimes ignore "loop" and stop on the last frame (it looks like a
+    // photo): start again from the beginning ourselves.
+    const again = () => { v.currentTime = 0; void v.play().catch(() => {}); };
+    v.addEventListener("ended", again);
+    // Paused while off screen (or by the page's pause-hidden watcher): play again when it is back in view.
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting && v.paused) void v.play().catch(() => {}); }, { threshold: 0.5 });
+    io.observe(v);
+    const onVis = () => { if (!document.hidden && v.paused && v.isConnected) void v.play().catch(() => {}); };
+    document.addEventListener("visibilitychange", onVis);
+    // Stopped while still on screen (a WebView hiccup): resume shortly after.
+    let resume = 0;
+    const onPause = () => {
+      window.clearTimeout(resume);
+      resume = window.setTimeout(() => { if (v.paused && !document.hidden && videoShown(v)) void v.play().catch(() => {}); }, 400);
+    };
+    v.addEventListener("pause", onPause);
+    return () => {
+      window.clearTimeout(t); window.clearTimeout(resume);
+      v.removeEventListener("ended", again); v.removeEventListener("pause", onPause);
+      io.disconnect(); document.removeEventListener("visibilitychange", onVis);
+    };
   }, [local]);
 
   if (imgMode && anim) {

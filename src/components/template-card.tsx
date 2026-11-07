@@ -200,6 +200,8 @@ export function TemplateCard({ t, priority = false, aspect = "aspect-[3/4]", wal
             src={t.coverUrl ? (t.previewLiteUrl ?? t.previewUrl) : `${t.previewLiteUrl ?? t.previewUrl}#t=0.1`}
             muted
             loop
+            // iOS sometimes ignores "loop" and freezes on the last frame: restart it ourselves.
+            onEnded={(e) => { const v = e.currentTarget; v.currentTime = 0; if (wantRef.current) void v.play().catch(() => {}); }}
             playsInline
             preload="metadata"
             aria-hidden
