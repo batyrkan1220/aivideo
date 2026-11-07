@@ -87,6 +87,9 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
   const genLabel = kk.order.generation[o.generation_status as keyof typeof kk.order.generation];
 
   const awaitingPayment = ["pending", "failed", "cancelled"].includes(o.payment_status) && o.generation_status === "awaiting_payment";
+  const disc = (price as { discount?: { percent?: number; beforeKzt?: number } }).discount;
+  const personalPct = Number(disc?.percent) || 0;
+  const personal = disc && Number(disc.beforeKzt) > o.amount_kzt ? Number(disc.beforeKzt) - o.amount_kzt : 0;
   const priceBox = (
       <section className="rounded-card bg-night p-5 text-white sm:p-6">
         <dl className="space-y-2 text-sm">
@@ -95,6 +98,8 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
           {price.extraFacesKzt > 0 && <Line label={`${kk.pricing.extraFaces} (${price.extraFaces})`} value={`+${formatKzt(price.extraFacesKzt)}`} />}
           {price.platformFeeKzt > 0 && <Line label={kk.pricing.platformFee} value={`+${formatKzt(price.platformFeeKzt)}`} />}
           {price.discountKzt > 0 && <Line label={kk.pricing.discount} value={`−${formatKzt(price.discountKzt)}`} />}
+          {/* A personal or first-video discount is applied to the total (TM-100044 showed 1600 ₸ and 1280 ₸ with no line between). */}
+          {personal > 0 && <Line label={`${kk.pricing.discount} ${personalPct}%`} value={`−${formatKzt(personal)}`} />}
           <div className="flex items-baseline justify-between border-t border-white/20 pt-3">
             <dt className="font-semibold">{kk.pricing.total}</dt>
             <dd className="font-display text-2xl font-bold">{formatKzt(o.amount_kzt)}</dd>
