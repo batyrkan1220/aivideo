@@ -20,42 +20,46 @@ export function CinematicHero({ stack, newVideoHref }: { stack: React.ReactNode;
   return (
     <section className="relative isolate overflow-hidden">
       <Atmosphere />
-      <div className="mx-auto flex max-w-5xl flex-col items-center px-4 pb-2 pt-6 text-center sm:px-6 md:pb-10 md:pt-16">
-        <span style={delay(0)} className="hero-rise inline-flex items-center gap-2 rounded-full border border-line bg-surface/80 px-3 py-1.5 text-xs font-medium text-muted backdrop-blur-xl sm:text-[13px]">
-          <span className="hero-blink h-1.5 w-1.5 rounded-full bg-ink" aria-hidden />
-          {h.hxBadge}
-        </span>
-
-        <h1 className="mt-4 max-w-4xl text-[1.9rem] leading-[1.12] sm:text-5xl md:mt-6 lg:text-[4.1rem] lg:leading-[1.08] text-ink">
-          <span style={delay(80)} className="hero-rise block">{h.hxLine1} {h.hxLine2a}</span>
-          <span style={delay(160)} className="hero-rise block">
-            <span className="font-accent">{h.hxAccent}</span>{" "}{h.hxLine2b}
+      {/* Phones and tablets: one centred column (text, then the cards).
+          Desktop: two columns that fit the first screen: text and actions on the left, cards on the right. */}
+      <div className="mx-auto grid max-w-6xl items-center gap-4 px-4 pb-2 pt-6 sm:px-6 md:pb-10 md:pt-16 lg:min-h-[min(calc(100svh-4rem),46rem)] lg:grid-cols-[1.08fr_0.92fr] lg:gap-10 lg:px-8 lg:py-10">
+        <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
+          <span style={delay(0)} className="hero-rise inline-flex items-center gap-2 rounded-full border border-line bg-surface/80 px-3 py-1.5 text-xs font-medium text-muted backdrop-blur-xl sm:text-[13px]">
+            <span className="hero-blink h-1.5 w-1.5 rounded-full bg-ink" aria-hidden />
+            {h.hxBadge}
           </span>
-        </h1>
 
-        <p style={delay(260)} className="hero-rise mt-4 max-w-xl text-[15px] leading-[1.6] text-muted sm:text-base md:mt-6 md:text-lg">{h.hxLead}</p>
+          <h1 className="mt-4 max-w-4xl text-[1.9rem] leading-[1.12] text-ink sm:text-5xl md:mt-6 lg:text-[3.6rem] lg:leading-[1.06] xl:text-[4rem]">
+            <span style={delay(80)} className="hero-rise block">{h.hxLine1} {h.hxLine2a}</span>
+            <span style={delay(160)} className="hero-rise block">
+              <span className="font-accent">{h.hxAccent}</span>{" "}{h.hxLine2b}
+            </span>
+          </h1>
 
-        <div style={delay(340)} className="hero-rise mt-5 flex flex-wrap items-center justify-center gap-2.5 md:mt-8 md:gap-3">
-          <Link href={newVideoHref} className="cta-neon inline-flex h-11 items-center gap-2 rounded-xl bg-ink px-5 text-[15px] font-semibold text-paper shadow-[0_12px_28px_-14px_rgb(0_0_0/0.6)] sm:h-12 sm:px-6">
-            <Sparkles size={17} strokeWidth={2.2} aria-hidden />{kk.nav.createOwn}
-          </Link>
-          <a href="#templates" className="inline-flex h-11 items-center gap-2 rounded-xl border border-line-strong bg-surface px-5 text-[15px] font-semibold text-ink transition-[background-color,border-color,transform] duration-300 hover:border-ink active:scale-[0.98] sm:h-12 sm:px-6">
-            {h.hxPick}<ArrowRight size={16} aria-hidden />
-          </a>
+          <p style={delay(260)} className="hero-rise mt-4 max-w-xl text-[15px] leading-[1.6] text-muted sm:text-base md:mt-6 md:text-lg">{h.hxLead}</p>
+
+          <div style={delay(340)} className="hero-rise mt-5 flex flex-wrap items-center justify-center gap-2.5 md:mt-8 md:gap-3 lg:justify-start">
+            <Link href={newVideoHref} className="cta-neon inline-flex h-11 items-center gap-2 rounded-xl bg-ink px-5 text-[15px] font-semibold text-paper shadow-[0_12px_28px_-14px_rgb(0_0_0/0.6)] sm:h-12 sm:px-6">
+              <Sparkles size={17} strokeWidth={2.2} aria-hidden />{kk.nav.createOwn}
+            </Link>
+            <a href="#templates" className="inline-flex h-11 items-center gap-2 rounded-xl border border-line-strong bg-surface px-5 text-[15px] font-semibold text-ink transition-[background-color,border-color,transform] duration-300 hover:border-ink active:scale-[0.98] sm:h-12 sm:px-6">
+              {h.hxPick}<ArrowRight size={16} aria-hidden />
+            </a>
+          </div>
+
+          <dl style={delay(420)} className="hero-rise mt-8 hidden w-full max-w-xl grid-cols-3 gap-3 lg:mt-10 lg:grid">
+            {h.hxData.map((d) => (
+              <div key={d.k} className="rounded-2xl border border-line/70 bg-surface px-4 py-3 text-left elev-sm">
+                <dt className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted">{d.k}</dt>
+                <dd className="mt-1 font-display text-base text-ink">{d.v}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
 
-        <div style={delay(220)} className="hero-rise mt-4 w-full md:mt-10">
+        <div style={delay(220)} className="hero-rise mt-2 w-full md:mt-6 lg:mt-0">
           {stack}
         </div>
-
-        <dl style={delay(420)} className="hero-rise mt-6 hidden w-full max-w-2xl grid-cols-3 gap-3 sm:grid">
-          {h.hxData.map((d) => (
-            <div key={d.k} className="rounded-2xl border border-line bg-surface px-4 py-3 text-left">
-              <dt className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted">{d.k}</dt>
-              <dd className="mt-1 font-display text-base text-ink">{d.v}</dd>
-            </div>
-          ))}
-        </dl>
       </div>
     </section>
   );
@@ -121,7 +125,7 @@ export function DepthStack({ items }: { items: Item[] }) {
               ))}
             </span>
             {/* Status: generating, with a progress bar. */}
-            <span className={`absolute left-2.5 top-2.5 inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-semibold text-white sm:left-3 sm:top-3 sm:text-[11px] ${glass}`}>
+            <span className={`absolute left-2 top-2 inline-flex max-w-[calc(100%-1rem)] items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-[9px] font-semibold sm:left-3 sm:top-3 sm:gap-1.5 sm:px-2.5 sm:text-[11px] text-white ${glass}`}>
               <span className="hero-blink h-1.5 w-1.5 rounded-full bg-white shadow-[0_0_8px_white]" aria-hidden />{h.hxScanning}
             </span>
             <span className={`absolute inset-x-2.5 bottom-2.5 rounded-2xl p-2.5 sm:inset-x-3 sm:bottom-3 sm:p-3 ${glass}`}>
