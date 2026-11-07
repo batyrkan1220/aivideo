@@ -54,7 +54,7 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
       <TrackView item={{ id: t.id, name: t.title, price: t.startingPriceKzt ?? 0 }} />
       {/* Brand + speed promise, one line */}
       <header className="flex items-center justify-between">
-        <span className="inline-flex items-center gap-1.5 text-[15px] font-extrabold tracking-tight text-[#283040]"><LogoMark className="!h-[1.6em]" />TrendMe</span>
+        <span className="inline-flex items-center gap-1.5 text-[15px] font-extrabold tracking-tight text-ink"><LogoMark className="!h-[1.6em]" />TrendMe</span>
         <span className="rounded-full bg-brand-soft px-2.5 py-1 text-[11px] font-bold text-night">⚡ {L.speed}</span>
       </header>
 

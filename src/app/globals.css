@@ -270,8 +270,7 @@ body:has(> .theme-app:not(.fixed)) { background: #faf5f1; }
   --shadow-md: 0 2px 4px rgb(0 0 0 / 0.05), 0 18px 40px -20px rgb(0 0 0 / 0.25);
   --shadow-lg: 0 4px 10px rgb(0 0 0 / 0.06), 0 28px 60px -24px rgb(0 0 0 / 0.32);
   --logo-ink: #0e0e0e;
-  --logo-accent: #ffffff;
-  --logo-spark: #0e0e0e;
+  --logo-inner: #f5f4f1;
   --font-display: "Unbounded Variable", "Onest Variable", system-ui, sans-serif;
   color-scheme: light;
 }
