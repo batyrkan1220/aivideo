@@ -8,6 +8,31 @@ import { customVideoSettings, MIN_VIDEO_SECONDS, VIDEO_TYPES } from "./settings"
 import { mp4DurationSec, mp4VideoAspect, sniffVideoType } from "./mp4";
 import { aspectAllowed } from "./aspect";
 
+/**
+ * Scene cuts in the customer's video. Kling keeps the face only inside one continuous shot (after a
+ * cut it drifts back to the original person), so the form warns about cuts. Best effort: a busy
+ * server or an unreadable file gives null and the upload goes on.
+ */
+async function countCuts(bytes: Uint8Array): Promise<number | null> {
+  const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = await mkdtemp(join(tmpdir(), "cv-"));
+  try {
+    const p = join(dir, "in");
+    await writeFile(p, bytes);
+    const { findShots } = await import("@/lib/media/scene-parts");
+    const r = await Promise.race([findShots(p), new Promise<null>((res) => setTimeout(() => res(null), 25_000))]);
+    if (!r) return null;
+    // Cuts that leave both sides at least 0.8 s (flashes and double detections do not count).
+    return Math.max(0, r.parts.length - 1);
+  } catch {
+    return null;
+  } finally {
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
 export type VideoError = "bad_type" | "too_large" | "too_long" | "too_short" | "bad_aspect" | "unreadable" | "disabled" | "rate_limited" | "unauthorized" | "generic";
 const BUCKET = "user-videos";
 const VIDEOS_PER_HOUR = 20;
@@ -52,7 +77,7 @@ export async function requestVideoUpload(raw: unknown): Promise<{ ok: true; vide
 }
 
 /** Re-validates the stored bytes: real MP4/MOV container, size and duration. Invalid files are deleted. */
-export async function confirmVideoUpload(videoId: string): Promise<{ ok: true; durationSec: number; aspect: number | null } | { ok: false; error: VideoError }> {
+export async function confirmVideoUpload(videoId: string): Promise<{ ok: true; durationSec: number; aspect: number | null; cuts: number | null } | { ok: false; error: VideoError }> {
   const user = await getSessionUser();
   if (!user) return { ok: false, error: "unauthorized" };
   if (!z.string().uuid().safeParse(videoId).success) return { ok: false, error: "generic" };
@@ -80,7 +105,8 @@ export async function confirmVideoUpload(videoId: string): Promise<{ ok: true; d
   const aspect = mp4VideoAspect(bytes);
   if (aspect !== null && !aspectAllowed(aspect)) return reject("bad_aspect");
   await db.from("order_videos").update({ verified_at: new Date().toISOString(), mime_type: type, file_size: bytes.byteLength, duration_sec: dur, aspect }).eq("id", v.id);
-  return { ok: true, durationSec: dur, aspect };
+  const cuts = await countCuts(bytes);
+  return { ok: true, durationSec: dur, aspect, cuts };
 }
 
 export async function removeVideoUpload(videoId: string): Promise<{ ok: boolean }> {

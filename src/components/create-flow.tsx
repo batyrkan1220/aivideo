@@ -61,9 +61,15 @@ function uploadWithProgress(url: string, file: File, anonKey: string, onProgress
     xhr.open("PUT", url);
     xhr.setRequestHeader("apikey", anonKey);
     xhr.setRequestHeader("x-upsert", "false");
-    xhr.upload.onprogress = (ev) => ev.lengthComputable && onProgress(Math.round((ev.loaded / ev.total) * 100));
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(String(xhr.status))));
-    xhr.onerror = () => reject(new Error("network"));
+    // A stalled upload (weak mobile network) is stopped after 45 s without progress, so the
+    // customer gets "try again" instead of a bar that never moves.
+    let stall = 0;
+    const watch = () => { window.clearTimeout(stall); stall = window.setTimeout(() => xhr.abort(), 45_000); };
+    xhr.upload.onprogress = (ev) => { watch(); if (ev.lengthComputable) onProgress(Math.round((ev.loaded / ev.total) * 100)); };
+    xhr.onload = () => { window.clearTimeout(stall); if (xhr.status >= 200 && xhr.status < 300) resolve(); else reject(new Error(String(xhr.status))); };
+    xhr.onerror = () => { window.clearTimeout(stall); reject(new Error("network")); };
+    xhr.onabort = () => reject(new Error("stalled"));
+    watch();
     const fd = new FormData();
     fd.append("cacheControl", "3600");
     fd.append("", file);
@@ -75,7 +81,7 @@ type VideoState =
   | { phase: "empty" }
   | { phase: "uploading"; preview: string; progress: number }
   | { phase: "verifying"; preview: string }
-  | { phase: "ready"; preview: string; videoId: string; durationSec: number; aspect: number | null }
+  | { phase: "ready"; preview: string; videoId: string; durationSec: number; aspect: number | null; cuts: number | null }
   | { phase: "error"; message: string };
 
 /** Duration and shape from the browser's own decoder (the server re-checks both from the file). */
@@ -118,7 +124,6 @@ export function CreateFlow({
   noTabBar?: boolean;
   /** Personal discount (e.g. "second video −20%"); the server applies it again when ordering. */
   discount?: { percent: number; expiresAt: string } | null;
-  /** The customer's earlier photos still kept: one tap fills a slot ("another video with this photo"). */
   /** For ad pixels: what this form sells (template id, name, starting price). */
   item?: { id: string; name: string; price: number };
   /** "Өз видеом": the customer uploads their own video first. */
@@ -202,7 +207,7 @@ export function CreateFlow({
     setVideo({ phase: "verifying", preview });
     const conf = await confirmVideoUpload(req.videoId);
     if (!conf.ok) { setVideo({ phase: "error", message: videoErr(conf.error, customVideo) }); return; }
-    setVideo({ phase: "ready", preview, videoId: req.videoId, durationSec: conf.durationSec, aspect: conf.aspect ?? aspect });
+    setVideo({ phase: "ready", preview, videoId: req.videoId, durationSec: conf.durationSec, aspect: conf.aspect ?? aspect, cuts: conf.cuts });
   };
   const onRemoveVideo = () => {
     if (video.phase === "ready") void removeVideoUpload(video.videoId);
@@ -696,6 +701,9 @@ function VideoPicker({ st, limits, onPick, onRemove }: { st: VideoState; limits:
                   </div>
                 )}
               </dl>
+            )}
+            {st.phase === "ready" && (st.cuts ?? 0) > 0 && (
+              <p className="mt-2 rounded-xl bg-warning-soft px-2.5 py-2 text-[12px] leading-snug text-warning" role="status">{cv.cutsWarning(st.cuts ?? 0)}</p>
             )}
             {!busy && (
               <div className="mt-3 flex gap-4 text-sm">
