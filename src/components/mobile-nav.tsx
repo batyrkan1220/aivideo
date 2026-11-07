@@ -18,11 +18,12 @@ const items: Item[] = [
 
 /**
  * Floating "liquid glass" dock on phones: see-through, the content behind shows blurred. The active tab gets an obsidian capsule; "Создать" is always
- * a chartreuse button in the middle. Sections not open yet are not shown. Hidden from sm up.
+ * the primary button in the middle. A section not open yet ("Фото") stays in its place with a "Скоро" tag
+ * and opens its "coming soon" page. Hidden from sm up.
  */
 export function MobileNav() {
   const path = usePathname();
-  const shown = items.filter((i) => !i.soon);
+  const shown = items;
   return (
     <nav
       aria-label={kk.nav.home}
@@ -36,12 +37,15 @@ export function MobileNav() {
               <Link
                 href={it.href}
                 aria-current={on ? "page" : undefined}
-                className={`group flex min-w-0 flex-col items-center gap-1 text-[11px] font-semibold leading-none transition-colors duration-200 ${on ? "text-ink" : "text-[#3d3935]"}`}
+                className={`group flex min-w-0 flex-col items-center gap-1 text-[11px] font-semibold leading-none transition-colors duration-200 ${on ? "text-ink" : it.soon ? "text-faint" : "text-[#3d3935]"}`}
               >
-                <span className={`flex h-10 w-14 items-center justify-center rounded-full transition-all duration-300 ease-[var(--ease-out)] group-active:scale-95 ${
+                <span className={`relative flex h-10 w-14 items-center justify-center rounded-full transition-all duration-300 ease-[var(--ease-out)] group-active:scale-95 ${
                   it.primary ? "bg-brand text-night shadow-[0_10px_22px_-10px_rgba(140,170,10,0.9)]" : on ? "bg-night text-white shadow-[0_8px_18px_-8px_rgba(22,22,22,0.6)]" : "text-ink group-hover:bg-white/50"
                 }`}>
                   {it.icon}
+                  {it.soon && (
+                    <span className="absolute -right-1 -top-1.5 rounded-full bg-ink px-1.5 py-[3px] text-[8px] font-bold uppercase leading-none tracking-wide text-paper">{kk.nav.soon}</span>
+                  )}
                 </span>
                 <span className="max-w-full truncate px-0.5">{it.label}</span>
               </Link>
