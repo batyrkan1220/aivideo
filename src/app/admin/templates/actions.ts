@@ -251,7 +251,7 @@ export type DetectResult =
 export async function detectTemplateElements(framesRaw: unknown): Promise<DetectResult> {
   const user = await guard("templates.manage");
   if (!user) return { ok: false, error: "forbidden" };
-  const frames = z.array(z.string().regex(/^[A-Za-z0-9+/=]+$/).max(500_000)).min(1).max(8).safeParse(framesRaw);
+  const frames = z.array(z.string().regex(/^[A-Za-z0-9+/=]+$/).max(500_000)).min(1).max(10).safeParse(framesRaw);
   if (!frames.success) return { ok: false, error: "invalid" };
   const { describeTemplateFrames, VisionError } = await import("@/lib/templates/vision");
   try {

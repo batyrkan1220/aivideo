@@ -150,6 +150,9 @@ export function TemplateEditor({
     const next = applyAnalysis(sd, r, { people, objects, peopleKling });
     // A whole new analysis is a new start: edit mode keeps the template video 1:1.
     setSd({ ...next, klingMode: "edit" });
+    // Name and text for customers from the AI, only where the admin left them empty.
+    if (!t.titleKk.trim() && r.title) set("titleKk", r.title);
+    if (!t.descriptionKk.trim() && r.description) set("descriptionKk", r.description);
     const scene = r.scene ? `Keep the video 1:1: ${r.scene}` : "";
     setSceneTip(scene && sd.prompt.trim() ? scene : null);
     setAi({ busy: false, text: r.people.length || r.objects.length ? e.seedance.aiDone : e.seedance.detectNone, found: [...r.people.map((x) => x.ru), ...r.objects.map((x) => x.ru)] });

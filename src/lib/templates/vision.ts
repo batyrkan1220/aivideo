@@ -32,6 +32,8 @@ const resultSchema = z.object({
     box: z.array(z.number()).length(4).nullable().catch(null),
   })).catch([]),
   scene: z.string().max(600).catch(""),
+  title: z.string().max(120).catch(""),
+  description: z.string().max(600).catch(""),
 });
 
 const promptFor = (kinds: string[]) => `These are frames, in time order, from one short video. A customer will upload photos to replace the people in it (and maybe some things) with an AI video model.
@@ -52,6 +54,9 @@ For each thing:
 - ru: the same in Russian.
 - frame and box: as for people, around the whole thing.
 Finally write scene: 1–3 short English sentences (max 50 words) for the video model that lock everything that must stay exactly as in this video, 1:1: the location and background, lighting and colors, camera movement and framing, and what each person does and when (gestures, moves, turns, timing). Call people only "the person" (or "the first person", "the second person"): never their gender, age, hair, face, body or clothing, because they will be replaced by someone else. Only describe what is there; do not suggest any change.
+Then write, in Russian, for the customers of a video app who put themselves (or their car, pet…) into this video:
+- title: a short, catchy name for this video, 2–5 words, no quotes, no emoji, no names of real people or brands.
+- description: 1–2 short sentences: what happens in the video with the customer in it, then what to upload and how, for this exact video (e.g. "Загрузите своё фото в хорошем качестве: лицо анфас, хорошо освещено, без очков." for one person; a photo for each person when there are several; photos of the car from the front, side and back when a car is swapped). Friendly, simple, max 220 characters.
 Reply with JSON only.`;
 
 const responseSchema = {
@@ -60,8 +65,10 @@ const responseSchema = {
     people: { type: "ARRAY", items: { type: "OBJECT", properties: { where: { type: "STRING" }, look: { type: "STRING" }, ru: { type: "STRING" }, frame: { type: "INTEGER" }, box: { type: "ARRAY", items: { type: "INTEGER" } }, face: { type: "ARRAY", items: { type: "INTEGER" } } }, required: ["where", "look", "ru", "frame", "box", "face"] } },
     objects: { type: "ARRAY", items: { type: "OBJECT", properties: { what: { type: "STRING", enum: KINDS }, look: { type: "STRING" }, ru: { type: "STRING" }, frame: { type: "INTEGER" }, box: { type: "ARRAY", items: { type: "INTEGER" } } }, required: ["what", "look", "ru", "frame", "box"] } },
     scene: { type: "STRING" },
+    title: { type: "STRING" },
+    description: { type: "STRING" },
   },
-  required: ["people", "objects", "scene"],
+  required: ["people", "objects", "scene", "title", "description"],
 };
 
 /** Tried in order after GEMINI_MODEL when it is busy or not available. */
@@ -159,5 +166,5 @@ export async function describeTemplateFrames(frames: string[], hint?: { people: 
     // A "thing" that sits inside a found person (their clothes, their body) is that person again.
     .filter((o) => !people.some((p) => p.frame === o.frame && covered(o.box, p.box) > 0.6))
     .slice(0, SEEDANCE_MAX_OBJECTS);
-  return { people, objects, scene: clean(parsed.scene, 500) };
+  return { people, objects, scene: clean(parsed.scene, 500), title: clean(parsed.title, 60), description: clean(parsed.description, 300) };
 }

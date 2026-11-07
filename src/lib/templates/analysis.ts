@@ -8,7 +8,8 @@ import { OBJECT_PRESETS, SEEDANCE_MAX_OBJECTS, SEEDANCE_MAX_PEOPLE, type Seedanc
 export type Box = [number, number, number, number]; // ymin, xmin, ymax, xmax in 0–1000
 export type FoundPerson = { where: string; look: string; ru: string; frame: number; box: Box | null; face?: Box | null };
 export type FoundObject = { what: string; look: string; ru: string; frame: number; box: Box | null };
-export type Analysis = { people: FoundPerson[]; objects: FoundObject[]; scene: string };
+/** title / description: a Russian name and text for customers, written by the AI (used when the admin left them empty). */
+export type Analysis = { people: FoundPerson[]; objects: FoundObject[]; scene: string; title?: string; description?: string };
 
 /** Version of the analysis: 2 = face-hidden cut-outs for Kling; 3 = scene notes call people only "the person". */
 export const ANALYSIS_VERSION = 3;

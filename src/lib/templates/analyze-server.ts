@@ -70,7 +70,7 @@ async function drain() {
 export async function analyzeTemplate(templateId: string, keep = true): Promise<boolean> {
   const db = supabaseAdmin();
   const { data: t } = await db.from("templates")
-    .select("id,status,provider_key,preview_video_path,video_duration_sec,provider_config_json").eq("id", templateId).maybeSingle();
+    .select("id,status,provider_key,preview_video_path,video_duration_sec,provider_config_json,title_kk,description_kk").eq("id", templateId).maybeSingle();
   const url = mediaUrl(t?.preview_video_path ?? null);
   if (!t || t.provider_key !== "seedance" || !url) return false;
   const src = t.preview_video_path;
@@ -140,7 +140,12 @@ export async function analyzeTemplate(templateId: string, keep = true): Promise<
     const slots = seedanceSlots(next.people, "face_", next.labels, next.objects, next.targets);
     // Only if the template still has the same video (the admin may have replaced it meanwhile).
     const { data: updated } = await db.from("templates")
-      .update({ provider_config_json: next, face_slots_json: slots, required_face_count: slots.length })
+      .update({
+        provider_config_json: next, face_slots_json: slots, required_face_count: slots.length,
+        // Name and text for customers from the AI, only where the admin left them empty.
+        ...(!String(t.title_kk ?? "").trim() && a.title ? { title_kk: a.title } : {}),
+        ...(!String(t.description_kk ?? "").trim() && a.description ? { description_kk: a.description } : {}),
+      })
       .eq("id", templateId).eq("preview_video_path", src).select("id");
     if (!updated?.length) { if (uploaded.length) await db.storage.from("template-media").remove(uploaded); return false; }
     if (t.status === "published") await snapshotVersion(templateId);
