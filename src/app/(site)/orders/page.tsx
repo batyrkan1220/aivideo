@@ -9,7 +9,7 @@ export const metadata = { title: kk.gallery.title };
 /** Gallery: every video and photo the customer has made (and orders still in progress). */
 export default function GalleryPage({ searchParams }: { searchParams: Promise<{ day?: string }> }) {
   return (
-    <main className="mx-auto max-w-2xl px-4 pb-8 pt-6 sm:px-6 md:pt-12">
+    <main data-dark="" className="mx-auto max-w-2xl px-4 pb-8 pt-6 sm:px-6 md:pt-12">
       <h1 className="t-h1 mb-6">{kk.gallery.title}</h1>
       <Suspense fallback={<ul className="grid gap-3">{Array.from({ length: 5 }, (_, i) => <li key={i}><Skeleton className="h-24 rounded-card" /></li>)}</ul>}>
         <List searchParams={searchParams} />

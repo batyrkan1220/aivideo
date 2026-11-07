@@ -32,7 +32,7 @@ export const metadata = { title: kk.order.title };
 type SP = { deleted?: string; error?: string; pay_error?: string };
 export default function OrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<SP> }) {
   return (
-    <main className="mx-auto max-w-3xl px-4 pb-8 pt-6 sm:px-6 sm:pt-12">
+    <main data-dark="" className="mx-auto max-w-3xl px-4 pb-8 pt-6 sm:px-6 sm:pt-12">
       <Suspense fallback={<div className="grid gap-4"><Skeleton className="h-10 w-56 rounded-full" /><Skeleton className="h-[60svh] rounded-card" /></div>}>
         <OrderView params={params} searchParams={searchParams} />
       </Suspense>

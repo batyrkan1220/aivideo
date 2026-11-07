@@ -17,7 +17,7 @@ export function CinematicHero({ items, newVideoHref }: { items: Item[]; newVideo
   return (
     <section className="relative isolate overflow-hidden">
       <Atmosphere />
-      <div className="mx-auto grid max-w-6xl items-center gap-6 px-4 pb-6 pt-5 sm:px-6 md:grid-cols-[1.05fr_0.95fr] md:gap-10 md:pb-16 md:pt-16">
+      <div className="mx-auto grid max-w-6xl items-center gap-6 px-4 pb-2 pt-4 sm:px-6 md:grid-cols-[1.05fr_0.95fr] md:gap-10 md:pb-16 md:pt-16">
         <div className="relative z-10 min-w-0">
           <span style={delay(0)} className="hero-rise inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-[#9ca3af] backdrop-blur-xl sm:text-[13px]">
             <span className="relative flex h-2 w-2" aria-hidden>
@@ -26,7 +26,7 @@ export function CinematicHero({ items, newVideoHref }: { items: Item[]; newVideo
             {h.hxBadge}
           </span>
 
-          <h1 className="mt-4 text-[2.35rem] font-bold leading-[1.02] tracking-[-0.035em] text-white sm:text-6xl md:mt-6 lg:text-[4.6rem]">
+          <h1 className="mt-4 text-[2.1rem] font-bold leading-[1.02] tracking-[-0.035em] text-white sm:text-6xl md:mt-6 lg:text-[4.6rem]">
             <span style={delay(80)} className="hero-rise block">{h.hxLine1}</span>
             <span style={delay(160)} className="hero-rise block">
               {h.hxLine2a}{" "}
@@ -35,10 +35,10 @@ export function CinematicHero({ items, newVideoHref }: { items: Item[]; newVideo
             </span>
           </h1>
 
-          <p style={delay(260)} className="hero-rise mt-4 max-w-xl text-base leading-[1.6] text-[#9ca3af] md:mt-6 md:text-lg">{h.hxLead}</p>
+          <p style={delay(260)} className="hero-rise mt-3 max-w-xl text-[15px] leading-[1.55] sm:text-base sm:leading-[1.6] text-[#9ca3af] md:mt-6 md:text-lg">{h.hxLead}</p>
 
-          <div style={delay(340)} className="hero-rise mt-6 flex flex-wrap items-center gap-3 md:mt-8">
-            <Link href={newVideoHref} className="cta-neon inline-flex h-12 items-center gap-2 rounded-full bg-[#d4ff00] px-6 text-[15px] font-bold text-[#060608] shadow-[0_12px_32px_-12px_rgb(212_255_0/0.6)] sm:h-14 sm:px-7 sm:text-base">
+          <div style={delay(340)} className="hero-rise mt-5 flex flex-wrap items-center gap-3 md:mt-8">
+            <Link href={newVideoHref} className="cta-neon inline-flex h-12 items-center gap-2 rounded-full bg-[#d4ff00] px-6 text-[15px] font-bold text-[#101014] shadow-[0_12px_32px_-12px_rgb(212_255_0/0.6)] sm:h-14 sm:px-7 sm:text-base">
               <Sparkles size={18} strokeWidth={2.4} aria-hidden />{kk.nav.createOwn}
             </Link>
             <a href="#templates" className="inline-flex h-12 items-center gap-2 rounded-full border border-white/12 bg-white/[0.03] px-6 text-[15px] font-semibold text-white backdrop-blur-xl transition-[background-color,border-color,transform] duration-300 hover:border-white/25 hover:bg-white/[0.08] active:scale-[0.98] sm:h-14 sm:px-7 sm:text-base">
@@ -46,7 +46,7 @@ export function CinematicHero({ items, newVideoHref }: { items: Item[]; newVideo
             </a>
           </div>
 
-          <dl style={delay(420)} className="hero-rise mt-6 grid max-w-md grid-cols-3 gap-2 md:mt-10 md:gap-3">
+          <dl style={delay(420)} className="hero-rise mt-6 hidden max-w-md grid-cols-3 gap-2 sm:grid md:mt-10 md:gap-3">
             {h.hxData.map((d) => (
               <div key={d.k} className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 backdrop-blur-xl md:px-4 md:py-3">
                 <dt className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#00f0ff]/80">{d.k}</dt>
@@ -68,12 +68,12 @@ export function CinematicHero({ items, newVideoHref }: { items: Item[]; newVideo
 function Atmosphere() {
   return (
     <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
-      <div className="drift-a absolute -left-[15%] -top-[25%] h-[70%] w-[60%] rounded-full bg-[radial-gradient(closest-side,rgb(64_120_40/0.35),transparent)] blur-3xl" />
-      <div className="drift-b absolute -right-[10%] top-[5%] h-[80%] w-[55%] rounded-full bg-[radial-gradient(closest-side,rgb(76_48_160/0.38),transparent)] blur-3xl" />
-      <div className="drift-a absolute bottom-[-30%] left-[30%] h-[60%] w-[45%] rounded-full bg-[radial-gradient(closest-side,rgb(0_160_170/0.14),transparent)] blur-3xl [animation-delay:-9s]" />
+      <div className="drift-a absolute -left-[15%] -top-[25%] h-[70%] w-[60%] rounded-full bg-[radial-gradient(closest-side,rgb(90_150_40/0.42),transparent)] blur-3xl" />
+      <div className="drift-b absolute -right-[10%] top-[5%] h-[80%] w-[55%] rounded-full bg-[radial-gradient(closest-side,rgb(96_64_190/0.42),transparent)] blur-3xl" />
+      <div className="drift-a absolute bottom-[-30%] left-[30%] h-[60%] w-[45%] rounded-full bg-[radial-gradient(closest-side,rgb(0_170_180/0.18),transparent)] blur-3xl [animation-delay:-9s]" />
       {/* Fine grid, fading out toward the edges. */}
       <div className="absolute inset-0 opacity-[0.07] [background-image:linear-gradient(rgb(255_255_255/0.6)_1px,transparent_1px),linear-gradient(90deg,rgb(255_255_255/0.6)_1px,transparent_1px)] [background-size:56px_56px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]" />
-      <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-b from-transparent to-[#060608]" />
+      <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-b from-transparent to-[#101014]" />
     </div>
   );
 }
@@ -82,27 +82,27 @@ const glass = "border border-white/10 bg-[rgb(10_10_14/0.55)] backdrop-blur-xl";
 
 /** Three cards in 3D depth; the centre one plays, with a neon rim, face frame and scanner line. */
 function DepthStack({ items }: { items: Item[] }) {
-  if (!items.length) return <div className="h-[19rem] sm:h-[26rem] md:h-[34rem]" />;
+  if (!items.length) return <div className="h-[15rem] sm:h-[26rem] md:h-[34rem]" />;
   const [front, left, right] = items;
   const side = (t: Item | undefined, pos: "l" | "r") => t && (
     <Link href={`/templates/${t.id}`} tabIndex={-1} aria-hidden
-      className={`absolute aspect-[9/16] h-[13rem] overflow-hidden rounded-[1.3rem] border border-white/10 bg-[#0b0b0e] opacity-60 shadow-[0_40px_80px_-30px_rgb(0_0_0/0.95)] transition-opacity duration-500 hover:opacity-90 sm:h-[18rem] md:h-[24rem] md:rounded-[1.6rem] ${
+      className={`absolute aspect-[9/16] h-[10.5rem] overflow-hidden rounded-[1.3rem] border border-white/10 bg-[#0b0b0e] opacity-60 shadow-[0_40px_80px_-30px_rgb(0_0_0/0.95)] transition-opacity duration-500 hover:opacity-90 sm:h-[18rem] md:h-[24rem] md:rounded-[1.6rem] ${
         pos === "l" ? "[transform:translateX(-62%)_translateZ(-140px)_rotateY(22deg)_rotateZ(-3deg)]" : "[transform:translateX(62%)_translateZ(-140px)_rotateY(-22deg)_rotateZ(3deg)]"}`}>
       {t.coverUrl && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={t.coverUrl} alt="" loading="eager" className="absolute inset-0 h-full w-full object-cover" />
       )}
-      <span className="absolute inset-0 bg-gradient-to-t from-[#060608]/80 via-transparent to-[#060608]/20" />
+      <span className="absolute inset-0 bg-gradient-to-t from-[#101014]/80 via-transparent to-[#101014]/20" />
     </Link>
   );
   return (
-    <div className="relative mx-auto flex h-[19rem] w-full max-w-lg items-center justify-center [perspective:1400px] sm:h-[26rem] md:h-[34rem]" aria-label={kk.home.trendingTitle}>
+    <div className="relative mx-auto flex h-[15rem] w-full max-w-lg items-center justify-center [perspective:1400px] sm:h-[26rem] md:h-[34rem]" aria-label={kk.home.trendingTitle}>
       <div className="relative flex h-full w-full items-center justify-center [transform-style:preserve-3d]">
         {side(left, "l")}
         {side(right, "r")}
         <div className="hero-float relative z-10 [transform-style:preserve-3d]">
           <Link href={`/templates/${front.id}`}
-            className="relative block aspect-[9/16] h-[16rem] overflow-hidden rounded-[1.5rem] border-[1.5px] border-[#d4ff00]/80 bg-[#0b0b0e] shadow-[0_0_0_1px_rgb(212_255_0/0.25),0_0_48px_-6px_rgb(212_255_0/0.45),0_50px_100px_-30px_rgb(0_0_0/0.95)] [transform:rotateY(-7deg)_rotateX(3deg)] sm:h-[22rem] md:h-[29rem] md:rounded-[1.9rem]">
+            className="relative block aspect-[9/16] h-[13rem] overflow-hidden rounded-[1.5rem] border-[1.5px] border-[#d4ff00]/80 bg-[#0b0b0e] shadow-[0_0_0_1px_rgb(212_255_0/0.25),0_0_48px_-6px_rgb(212_255_0/0.45),0_50px_100px_-30px_rgb(0_0_0/0.95)] [transform:rotateY(-7deg)_rotateX(3deg)] sm:h-[22rem] md:h-[29rem] md:rounded-[1.9rem]">
             {front.coverUrl && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={front.coverUrl} alt="" fetchPriority="high" loading="eager" className="absolute inset-0 h-full w-full object-cover" />

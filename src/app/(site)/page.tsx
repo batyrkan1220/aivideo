@@ -48,7 +48,7 @@ async function Hero() {
 
 /** Same size as the hero while the showcase loads, so the feed below does not jump. */
 function HeroFallback() {
-  return <div className="h-[37rem] md:h-[40rem]" aria-hidden />;
+  return <div className="h-[29rem] md:h-[40rem]" aria-hidden />;
 }
 
 async function Feed({ searchParams }: { searchParams: Promise<SP> }) {

@@ -25,7 +25,7 @@ const H = kk.createHub;
     Title and tabs paint instantly; only the flow below waits for data (all fetched in parallel, cached). */
 export default function CreatePage({ searchParams }: { searchParams: Promise<SP> }) {
   return (
-    <main className="mx-auto w-full max-w-xl px-4 pb-4 pt-4 md:pt-10">
+    <main data-dark="" className="mx-auto w-full max-w-xl px-4 pb-4 pt-4 md:pt-10">
       <h1 className="text-[28px] font-extrabold leading-none tracking-tight">{H.title}</h1>
       <div className="mt-4">
         <Suspense fallback={<TabsView type="video" />}>
