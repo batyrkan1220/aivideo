@@ -7,9 +7,9 @@ import { kk } from "@/lib/i18n/kk";
 export function LogoMark({ className = "" }: { className?: string }) {
   return (
     <svg viewBox="2 -1 60 56" fill="none" aria-hidden className={`h-[1.9em] w-auto shrink-0 ${className}`}>
-      <g stroke="#283040" strokeLinecap="round">
+      <g stroke="currentColor" strokeLinecap="round">
       <path d="M10 26h9M6 32h13M9 38h10M13 44h7" strokeWidth="3.2"/>
-      <circle cx="5" cy="26" r="1.7" fill="#283040" stroke="none"/>
+      <circle cx="5" cy="26" r="1.7" fill="currentColor" stroke="none"/>
       </g>
       <path d="M25.5 14.6c0-3.3 3.6-5.4 6.5-3.7l22.3 13.4c3 1.8 3 6.1 0 7.9L32 45.6c-2.9 1.7-6.5-.4-6.5-3.7z" transform="translate(-4 4)" fill="#d7f443" stroke="#283040" strokeWidth="3.6" strokeLinejoin="round"/>
       <path d="M31.5 28.3c0-1.3 1.4-2.1 2.6-1.4l7.4 4.4c1.1.7 1.1 2.3 0 3l-7.4 4.4c-1.2.7-2.6-.1-2.6-1.4z" fill="#283040"/>
@@ -25,7 +25,7 @@ export function LogoMark({ className = "" }: { className?: string }) {
 /** Mark + "TrendMe" wordmark. Size it with a text-* class. */
 export function Logo({ className = "", compact = false }: { className?: string; compact?: boolean }) {
   return (
-    <span className={`inline-flex items-center gap-[0.35em] font-extrabold tracking-[-0.03em] text-[#283040] ${className}`}>
+    <span className={`inline-flex items-center gap-[0.35em] font-extrabold tracking-[-0.03em] text-[var(--logo-ink,#283040)] ${className}`}>
       <LogoMark />
       {!compact && (
         <span className="leading-none">

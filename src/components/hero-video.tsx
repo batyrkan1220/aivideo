@@ -1,11 +1,13 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { autoplayRefused, useImgPreviews } from "@/lib/video-autoplay";
+import { autoplayRefused, useImgPreviews, useInTelegram } from "@/lib/video-autoplay";
 
 /** Hero's front phone: muted autoplay loop; where autoplay is refused, an animated WebP. */
 export function HeroVideo({ src, poster, anim }: { src: string; poster?: string; anim?: string }) {
   const ref = useRef<HTMLVideoElement>(null);
-  const imgMode = useImgPreviews() || !!anim; // animated WebP whenever it exists
+  // Website: the video. Mini App (or autoplay refused): the animated WebP.
+  const tg = useInTelegram();
+  const imgMode = useImgPreviews() || (tg && !!anim);
   // The animated image (0.5–1 MB) waits until the page has loaded: the cover underneath paints first.
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {

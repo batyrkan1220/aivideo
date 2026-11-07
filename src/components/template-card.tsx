@@ -1,10 +1,10 @@
 "use client";
 import { Flame } from "lucide-react";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { kk } from "@/lib/i18n/kk";
 import { formatKzt } from "@/lib/pricing";
-import { autoplayRefused, useImgPreviews } from "@/lib/video-autoplay";
+import { autoplayRefused, useImgPreviews, useInTelegram } from "@/lib/video-autoplay";
 import { primeSound, videoShown } from "@/lib/sound-handoff";
 
 export type CardData = {
@@ -73,10 +73,6 @@ function releasePlayback(v: HTMLVideoElement) {
  *  - the cover image is lazy-loaded; the video has NO src until the card is near the screen;
  *  - visible cards autoplay (muted, inline); off-screen videos are paused.
  */
-/** True inside the Telegram Mini App (the bridge marks <html data-tg>). */
-const inTelegram = () => document.documentElement.hasAttribute("data-tg");
-const useInTelegram = () => useSyncExternalStore(() => () => {}, inTelegram, () => false);
-
 /**
  * aspect: the card's shape (the home wall mixes several); wall: tight corners for the edge-to-edge feed.
  * The website plays the light MP4; the Mini App shows the animated WebP (Telegram's WebView is weak at many videos).

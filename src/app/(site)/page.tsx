@@ -6,9 +6,8 @@ import { kk } from "@/lib/i18n/kk";
 import { listCategories, listTemplates } from "@/lib/templates/queries";
 import { CategoryChips, pickCard } from "@/components/catalog-bits";
 import { VideoFeed } from "@/components/video-feed";
-import { HeroShowcase } from "@/components/hero-showcase";
+import { CinematicHero } from "@/components/cinematic-hero";
 import { Logo } from "@/components/logo";
-import { DesktopOnly, PhoneOnly } from "@/components/desktop-only";
 import { CachedFeedFallback } from "@/components/cached-feed";
 import { resolveShowcase } from "@/lib/templates/showcase";
 
@@ -20,66 +19,36 @@ type SP = { account?: string; category?: string };
  */
 export default function HomePage({ searchParams }: { searchParams: Promise<SP> }) {
   return (
-    <main className="pb-6">
+    // data-dark: the cinematic dark theme for this page only (see globals.css).
+    <main data-dark="" className="pb-6">
       <Suspense fallback={null}>
         <Notice searchParams={searchParams} />
       </Suspense>
 
-      {/* Desktop hero */}
-      <section className="relative mx-auto hidden max-w-6xl grid-cols-[1.15fr_0.85fr] items-center gap-10 px-6 pb-8 pt-16 md:grid">
-        <div className="pointer-events-none absolute -left-40 -top-24 h-96 w-96 rounded-full bg-brand/30 blur-3xl" aria-hidden />
-        <div className="relative min-w-0">
-          <span className="t-micro inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 elev-xs">
-            <span className="h-2 w-2 rounded-full bg-[#9cbf12]" aria-hidden />{kk.home.badge}
-          </span>
-          <h1 className="mt-5 max-w-3xl font-display text-5xl font-extrabold leading-[1.04] tracking-[-0.035em] lg:text-6xl">{kk.home.title}</h1>
-          <p className="mt-5 max-w-xl text-lg leading-7 text-muted">{kk.home.lead}</p>
-          <HowItWorks />
-        </div>
-        <div className="min-w-0">
-          <DesktopOnly>
-            <Suspense fallback={<div className="h-[30rem]" />}>
-              <Showcase />
-            </Suspense>
-          </DesktopOnly>
-        </div>
-      </section>
+      {/* Mini App: Telegram hides the site header, so the brand sits on top. */}
+      <div className="tg-only px-4 pt-3">
+        <Logo className="text-base" />
+      </div>
 
-      {/* Phones / Mini App: brand bar (Telegram hides the site header) + the 3-video hero */}
-      <section className="mx-auto max-w-6xl px-4 pt-3 md:hidden">
-        <div className="tg-only">
-          <div className="mb-3 flex items-center">
-            <Logo className="text-base" />
-          </div>
-        </div>
-        {/* Same hero as the website: three trend templates fanned like phones, the front one playing (lite preview). */}
-        <p className="text-center text-[17px] font-extrabold leading-tight tracking-tight">{kk.home.heroMini} <span className="rounded-md bg-brand px-1.5 text-night">{kk.home.heroMiniAccent}</span></p>
-        <PhoneOnly fallback={<div className="h-[16.25rem]" />}>
-          <Suspense fallback={<div className="h-[16.25rem]" />}>
-            <Showcase compact />
-          </Suspense>
-        </PhoneOnly>
-        <p className="mt-0.5 text-center text-[12px] font-medium text-muted">{kk.home.heroMiniHint}</p>
-      </section>
+      <Suspense fallback={<HeroFallback />}>
+        <Hero />
+      </Suspense>
 
-      <Suspense fallback={<div className="mx-auto mt-4 max-w-6xl px-4"><CachedFeedFallback /></div>}>
+      <Suspense fallback={<div className="mx-auto mt-4 max-w-[1600px] px-1.5 sm:px-3"><CachedFeedFallback /></div>}>
         <Feed searchParams={searchParams} />
       </Suspense>
     </main>
   );
 }
 
-function HowItWorks({ compact = false }: { compact?: boolean }) {
-  return (
-    <ol className={compact ? "no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 text-xs" : "mt-8 grid max-w-xl grid-cols-3 gap-3 text-sm"}>
-      {kk.home.steps.map((s, i) => (
-        <li key={s.t} className={compact ? "flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full bg-surface py-1.5 pl-1.5 pr-3 ring-1 ring-line" : "rounded-2xl border border-line/80 bg-surface p-4 elev-xs"}>
-          <span className={compact ? "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-night" : `grid h-8 w-8 place-items-center rounded-full text-sm font-extrabold ${["bg-peach", "bg-lavender", "bg-rose"][i % 3]}`}>{i + 1}</span>
-          <span className={compact ? "font-medium" : "mt-3 block font-semibold leading-5"}>{compact ? s.short : s.t}</span>
-        </li>
-      ))}
-    </ol>
-  );
+async function Hero() {
+  const items = (await resolveShowcase()).map(({ id, title, coverUrl, coverThumbUrl, previewUrl, previewLiteUrl, previewAnimUrl }) => ({ id, title, coverUrl: coverThumbUrl ?? coverUrl, previewUrl: previewLiteUrl ?? previewUrl, animUrl: previewAnimUrl }));
+  return <CinematicHero items={items} newVideoHref="/create" />;
+}
+
+/** Same size as the hero while the showcase loads, so the feed below does not jump. */
+function HeroFallback() {
+  return <div className="h-[37rem] md:h-[40rem]" aria-hidden />;
 }
 
 async function Feed({ searchParams }: { searchParams: Promise<SP> }) {
@@ -123,9 +92,4 @@ async function Notice({ searchParams }: { searchParams: Promise<SP> }) {
       <Alert tone="success">{kk.account.accountDeleted}</Alert>
     </p>
   );
-}
-
-async function Showcase({ compact = false }: { compact?: boolean }) {
-  const items = (await resolveShowcase()).map(({ id, title, coverUrl, coverThumbUrl, previewUrl, previewLiteUrl, previewAnimUrl }) => ({ id, title, coverUrl: coverThumbUrl ?? coverUrl, previewUrl: previewLiteUrl ?? previewUrl, animUrl: previewAnimUrl }));
-  return <HeroShowcase items={items} compact={compact} />;
 }

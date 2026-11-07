@@ -18,6 +18,10 @@ export function autoplayRefused(err: unknown): boolean {
   return true;
 }
 
+/** True inside the Telegram Mini App (the bridge marks <html data-tg>). */
+const inTelegram = () => document.documentElement.hasAttribute("data-tg");
+export const useInTelegram = () => useSyncExternalStore(() => () => {}, inTelegram, () => false);
+
 export function useImgPreviews(): boolean {
   return useSyncExternalStore(
     (f) => { subs.add(f); return () => subs.delete(f); },
