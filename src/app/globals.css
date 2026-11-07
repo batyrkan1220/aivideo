@@ -335,9 +335,6 @@ body:has(> .theme-app.theme-mono) { background: #f5f4f1; }
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   backdrop-filter: blur(24px) saturate(180%);
 }
-/* Pages fade in (opacity only: a transform here would break fixed bars inside the page). */
-@keyframes tm-page-in { from { opacity: 0; } to { opacity: 1; } }
-.theme-app.theme-mono main { animation: tm-page-in 0.35s var(--ease-out) both; }
 /* Primary buttons: black with a soft top highlight; lift a hair on hover. */
 .theme-app.theme-mono .btn-glow {
   background: linear-gradient(180deg, #2a2a2a 0%, #0e0e0e 100%);

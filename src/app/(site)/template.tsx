@@ -1,4 +1,7 @@
-/** Each page fades up softly when it opens (CSS only; respects reduced motion). */
+/**
+ * No page-open animation: an animated wrapper (transform/opacity) around every page made the fixed
+ * bars (bottom menu, pay bar) jump and flicker on phones while a page opened.
+ */
 export default function Template({ children }: { children: React.ReactNode }) {
-  return <div className="animate-fade-up">{children}</div>;
+  return <>{children}</>;
 }

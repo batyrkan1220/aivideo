@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { Clapperboard, Image as ImageIcon, LayoutGrid, Plus, UserRound } from "lucide-react";
 import { kk } from "@/lib/i18n/kk";
 import { PHOTOS_SOON } from "@/lib/features";
@@ -23,6 +24,9 @@ const items: Item[] = [
  */
 export function MobileNav() {
   const path = usePathname();
+  // The tapped tab turns active at once (the page may still be loading); the real path takes over after.
+  const [tapped, setTapped] = useState<{ href: string; from: string } | null>(null);
+  const pending = tapped && tapped.from === path ? tapped.href : null;
   const shown = items;
   return (
     <nav
@@ -31,15 +35,16 @@ export function MobileNav() {
     >
       <ul className="grid h-[4.5rem] items-center px-1" style={{ gridTemplateColumns: `repeat(${shown.length}, minmax(0, 1fr))` }}>
         {shown.map((it) => {
-          const on = it.match(path);
+          const on = pending ? it.href === pending : it.match(path);
           return (
             <li key={it.href} className="flex justify-center">
               <Link
                 href={it.href}
                 aria-current={on ? "page" : undefined}
+                onClick={() => { if (!it.match(path)) setTapped({ href: it.href, from: path }); }}
                 className={`group flex min-w-0 flex-col items-center gap-1 text-[11px] font-semibold leading-none transition-colors duration-200 ${on ? "text-ink" : it.soon ? "text-faint" : "text-[#3d3935]"}`}
               >
-                <span className={`relative flex h-10 w-14 items-center justify-center rounded-full transition-all duration-300 ease-[var(--ease-out)] group-active:scale-95 ${
+                <span className={`relative flex h-10 w-14 items-center justify-center rounded-full transition-[background-color,color,box-shadow,transform] duration-200 ease-[var(--ease-out)] group-active:scale-95 ${
                   it.primary ? "bg-brand text-night shadow-[0_10px_22px_-10px_rgba(140,170,10,0.9)]" : on ? "bg-night text-white shadow-[0_8px_18px_-8px_rgba(22,22,22,0.6)]" : "text-ink group-hover:bg-white/50"
                 }`}>
                   {it.icon}
