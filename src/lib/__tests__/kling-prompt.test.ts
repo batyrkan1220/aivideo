@@ -146,3 +146,14 @@ describe("a day photo of a car in a night video", () => {
     expect(p).toContain("Never bring the photos' daylight, sky or background into the video.");
   });
 });
+
+describe("number plates", () => {
+  it("a car's plate is copied from the photos, with its flag", () => {
+    const p = buildKlingDirectPrompt("edit", "photo", "", "", 0, [], [{ what: "car", n: 3 }]);
+    expect(p).toContain("Number plates: copy them exactly as on @image_1, @image_2 and @image_3");
+    expect(p).toContain("the Kazakhstan flag with \"KZ\"");
+  });
+  it("nothing about plates for a horse", () => {
+    expect(buildKlingDirectPrompt("edit", "photo", "", "", 0, [], [{ what: "horse" }])).not.toContain("Number plates");
+  });
+});

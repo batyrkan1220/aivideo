@@ -93,6 +93,15 @@ const KEEP_OWN = (what: string, ref: string) =>
   `It must be recognisably the customer's ${what} from ${ref}, not the ${what} from @video_1 and not a mix of the two: take nothing of the original ${what}'s model, shape or details. ` +
   `Keep the ${what}'s own real shape, proportions and size (it may be longer, taller or smaller than the original); from @video_1 take only its place, path, distance, angle and movement. ` +
   "Do not invent or change any of its details.";
+/**
+ * A vehicle's number plate exactly as on the customer's photos: the same letters and digits, region
+ * code, flag (the Kazakhstan flag and "KZ" on Kazakh plates, or whatever flag is there), colors, font
+ * and layout. Nothing for other things.
+ */
+const VEHICLES = /\b(car|sedan|suv|jeep|truck|pickup|van|bus|motorcycle|motorbike|scooter|vehicle)\b/i;
+const PLATE = (what: string, ref: string) => VEHICLES.test(what)
+  ? `Number plates: copy them exactly as on ${ref} — the same letters and digits in the same order, the same region code, the same flag and country mark (for example the Kazakhstan flag with "KZ" if the photo has it, or whatever flag is on the plate), the same colors, font, frame and layout, front and back. Never make up or change a plate; if a plate cannot be read on the photos, keep it as in @video_1. `
+  : "";
 const listRefs = (r: string[]) => (r.length < 2 ? r[0] ?? "" : `${r.slice(0, -1).join(", ")} and ${r[r.length - 1]}`);
 /** "@image_2 is a photo of a car" / "@image_2, @image_3 and @image_4 are photos of the same car from different sides (front, side, back)". */
 const thingIntro = (refs: string[], what: string, notPerson: boolean) => refs.length < 2
@@ -108,7 +117,7 @@ function thingsOnlyPrompt(mode: KlingMode, adminPrompt: string, wish: string, ob
   const things = objects.map((o, j) => ({ what: o.what.trim().toLowerCase(), look: o.look?.trim() ?? "", refs: tr[j], ref: listRefs(tr[j]), shown: targetRefs[j] ? ` shown in ${targetRefs[j]}` : "" }));
   const parts: string[] = [mode === "edit" ? "Edit @video_1." : "Follow the motion, actions, timing, camera movement, framing and cuts of @video_1, and recreate its location, background and lighting."];
   for (const t of things) {
-    parts.push(`${thingIntro(t.refs, t.what, false)} Replace the ${t.what}${t.look ? ` (${t.look})` : ""}${t.shown} in @video_1 with the ${t.what} from ${t.ref}, 1:1: exactly the same make and model or breed, body shape, color and shade, wheels or markings, logos, number plates, stickers and every detail, from every side. ${KEEP_OWN(t.what, t.ref)} ${RELIGHT(t.what)}`);
+    parts.push(`${thingIntro(t.refs, t.what, false)} Replace the ${t.what}${t.look ? ` (${t.look})` : ""}${t.shown} in @video_1 with the ${t.what} from ${t.ref}, 1:1: exactly the same make and model or breed, body shape, color and shade, wheels or markings, logos, number plates, stickers and every detail, from every side. ${KEEP_OWN(t.what, t.ref)} ${PLATE(t.what, t.ref)}${RELIGHT(t.what)}`);
   }
   parts.push(mode === "edit"
     ? "Keep everything else in @video_1 unchanged: every person with their own face and body, background, location, other objects, lighting, camera movement, framing, cuts, motion and timing."
@@ -173,7 +182,7 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
       ];
   for (const t of things) {
     if (t.ref === outfitRef) continue;
-    parts.push(`${thingIntro(t.refs, t.what, true)} Replace the ${t.what}${t.look ? ` (${t.look})` : ""}${t.shown} in @video_1 with the ${t.what} from ${t.ref}, 1:1: exactly the same make and model or breed, body shape, color and shade, wheels or markings, logos, number plates, stickers and every detail, from every side. ${KEEP_OWN(t.what, t.ref)} ${RELIGHT(t.what)}`);
+    parts.push(`${thingIntro(t.refs, t.what, true)} Replace the ${t.what}${t.look ? ` (${t.look})` : ""}${t.shown} in @video_1 with the ${t.what} from ${t.ref}, 1:1: exactly the same make and model or breed, body shape, color and shade, wheels or markings, logos, number plates, stickers and every detail, from every side. ${KEEP_OWN(t.what, t.ref)} ${PLATE(t.what, t.ref)}${RELIGHT(t.what)}`);
   }
   const cutouts = targetRefs.filter(Boolean);
   if (cutouts.length) {
