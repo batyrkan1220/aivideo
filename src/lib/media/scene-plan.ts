@@ -54,3 +54,26 @@ export function toFrames(parts: Part[], total: number, fps: number): FramePart[]
     return { ...p, from, to, frames, len: frames / fps };
   });
 }
+
+/**
+ * Moments of a video for the AI analysis to look at: the middle of every scene (a person seen only in
+ * one short scene was missed by 6 evenly spaced frames: "Цена успеха", the woman), then evenly spaced
+ * ones up to `min`. At most `max`, in time order, at least 0.15 s apart.
+ */
+export function analysisTimes(total: number, cuts: number[], min = 6, max = 10): number[] {
+  if (!(total > 0)) return [];
+  const edges = [0, ...cuts.filter((c) => c > 0.1 && c < total - 0.1).sort((a, b) => a - b), total];
+  let mids = edges.slice(0, -1).map((s, i) => (s + edges[i + 1]) / 2);
+  // Too many scenes: keep the longest ones.
+  if (mids.length > max) {
+    const lens = edges.slice(0, -1).map((s, i) => ({ t: mids[i], len: edges[i + 1] - s }));
+    mids = lens.sort((a, b) => b.len - a.len).slice(0, max).map((x) => x.t);
+  }
+  const out = [...mids];
+  for (const f of [0.05, 0.95, 0.5, 0.25, 0.75, 0.15, 0.35, 0.65, 0.85]) {
+    if (out.length >= min) break;
+    const t = Math.min(total * f, total - 0.1);
+    if (out.every((x) => Math.abs(x - t) >= 0.15)) out.push(t);
+  }
+  return out.sort((a, b) => a - b).slice(0, max).map((t) => Math.max(0, Math.round(t * 100) / 100));
+}

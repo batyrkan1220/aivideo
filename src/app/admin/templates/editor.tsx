@@ -1,4 +1,5 @@
 "use client";
+import { analysisTimes } from "@/lib/media/scene-plan";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -809,10 +810,37 @@ async function videoFrames(url: string): Promise<string[] | null> {
     c.width = Math.round((v.videoWidth || 720) * scale); c.height = Math.round((v.videoHeight || 1280) * scale);
     const ctx = c.getContext("2d");
     if (!ctx) return null;
+    const seek = async (t: number) => {
+      v.currentTime = Math.min(Math.max(0, t), Math.max(0, d - 0.1));
+      await new Promise<void>((res) => { v.onseeked = () => res(); setTimeout(res, 3000); });
+    };
+    // Scene changes from tiny frames every 0.4 s: a person seen only in one short scene was missed by
+    // six evenly spaced frames ("Цена успеха"), so a frame of every scene goes to the AI.
+    const tiny = document.createElement("canvas");
+    tiny.width = 32; tiny.height = Math.max(8, Math.round(32 * (c.height / c.width)));
+    const tctx = tiny.getContext("2d", { willReadFrequently: true });
+    const cuts: number[] = [];
+    if (tctx) {
+      const step = 0.4, diffs: { t: number; v: number }[] = [];
+      let prev: Uint8ClampedArray | null = null;
+      for (let t = 0; t < d - 0.05 && diffs.length < 120; t += step) {
+        await seek(t);
+        tctx.drawImage(v, 0, 0, tiny.width, tiny.height);
+        const px = tctx.getImageData(0, 0, tiny.width, tiny.height).data;
+        if (prev) {
+          let sum = 0;
+          for (let i = 0; i < px.length; i += 4) sum += Math.abs(px[i] - prev[i]) + Math.abs(px[i + 1] - prev[i + 1]) + Math.abs(px[i + 2] - prev[i + 2]);
+          diffs.push({ t, v: sum / (px.length / 4) / 3 });
+        }
+        prev = px;
+      }
+      const sorted = diffs.map((x) => x.v).sort((a, b) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
+      for (const x of diffs) if (x.v > 28 && x.v > median * 3) cuts.push(x.t);
+    }
     const out: string[] = [];
-    for (const f of [0.05, 0.2, 0.4, 0.6, 0.8, 0.95]) {
-      v.currentTime = Math.min(d * f, Math.max(0, d - 0.1));
-      await new Promise<void>((res) => { v.onseeked = () => res(); });
+    for (const t of analysisTimes(d, cuts)) {
+      await seek(t);
       ctx.drawImage(v, 0, 0, c.width, c.height);
       out.push(c.toDataURL("image/jpeg", 0.72).split(",")[1] ?? "");
     }

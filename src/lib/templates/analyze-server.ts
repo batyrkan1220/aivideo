@@ -19,7 +19,7 @@ import { snapshotVersion } from "./versions";
 
 /*
   Server-side AI analysis of a template video, for templates made before the editor did it (and an
-  admin "re-analyse" button). Same steps as the editor: 6 frames → Gemini → cut-outs → config.
+  admin "re-analyse" button). Same steps as the editor: a frame of every scene (6–10) → Gemini → cut-outs → config.
   The admin's people count and things are kept; only descriptions, cut-outs and the scene note are added.
   Memory: the video is streamed to a temp file and ffmpeg runs single-threaded, one template at a time.
 */
@@ -87,9 +87,14 @@ export async function analyzeTemplate(templateId: string, keep = true): Promise<
     const d = Number(t.video_duration_sec) || 10;
     const frames: string[] = [];
     const framePaths: string[] = [];
-    for (const [i, f] of [0.05, 0.2, 0.4, 0.6, 0.8, 0.95].entries()) {
+    // A frame from every scene (a person in one short scene was missed), then evenly spaced ones.
+    const { findShots } = await import("@/lib/media/scene-parts");
+    const { analysisTimes } = await import("@/lib/media/scene-plan");
+    const scenes = await findShots(inPath).catch(() => null);
+    const times = analysisTimes(scenes?.total || d, scenes?.cuts ?? []);
+    for (const [i, tm] of times.entries()) {
       const out = join(dir, `f${i}.jpg`);
-      const at = Math.max(0, Math.min(d * f, d - 0.2)).toFixed(2);
+      const at = Math.max(0, Math.min(tm, d - 0.2)).toFixed(2);
       try {
         await runFfmpeg(inPath, out, (inp, o) => ["-hide_banner", "-loglevel", "error", "-y", "-threads", "1", "-ss", at, "-i", inp, "-frames:v", "1",
           "-vf", "scale='if(gt(iw,ih),640,-2)':'if(gt(iw,ih),-2,640)'", "-q:v", "4", o]);

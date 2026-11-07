@@ -36,6 +36,7 @@ const resultSchema = z.object({
 
 const promptFor = (kinds: string[]) => `These are frames, in time order, from one short video. A customer will upload photos to replace the people in it (and maybe some things) with an AI video model.
 List the people who are clearly visible and important in the video (ignore tiny background passers-by), ordered from left to right as they mainly appear. At most ${SEEDANCE_MAX_PEOPLE}.
+The video may have several scenes: a person may be seen in only one or two of the frames. Look at every frame and list such a person too, with the frame where they are seen best.
 For each person give:
 - where: short English position, e.g. "on the left", "in the center", "on the right", "in the foreground", "in the background". Use "" if there is only one person.
 - look: short English description that tells this person apart in every frame: gender, approximate age, clothing and color, hair, what they hold or do. Max 12 words. No names. It must differ from every other person's look, and "where" must differ too when they stand in different places.

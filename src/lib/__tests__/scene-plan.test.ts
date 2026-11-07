@@ -32,3 +32,19 @@ describe("toFrames", () => {
     expect(f[0].len).toBeCloseTo(55 / 30);
   });
 });
+
+import { analysisTimes } from "../media/scene-plan";
+describe("analysisTimes: a frame of every scene for the AI", () => {
+  it("one frame from the middle of each scene, more evenly up to 6", () => {
+    const t = analysisTimes(12, [3.1, 3.9, 8]);
+    for (const mid of [1.55, 3.5, 5.95, 10]) expect(t).toContain(mid); // the short 0.8 s scene too
+    expect(t.length).toBeGreaterThanOrEqual(6);
+    expect([...t].sort((a, b) => a - b)).toEqual(t);
+  });
+  it("no cuts: 6 spread over the video", () => {
+    expect(analysisTimes(10, [])).toHaveLength(6);
+  });
+  it("many scenes: at most 10, the longest", () => {
+    expect(analysisTimes(30, Array.from({ length: 20 }, (_, i) => (i + 1) * 1.4))).toHaveLength(10);
+  });
+});

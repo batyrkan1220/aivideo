@@ -31,7 +31,8 @@ const q = ["-hide_banner", "-y", "-threads", "1"];
 // was killed while encoding a 720×1280 shot (TM-100035).
 const x264 = ["-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency", "-x264-params", "ref=1", "-threads", "1"];
 
-async function findShots(inPath: string) {
+/** Scene changes of a local video file (seconds), its length and frame rate. */
+export async function findShots(inPath: string) {
   // Scene changes from a small, cheap copy of the picture.
   const log = await ffmpegLog([...q, "-i", inPath, "-an", "-filter_threads", "1",
     "-vf", "scale=160:-2,select='gt(scene,0.35)',showinfo", "-f", "null", "-"]);
