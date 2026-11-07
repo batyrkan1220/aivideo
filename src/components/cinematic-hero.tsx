@@ -63,7 +63,7 @@ export function CinematicHero({ stack, newVideoHref }: { stack: React.ReactNode;
           </dl>
         </div>
 
-        <div style={delay(220)} className="hero-rise mt-2 w-full md:mt-6 lg:mt-0">
+        <div style={delay(220)} className="hero-fade mt-2 w-full md:mt-6 lg:mt-0">
           {stack}
         </div>
       </div>
@@ -111,7 +111,7 @@ export function DepthStack({ items }: { items: Item[] }) {
       <div className="relative flex h-full w-full items-center justify-center [transform-style:preserve-3d]">
         {side(left, "l")}
         {side(right, "r")}
-        <div className="hero-float relative z-10 [transform-style:preserve-3d]">
+        <div className="relative z-10 [transform-style:preserve-3d]">
           <Link href={`/templates/${front.id}`}
             className="relative block aspect-[9/16] h-[15rem] overflow-hidden rounded-[1.5rem] border-[3px] border-ink bg-ink shadow-[0_50px_90px_-30px_rgb(0_0_0/0.55)] [transform:rotateY(-7deg)_rotateX(3deg)] sm:h-[22rem] md:h-[27rem] md:rounded-[1.9rem]">
             {front.coverUrl && (

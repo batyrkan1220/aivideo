@@ -355,9 +355,13 @@ body:has(> .theme-app.theme-mono) { background: #f5f4f1; }
 @keyframes tm-cta-glow { 0%, 100% { box-shadow: 0 0 0 0 rgb(0 0 0 / 0.25), 0 12px 28px -14px rgb(0 0 0 / 0.6); } 50% { box-shadow: 0 0 0 7px rgb(0 0 0 / 0), 0 16px 36px -14px rgb(0 0 0 / 0.7); } }
 @keyframes tm-bar { 0% { width: 6%; } 70% { width: 100%; } 100% { width: 100%; } }
 @keyframes tm-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
-@keyframes tm-rise { from { opacity: 0; transform: translateY(18px); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+/* No blur here: a filter on an ancestor flattens the 3D cards while it runs, and they jumped when it ended (tablets). */
+@keyframes tm-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes tm-fade { from { opacity: 0; } to { opacity: 1; } }
 @utility hero-rise { animation: tm-rise 0.8s var(--ease-out) both; }
 @utility hero-float { animation: tm-float 7s ease-in-out infinite; }
+/* The 3D cards only fade in: moving them (or their parent) made the playing card and its frame shake on iPads. */
+@utility hero-fade { animation: tm-fade 0.7s var(--ease-out) both; }
 @utility hero-scan { animation: tm-scan 3.2s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate; }
 @utility hero-blink { animation: tm-blink 1.6s ease-in-out infinite; }
 @utility hero-bar { animation: tm-bar 5s var(--ease-out) infinite; }
