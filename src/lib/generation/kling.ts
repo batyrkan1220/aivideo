@@ -91,6 +91,9 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   const same = [
     `The new ${people === 1 ? "person" : "people"} must look 100% identical to ${refs.join(", ")} in every frame, from the first frame to the very last: the same face shape, eyes, eyebrows, nose, lips, jaw, ears, moles, hairstyle, hair color, skin tone and age.`,
     `Replace the whole person, not only the face: head, hair, neck, arms, hands, legs and feet, with the skin color and skin tone of ${refs.join(", ")} everywhere on the body, and their body build and proportions. No part of the original person's body or skin may remain${outfit === "template" && !hasOutfitPhoto ? " (their clothing is the only thing that stays, see below)" : ""}.`,
+    // TM-100047: the hands kept the original person's skin color and size. Hands and arms often fill the
+    // frame on their own (holding, pointing, close-ups), where Kling saw no face and left them as they were.
+    `Hands and arms count as the person too, also when they are the only part in the frame (close-ups, holding things, reaching to the camera): give them the skin color and tone of ${refs.join(", ")} (from the face and neck when only the face is shown) and the size and build of that person's hands, fingers and arms. Never leave the original person's hands or skin in any frame.`,
     "Keep the identity the same from every angle: front, three-quarter, profile, looking up and looking down. Never return to the original face from @video_1, also not in the last seconds.",
     "Natural, realistic skin. Do not beautify, slim, smooth or stylize the faces.",
   ].join(" ");

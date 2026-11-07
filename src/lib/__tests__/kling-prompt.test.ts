@@ -120,3 +120,11 @@ describe("findBy: where and what they wear, not the original person's looks", ()
     ["", ""],
   ])("%s", (inp, out) => expect(findBy(inp)).toBe(out));
 });
+
+describe("hands and skin (TM-100047)", () => {
+  it("hands and arms get the customer's skin and size, also in close-ups", () => {
+    const p = buildKlingDirectPrompt("edit", "photo", "", "", 1, []);
+    expect(p).toContain("Hands and arms count as the person too");
+    expect(p).toContain("skin color and tone of @image_1 (from the face and neck when only the face is shown)");
+  });
+});
