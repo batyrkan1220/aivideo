@@ -11,6 +11,11 @@ export const showcaseSchema = z.array(z.string().uuid().nullable()).length(3);
 
 export async function readShowcaseSetting(): Promise<(string | null)[]> {
   await connection();
+  return loadShowcaseSetting();
+}
+
+/** readShowcaseSetting without the request check (used by the cached loader and the start-up warm-up). */
+async function loadShowcaseSetting(): Promise<(string | null)[]> {
   try {
     const { data } = await supabaseAdmin().from("site_settings").select("value").eq("key", SHOWCASE_KEY).maybeSingle();
     const parsed = showcaseSchema.safeParse(data?.value);
@@ -35,7 +40,7 @@ export async function warmShowcase() {
 }
 
 async function loadShowcase(): Promise<TemplateDetail[]> {
-  const chosen = await readShowcaseSetting();
+  const chosen = await loadShowcaseSetting();
   const picked = await Promise.all(chosen.map((id) => (id ? cachedTemplate(id) : Promise.resolve(null))));
   const hasMedia = (t: TemplateDetail | null): t is TemplateDetail => !!t && !!(t.coverUrl || t.previewUrl);
   const used = new Set(picked.filter(hasMedia).map((t) => t.id));
