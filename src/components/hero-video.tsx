@@ -70,7 +70,8 @@ export function HeroVideo({ src, poster, anim }: { src: string; poster?: string;
     if (v.readyState >= 2) tryPlay(); else v.addEventListener("loadeddata", tryPlay, { once: true });
     tryPlay();
     // Neither playing nor refused after a few seconds (some iOS WebViews): use the animated image.
-    const t = window.setTimeout(() => { if (v.paused && v.readyState >= 1) autoplayRefused({ name: "NotAllowedError" }); }, 3500);
+    // Only in Telegram: on the website a slow network must not switch the whole page to still images.
+    const t = window.setTimeout(() => { if (tg && v.paused && v.readyState >= 1) autoplayRefused({ name: "NotAllowedError" }); }, 3500);
     // iOS Safari and Telegram sometimes ignore "loop" and stop on the last frame (it looks like a
     // photo): start again from the beginning ourselves.
     const again = () => { v.currentTime = 0; void v.play().catch(() => {}); };
@@ -92,7 +93,7 @@ export function HeroVideo({ src, poster, anim }: { src: string; poster?: string;
       v.removeEventListener("ended", again); v.removeEventListener("pause", onPause);
       io.disconnect(); document.removeEventListener("visibilitychange", onVis);
     };
-  }, [local]);
+  }, [local, tg]);
 
   if (imgMode && anim) {
     // eslint-disable-next-line @next/next/no-img-element

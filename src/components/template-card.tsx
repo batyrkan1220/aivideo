@@ -115,17 +115,29 @@ export function TemplateCard({ t, priority = false, aspect = "aspect-[3/4]", wal
     wantRef.current = true;
     // Some WebViews (Telegram on iPad/iPhone) neither play nor reject: if the video still sits
     // paused a few seconds after we asked, treat autoplay as refused and use animated images.
-    window.setTimeout(() => {
+    // Only in Telegram: on the website a slow network (a card scrolled back into view while its
+    // video is still loading) switched the whole page to still covers.
+    if (tg) window.setTimeout(() => {
       if (wantRef.current && videoRef.current === v && v.paused && v.readyState >= 1 && playingNow.includes(v)) {
         if (autoplayRefused({ name: "NotAllowedError" })) { releasePlayback(v); setPlaying(true); }
       }
     }, 3500);
+    // Back on screen but still paused a moment later (play() interrupted by a pause while scrolling,
+    // or the data was late): try again, without waiting for a tap.
+    window.setTimeout(() => {
+      if (wantRef.current && videoRef.current === v && v.paused && videoShown(v)) v.play().then(() => setPlaying(true)).catch(() => {});
+    }, 900);
     const again = () => {
       if (videoRef.current !== v || !videoShown(v)) { waitingForGesture.delete(again); return; }
       v.play().then(() => { waitingForGesture.delete(again); setPlaying(true); }).catch(() => {});
     };
     v.play().then(() => setPlaying(true)).catch((err) => {
       if (autoplayRefused(err)) { releasePlayback(v); setPlaying(true); return; }
+      // Interrupted by a pause (fast scrolling): just try again shortly, it is not an autoplay block.
+      if ((err as { name?: string } | null)?.name === "AbortError") {
+        window.setTimeout(() => { if (wantRef.current && videoRef.current === v && v.paused && videoShown(v)) v.play().then(() => setPlaying(true)).catch(() => {}); }, 250);
+        return;
+      }
       // Not enough data yet: retry once the first frame is loaded; autoplay blocked: retry on first touch.
       if (v.readyState < 2) v.addEventListener("loadeddata", () => { if (videoShown(v)) v.play().then(() => setPlaying(true)).catch(() => retryOnGesture(again)); }, { once: true });
       else retryOnGesture(again);
@@ -174,10 +186,10 @@ export function TemplateCard({ t, priority = false, aspect = "aspect-[3/4]", wal
         stop();
         primeSound(t.previewUrl);
       }}
+      // Every card on screen plays anyway; hover/focus only nudges a paused one. Leaving does not stop
+      // it (phones fire a fake mouseleave after a tap, which stopped cards still on screen).
       onMouseEnter={start}
-      onMouseLeave={stop}
       onFocus={start}
-      onBlur={stop}
     >
       <div className={`relative ${aspect} overflow-hidden bg-night transition-[transform,box-shadow] duration-300 ease-[var(--ease-out)] group-active:scale-[0.98] ${wall ? "rounded-lg sm:rounded-xl group-hover:brightness-110" : "rounded-[1rem] ring-1 ring-black/5 elev-sm group-hover:-translate-y-0.5 group-hover:elev-md sm:rounded-[1.25rem]"}`}>
         {t.coverUrl && (
