@@ -608,7 +608,8 @@ export function CreateFlow({
         <div className={`sticky ${noTabBar ? "bottom-[calc(0.75rem+env(safe-area-inset-bottom))]" : "bottom-[calc(5.25rem+env(safe-area-inset-bottom))]"} z-20 -mx-1 rounded-[28px] border border-white/70 glass px-4 pb-3 pt-3 elev-lg sm:static sm:mx-0 sm:rounded-card sm:border-line sm:bg-surface sm:p-6 sm:elev-sm`}>
           <p className="mb-2 text-[11px] leading-snug text-muted">
             {customVideo ? cv.consentByButton : kk.consent.byButton}{" "}
-            <a href="/terms" target="_blank" rel="noopener" className="underline underline-offset-2">{kk.consent.terms}</a>.
+            <a href="/terms" target="_blank" rel="noopener" className="underline underline-offset-2">{kk.consent.terms}</a>{" "}{kk.consent.and}{" "}
+            <a href="/privacy" target="_blank" rel="noopener" className="underline underline-offset-2">{kk.consent.privacy}</a>.
           </p>
           <div className="flex items-center gap-3">
             <div className="min-w-0 shrink-0">
