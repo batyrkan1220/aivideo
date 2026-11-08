@@ -38,7 +38,7 @@ export async function listCombos(): Promise<ComboCard[]> {
         covers: parts.map((i) => mediaUrl(i.cover_asset_path)).filter((u): u is string => !!u).slice(0, 4),
       };
     });
-  });
+  }, { swr: true });
 }
 
 /** Covers + titles of a combo's photos, for its page. */

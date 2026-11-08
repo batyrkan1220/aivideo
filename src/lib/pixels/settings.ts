@@ -29,7 +29,7 @@ export async function pixelSettings(): Promise<PixelSettings> {
     } catch {
       return pixelSettingsSchema.parse({});
     }
-  });
+  }, { swr: true });
 }
 
 export async function publicPixels(): Promise<PublicPixels> {

@@ -6,7 +6,7 @@ import { seedancePricingSchema, DEFAULT_SEEDANCE_PRICING, type SeedancePricing }
 export const SEEDANCE_PRICING_KEY = "seedance_pricing";
 
 export async function seedancePricingSettings(): Promise<SeedancePricing> {
-  return memo("settings:pricing", 60_000, loadPricing);
+  return memo("settings:pricing", 60_000, loadPricing, { swr: true });
 }
 
 async function loadPricing(): Promise<SeedancePricing> {

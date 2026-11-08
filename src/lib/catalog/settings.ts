@@ -23,5 +23,5 @@ export function catalogSettings(): Promise<CatalogSettings> {
     } catch {
       return schema.parse({});
     }
-  });
+  }, { swr: true });
 }

@@ -158,7 +158,11 @@ export function parseRow(r: Row, seedancePricing: SeedancePricing = DEFAULT_SEED
 async function toCards(rows: Row[] | null): Promise<TemplateDetail[]> {
   const s = await seedancePricingSettings();
   const missing = (rows ?? []).filter((r) => r.provider_key === "seedance" && r.video_duration_sec == null && r.preview_video_path).slice(0, 3);
-  if (missing.length) after(async () => { for (const r of missing) await ensureTemplateDuration(r.id, mediaUrl(r.preview_video_path)); });
+  if (missing.length) {
+    const fill = async () => { for (const r of missing) await ensureTemplateDuration(r.id, mediaUrl(r.preview_video_path)); };
+    // after() exists only inside a request; the start-up cache warm-up just runs it in the background.
+    try { after(fill); } catch { void fill().catch(() => {}); }
+  }
   return (rows ?? []).map((r) => parseRow(r, s)).filter((t): t is TemplateDetail => t !== null);
 }
 
@@ -172,7 +176,7 @@ async function parseOne(r: Row): Promise<TemplateDetail | null> {
 
 export async function listCategories(): Promise<Category[]> {
   await connection(); // request-time only: never run during prerender
-  return memo("cat:list", 300_000, loadCategories);
+  return memo("cat:list", 300_000, loadCategories, { swr: true });
 }
 
 async function loadCategories(): Promise<Category[]> {
@@ -193,7 +197,7 @@ function sanitizeSearch(q: string) {
 export async function listTemplates(opts: { q?: string; category?: string; sort?: CatalogSort; page?: number; media?: "video" | "photo" }) {
   await connection(); // request-time only: never run during prerender
   // Catalog pages are public and change only when an admin edits templates (which clears the cache).
-  return memo(`cat:page:${JSON.stringify([opts.q ?? "", opts.category ?? "", opts.sort ?? "", opts.page ?? 1, opts.media ?? "video"])}`, 60_000, () => loadTemplates(opts));
+  return memo(`cat:page:${JSON.stringify([opts.q ?? "", opts.category ?? "", opts.sort ?? "", opts.page ?? 1, opts.media ?? "video"])}`, 60_000, () => loadTemplates(opts), { swr: true });
 }
 
 async function loadTemplates(opts: { q?: string; category?: string; sort?: CatalogSort; page?: number; media?: "video" | "photo" }) {
@@ -219,8 +223,28 @@ async function loadTemplates(opts: { q?: string; category?: string; sort?: Catal
   return { items: await toCards(data as unknown as Row[]), total: count ?? 0, page };
 }
 
+/**
+ * Server start: fill the cache for what the home page needs (categories, the first page of every
+ * shelf and of all videos), so the first visitor after a deploy does not wait for the database.
+ * Same keys and loaders as listCategories / listTemplates (without connection(): no request here).
+ */
+export async function warmCatalog(): Promise<number> {
+  const cats = await memo("cat:list", 300_000, loadCategories, { swr: true });
+  const pages = [undefined, ...cats.map((c) => c.slug)].map((category) => {
+    const opts = { sort: "trending" as const, page: 1, category };
+    return memo(`cat:page:${JSON.stringify(["", opts.category ?? "", opts.sort, 1, "video"])}`, 60_000, () => loadTemplates(opts), { swr: true });
+  });
+  await Promise.all(pages);
+  return pages.length;
+}
+
 export async function listTrending(limit = 8) {
   await connection(); // request-time only: never run during prerender
+  return cachedTrending(limit);
+}
+
+/** listTrending without the request check (cache warm-up, other cached loaders). */
+export async function cachedTrending(limit = 8) {
   return memo(`cat:trending:${limit}`, 60_000, async () => {
   const cs = await catalogSettings();
   let q = supabasePublic().from("templates").select(CARD_COLUMNS)
@@ -228,11 +252,16 @@ export async function listTrending(limit = 8) {
   if (cs.requireAnalysis) q = q.eq("ai_ready", true);
   const { data } = await q.order("sort_order").limit(limit);
   return await toCards(data as unknown as Row[]);
-  });
+  }, { swr: true });
 }
 
 export async function listNewest(limit = 8) {
   await connection(); // request-time only: never run during prerender
+  return cachedNewest(limit);
+}
+
+/** listNewest without the request check (cache warm-up, other cached loaders). */
+export async function cachedNewest(limit = 8) {
   return memo(`cat:newest:${limit}`, 60_000, async () => {
   const cs = await catalogSettings();
   let q = supabasePublic().from("templates").select(CARD_COLUMNS)
@@ -240,11 +269,16 @@ export async function listNewest(limit = 8) {
   if (cs.requireAnalysis) q = q.eq("ai_ready", true);
   const { data } = await q.order("published_at", { ascending: false, nullsFirst: false }).limit(limit);
   return await toCards(data as unknown as Row[]);
-  });
+  }, { swr: true });
 }
 
 export async function getTemplate(id: string): Promise<TemplateDetail | null> {
   await connection(); // request-time only: never run during prerender
+  return cachedTemplate(id);
+}
+
+/** getTemplate without the request check (cache warm-up, other cached loaders). */
+export async function cachedTemplate(id: string): Promise<TemplateDetail | null> {
   if (!z.string().uuid().safeParse(id).success) return null;
   return memo(`cat:tpl:${id}`, 60_000, async () => {
     const { data } = await supabasePublic().from("templates").select(CARD_COLUMNS)
@@ -257,7 +291,7 @@ export async function getTemplate(id: string): Promise<TemplateDetail | null> {
     // 2–3 people (one Kling run each) are shown only when the admin switched them on.
     if (t && t.peopleCount > 1 && !cs.multiPeople) t.available = false;
     return t;
-  });
+  }, { swr: true });
 }
 
 /** Staff-only preview of any template regardless of status (caller must check permissions). */

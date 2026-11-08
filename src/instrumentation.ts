@@ -15,6 +15,20 @@ export async function register() {
       }
     })();
   }, 8_000);
+  // Warm the catalog cache (home page data) right after start: the database is an ocean away.
+  setTimeout(() => {
+    void (async () => {
+      try {
+        const [{ warmCatalog }, { warmShowcase }] = await Promise.all([import("@/lib/templates/queries"), import("@/lib/templates/showcase")]);
+        const t0 = Date.now();
+        const n = await warmCatalog();
+        await warmShowcase();
+        console.log(`[cache] catalog warm pages=${n} in ${Date.now() - t0} ms`);
+      } catch (err) {
+        console.error("[cache] warm failed", err instanceof Error ? err.message : err);
+      }
+    })();
+  }, 1_500);
   // Light card previews for templates that don't have one yet (one ffmpeg job at a time).
   setTimeout(() => {
     void (async () => {

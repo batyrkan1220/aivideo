@@ -20,7 +20,7 @@ export const MIN_VIDEO_SECONDS = SEEDANCE_MIN_SEC;
 export const VIDEO_TYPES = ["video/mp4", "video/quicktime"] as const;
 
 export async function customVideoSettings(): Promise<CustomVideoSettings> {
-  return memo("settings:custom", 60_000, loadCustom);
+  return memo("settings:custom", 60_000, loadCustom, { swr: true });
 }
 
 async function loadCustom(): Promise<CustomVideoSettings> {
@@ -40,7 +40,7 @@ export async function customTemplateId(): Promise<string | null> {
   return memo("tpl:custom", 300_000, async () => {
   const { data } = await supabaseAdmin().from("templates").select("id").eq("kind", "custom").eq("status", "published").limit(1).maybeSingle();
   return data?.id ?? null;
-  });
+  }, { swr: true });
 }
 
 /** The hidden published photo template for Create → AI photo (Kling image, the customer's description). */
@@ -48,12 +48,12 @@ export async function customPhotoTemplateId(): Promise<string | null> {
   return memo("tpl:custom_photo", 300_000, async () => {
   const { data } = await supabaseAdmin().from("templates").select("id").eq("kind", "custom_photo").eq("status", "published").limit(1).maybeSingle();
   return data?.id ?? null;
-  });
+  }, { swr: true });
 }
 
 /** The hidden template behind Create → Video / AI photo, cached (cleared on admin writes). */
 export async function customFlowTemplate(kind: "custom" | "custom_photo"): Promise<TemplateDetail | null> {
   const id = kind === "custom" ? await customTemplateId() : await customPhotoTemplateId();
   if (!id) return null;
-  return memo(`tpl:flow:${id}`, 300_000, () => getTemplateForAdmin(id));
+  return memo(`tpl:flow:${id}`, 300_000, () => getTemplateForAdmin(id), { swr: true });
 }
