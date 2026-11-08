@@ -53,6 +53,8 @@ export async function signInTelegramUser(u: TelegramUser): Promise<string> {
   }).eq("id", userId);
   await admin.from("profiles").update({ display_name: name }).eq("id", userId).is("display_name", null);
   forgetProfile(userId!);
+  // Profile photo for the account page, in the background (at most weekly).
+  void import("./avatar").then((m) => m.refreshTelegramAvatar(userId!, u.id)).catch(() => {});
 
   if (!email) {
     const { data } = await admin.auth.admin.getUserById(userId!);

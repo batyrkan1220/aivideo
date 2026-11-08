@@ -9,6 +9,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { DisplayNameForm, DeleteAllPhotosForm, DeleteAccountForm, LogoutButton, TelegramDeleteNote } from "@/components/account-forms";
 import { PHOTOS_SOON } from "@/lib/features";
 import { TelegramBotLogin } from "@/components/telegram-bot-login";
+import { avatarUrl, refreshTelegramAvatar } from "@/lib/telegram/avatar";
 
 export const metadata = { title: kk.account.title };
 
@@ -56,7 +57,7 @@ async function Profile() {
   const user = await requireUser("/account");
   const db = supabaseAdmin();
   const [{ data: prof }, { data: done }] = await Promise.all([
-    db.from("profiles").select("telegram_username,created_at").eq("id", user.id).maybeSingle(),
+    db.from("profiles").select("telegram_id,telegram_username,created_at,avatar_path,avatar_checked_at").eq("id", user.id).maybeSingle(),
     db.from("orders").select("template_snapshot_json->>provider_key").eq("user_id", user.id).eq("generation_status", "completed"),
   ]);
   const photos = (done ?? []).filter((o) => (o as { provider_key?: string }).provider_key === "kling_photo").length;
@@ -64,6 +65,9 @@ async function Profile() {
   const tg = isTelegramEmail(user.email);
   const guest = isGuestEmail(user.email);
   const name = user.displayName?.trim() || (prof?.telegram_username ? `@${prof.telegram_username}` : tg || guest ? P.guest : (user.email ?? "").split("@")[0] || P.guest);
+  // Accounts made before photos were saved: fetch it now in the background (shows on the next visit).
+  if (prof?.telegram_id && !prof.avatar_checked_at) void refreshTelegramAvatar(user.id, Number(prof.telegram_id));
+  const avatar = avatarUrl(prof?.avatar_path);
   const since = prof?.created_at ? new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric", timeZone: "Asia/Almaty" }).format(new Date(prof.created_at)) : null;
 
   return (
@@ -72,9 +76,14 @@ async function Profile() {
       <section className="relative overflow-hidden rounded-card bg-night p-6 text-white elev-lg">
         <span className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full bg-[#d7f443]/20 blur-3xl" aria-hidden />
         <div className="relative flex items-center gap-4">
-          <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#d7f443] text-2xl font-extrabold text-black" aria-hidden>
-            {name.replace(/^@/, "").charAt(0).toUpperCase() || "T"}
-          </span>
+          {avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={avatar} alt="" width={64} height={64} className="h-16 w-16 shrink-0 rounded-full bg-white/10 object-cover ring-2 ring-white/15" />
+          ) : (
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#d7f443] text-2xl font-extrabold text-black" aria-hidden>
+              {name.replace(/^@/, "").charAt(0).toUpperCase() || "T"}
+            </span>
+          )}
           <div className="min-w-0">
             <p className="truncate text-xl font-extrabold tracking-tight">{name}</p>
             <p className="mt-0.5 truncate text-sm text-white/65">{tg ? kk.account.viaTelegram : guest ? kk.account.guestNote : user.email ?? ""}</p>

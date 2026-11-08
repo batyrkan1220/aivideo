@@ -120,6 +120,9 @@ export async function deleteAccount(_: FormState, fd: FormData): Promise<FormSta
   await db.from("order_assets").delete().eq("user_id", user.id);
   await audit(null, "account.delete", "profile", null, { orders: orderIds.length });
 
+  // Telegram profile photo copy (the profile row itself goes with the user).
+  const { data: av } = await db.from("profiles").select("avatar_path").eq("id", user.id).maybeSingle();
+  if (av?.avatar_path) await db.storage.from("avatars").remove([av.avatar_path]);
   const { error } = await db.auth.admin.deleteUser(user.id); // cascades profile; orders keep user_id = null
   if (error) { console.error("[account.delete]", error.message); return { error: kk.errors.generic }; }
   const sb = await supabaseServer();
