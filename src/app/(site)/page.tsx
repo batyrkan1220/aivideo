@@ -33,7 +33,7 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
         <Logo className="text-base" />
       </div>
 
-      <CinematicHero newVideoHref="/create" stack={<Suspense fallback={<HeroStackFallback />}><HeroCards /></Suspense>} />
+      <CinematicHero stack={<Suspense fallback={<HeroStackFallback />}><HeroCards /></Suspense>} />
 
       <Suspense fallback={<FeedFallback />}>
         <Feed searchParams={searchParams} />

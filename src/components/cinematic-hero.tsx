@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, ScanFace, Sparkles, Zap } from "lucide-react";
+import { ArrowDown, ScanFace, Zap } from "lucide-react";
 import { kk } from "@/lib/i18n/kk";
 import { HeroVideo } from "./hero-video";
 
@@ -16,7 +16,7 @@ const delay = (ms: number) => ({ animationDelay: `${ms}ms` });
 /** The hero's text and actions need no data, so they are in the page's instant shell; only the cards
  *  (`stack`) wait for the showcase. Going back to the home page then shows the hero at once, at its
  *  final size, instead of a placeholder that later grows. */
-export function CinematicHero({ stack, newVideoHref }: { stack: React.ReactNode; newVideoHref: string }) {
+export function CinematicHero({ stack }: { stack: React.ReactNode }) {
   return (
     <section className="relative isolate overflow-hidden">
       <Atmosphere />
@@ -39,12 +39,9 @@ export function CinematicHero({ stack, newVideoHref }: { stack: React.ReactNode;
 
           <p style={delay(260)} className="hero-rise mt-3 max-w-[22rem] text-[15px] leading-[1.55] text-muted sm:max-w-xl sm:text-base md:mt-6 md:text-lg">{h.hxLead}</p>
 
-          <div style={delay(340)} className="hero-rise mt-5 grid w-full max-w-sm grid-cols-2 gap-2 sm:flex sm:w-auto sm:max-w-none sm:flex-wrap sm:items-center sm:justify-center sm:gap-2.5 md:mt-8 md:justify-start md:gap-3">
-            <Link href={newVideoHref} className="cta-neon inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-ink px-3 text-[15px] font-semibold text-paper shadow-[0_12px_28px_-14px_rgb(0_0_0/0.6)] sm:px-6">
-              <Sparkles size={17} strokeWidth={2.2} aria-hidden />{kk.nav.createOwn}
-            </Link>
-            <a href="#templates" className="inline-flex h-12 items-center justify-center gap-1.5 rounded-xl border border-line-strong bg-surface px-3 text-[15px] font-semibold text-ink transition-[background-color,border-color,transform] duration-300 hover:border-ink active:scale-[0.98] sm:gap-2 sm:px-6">
-              {h.hxPick}<ArrowRight size={16} aria-hidden />
+          <div style={delay(340)} className="hero-rise mt-5 flex w-full max-w-sm justify-center sm:w-auto md:mt-8 md:justify-start">
+            <a href="#templates" className="cta-neon inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-ink px-7 text-[15px] font-semibold text-paper shadow-[0_12px_28px_-14px_rgb(0_0_0/0.6)] transition-transform active:scale-[0.98] sm:w-auto">
+              {h.hxPick}<ArrowDown size={17} strokeWidth={2.2} className="animate-bounce [animation-duration:1.6s]" aria-hidden />
             </a>
           </div>
 
