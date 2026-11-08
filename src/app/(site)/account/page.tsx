@@ -6,7 +6,7 @@ import { logoutAction } from "@/app/(auth)/actions";
 import { kk } from "@/lib/i18n/kk";
 import { isGuestEmail, isTelegramEmail } from "@/lib/telegram/session";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { DisplayNameForm, LogoutButton } from "@/components/account-forms";
+import { LogoutButton } from "@/components/account-forms";
 import { PHOTOS_SOON } from "@/lib/features";
 import { TelegramBotLogin } from "@/components/telegram-bot-login";
 import { avatarUrl, refreshTelegramAvatar } from "@/lib/telegram/avatar";
@@ -130,16 +130,6 @@ async function Profile() {
         <Row href="/refund" icon="↩️" label={kk.footer.refund} />
         {isStaff(user.role) && <Row href="/admin" icon="🛠" label={kk.nav.admin} hint={kk.account.roles[user.role]} />}
       </Group>
-
-      <section className="mt-6">
-        <h2 className="t-eyebrow mb-3 px-1 text-muted">{P.settings}</h2>
-        <div className="space-y-4 rounded-card border border-line/80 bg-surface p-4 sm:p-6">
-          <div>
-            <p className="mb-2 text-[15px] font-semibold">{kk.account.editName}</p>
-            <DisplayNameForm current={user.displayName ?? ""} />
-          </div>
-        </div>
-      </section>
 
       {/* Inside the Telegram Mini App the account is the Telegram account: no logout there. */}
       <section className="tg-hide mt-6 flex justify-center">
