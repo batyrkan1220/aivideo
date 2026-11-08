@@ -49,7 +49,7 @@ export async function deleteVideo(fd: FormData) {
   const db = supabaseAdmin();
   const { data: v } = await db.from("generated_videos").select("private_storage_path").eq("order_id", o.id).maybeSingle();
   if (v) {
-    await db.storage.from("generated-videos").remove([v.private_storage_path]);
+    await db.storage.from("generated-videos").remove([v.private_storage_path, `${v.private_storage_path}.poster.webp`]);
     await db.from("generated_videos").delete().eq("order_id", o.id);
     await audit(user.id, "video.delete", "order", o.id);
   }

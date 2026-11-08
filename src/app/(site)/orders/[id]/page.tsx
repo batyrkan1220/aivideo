@@ -201,7 +201,7 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={`/api/orders/${o.id}/video`} alt={kk.photos.watch} className="mx-auto max-h-[56svh] w-auto max-w-full rounded-[1.5rem] bg-night object-contain ring-1 ring-black/5 elev-lg md:max-h-[70vh]" />
                 ) : (
-                  <video src={`/api/orders/${o.id}/video`} controls playsInline preload="metadata" aria-label={kk.result.watch}
+                  <video src={`/api/orders/${o.id}/video`} poster={`/api/orders/${o.id}/poster`} controls playsInline preload="metadata" aria-label={kk.result.watch}
                     className="aspect-[9/16] w-full rounded-[1.5rem] bg-night object-cover ring-1 ring-black/5 elev-lg" />
                 )}
               </div>

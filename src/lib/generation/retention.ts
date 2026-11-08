@@ -48,7 +48,7 @@ export async function runRetention() {
   const { data: videos } = await db.from("generated_videos")
     .select("order_id,private_storage_path").lt("expires_at", now).neq("private_storage_path", "").limit(1000);
   if (videos?.length) {
-    await db.storage.from("generated-videos").remove(videos.map((v) => v.private_storage_path));
+    await db.storage.from("generated-videos").remove(videos.flatMap((v) => [v.private_storage_path, `${v.private_storage_path}.poster.webp`]));
     await db.from("generated_videos").update({ private_storage_path: "" }).in("order_id", videos.map((v) => v.order_id));
     out.videos = videos.length;
   }
@@ -85,9 +85,11 @@ async function sweepOrphans(): Promise<number> {
     try { await walk("", 0); } catch { continue; }
     for (let i = 0; i < files.length; i += 100) {
       const chunk = files.slice(i, i + 100);
-      const { data: rows } = await db.from(b.table).select(b.col).in(b.col, chunk);
+      // A video's still frame (".poster.webp") belongs to the video row.
+      const base = (f: string) => f.replace(/\.poster\.webp$/, "");
+      const { data: rows } = await db.from(b.table).select(b.col).in(b.col, [...new Set(chunk.map(base))]);
       const known = new Set(((rows ?? []) as unknown as Record<string, string>[]).map((r) => r[b.col]));
-      const stale = chunk.filter((f) => !known.has(f));
+      const stale = chunk.filter((f) => !known.has(base(f)));
       if (stale.length) {
         const { error } = await db.storage.from(b.bucket).remove(stale);
         if (!error) removed += stale.length;
