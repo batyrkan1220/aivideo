@@ -5,10 +5,8 @@ import { kk } from "@/lib/i18n/kk";
 import type { TemplateDetail } from "@/lib/templates/queries";
 import { calculatePrice, formatKzt } from "@/lib/pricing";
 import { AutoVideo } from "@/components/auto-video";
-import { TemplateSwipe } from "@/components/template-swipe";
 import { TemplateQuickActions } from "@/components/card-actions";
 import { pickCard } from "@/components/catalog-bits";
-import type { TemplateNeighbor } from "@/lib/templates/queries";
 
 /** Per-quality prices (server-computed). Shown to guests and in admin preview. */
 export function QualityPriceList({ t }: { t: TemplateDetail }) {
@@ -49,7 +47,7 @@ export function QualityPriceList({ t }: { t: TemplateDetail }) {
 
 type ComboPart = { id: string; title: string; cover: string | null };
 
-export function TemplateDetailView({ t, cta, combo, staffUnits, nav }: { t: TemplateDetail; cta?: React.ReactNode; combo?: ComboPart[]; staffUnits?: string | null; nav?: { prev: TemplateNeighbor; next: TemplateNeighbor } | null }) {
+export function TemplateDetailView({ t, cta, combo, staffUnits }: { t: TemplateDetail; cta?: React.ReactNode; combo?: ComboPart[]; staffUnits?: string | null }) {
   const sample = (
         <div
           style={{ "--a": String(t.videoAspect ?? 9 / 16), aspectRatio: String(t.videoAspect ?? 9 / 16) } as React.CSSProperties}
@@ -73,7 +71,7 @@ export function TemplateDetailView({ t, cta, combo, staffUnits, nav }: { t: Temp
       {/* The sample in its original proportions (vertical, square or horizontal), never cropped. */}
       <figure className="mx-auto w-full md:sticky md:top-24 md:self-start">
         {/* The box is sized from the stored video proportions before anything loads: no jump. */}
-        {nav ? <TemplateSwipe prev={nav.prev} next={nav.next}>{sample}</TemplateSwipe> : sample}
+        {sample}
         <figcaption className="mt-3 hidden text-sm text-muted md:block">{kk.template.sampleNote}</figcaption>
       </figure>
       </>

@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { kk } from "@/lib/i18n/kk";
-import { getTemplate, templateNeighbors } from "@/lib/templates/queries";
+import { getTemplate } from "@/lib/templates/queries";
 import { TemplateDetailView } from "@/components/template-detail";
 import { comboItems } from "@/lib/combos/catalog";
 import { track } from "@/lib/analytics";
@@ -38,10 +38,7 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
   if (!t) notFound();
   void track("template_viewed", { templateId: t.id });
   const photo = t.media === "photo";
-  const [combo, nav] = await Promise.all([
-    t.comboIds ? comboItems(t.comboIds) : Promise.resolve(undefined),
-    photo ? Promise.resolve(null) : templateNeighbors(t.id).catch(() => null),
-  ]);
+  const combo = t.comboIds ? await comboItems(t.comboIds) : undefined;
   const user = await getSessionUser();
   const staffUnits = !photo && t.durationSec && user && can(user.role, "templates.manage")
     ? await staffUnitLabel(t.durationSec)
@@ -55,7 +52,6 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
       t={t}
       combo={combo}
       staffUnits={staffUnits}
-      nav={nav}
       cta={t.available ? (
         <Suspense fallback={<div className="h-64 animate-pulse rounded-card bg-line" />}>
           <CreateSection t={t} />

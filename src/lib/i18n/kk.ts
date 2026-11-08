@@ -476,9 +476,6 @@ export const kk = {
     qualities: "Качество",
   },
   template: {
-    swipeNext: "Следующее",
-    swipePrev: "Предыдущее",
-    swipeHint: "Листайте вбок — другие видео",
     tgCreate: "Создать видео с собой",
     tgCreatePhoto: "Создать фото",
     sampleNote: "Это пример видео. В вашем видео будут люди с загруженных фото.",
