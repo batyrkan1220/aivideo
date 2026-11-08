@@ -1,4 +1,4 @@
-import { ChevronRight, Sparkles } from "lucide-react";
+import { ChevronRight, RotateCw, Sparkles } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/states";
 import Link from "next/link";
@@ -10,7 +10,8 @@ import { mediaUrl } from "@/lib/templates/queries";
 type Row = {
   id: string; public_order_number: string; created_at: string; amount_kzt: number;
   payment_status: string; generation_status: string; template_snapshot_json: unknown;
-  templates: { cover_asset_path: string | null } | { cover_asset_path: string | null }[] | null;
+  template_id: string | null;
+  templates: { cover_asset_path: string | null; status?: string } | { cover_asset_path: string | null; status?: string }[] | null;
 };
 
 const IMG = /\.(jpe?g|png|webp)$/i;
@@ -22,7 +23,7 @@ const IMG = /\.(jpe?g|png|webp)$/i;
 export async function OrderList({ limit = 50, day }: { limit?: number; day?: string }) {
   const sb = await supabaseServer();
   const { data } = await sb.from("orders")
-    .select("id,public_order_number,created_at,amount_kzt,payment_status,generation_status,template_snapshot_json,templates(cover_asset_path)")
+    .select("id,public_order_number,created_at,amount_kzt,payment_status,generation_status,template_id,template_snapshot_json,templates(cover_asset_path,status)")
     .is("parent_order_id", null) // combo parts live inside their combo card
     .order("created_at", { ascending: false }).limit(limit);
   const all = (data ?? []) as unknown as Row[];
@@ -110,8 +111,8 @@ export async function OrderList({ limit = 50, day }: { limit?: number; day?: str
               const title = (o.template_snapshot_json as { title_kk?: string }).title_kk ?? "TrendMe";
               const combo = comboInfo.get(o.id);
               return (
-                <li key={o.id}>
-                  <Link href={`/orders/${o.id}`} className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-mist/60 active:bg-mist">
+                <li key={o.id} className="flex items-center">
+                  <Link href={`/orders/${o.id}`} className="flex min-w-0 flex-1 items-center gap-4 py-3 pl-4 pr-2 transition-colors hover:bg-mist/60 active:bg-mist">
                     <span className="relative block h-[64px] w-[48px] shrink-0 overflow-hidden rounded-[12px] bg-night">
                       {thumb ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -131,8 +132,15 @@ export async function OrderList({ limit = 50, day }: { limit?: number; day?: str
                         {st.tone === "pay" ? st.action : st.text}
                       </span>
                     </span>
-                    <ChevronRight size={20} className="shrink-0 text-faint" aria-hidden />
+                    {!(st.tone === "ok" && o.template_id && t?.status === "published" && !combo) && <ChevronRight size={20} className="shrink-0 text-faint" aria-hidden />}
                   </Link>
+                  {/* One tap to make the same video again (new photo or for a friend). */}
+                  {st.tone === "ok" && o.template_id && t?.status === "published" && !combo && (
+                    <Link href={`/templates/${o.template_id}`} aria-label={`${kk.home2.repeat}: ${title}`}
+                      className="mr-3 flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-line px-3 text-xs font-semibold transition-colors hover:border-ink">
+                      <RotateCw size={14} aria-hidden />{kk.home2.repeat}
+                    </Link>
+                  )}
                 </li>
               );
             })}

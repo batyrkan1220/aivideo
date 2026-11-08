@@ -272,6 +272,31 @@ export async function cachedNewest(limit = 8) {
   }, { swr: true });
 }
 
+export type TemplateNeighbor = { id: string; title: string; cover: string | null };
+
+/**
+ * The video templates in home-feed order («Все видео»: trending first, then the catalog order),
+ * only what swiping between template pages needs. Cached like the catalog pages.
+ */
+async function videoOrder(): Promise<TemplateNeighbor[]> {
+  return memo("cat:order", 60_000, async () => {
+    const cs = await catalogSettings();
+    let q = supabasePublic().from("templates").select("id,title_kk,cover_thumb_path,cover_asset_path")
+      .eq("status", "published").eq("kind", "catalog").neq("provider_key", PHOTO_PROVIDER).lte("people_n", cs.multiPeople ? 99 : 1);
+    if (cs.requireAnalysis) q = q.eq("ai_ready", true);
+    const { data } = await q.order("is_trending", { ascending: false }).order("sort_order").order("published_at", { ascending: false }).limit(500);
+    return (data ?? []).map((r) => ({ id: r.id as string, title: r.title_kk as string, cover: mediaUrl((r.cover_thumb_path ?? r.cover_asset_path) as string | null) }));
+  }, { swr: true });
+}
+
+/** Previous and next video template around `id` (wrapping around), for swipe navigation. */
+export async function templateNeighbors(id: string): Promise<{ prev: TemplateNeighbor; next: TemplateNeighbor } | null> {
+  const list = await videoOrder();
+  const i = list.findIndex((t) => t.id === id);
+  if (i < 0 || list.length < 2) return null;
+  return { prev: list[(i - 1 + list.length) % list.length], next: list[(i + 1) % list.length] };
+}
+
 export async function getTemplate(id: string): Promise<TemplateDetail | null> {
   await connection(); // request-time only: never run during prerender
   return cachedTemplate(id);

@@ -1,4 +1,5 @@
 "use client";
+import { haptic } from "@/lib/telegram/client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -41,7 +42,7 @@ export function MobileNav() {
               <Link
                 href={it.href}
                 aria-current={on ? "page" : undefined}
-                onClick={() => { if (!it.match(path)) setTapped({ href: it.href, from: path }); }}
+                onClick={() => { if (!it.match(path)) { haptic("select"); setTapped({ href: it.href, from: path }); } }}
                 className={`group flex min-w-0 flex-col items-center gap-1 text-[11px] font-semibold leading-none transition-colors duration-200 ${on ? "text-ink" : it.soon ? "text-faint" : "text-[#3d3935]"}`}
               >
                 <span className={`relative flex h-10 w-14 items-center justify-center rounded-full transition-[background-color,color,box-shadow,transform] duration-200 ease-[var(--ease-out)] group-active:scale-95 ${

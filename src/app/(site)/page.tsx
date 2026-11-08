@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, Clapperboard } from "lucide-react";
 import Link from "next/link";
 import { ShelfRow } from "@/components/shelf-row";
+import { FavoritesShelf } from "@/components/favorites-shelf";
 import { Alert, EmptyState } from "@/components/ui/states";
 import { Suspense } from "react";
 import { connection } from "next/server";
@@ -92,6 +93,7 @@ async function Feed({ searchParams }: { searchParams: Promise<SP> }) {
 
   return (
     <div id="templates" className="mx-auto max-w-[1600px] scroll-mt-20 px-1.5 sm:px-3">
+      <FavoritesShelf />
       {filled.map(({ c, r }) => (
         <section key={c.id} className="mt-6 first:mt-4" aria-labelledby={`shelf-${c.slug}`}>
           <ShelfHead id={`shelf-${c.slug}`} title={c.title} count={r.total} href={`/?category=${c.slug}`} />

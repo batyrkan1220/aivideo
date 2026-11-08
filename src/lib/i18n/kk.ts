@@ -367,6 +367,18 @@ export const kk = {
     stillText: "Напишите нам в Telegram — ответим как можно скорее.",
     requisites: "Реквизиты",
   },
+  home2: {
+    addHome: "Добавить на главный экран",
+    addHomeHint: "Открывайте TrendMe одним нажатием, как приложение",
+    iosSteps: ["Нажмите «Поделиться» — квадрат со стрелкой внизу экрана", "Выберите «На экран «Домой»»", "Нажмите «Добавить»"],
+    share: "Поделиться",
+    linkCopied: "Ссылка скопирована",
+    saved: "Сохранено в избранное",
+    unsaved: "Убрано из избранного",
+    favorites: "Избранное",
+    repeat: "Повторить",
+    story: "В сторис Telegram",
+  },
   profile: {
     guest: "Пользователь TrendMe",
     since: (d: string) => `С нами с ${d}`,
@@ -464,6 +476,11 @@ export const kk = {
     qualities: "Качество",
   },
   template: {
+    swipeNext: "Следующее",
+    swipePrev: "Предыдущее",
+    swipeHint: "Листайте вбок — другие видео",
+    tgCreate: "Создать видео с собой",
+    tgCreatePhoto: "Создать фото",
     sampleNote: "Это пример видео. В вашем видео будут люди с загруженных фото.",
     unavailableTitle: "Шаблон недоступен",
     unavailableText: "Мы улучшаем этот шаблон. Скоро он снова будет доступен — посмотрите пока другие тренды.",
@@ -908,6 +925,7 @@ export const kk = {
     },
   },
   result: {
+    storyText: "Сделано в TrendMe ✨ @trendmebot",
     ready: "Видео готово!",
     readyPhoto: "Фото готово!",
     badge: "Готово",

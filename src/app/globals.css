@@ -371,3 +371,6 @@ body:has(> .theme-app.theme-mono) { background: #f5f4f1; }
 .cta-neon:hover { transform: scale(1.05); animation: tm-cta-glow 1.6s ease-in-out infinite; }
 .cta-neon:active { transform: scale(0.98); }
 .font-accent { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.03em; }
+
+/* Swipe hint: a finger moving sideways. */
+@keyframes tm-swipe { 0%, 100% { transform: translateX(-6px); } 50% { transform: translateX(6px); } }

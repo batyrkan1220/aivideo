@@ -3,22 +3,13 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { kk } from "@/lib/i18n/kk";
 import { TG_READY_EVENT, launchInitData, noAutoLogin, setNoAutoLogin, telegramApp } from "@/lib/telegram/client";
+import { backTarget } from "@/lib/nav-back";
 
 const SCRIPT = "https://telegram.org/js/telegram-web-app.js";
 const AUTH_PAGES = ["/login", "/signup"];
 let signInRef: (() => void) | null = null;
 let navDepth = -1; // in-app page changes since launch (first render = 0)
 let lastPath = "";
-const TAB_ROOTS = ["/", "/photos", "/create", "/orders", "/account", ...AUTH_PAGES];
-
-/** Where Back goes when there is no in-app history (e.g. opened from a direct link). Null on tab roots. */
-function backTarget(path: string): string | null {
-  if (TAB_ROOTS.includes(path)) return null;
-  if (path.startsWith("/orders/")) return "/orders";
-  if (path.startsWith("/account/")) return "/account";
-  if (path.startsWith("/photos/")) return "/photos";
-  return "/";
-}
 
 /**
  * Inside the Telegram Mini App:
@@ -98,7 +89,16 @@ export function TelegramBridge() {
       const wa = telegramApp();
       if (!wa) return;
       wa.ready(); wa.expand();
-      wa.setHeaderColor?.("#faf5f1"); wa.setBackgroundColor?.("#faf5f1"); wa.setBottomBarColor?.("#faf5f1");
+      wa.setHeaderColor?.("#f5f4f1"); wa.setBackgroundColor?.("#f5f4f1"); wa.setBottomBarColor?.("#f5f4f1");
+      // Scrolling up inside a page must not close or minimise the app.
+      try { if (wa.isVersionAtLeast?.("7.7")) wa.disableVerticalSwipes?.(); } catch { /* old client */ }
+      // «Настройки» in the Mini App menu → the profile.
+      try {
+        if (wa.isVersionAtLeast?.("7.0") && wa.SettingsButton) {
+          wa.SettingsButton.onClick(() => router.push("/account"));
+          wa.SettingsButton.show();
+        }
+      } catch { /* old client */ }
       window.dispatchEvent(new Event(TG_READY_EVENT));
       setTgUi((n) => n + 1);
     };

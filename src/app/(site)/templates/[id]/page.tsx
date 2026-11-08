@@ -4,12 +4,13 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { kk } from "@/lib/i18n/kk";
-import { getTemplate } from "@/lib/templates/queries";
+import { getTemplate, templateNeighbors } from "@/lib/templates/queries";
 import { TemplateDetailView } from "@/components/template-detail";
 import { comboItems } from "@/lib/combos/catalog";
 import { track } from "@/lib/analytics";
 import { CreateFlow } from "@/components/create-flow";
 import { TrackView } from "@/components/pixel-events";
+import { TgMainButton } from "@/components/tg-main-button";
 import { isFreeOrderUser } from "@/lib/orders/free";
 import { activeDiscount } from "@/lib/engage/discount";
 import { adOffer } from "@/lib/engage/offer";
@@ -37,7 +38,10 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
   if (!t) notFound();
   void track("template_viewed", { templateId: t.id });
   const photo = t.media === "photo";
-  const combo = t.comboIds ? await comboItems(t.comboIds) : undefined;
+  const [combo, nav] = await Promise.all([
+    t.comboIds ? comboItems(t.comboIds) : Promise.resolve(undefined),
+    photo ? Promise.resolve(null) : templateNeighbors(t.id).catch(() => null),
+  ]);
   const user = await getSessionUser();
   const staffUnits = !photo && t.durationSec && user && can(user.role, "templates.manage")
     ? await staffUnitLabel(t.durationSec)
@@ -45,11 +49,13 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
   return (
     <>
     <TrackView item={{ id: t.id, name: t.title, price: t.startingPriceKzt ?? 0 }} />
+    {t.available && <TgMainButton text={photo ? kk.template.tgCreatePhoto : kk.template.tgCreate} targetId="create-section" />}
     <Link href={photo ? "/photos" : "/"} className="tg-hide -my-2 inline-block py-2 text-sm font-medium text-muted hover:text-ink">← {photo ? kk.template.backPhotos : kk.template.back}</Link>
     <TemplateDetailView
       t={t}
       combo={combo}
       staffUnits={staffUnits}
+      nav={nav}
       cta={t.available ? (
         <Suspense fallback={<div className="h-64 animate-pulse rounded-card bg-line" />}>
           <CreateSection t={t} />

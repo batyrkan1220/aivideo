@@ -5,6 +5,10 @@ import { kk } from "@/lib/i18n/kk";
 import type { TemplateDetail } from "@/lib/templates/queries";
 import { calculatePrice, formatKzt } from "@/lib/pricing";
 import { AutoVideo } from "@/components/auto-video";
+import { TemplateSwipe } from "@/components/template-swipe";
+import { TemplateQuickActions } from "@/components/card-actions";
+import { pickCard } from "@/components/catalog-bits";
+import type { TemplateNeighbor } from "@/lib/templates/queries";
 
 /** Per-quality prices (server-computed). Shown to guests and in admin preview. */
 export function QualityPriceList({ t }: { t: TemplateDetail }) {
@@ -45,15 +49,8 @@ export function QualityPriceList({ t }: { t: TemplateDetail }) {
 
 type ComboPart = { id: string; title: string; cover: string | null };
 
-export function TemplateDetailView({ t, cta, combo, staffUnits }: { t: TemplateDetail; cta?: React.ReactNode; combo?: ComboPart[]; staffUnits?: string | null }) {
-  return (
-    <div className="mt-3 grid gap-5 md:mt-6 md:grid-cols-[minmax(0,360px)_1fr] md:gap-12">
-      {combo ? <ComboGrid parts={combo} /> : (
-      <>
-      {/* On phones the sample is capped so the photo step stays close; the title sits on the video. */}
-      {/* The sample in its original proportions (vertical, square or horizontal), never cropped. */}
-      <figure className="mx-auto w-full md:sticky md:top-24 md:self-start">
-        {/* The box is sized from the stored video proportions before anything loads: no jump. */}
+export function TemplateDetailView({ t, cta, combo, staffUnits, nav }: { t: TemplateDetail; cta?: React.ReactNode; combo?: ComboPart[]; staffUnits?: string | null; nav?: { prev: TemplateNeighbor; next: TemplateNeighbor } | null }) {
+  const sample = (
         <div
           style={{ "--a": String(t.videoAspect ?? 9 / 16), aspectRatio: String(t.videoAspect ?? 9 / 16) } as React.CSSProperties}
           className="relative mx-auto w-[min(100%,calc(58svh*var(--a)))] overflow-hidden rounded-[1.75rem] bg-night ring-1 ring-black/5 elev-lg md:w-[min(100%,calc(80vh*var(--a)))]">
@@ -67,6 +64,16 @@ export function TemplateDetailView({ t, cta, combo, staffUnits }: { t: TemplateD
             {t.media === "photo" ? kk.photos.sample : kk.catalog.sample}
           </span>
         </div>
+  );
+  return (
+    <div className="mt-3 grid gap-5 md:mt-6 md:grid-cols-[minmax(0,360px)_1fr] md:gap-12">
+      {combo ? <ComboGrid parts={combo} /> : (
+      <>
+      {/* On phones the sample is capped so the photo step stays close; the title sits on the video. */}
+      {/* The sample in its original proportions (vertical, square or horizontal), never cropped. */}
+      <figure className="mx-auto w-full md:sticky md:top-24 md:self-start">
+        {/* The box is sized from the stored video proportions before anything loads: no jump. */}
+        {nav ? <TemplateSwipe prev={nav.prev} next={nav.next}>{sample}</TemplateSwipe> : sample}
         <figcaption className="mt-3 hidden text-sm text-muted md:block">{kk.template.sampleNote}</figcaption>
       </figure>
       </>
@@ -85,6 +92,7 @@ export function TemplateDetailView({ t, cta, combo, staffUnits }: { t: TemplateD
             {t.isTrending && <Badge tone="brand" icon={<Flame size={13} strokeWidth={2.6} aria-hidden />} className="!text-sm !px-3.5 !py-1.5">{kk.catalog2.trendBadge}</Badge>}
             {staffUnits && <Badge tone="neutral">{staffUnits}</Badge>}
           </div>
+          {!combo && <TemplateQuickActions t={pickCard(t)} />}
         </div>
         {/* Phones: title, facts and how it works, right under the sample */}
         <div className="md:hidden">
@@ -94,6 +102,7 @@ export function TemplateDetailView({ t, cta, combo, staffUnits }: { t: TemplateD
           </div>
           {staffUnits && <p className="mt-2 text-sm font-semibold text-night">{staffUnits}</p>}
           {t.description && <p className="t-small mt-2 text-muted">{t.description}</p>}
+          {!combo && <TemplateQuickActions t={pickCard(t)} />}
           {(combo || t.isTrending) && (
             <ul className="mt-3 flex flex-wrap gap-1.5 text-[12px] font-semibold">
               {combo && <li className="rounded-full bg-brand px-2.5 py-1 text-night">{kk.combo.badge(combo.length)}</li>}
@@ -104,7 +113,7 @@ export function TemplateDetailView({ t, cta, combo, staffUnits }: { t: TemplateD
         {t.description && <p className="hidden max-w-prose text-muted md:mt-5 md:block md:text-lg">{t.description}</p>}
 
 
-        <div className="mt-5 md:mt-8">
+        <div id="create-section" className="mt-5 scroll-mt-4 md:mt-8">
           {cta ?? (
             <>
               <QualityPriceList t={t} />

@@ -20,7 +20,37 @@ export type TelegramWebApp = {
   requestWriteAccess?(cb?: (granted: boolean) => void): void;
   initDataUnsafe?: { user?: { allows_write_to_pm?: boolean } };
   HapticFeedback?: { impactOccurred(style: "light" | "medium" | "heavy" | "rigid" | "soft"): void; notificationOccurred(type: "error" | "success" | "warning"): void; selectionChanged(): void };
+  version?: string;
+  /** Bot API 7.7+: pulling the page down no longer closes or minimises the Mini App. */
+  disableVerticalSwipes?(): void;
+  /** Bot API 6.2+: asks before closing (unsent order). */
+  enableClosingConfirmation?(): void;
+  disableClosingConfirmation?(): void;
+  /** Native button under the Mini App. */
+  MainButton?: TgBottomButton;
+  /** Bot API 7.0+: «Настройки» item in the Mini App menu. */
+  SettingsButton?: { show(): void; hide(): void; onClick(cb: () => void): void; offClick(cb: () => void): void };
+  /** Bot API 8.0+: home-screen shortcut. */
+  addToHomeScreen?(): void;
+  checkHomeScreenStatus?(cb: (status: "unsupported" | "unknown" | "added" | "missed") => void): void;
+  /** Bot API 7.8+: Telegram story editor with a photo or video. */
+  shareToStory?(mediaUrl: string, params?: { text?: string; widget_link?: { url: string; name?: string } }): void;
+  /** Bot API 8.0+: share a message to a chat the user picks. */
+  shareMessage?(msgId: string, cb?: (sent: boolean) => void): void;
+  /** Opens a t.me link inside Telegram (e.g. share dialog). */
+  openTelegramLink?(url: string): void;
+  onEvent?(event: string, cb: (...a: unknown[]) => void): void;
+  offEvent?(event: string, cb: (...a: unknown[]) => void): void;
 };
+export type TgBottomButton = {
+  setParams(p: { text?: string; color?: string; text_color?: string; is_active?: boolean; is_visible?: boolean; has_shine_effect?: boolean }): void;
+  show(): void; hide(): void; onClick(cb: () => void): void; offClick(cb: () => void): void;
+};
+
+/** True when the Telegram client supports at least this Bot API version. */
+export function tgSupports(version: string): boolean {
+  try { return !!telegramApp()?.isVersionAtLeast?.(version); } catch { return false; }
+}
 
 /** Telegram vibration feedback; does nothing outside the Mini App. */
 export function haptic(kind: "tap" | "success" | "error" | "select") {

@@ -3,7 +3,7 @@ import { DISCOUNTS_ON } from "@/lib/engage/price";
 import { ButtonLink } from "@/components/ui/button";
 import { Alert, Skeleton } from "@/components/ui/states";
 import { Suspense } from "react";
-import { DownloadVideo, SendComboToChat, ShareVideo } from "@/components/download-video";
+import { DownloadVideo, SendComboToChat, ShareVideo, ShareToStory } from "@/components/download-video";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
@@ -214,6 +214,7 @@ async function OrderView({ params, searchParams }: { params: Promise<{ id: strin
                 <div className="mx-auto mt-6 grid max-w-sm gap-3 md:mx-0">
                   <DownloadVideo orderId={o.id} photo={isPhoto} />
                   <ShareVideo orderId={o.id} title={snap.title_kk ?? "TrendMe"} photo={isPhoto} />
+                  <ShareToStory orderId={o.id} />
                 </div>
                 <p className="t-small mx-auto mt-4 flex max-w-sm items-center justify-center gap-2 text-muted md:mx-0 md:justify-start">
                   <Clock size={15} className="shrink-0" aria-hidden />{kk.result.keptUntil(dateFmt.format(new Date(video.expires_at)))}

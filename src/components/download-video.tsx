@@ -1,8 +1,8 @@
 "use client";
-import { Download, Send, Share2 } from "lucide-react";
+import { CircleFadingPlus, Download, Send, Share2 } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { kk } from "@/lib/i18n/kk";
-import { haptic, launchInitData, telegramApp } from "@/lib/telegram/client";
+import { haptic, launchInitData, telegramApp, tgSupports, TG_READY_EVENT } from "@/lib/telegram/client";
 
 const r = kk.result;
 
@@ -128,6 +128,33 @@ export function ShareVideo({ orderId, title, photo = false }: { orderId: string;
       className={`${btn} w-full border border-line bg-surface text-ink elev-xs hover:bg-mist disabled:opacity-70`}>
       {busy ? <span className="h-5 w-5 animate-spin rounded-full border-2 border-black/15 border-t-black" aria-hidden /> : <Share2 size={18} aria-hidden />}
       {r.share}
+    </button>
+  );
+}
+
+/** Telegram 7.8+: opens Telegram's story editor with the finished video or photo. */
+export function ShareToStory({ orderId }: { orderId: string }) {
+  const can = useSyncExternalStore(
+    (cb) => { window.addEventListener(TG_READY_EVENT, cb); return () => window.removeEventListener(TG_READY_EVENT, cb); },
+    () => !!telegramApp()?.shareToStory && tgSupports("7.8"), () => false,
+  );
+  const [busy, setBusy] = useState(false);
+  if (!can) return null;
+  const go = async () => {
+    if (busy) return;
+    setBusy(true);
+    haptic("tap");
+    try {
+      const res = await fetch(`/api/orders/${orderId}/video?json=1`, { credentials: "same-origin" });
+      const j = (await res.json().catch(() => null)) as { url?: string } | null;
+      if (j?.url) telegramApp()?.shareToStory?.(j.url, { text: kk.result.storyText });
+    } catch { /* closed */ } finally { setBusy(false); }
+  };
+  return (
+    <button type="button" onClick={() => void go()} disabled={busy}
+      className={`${btn} w-full border border-line bg-surface text-ink elev-xs hover:bg-mist disabled:opacity-70`}>
+      {busy ? <span className="h-5 w-5 animate-spin rounded-full border-2 border-black/15 border-t-black" aria-hidden /> : <CircleFadingPlus size={18} aria-hidden />}
+      {kk.home2.story}
     </button>
   );
 }

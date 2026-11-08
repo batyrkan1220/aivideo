@@ -6,6 +6,7 @@ import { kk } from "@/lib/i18n/kk";
 import { formatKzt } from "@/lib/pricing";
 import { autoplayRefused, useImgPreviews, useInTelegram } from "@/lib/video-autoplay";
 import { primeSound, videoShown } from "@/lib/sound-handoff";
+import { FavoriteButton } from "@/components/card-actions";
 
 export type CardData = {
   id: string;
@@ -244,6 +245,7 @@ export function TemplateCard({ t, priority = false, aspect = "aspect-[3/4]", wal
             </span>
           )}
         </div>
+        <FavoriteButton t={t} className="absolute right-1.5 top-1.5 sm:right-2 sm:top-2" />
         <div className="absolute inset-x-2.5 bottom-2.5 text-white sm:inset-x-3 sm:bottom-3">
           <h3 className="line-clamp-2 font-display text-[13px] font-semibold leading-tight tracking-tight sm:text-[14px]">{t.title}</h3>
           {t.startingPriceKzt !== null && (

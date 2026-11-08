@@ -5,6 +5,7 @@ import "./globals.css";
 import { Suspense } from "react";
 import { kk } from "@/lib/i18n/kk";
 import { TelegramBridge } from "@/components/telegram-bridge";
+import { EdgeSwipeBack } from "@/components/edge-swipe-back";
 import { PixelsLoader } from "@/components/pixels-loader";
 import { SwRegister } from "@/components/sw-register";
 import { PauseHiddenVideos } from "@/components/pause-hidden-videos";
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <PauseHiddenVideos />
         <Suspense fallback={null}>
           <TelegramBridge />
+          <EdgeSwipeBack />
           <PixelsLoader />
           <SwRegister />
         </Suspense>

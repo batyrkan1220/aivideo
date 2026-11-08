@@ -13,6 +13,7 @@ import { PHOTOS_SOON } from "@/lib/features";
 import { TelegramBotLogin } from "@/components/telegram-bot-login";
 import { avatarUrl, refreshTelegramAvatar } from "@/lib/telegram/avatar";
 import { mediaUrl } from "@/lib/templates/queries";
+import { AddToHome } from "@/components/add-to-home";
 
 export const metadata = { title: kk.account.title };
 
@@ -154,6 +155,8 @@ async function Profile() {
               </Link>
             </div>
           </section>
+
+          <AddToHome />
 
           {/* Guest (photos uploaded from an ad, not confirmed yet): keep them by signing in with Telegram. */}
           {guest && (

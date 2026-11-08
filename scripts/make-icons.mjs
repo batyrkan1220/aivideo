@@ -31,6 +31,9 @@ const png = (size, o) => sharp(Buffer.from(svg(size, o))).png().toBuffer();
 
 await writeFile("src/app/icon.png", await png(512, { rounded: true, scale: 0.66 }));
 await writeFile("src/app/apple-icon.png", await png(180, { rounded: false, scale: 0.62 }));
+// Installed app (manifest): full-bleed squares, the mark inside the maskable safe zone.
+await writeFile("public/icons/icon-192.png", await png(192, { rounded: false, scale: 0.56 }));
+await writeFile("public/icons/icon-512.png", await png(512, { rounded: false, scale: 0.56 }));
 
 // favicon.ico: PNG-in-ICO with 16, 32 and 48 px images (small sizes get a bigger mark).
 const sizes = [16, 32, 48];
