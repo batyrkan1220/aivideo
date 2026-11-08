@@ -3,7 +3,7 @@ import { ArrowRight, ScanFace, Sparkles, Zap } from "lucide-react";
 import { kk } from "@/lib/i18n/kk";
 import { HeroVideo } from "./hero-video";
 
-type Item = { id: string; title: string; coverUrl: string | null; previewUrl: string | null; animUrl?: string | null };
+export type HeroItem = { id: string; title: string; coverUrl: string | null; previewUrl: string | null; animUrl?: string | null };
 
 const h = kk.home;
 const delay = (ms: number) => ({ animationDelay: `${ms}ms` });
@@ -96,10 +96,10 @@ export function DepthStackShell() {
   return <div className="mx-auto h-[17rem] w-full max-w-lg sm:h-[26rem] md:h-[25rem] lg:h-[31rem]" aria-hidden />;
 }
 
-export function DepthStack({ items }: { items: Item[] }) {
+export function DepthStack({ items }: { items: HeroItem[] }) {
   if (!items.length) return <DepthStackShell />;
   const [front, left, right] = items;
-  const side = (t: Item | undefined, pos: "l" | "r") => t && (
+  const side = (t: HeroItem | undefined, pos: "l" | "r") => t && (
     <Link href={`/templates/${t.id}`} tabIndex={-1} aria-hidden
       className={`absolute aspect-[9/16] h-[12rem] overflow-hidden rounded-[1.3rem] border border-line bg-mist opacity-70 shadow-[0_30px_60px_-30px_rgb(0_0_0/0.45)] transition-opacity duration-500 hover:opacity-100 sm:h-[18rem] md:h-[17rem] lg:h-[24rem] md:rounded-[1.6rem] ${
         pos === "l" ? "[transform:translateX(-62%)_translateZ(-140px)_rotateY(22deg)_rotateZ(-3deg)]" : "[transform:translateX(62%)_translateZ(-140px)_rotateY(-22deg)_rotateZ(3deg)]"}`}>

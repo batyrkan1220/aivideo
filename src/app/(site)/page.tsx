@@ -9,7 +9,8 @@ import { kk } from "@/lib/i18n/kk";
 import { listCategories, listTemplates } from "@/lib/templates/queries";
 import { pickCard } from "@/components/catalog-bits";
 import { VideoFeed } from "@/components/video-feed";
-import { CinematicHero, DepthStack, DepthStackShell } from "@/components/cinematic-hero";
+import { CinematicHero, DepthStack } from "@/components/cinematic-hero";
+import { HeroStackFallback, RememberShowcase } from "@/components/hero-stack-fallback";
 import { Logo } from "@/components/logo";
 import { CachedFeedFallback } from "@/components/cached-feed";
 import { resolveShowcase } from "@/lib/templates/showcase";
@@ -32,7 +33,7 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
         <Logo className="text-base" />
       </div>
 
-      <CinematicHero newVideoHref="/create" stack={<Suspense fallback={<DepthStackShell />}><HeroCards /></Suspense>} />
+      <CinematicHero newVideoHref="/create" stack={<Suspense fallback={<HeroStackFallback />}><HeroCards /></Suspense>} />
 
       <Suspense fallback={<FeedFallback />}>
         <Feed searchParams={searchParams} />
@@ -43,7 +44,7 @@ export default function HomePage({ searchParams }: { searchParams: Promise<SP> }
 
 async function HeroCards() {
   const items = (await resolveShowcase()).map(({ id, title, coverUrl, coverThumbUrl, previewUrl, previewLiteUrl, previewAnimUrl }) => ({ id, title, coverUrl: coverThumbUrl ?? coverUrl, previewUrl: previewLiteUrl ?? previewUrl, animUrl: previewAnimUrl }));
-  return <DepthStack items={items} />;
+  return <><DepthStack items={items} /><RememberShowcase items={items} /></>;
 }
 
 /** While the feed loads: a shelf heading in the same place as the real one (no jump), then the saved cards. */
