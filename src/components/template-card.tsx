@@ -159,7 +159,8 @@ export function TemplateCard({ t, priority = false, aspect = "aspect-[3/4]", wal
     const el = cardRef.current;
     if (!el || !near) return;
     if ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return;
-    const io = new IntersectionObserver(([e]) => (e.isIntersecting ? play() : stop()), { threshold: 0.6 });
+    // Several thresholds so a card that came back only partly is checked again as it scrolls in.
+    const io = new IntersectionObserver(([e]) => (e.intersectionRatio >= 0.55 ? play() : e.intersectionRatio < 0.3 ? stop() : undefined), { threshold: [0, 0.3, 0.55, 0.6, 0.8, 1] });
     io.observe(el);
     return () => { io.disconnect(); stop(); };
   }, [near]); // eslint-disable-line react-hooks/exhaustive-deps

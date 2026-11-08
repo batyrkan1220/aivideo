@@ -77,7 +77,7 @@ export function HeroVideo({ src, poster, anim }: { src: string; poster?: string;
     const again = () => { v.currentTime = 0; void v.play().catch(() => {}); };
     v.addEventListener("ended", again);
     // Paused while off screen (or by the page's pause-hidden watcher): play again when it is back in view.
-    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting && v.paused) void v.play().catch(() => {}); }, { threshold: 0.5 });
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting && v.paused && videoShown(v)) void v.play().catch(() => {}); }, { threshold: [0.25, 0.5, 0.55, 0.75, 1] });
     io.observe(v);
     const onVis = () => { if (!document.hidden && v.paused && v.isConnected) void v.play().catch(() => {}); };
     document.addEventListener("visibilitychange", onVis);

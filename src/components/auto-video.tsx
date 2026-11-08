@@ -54,7 +54,12 @@ export function AutoVideo(props: { src: string; poster?: string; controls?: bool
       v.removeAttribute("muted");
       return v.play().then(() => { setMuted(false); return true; }).catch(() => false);
     };
-    const tryPlay = () => { if (videoShown(v)) v.play().catch(() => {}); else v.pause(); };
+    // On screen: play (with sound if it had it; if the browser refuses that now, muted).
+    const tryPlay = () => {
+      if (!videoShown(v)) { v.pause(); return; }
+      if (!v.paused) return;
+      v.play().catch(() => { if (!v.muted) { v.muted = true; setMuted(true); v.play().catch(() => {}); } });
+    };
     // Blocked autoplay with sound: turn the sound on at the first touch anywhere.
     const unmuteOnTouch = (e: Event) => {
       if ((e.target as Element | null)?.closest?.("[data-sound-toggle]")) return; // the toggle handles itself
@@ -70,7 +75,9 @@ export function AutoVideo(props: { src: string; poster?: string; controls?: bool
     } else {
       playMuted();
     }
-    const io = new IntersectionObserver(([e]) => (e.isIntersecting ? tryPlay() : v.pause()), { threshold: 0.25 });
+    // Several thresholds: "shown" means over half visible, so the check must run again as the video
+    // scrolls further in (with one 25 % threshold it fired once at 25 %, paused, and never resumed).
+    const io = new IntersectionObserver(([e]) => (e.isIntersecting ? tryPlay() : v.pause()), { threshold: [0, 0.25, 0.5, 0.55, 0.75, 1] });
     io.observe(v);
     v.addEventListener("loadeddata", tryPlay);
     // Some WebViews only allow playback after the first touch.
