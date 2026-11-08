@@ -6,7 +6,7 @@ import { logoutAction } from "@/app/(auth)/actions";
 import { kk } from "@/lib/i18n/kk";
 import { isGuestEmail, isTelegramEmail } from "@/lib/telegram/session";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { DisplayNameForm, DeleteAllPhotosForm, DeleteAccountForm, LogoutButton, TelegramDeleteNote } from "@/components/account-forms";
+import { DisplayNameForm, LogoutButton } from "@/components/account-forms";
 import { PHOTOS_SOON } from "@/lib/features";
 import { TelegramBotLogin } from "@/components/telegram-bot-login";
 import { avatarUrl, refreshTelegramAvatar } from "@/lib/telegram/avatar";
@@ -138,24 +138,12 @@ async function Profile() {
             <p className="mb-2 text-[15px] font-semibold">{kk.account.editName}</p>
             <DisplayNameForm current={user.displayName ?? ""} />
           </div>
-          <div className="border-t border-line pt-4">
-            <p className="text-[15px] font-semibold">{kk.account.privacyTitle}</p>
-            <p className="mb-3 mt-1 text-sm text-muted">{kk.account.privacyText}</p>
-            <DeleteAllPhotosForm />
-          </div>
         </div>
       </section>
 
-      {/* Inside the Telegram Mini App the account is the Telegram account: no logout / delete there. */}
-      <section className="tg-hide mt-6 space-y-3">
-        <div className="flex justify-center"><LogoutButton action={logoutAction} /></div>
-        <details className="rounded-card border border-line/80 bg-surface p-4 sm:p-6">
-          <summary className="cursor-pointer text-sm font-semibold text-danger">{kk.account.deleteAccount}</summary>
-          <div className="mt-3">
-            <TelegramDeleteNote />
-            <DeleteAccountForm />
-          </div>
-        </details>
+      {/* Inside the Telegram Mini App the account is the Telegram account: no logout there. */}
+      <section className="tg-hide mt-6 flex justify-center">
+        <LogoutButton action={logoutAction} />
       </section>
     </>
   );
