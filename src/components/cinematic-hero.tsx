@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowDown, ScanFace, Zap } from "lucide-react";
+import { ArrowDown, ScanFace, Sparkles, Zap } from "lucide-react";
 import { kk } from "@/lib/i18n/kk";
 import { HeroVideo } from "./hero-video";
 
@@ -40,8 +40,11 @@ export function CinematicHero({ stack }: { stack: React.ReactNode }) {
           <p style={delay(260)} className="hero-rise mt-3 max-w-[22rem] text-[15px] leading-[1.55] text-muted sm:max-w-xl sm:text-base md:mt-6 md:text-lg">{h.hxLead}</p>
 
           <div style={delay(340)} className="hero-rise mt-5 flex w-full max-w-sm justify-center sm:w-auto md:mt-8 md:justify-start">
-            <a href="#templates" className="cta-neon inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-ink px-7 text-[15px] font-semibold text-paper shadow-[0_12px_28px_-14px_rgb(0_0_0/0.6)] transition-transform active:scale-[0.98] sm:w-auto">
-              {h.hxPick}<ArrowDown size={17} strokeWidth={2.2} className="animate-bounce [animation-duration:1.6s]" aria-hidden />
+            <a href="#templates" className="cta-ai inline-flex h-13 w-full items-center justify-center gap-2.5 rounded-2xl px-7 text-[15px] font-semibold sm:w-auto sm:text-base">
+              <span className="ai-glow" aria-hidden />
+              <Sparkles size={18} strokeWidth={2.2} className="ai-spark text-[#c8b8ff]" aria-hidden />
+              <span className="ai-text">{h.hxPick}</span>
+              <ArrowDown size={17} strokeWidth={2.4} className="ai-down text-white/90" aria-hidden />
             </a>
           </div>
 
