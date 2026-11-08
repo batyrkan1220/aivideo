@@ -24,15 +24,15 @@ export function CinematicHero({ stack, newVideoHref }: { stack: React.ReactNode;
           Tablets and desktops (768 px and up): two columns that fit the first screen, text and actions
           on the left, the cards on the right, with the full effects. The Mini App keeps the phone layout. */}
       <div className="mx-auto grid max-w-6xl items-center gap-4 px-4 pb-2 pt-5 sm:px-6 md:min-h-[min(calc(100svh-4rem),46rem)] md:grid-cols-[1.05fr_0.95fr] md:gap-6 md:py-10 lg:gap-10 lg:px-8">
-        <div className="relative z-20 flex flex-col items-center text-center md:items-start md:text-left">
+        <div className="@container relative z-20 flex flex-col items-center text-center md:items-start md:text-left">
           <span style={delay(0)} className="hero-rise inline-flex items-center gap-2 rounded-full border border-line bg-surface/80 px-3 py-1.5 text-xs font-medium text-muted backdrop-blur-xl sm:text-[13px]">
             <span className="hero-blink h-1.5 w-1.5 rounded-full bg-[#22c55e] shadow-[0_0_0_3px_rgb(34_197_94/0.18)]" aria-hidden />
             {h.hxBadge}
           </span>
 
-          <h1 className="mt-3.5 max-w-4xl text-[clamp(1.75rem,8.2vw,2.15rem)] leading-[1.12] text-ink sm:text-5xl md:mt-6 md:text-[2.5rem] md:leading-[1.08] lg:text-[3.2rem] lg:leading-[1.06] xl:text-[4rem]">
-            <span style={delay(80)} className="hero-rise block">{h.hxLine1} {h.hxLine2a}</span>
-            <span style={delay(160)} className="hero-rise block">
+          <h1 className="mt-3.5 w-full max-w-4xl text-[min(2.6rem,9.1cqi)] leading-[1.1] text-ink md:mt-6 md:text-[min(4rem,9.1cqi)] md:leading-[1.06]">
+            <span style={delay(80)} className="hero-rise block whitespace-nowrap">{h.hxLine1} {h.hxLine2a}</span>
+            <span style={delay(160)} className="hero-rise block whitespace-nowrap">
               <span className="font-accent">{h.hxAccent}</span>{" "}{h.hxLine2b}
             </span>
           </h1>
