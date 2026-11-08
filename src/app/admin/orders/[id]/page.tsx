@@ -10,7 +10,7 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { formatKzt, type PriceBreakdown } from "@/lib/pricing";
 import { ActionForm } from "../action-form";
 import { KlingTasks } from "../kling-tasks";
-import { retryGeneration, cancelGeneration, refundPayment } from "../actions";
+import { retryGeneration, cancelGeneration, refundPayment, remakeOrder } from "../actions";
 import { unitsFromUsd } from "@/lib/pricing-seedance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { Badge, Stat, orderState, usd, nowMs } from "../../ui";
@@ -139,6 +139,10 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
       <section className={`${card} flex flex-wrap gap-3`}>
         {can(u.role, "orders.retry") && o.payment_status === "succeeded" && ["failed", "cancelled"].includes(o.generation_status) && (
           <ActionForm action={retryGeneration} fields={{ orderId: o.id }} label={A.retry} confirm={A.retryConfirm} />
+        )}
+        {can(u.role, "orders.retry") && o.payment_status === "succeeded" && o.generation_status === "completed" && !o.photos_deleted_at && !(kids ?? []).length && (
+          <ActionForm action={remakeOrder} fields={{ orderId: o.id }} label="↻ Пересоздать бесплатно"
+            confirm={`Создать видео ${o.public_order_number} заново бесплатно? Новое видео заменит старое и придёт клиенту в Telegram.`} />
         )}
         {can(u.role, "orders.cancel") && activeJob && (
           <ActionForm action={cancelGeneration} fields={{ orderId: o.id }} label={A.cancel} confirm={A.cancelConfirm} />

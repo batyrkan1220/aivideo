@@ -58,6 +58,11 @@ export async function runRetention() {
   await db.from("rate_limits").delete().lt("window_start", new Date(Date.now() - 86400_000).toISOString());
   await db.from("webhook_events").delete()
     .lt("created_at", new Date(Date.now() - 90 * 86400_000).toISOString()).not("processed_at", "is", null);
+  // Support chats: messages older than 180 days; the bot's message-id map after 30 days.
+  const half = new Date(Date.now() - 180 * 86400_000).toISOString();
+  await db.from("support_entries").delete().lt("created_at", half);
+  await db.from("support_threads").delete().lt("last_message_at", half);
+  await db.from("support_messages").delete().lt("created_at", new Date(Date.now() - 30 * 86400_000).toISOString());
   return out;
 }
 

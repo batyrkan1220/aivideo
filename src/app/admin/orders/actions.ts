@@ -44,6 +44,37 @@ export async function retryGeneration(_: AdminState, fd: FormData): Promise<Admi
   return { ok: ru.admin.orders.done };
 }
 
+/**
+ * Makes the order's video again for free (support: the customer is unhappy with a finished result,
+ * or it failed). Needs the customer's photos to still be stored. The new result replaces the old.
+ */
+export async function remakeOrder(_: AdminState, fd: FormData): Promise<AdminState> {
+  const u = await staff("orders.retry");
+  if (!u) return { error: E.forbidden };
+  const id = uuid(fd.get("orderId"));
+  if (!id.success) return { error: E.generic };
+  const db = supabaseAdmin();
+  const { data: o } = await db.from("orders")
+    .select("id,payment_status,generation_status,photos_deleted_at,template_snapshot_json").eq("id", id.data).single();
+  if (!o || o.payment_status !== "succeeded" || !["completed", "failed", "cancelled"].includes(o.generation_status)) {
+    return { error: E.not_eligible };
+  }
+  if (o.photos_deleted_at) return { error: "Фото клиента уже удалены (срок хранения) — пересоздать нельзя. Попросите загрузить фото заново." };
+  const { count } = await db.from("orders").select("id", { count: "exact", head: true }).eq("parent_order_id", o.id);
+  if (count) return { error: "Это фото-комбо: пересоздайте нужную фотографию в её заказе." };
+  const provider = (o.template_snapshot_json as { provider_key?: string }).provider_key ?? "dev";
+  const { error } = await db.from("generation_jobs").insert({ order_id: o.id, provider, status: "queued" });
+  if (error) return { error: E.generic };
+  // The old still frame belongs to the old video.
+  const { data: v } = await db.from("generated_videos").select("private_storage_path").eq("order_id", o.id).maybeSingle();
+  if (v?.private_storage_path) await db.storage.from("generated-videos").remove([`${v.private_storage_path}.poster.webp`]);
+  await db.from("orders").update({ generation_status: "queued", completed_at: null }).eq("id", o.id);
+  await audit(u.id, "order.remake", "order", o.id);
+  revalidatePath(`/admin/orders/${o.id}`);
+  revalidatePath("/admin/support", "layout");
+  return { ok: "Поставлено в очередь — готовое видео придёт клиенту в Telegram" };
+}
+
 /** Stops an active generation (asks the provider to cancel when it supports it). */
 export async function cancelGeneration(_: AdminState, fd: FormData): Promise<AdminState> {
   const u = await staff("orders.cancel");

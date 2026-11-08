@@ -5,7 +5,7 @@ import { botMessage } from "@/lib/telegram/messages";
 import { codeFromPayload, linkPartnerTelegram, partnerSelfReport, touchFromBot } from "@/lib/partners";
 import { confirmLoginFromBot, loginIdFromStart } from "@/lib/telegram/bot-login";
 import { env } from "@/lib/env";
-import { relayAdminReply, relayToSupport } from "@/lib/telegram/support";
+import { relayAdminReply, relayToSupport, type TgMessage } from "@/lib/telegram/support";
 
 /**
  * Telegram bot updates. Authentic only with our X-Telegram-Bot-Api-Secret-Token (set via setWebhook).
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
 
   const admin = await isBotAdmin(msg.from?.id);
   // Support: an admin's «Reply» to a customer's relayed message goes back to that customer.
-  if (admin && msg.message_id && (await relayAdminReply(chatId, msg.message_id, msg.reply_to_message?.message_id))) {
+  if (admin && msg.message_id && (await relayAdminReply(chatId, msg as TgMessage, msg.reply_to_message?.message_id))) {
     return NextResponse.json({ ok: true });
   }
   // Admin commands (/admin, /stats, /orders, /problems, /order TM-…) — only for listed Telegram ids.
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
   }
   // Anything that is not a command (text, photo, video, file, voice) is a message to support.
   if (!cmd.startsWith("/") && msg.message_id && !msg.from?.is_bot && !admin) {
-    if (await relayToSupport(chatId, msg.message_id, msg.from)) return NextResponse.json({ ok: true });
+    if (await relayToSupport(chatId, msg as TgMessage)) return NextResponse.json({ ok: true });
   }
   const [key, path] = cmd.startsWith("/start") ? (["welcome", "/"] as const)
     : cmd.startsWith("/help") ? (["help", "/"] as const)

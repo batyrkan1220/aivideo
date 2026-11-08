@@ -2,15 +2,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BarChart3, Bot, Clapperboard, CreditCard, FolderTree, Handshake, Home, Images, LineChart, Receipt, ScrollText, Sparkles, Target, Users,
+  BarChart3, Bot, Clapperboard, MessageCircle, CreditCard, FolderTree, Handshake, Home, Images, LineChart, Receipt, ScrollText, Sparkles, Target, Users,
   type LucideIcon,
 } from "lucide-react";
 
-export type NavItem = { href: string; label: string; icon: string };
+export type NavItem = { href: string; label: string; icon: string; badge?: number };
 export type NavGroup = { title: string; items: NavItem[] };
 
 const ICONS: Record<string, LucideIcon> = {
-  overview: BarChart3, orders: Receipt, funnel: Target, payments: CreditCard, templates: Clapperboard, categories: FolderTree,
+  overview: BarChart3, orders: Receipt, support: MessageCircle, funnel: Target, payments: CreditCard, templates: Clapperboard, categories: FolderTree,
   combos: Images, home: Home, ai: Sparkles, users: Users, partners: Handshake, bot: Bot, pixels: LineChart, audit: ScrollText,
 };
 
@@ -34,6 +34,7 @@ export function AdminNav({ groups }: { groups: NavGroup[] }) {
             <Link key={it.href} href={it.href} aria-current={on ? "page" : undefined}
               className={`flex h-10 shrink-0 items-center gap-2 rounded-full border px-4 font-semibold transition-colors ${on ? "border-night bg-night text-white elev-sm" : "border-line bg-surface text-ink hover:border-line-strong"}`}>
               <Icon name={it.icon} />{it.label}
+              {!!it.badge && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#22c55e] px-1.5 text-[11px] font-semibold text-white">{it.badge}</span>}
             </Link>
           );
         })}
@@ -50,6 +51,7 @@ export function AdminNav({ groups }: { groups: NavGroup[] }) {
                     <Link href={it.href} aria-current={on ? "page" : undefined}
                       className={`group flex h-10 items-center gap-3 rounded-xl px-3 font-semibold transition-colors duration-200 ${on ? "bg-night text-white elev-sm" : "text-ink/80 hover:bg-surface hover:text-ink"}`}>
                       <Icon name={it.icon} className={on ? "text-white" : "text-muted group-hover:text-ink"} />{it.label}
+                      {!!it.badge && <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[#22c55e] px-1.5 text-[11px] font-semibold text-white">{it.badge}</span>}
                     </Link>
                   </li>
                 );

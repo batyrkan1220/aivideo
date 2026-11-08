@@ -7,6 +7,7 @@ import { isStaff, can } from "@/lib/auth/permissions";
 import { redirect } from "next/navigation";
 import { Logo } from "@/components/logo";
 import { AdminNav, type NavGroup } from "./nav";
+import { supabaseAdmin } from "@/lib/supabase/server";
 
 export const metadata = { title: ru.admin.title };
 
@@ -34,10 +35,15 @@ async function Gate({ children }: { children: React.ReactNode }) {
     return <p className="mx-auto max-w-5xl px-4 py-16 text-center text-muted">{ru.admin.forbidden}</p>;
   }
   const r = u.role;
+  // Conversations waiting for an answer (badge on «Поддержка»).
+  const { count: waiting } = can(r, "orders.view")
+    ? await supabaseAdmin().from("support_threads").select("id", { count: "exact", head: true }).gt("unread", 0)
+    : { count: 0 };
   const groups: NavGroup[] = [
     { title: "Продажи", items: [
       ...(can(r, "dashboard.view") ? [{ href: "/admin", label: "Обзор", icon: "overview" }] : []),
       ...(can(r, "orders.view") ? [{ href: "/admin/orders", label: "Заказы", icon: "orders" }] : []),
+      ...(can(r, "orders.view") ? [{ href: "/admin/support", label: "Поддержка", icon: "support", badge: waiting ?? 0 }] : []),
       ...(can(r, "dashboard.view") ? [{ href: "/admin/funnel", label: "Воронка по рекламе", icon: "funnel" }] : []),
       ...(can(r, "users.manage") ? [{ href: "/admin/payments", label: "Платежи · Tolepay", icon: "payments" }] : []),
     ] },
