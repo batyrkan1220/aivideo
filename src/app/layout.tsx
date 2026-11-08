@@ -24,6 +24,9 @@ export const metadata: Metadata = {
     description: kk.brand.description,
     locale: "ru_RU",
   },
+  // Link previews (Telegram, WhatsApp, Instagram): the brand card in src/app/opengraph-image.png, not
+  // the first video cover the messenger happens to find on the page.
+  twitter: { card: "summary_large_image", title: `${kk.brand.name} — ${kk.brand.tagline}`, description: kk.brand.description },
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#f5f4f1" };
