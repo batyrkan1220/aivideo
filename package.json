@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:db": "bash scripts/test-db.sh"
+    "test:db": "bash scripts/test-db.sh",
+    "prebuild": "node scripts/ensure-ffmpeg.mjs"
   },
   "dependencies": {
     "@fontsource-variable/onest": "^5.3.1",
