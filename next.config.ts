@@ -53,7 +53,8 @@ const nextConfig: NextConfig = {
   },
   cacheComponents: true,
   // Going back to a page within 30 s reuses it from the client cache (the home page "thought" again before).
-  experimental: { staleTimes: { dynamic: 30 } },
+  // inlineCss: the stylesheet comes inside the HTML, so the first paint does not wait for a CSS request.
+  experimental: { staleTimes: { dynamic: 30 }, inlineCss: true },
   partialPrefetching: true,
   turbopack: {
     rules: {
