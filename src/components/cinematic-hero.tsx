@@ -26,7 +26,7 @@ export function CinematicHero({ stack, newVideoHref }: { stack: React.ReactNode;
       <div className="mx-auto grid max-w-6xl items-center gap-4 px-4 pb-2 pt-5 sm:px-6 md:min-h-[min(calc(100svh-4rem),46rem)] md:grid-cols-[1.05fr_0.95fr] md:gap-6 md:py-10 lg:gap-10 lg:px-8">
         <div className="relative z-20 flex flex-col items-center text-center md:items-start md:text-left">
           <span style={delay(0)} className="hero-rise inline-flex items-center gap-2 rounded-full border border-line bg-surface/80 px-3 py-1.5 text-xs font-medium text-muted backdrop-blur-xl sm:text-[13px]">
-            <span className="hero-blink h-1.5 w-1.5 rounded-full bg-ink" aria-hidden />
+            <span className="hero-blink h-1.5 w-1.5 rounded-full bg-[#22c55e] shadow-[0_0_0_3px_rgb(34_197_94/0.18)]" aria-hidden />
             {h.hxBadge}
           </span>
 
