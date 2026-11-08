@@ -21,7 +21,7 @@ const WORKING = ["queued", "processing", "postprocessing"];
 
 export default function AccountPage() {
   return (
-    <main className="mx-auto w-full max-w-xl px-4 pb-8 pt-4 sm:pt-10">
+    <main className="mx-auto w-full max-w-xl px-4 pb-8 pt-4 sm:pt-10 md:max-w-5xl md:px-6 md:pb-12 lg:px-8">
       <Suspense fallback={<ProfileSkeleton />}>
         <Profile />
       </Suspense>
@@ -31,10 +31,12 @@ export default function AccountPage() {
 
 function ProfileSkeleton() {
   return (
-    <div className="space-y-4" aria-hidden>
-      <div className="skeleton h-72 rounded-card" />
-      <div className="skeleton h-40 rounded-card" />
-      <div className="skeleton h-56 rounded-card" />
+    <div className="grid gap-4 md:grid-cols-[340px_minmax(0,1fr)] md:gap-8 lg:grid-cols-[380px_minmax(0,1fr)]" aria-hidden>
+      <div className="skeleton h-80 rounded-card" />
+      <div className="space-y-4">
+        <div className="skeleton h-44 rounded-card" />
+        <div className="skeleton h-56 rounded-card" />
+      </div>
     </div>
   );
 }
@@ -106,117 +108,129 @@ async function Profile() {
     : "—";
 
   return (
-    <>
-      {/* Who: avatar, name, numbers, the two main actions. */}
-      <section className="relative overflow-hidden rounded-card border border-line/80 bg-surface px-5 pb-5 pt-7 text-center elev-sm sm:px-7">
-        <span className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-mist to-transparent" aria-hidden />
-        <div className="relative mx-auto w-fit">
-          {avatar ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatar} alt="" width={88} height={88} className="h-[88px] w-[88px] rounded-full bg-mist object-cover ring-4 ring-surface shadow-[0_12px_30px_-12px_rgb(0_0_0/0.35)]" />
-          ) : (
-            <span className="flex h-[88px] w-[88px] items-center justify-center rounded-full bg-ink font-display text-3xl text-paper ring-4 ring-surface shadow-[0_12px_30px_-12px_rgb(0_0_0/0.35)]" aria-hidden>
-              {name.replace(/^@/, "").charAt(0).toUpperCase() || "T"}
-            </span>
-          )}
-          {tg && (
-            <span className="absolute -bottom-0.5 -right-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-[#2aabee] text-white ring-[3px] ring-surface" aria-label={kk.account.viaTelegram}>
-              <Send size={13} strokeWidth={2.4} className="-ml-px" aria-hidden />
-            </span>
-          )}
-        </div>
-        <h1 className="relative mt-4 truncate font-display text-[1.6rem] leading-tight">{name}</h1>
-        {sub && <p className="relative mt-1 truncate text-sm text-muted">{sub}</p>}
-
-        <dl className="relative mt-5 grid grid-cols-3 divide-x divide-line rounded-2xl bg-mist/70 py-3">
-          {[
-            { k: P.ready, v: String(ready) },
-            { k: P.inWork, v: String(working) },
-            { k: P.withUs, v: since, small: true },
-          ].map((s) => (
-            <div key={s.k} className="flex min-w-0 flex-col-reverse items-center justify-end px-2">
-              <dt className="mt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">{s.k}</dt>
-              <dd className={`max-w-full truncate font-display leading-none ${"small" in s ? "pt-1 text-[15px]" : "text-xl"}`}>{s.v}</dd>
+    <div className="grid gap-x-8 md:grid-cols-[340px_minmax(0,1fr)] md:items-start lg:grid-cols-[380px_minmax(0,1fr)]">
+      {/* Left (desktop: stays in view): who you are and the main actions. */}
+      <aside className="md:sticky md:top-20">
+          {/* Who: avatar, name, numbers, the two main actions. */}
+          <section className="relative overflow-hidden rounded-card border border-line/80 bg-surface px-5 pb-5 pt-7 text-center elev-sm sm:px-7">
+            <span className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-mist to-transparent" aria-hidden />
+            <div className="relative mx-auto w-fit">
+              {avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatar} alt="" width={88} height={88} className="h-[88px] w-[88px] rounded-full bg-mist object-cover ring-4 ring-surface shadow-[0_12px_30px_-12px_rgb(0_0_0/0.35)]" />
+              ) : (
+                <span className="flex h-[88px] w-[88px] items-center justify-center rounded-full bg-ink font-display text-3xl text-paper ring-4 ring-surface shadow-[0_12px_30px_-12px_rgb(0_0_0/0.35)]" aria-hidden>
+                  {name.replace(/^@/, "").charAt(0).toUpperCase() || "T"}
+                </span>
+              )}
+              {tg && (
+                <span className="absolute -bottom-0.5 -right-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-[#2aabee] text-white ring-[3px] ring-surface" aria-label={kk.account.viaTelegram}>
+                  <Send size={13} strokeWidth={2.4} className="-ml-px" aria-hidden />
+                </span>
+              )}
             </div>
-          ))}
-        </dl>
+            <h1 className="relative mt-4 truncate font-display text-[1.6rem] leading-tight">{name}</h1>
+            {sub && <p className="relative mt-1 truncate text-sm text-muted">{sub}</p>}
 
-        <div className="relative mt-4 grid grid-cols-2 gap-2">
-          <Link href="/" className="btn-glow flex h-12 items-center justify-center gap-1.5 rounded-full text-sm font-semibold">
-            <Plus size={17} strokeWidth={2.4} aria-hidden />{P.createVideo}
-          </Link>
-          <Link href="/orders" className="flex h-12 items-center justify-center rounded-full border border-line bg-surface text-sm font-semibold transition-colors hover:border-ink">
-            {kk.gallery.title}
-          </Link>
+            <dl className="relative mt-5 grid grid-cols-3 divide-x divide-line rounded-2xl bg-mist/70 py-3">
+              {[
+                { k: P.ready, v: String(ready) },
+                { k: P.inWork, v: String(working) },
+                { k: P.withUs, v: since, small: true },
+              ].map((s) => (
+                <div key={s.k} className="flex min-w-0 flex-col-reverse items-center justify-end px-2">
+                  <dt className="mt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">{s.k}</dt>
+                  <dd className={`max-w-full truncate font-display leading-none ${"small" in s ? "pt-1 text-[15px]" : "text-xl"}`}>{s.v}</dd>
+                </div>
+              ))}
+            </dl>
+
+            <div className="relative mt-4 grid grid-cols-2 gap-2">
+              <Link href="/" className="btn-glow flex h-12 items-center justify-center gap-1.5 rounded-full text-sm font-semibold">
+                <Plus size={17} strokeWidth={2.4} aria-hidden />{P.createVideo}
+              </Link>
+              <Link href="/orders" className="flex h-12 items-center justify-center rounded-full border border-line bg-surface text-sm font-semibold transition-colors hover:border-ink">
+                {kk.gallery.title}
+              </Link>
+            </div>
+          </section>
+
+          {/* Guest (photos uploaded from an ad, not confirmed yet): keep them by signing in with Telegram. */}
+          {guest && (
+            <section className="mt-4 rounded-card border border-line/80 bg-surface p-4 sm:p-6">
+              <p className="font-semibold">{kk.account.guestTitle}</p>
+              <p className="mb-3 mt-0.5 text-sm text-muted">{kk.account.guestText}</p>
+              <TelegramBotLogin next="/account" compact />
+            </section>
+          )}
+
+          {/* Inside the Telegram Mini App the account is the Telegram account: no logout there. */}
+          <section className="tg-hide mt-5 hidden justify-center md:flex">
+            <LogoutButton action={logoutAction} />
+          </section>
+      </aside>
+
+      {/* Right: your works and the menu. */}
+      <div className="min-w-0 md:[&>section:first-child]:mt-0">
+
+          {/* Latest works: straight back to a video. */}
+          <section className="mt-6">
+            <div className="mb-2.5 flex items-center justify-between px-1">
+              <h2 className="t-eyebrow text-muted">{P.recent}</h2>
+              {recent.length > 0 && <Link href="/orders" className="text-sm font-medium text-ink underline-offset-4 hover:underline">{P.all}</Link>}
+            </div>
+            {recent.length ? (
+              <ul className="grid grid-cols-4 gap-2">
+                {recent.map((o) => {
+                  const t = Array.isArray(o.templates) ? o.templates[0] : o.templates;
+                  const thumb = mediaUrl(t?.cover_thumb_path ?? t?.cover_asset_path ?? null);
+                  const st = statusOf(o);
+                  return (
+                    <li key={o.id}>
+                      <Link href={`/orders/${o.id}`} className="group relative block aspect-[3/4] overflow-hidden rounded-xl bg-mist ring-1 ring-black/5">
+                        {thumb && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={thumb} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
+                        )}
+                        <span className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/65 to-transparent" aria-hidden />
+                        <span className="absolute inset-x-1.5 bottom-1.5 flex items-center gap-1 text-[10px] font-medium text-white">
+                          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${st.dot}`} aria-hidden />
+                          <span className="truncate">{st.label}</span>
+                        </span>
+                        <span className="sr-only">{o.template_snapshot_json?.title_kk ?? ""}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div className="rounded-card border border-dashed border-line bg-surface/60 px-5 py-6 text-center">
+                <p className="font-semibold">{P.emptyTitle}</p>
+                <p className="mx-auto mt-1 max-w-xs text-sm text-muted">{P.emptyText}</p>
+                <Link href="/" className="mt-4 inline-flex h-10 items-center rounded-full bg-ink px-5 text-sm font-semibold text-paper">{P.pick}</Link>
+              </div>
+            )}
+          </section>
+        <div>
+
+            <Group title={P.creative}>
+              <Row href="/" icon={Clapperboard} label={P.videoTemplates} hint={P.videoTemplatesHint} />
+              {!PHOTOS_SOON && <Row href="/photos" icon={ImageIcon} label={P.photoTemplates} hint={P.photoTemplatesHint} />}
+              <Row href="/create" icon={Sparkles} label={P.ownVideo} hint={P.ownVideoHint} />
+            </Group>
+
+            <Group title={P.help}>
+              <Row href="/support" icon={LifeBuoy} label={kk.nav.support} hint={kk.legal.supportText} />
+              <Row href="/terms" icon={FileText} label={kk.footer.terms} />
+              <Row href="/privacy" icon={ShieldCheck} label={kk.footer.privacy} />
+              <Row href="/refund" icon={Undo2} label={kk.footer.refund} />
+              {isStaff(user.role) && <Row href="/admin" icon={Wrench} label={kk.nav.admin} hint={kk.account.roles[user.role]} />}
+            </Group>
         </div>
-      </section>
-
-      {/* Guest (photos uploaded from an ad, not confirmed yet): keep them by signing in with Telegram. */}
-      {guest && (
-        <section className="mt-4 rounded-card border border-line/80 bg-surface p-4 sm:p-6">
-          <p className="font-semibold">{kk.account.guestTitle}</p>
-          <p className="mb-3 mt-0.5 text-sm text-muted">{kk.account.guestText}</p>
-          <TelegramBotLogin next="/account" compact />
+        <section className="tg-hide mt-8 flex justify-center md:hidden">
+          <LogoutButton action={logoutAction} />
         </section>
-      )}
-
-      {/* Latest works: straight back to a video. */}
-      <section className="mt-6">
-        <div className="mb-2.5 flex items-center justify-between px-1">
-          <h2 className="t-eyebrow text-muted">{P.recent}</h2>
-          {recent.length > 0 && <Link href="/orders" className="text-sm font-medium text-ink underline-offset-4 hover:underline">{P.all}</Link>}
-        </div>
-        {recent.length ? (
-          <ul className="grid grid-cols-4 gap-2">
-            {recent.map((o) => {
-              const t = Array.isArray(o.templates) ? o.templates[0] : o.templates;
-              const thumb = mediaUrl(t?.cover_thumb_path ?? t?.cover_asset_path ?? null);
-              const st = statusOf(o);
-              return (
-                <li key={o.id}>
-                  <Link href={`/orders/${o.id}`} className="group relative block aspect-[3/4] overflow-hidden rounded-xl bg-mist ring-1 ring-black/5">
-                    {thumb && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={thumb} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
-                    )}
-                    <span className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/65 to-transparent" aria-hidden />
-                    <span className="absolute inset-x-1.5 bottom-1.5 flex items-center gap-1 text-[10px] font-medium text-white">
-                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${st.dot}`} aria-hidden />
-                      <span className="truncate">{st.label}</span>
-                    </span>
-                    <span className="sr-only">{o.template_snapshot_json?.title_kk ?? ""}</span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <div className="rounded-card border border-dashed border-line bg-surface/60 px-5 py-6 text-center">
-            <p className="font-semibold">{P.emptyTitle}</p>
-            <p className="mx-auto mt-1 max-w-xs text-sm text-muted">{P.emptyText}</p>
-            <Link href="/" className="mt-4 inline-flex h-10 items-center rounded-full bg-ink px-5 text-sm font-semibold text-paper">{P.pick}</Link>
-          </div>
-        )}
-      </section>
-
-      <Group title={P.creative}>
-        <Row href="/" icon={Clapperboard} label={P.videoTemplates} hint={P.videoTemplatesHint} />
-        {!PHOTOS_SOON && <Row href="/photos" icon={ImageIcon} label={P.photoTemplates} hint={P.photoTemplatesHint} />}
-        <Row href="/create" icon={Sparkles} label={P.ownVideo} hint={P.ownVideoHint} />
-      </Group>
-
-      <Group title={P.help}>
-        <Row href="/support" icon={LifeBuoy} label={kk.nav.support} hint={kk.legal.supportText} />
-        <Row href="/terms" icon={FileText} label={kk.footer.terms} />
-        <Row href="/privacy" icon={ShieldCheck} label={kk.footer.privacy} />
-        <Row href="/refund" icon={Undo2} label={kk.footer.refund} />
-        {isStaff(user.role) && <Row href="/admin" icon={Wrench} label={kk.nav.admin} hint={kk.account.roles[user.role]} />}
-      </Group>
-
-      {/* Inside the Telegram Mini App the account is the Telegram account: no logout there. */}
-      <section className="tg-hide mt-8 flex justify-center">
-        <LogoutButton action={logoutAction} />
-      </section>
-    </>
+      </div>
+    </div>
   );
 }
