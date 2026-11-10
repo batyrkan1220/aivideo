@@ -1,5 +1,4 @@
 "use client";
-import { Flame } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { kk } from "@/lib/i18n/kk";
@@ -230,18 +229,18 @@ export function TemplateCard({ t, priority = false, aspect = "aspect-[3/4]", wal
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
         <div className="absolute left-2 top-2 flex flex-col items-start gap-1 sm:left-2.5 sm:top-2.5">
           {t.isTrending && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-night shadow-[0_4px_12px_-4px_rgba(0,0,0,0.35)] sm:px-2.5 sm:py-1 sm:text-[11px]"><Flame size={11} strokeWidth={2.6} aria-hidden />{kk.catalog2.trendBadge}</span>
+            <span className="rounded-md bg-white/90 px-1.5 py-0.5 text-[11px] font-medium text-ink">{kk.catalog2.trendBadge}</span>
           )}
           {/* People in the template (only worth showing for 2+). */}
           {t.faceCount > 1 && (
             // Overlapping avatar stack (+count) — one circle per person in the video.
             <span className="flex items-center" aria-label={kk.catalog.faces(t.faceCount)}>
-              {["bg-brand-soft", "bg-peach", "bg-rose"].slice(0, Math.min(t.faceCount, 3)).map((bg, i) => (
-                <span key={bg} className={`-ml-1.5 flex h-5 w-5 items-center justify-center rounded-full text-night ring-2 ring-white first:ml-0 sm:h-6 sm:w-6 ${bg}`} style={{ zIndex: 3 - i }} aria-hidden>
+              {["p1", "p2", "p3"].slice(0, Math.min(t.faceCount, 3)).map((bg, i) => (
+                <span key={bg} className={`-ml-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-white/90 text-ink ring-2 ring-black/20 first:ml-0 sm:h-6 sm:w-6`} style={{ zIndex: 3 - i }} aria-hidden>
                   <svg viewBox="0 0 24 24" className="h-3 w-3 sm:h-3.5 sm:w-3.5" fill="currentColor"><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm-8.5 9a8.5 8.5 0 0 1 17 0z" /></svg>
                 </span>
               ))}
-              {t.faceCount > 3 && <span className="-ml-1.5 flex h-5 min-w-5 items-center sm:h-6 sm:min-w-6 justify-center rounded-full bg-night px-1 text-[10px] font-bold text-white ring-2 ring-white">+{t.faceCount - 3}</span>}
+              {t.faceCount > 3 && <span className="-ml-1.5 flex h-5 min-w-5 items-center sm:h-6 sm:min-w-6 justify-center rounded-full bg-ink px-1 text-[10px] font-medium text-paper ring-2 ring-black/20">+{t.faceCount - 3}</span>}
             </span>
           )}
         </div>

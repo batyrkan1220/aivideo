@@ -347,65 +347,11 @@ body:has(> .theme-app.theme-mono) { background: #f5f4f1; }
 .theme-app.theme-mono .btn-glow:active { transform: translateY(0) scale(0.98); }
 .theme-app.theme-mono .skeleton { background-image: linear-gradient(90deg, #ecebe7 0%, #f7f6f3 50%, #ecebe7 100%); }
 
-/* Hero atmosphere: slow drifting mesh light, scanner line, floating cards, CTA glow. */
-@keyframes tm-drift-a { 0%, 100% { transform: translate3d(0, 0, 0) scale(1); } 50% { transform: translate3d(8%, 6%, 0) scale(1.12); } }
-@keyframes tm-drift-b { 0%, 100% { transform: translate3d(0, 0, 0) scale(1.05); } 50% { transform: translate3d(-10%, -4%, 0) scale(0.92); } }
-@keyframes tm-scan { 0% { transform: translateY(-100%); } 100% { transform: translateY(0); } }
-@keyframes tm-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-@keyframes tm-cta-glow { 0%, 100% { box-shadow: 0 0 0 0 rgb(0 0 0 / 0.25), 0 12px 28px -14px rgb(0 0 0 / 0.6); } 50% { box-shadow: 0 0 0 7px rgb(0 0 0 / 0), 0 16px 36px -14px rgb(0 0 0 / 0.7); } }
-@keyframes tm-bar { 0% { transform: scaleX(0.06); } 70% { transform: scaleX(1); } 100% { transform: scaleX(1); } }
-@keyframes tm-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+/* Hero: one entrance (text rises, cards fade); no loops. */
 /* No blur here: a filter on an ancestor flattens the 3D cards while it runs, and they jumped when it ended (tablets). */
 @keyframes tm-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 @keyframes tm-fade { from { opacity: 0; } to { opacity: 1; } }
 @utility hero-rise { animation: tm-rise 0.8s var(--ease-out) both; }
-@utility hero-float { animation: tm-float 7s ease-in-out infinite; }
 /* The 3D cards only fade in: moving them (or their parent) made the playing card and its frame shake on iPads. */
 @utility hero-fade { animation: tm-fade 0.7s var(--ease-out) both; }
-@utility hero-scan { animation: tm-scan 3.2s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate; }
-@utility hero-blink { animation: tm-blink 1.6s ease-in-out infinite; }
-@utility hero-bar { animation: tm-bar 5s var(--ease-out) infinite; }
-@utility drift-a { animation: tm-drift-a 22s ease-in-out infinite; }
-@utility drift-b { animation: tm-drift-b 28s ease-in-out infinite; }
-.cta-neon { transition: transform 0.25s var(--ease-out), background-color 0.2s; }
-.cta-neon:hover { transform: scale(1.05); animation: tm-cta-glow 1.6s ease-in-out infinite; }
-.cta-neon:active { transform: scale(0.98); }
 .font-accent { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.03em; }
-
-
-/* «Выбрать тренд»: neural-network look — black pill, a slowly turning iridescent rim, a light sweep
-   across, twinkling sparkles. Motion stops for people who ask for reduced motion. */
-@property --ai-angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
-.cta-ai {
-  position: relative; isolation: isolate; overflow: hidden;
-  background: #0e0e0e; color: #fff;
-  box-shadow: 0 18px 40px -18px rgb(124 92 255 / 0.65), 0 10px 24px -14px rgb(0 0 0 / 0.6);
-  transition: transform .25s var(--ease-out), box-shadow .25s;
-}
-.cta-ai::before { /* iridescent rim */
-  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; z-index: -1;
-  background: conic-gradient(from var(--ai-angle), #7c5cff, #22d3ee, #f0abfc, #ffffff, #7c5cff);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
-  animation: tm-ai-spin 4s linear infinite;
-}
-.cta-ai::after { /* light sweep */
-  content: ""; position: absolute; inset: -40% auto -40% -30%; width: 35%; z-index: -1;
-  background: linear-gradient(100deg, transparent, rgb(255 255 255 / 0.22), transparent);
-  transform: skewX(-18deg); animation: tm-ai-sweep 3.2s ease-in-out infinite;
-}
-.cta-ai:hover { transform: translateY(-1px) scale(1.03); box-shadow: 0 22px 46px -16px rgb(124 92 255 / 0.8), 0 10px 24px -14px rgb(0 0 0 / 0.6); }
-.cta-ai:active { transform: scale(0.98); }
-.cta-ai .ai-glow { /* soft colour behind the text */
-  position: absolute; inset: 0; z-index: -1; opacity: .55;
-  background: radial-gradient(60% 120% at 15% 50%, rgb(124 92 255 / .35), transparent 60%), radial-gradient(60% 120% at 85% 50%, rgb(34 211 238 / .25), transparent 60%);
-}
-.cta-ai .ai-text { background: linear-gradient(90deg, #fff, #e9e3ff 40%, #c8f6ff 70%, #fff); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.cta-ai .ai-spark { animation: tm-ai-twinkle 2.2s ease-in-out infinite; }
-@keyframes tm-ai-spin { to { --ai-angle: 360deg; } }
-@keyframes tm-ai-sweep { 0% { left: -40%; } 55%, 100% { left: 120%; } }
-@keyframes tm-ai-twinkle { 0%, 100% { transform: scale(1) rotate(0); opacity: 1; } 50% { transform: scale(.75) rotate(20deg); opacity: .7; } }
-@keyframes tm-ai-down { 0%, 100% { transform: translateY(-2px); } 50% { transform: translateY(3px); } }
-.cta-ai .ai-down { animation: tm-ai-down 1.6s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) {
-  .cta-ai::before, .cta-ai::after, .cta-ai .ai-spark, .cta-ai .ai-down { animation: none; }
-}
