@@ -100,7 +100,7 @@ function Quick({ href, icon: Icon, title, hint }: { href: string; icon: LucideIc
 async function Contact({ light = false }: { light?: boolean }) {
   await connection();
   // The button must never disappear: if Telegram's getMe is unreachable, use the known bot name.
-  const bot = (await botUsername().catch(() => null)) ?? "trendmebot";
+  const bot = (await botUsername().catch(() => null)) ?? "Trendmekzbot";
   return (
     <a href={`https://t.me/${bot}?start=support`} target="_blank" rel="noopener noreferrer"
       className={light

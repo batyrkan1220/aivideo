@@ -1,7 +1,7 @@
 "use client";
 import { launchInitData, telegramApp } from "@/lib/telegram/client";
 
-const BOT = "trendmebot";
+const BOT = "Trendmekzbot";
 
 /** Small message at the bottom of the screen. */
 export function toast(text: string) {

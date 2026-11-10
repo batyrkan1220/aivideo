@@ -922,7 +922,7 @@ export const kk = {
     },
   },
   result: {
-    storyText: "Сделано в TrendMe ✨ @trendmebot",
+    storyText: "Сделано в TrendMe ✨ @Trendmekzbot",
     ready: "Видео готово!",
     readyPhoto: "Фото готово!",
     badge: "Готово",
