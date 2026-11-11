@@ -139,13 +139,23 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
   const tr = thingRefs(objects, people);
   const things = objects.map((o, j) => ({ what: o.what.trim().toLowerCase(), look: o.look?.trim() ?? "", refs: tr[j], ref: listRefs(tr[j]), shown: shown(people + j) }));
   const outfitRef = things.find((t) => ["outfit", "clothes", "clothing"].includes(t.what))?.ref;
-  const spot = (i: number) => `${findBy(positions[i]) || `number ${i + 1} from the left`}${shown(i)}`;
+  // Who is who by their look first, the side only as a hint: with a moving camera one person is often
+  // alone and centred in the frame, and "on the right" then matched nobody (TM-100064/71: the woman stayed).
+  const spot = (i: number) => {
+    const by = findBy(positions[i]);
+    const [side, ...rest] = by.split(",");
+    const look = rest.join(",").trim();
+    if (!by) return `person number ${i + 1} from the left${shown(i)}`;
+    return look
+      ? `${look} (${side.trim()} when both are in the frame; the same person wherever they are, also alone or centred in the frame)${shown(i)}`
+      : `person ${by}${shown(i)}`;
+  };
   const who = people === 1
     ? `Replace ${findBy(positions[0]) ? `the person ${findBy(positions[0])}` : "the main person"}${shown(0)} in @video_1 with the person from @image_1. ` +
       "That description only tells which person in @video_1 to replace; their face, hair and body all become the person from @image_1."
     : [
         `There are ${people} people to replace in @video_1. Replace every one of them, in every frame:`,
-        ...refs.map((r, i) => `- The person ${spot(i)} becomes the person from ${r}.`),
+        ...refs.map((r, i) => `- The ${spot(i)} becomes the person from ${r}.`),
         `All ${people} must be replaced; none of them may keep the face or look of the original person.`,
         `${refs.join(", ")} are ${people} different people: each one goes only to their own place. Do not swap, blend or mix their faces.`,
       ].join("\n");
