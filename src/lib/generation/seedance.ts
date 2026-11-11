@@ -88,7 +88,7 @@ export const seedanceProvider: GenerationProvider = {
     if (cfg.engine !== "kling") {
       const wish = cfg.allowWish ? cleanWish(extra.wish) : "";
       const prompt = buildKlingDirectPrompt("edit", outfit, cfg.prompt, wish, people, cfg.positions, objects, []);
-      return startFal(input.jobId, cfg.engine, input.templateVideoUrl, usedPhotos, people, prompt, durationSec, resolution);
+      return startFal(input.jobId, cfg.engine, input.templateVideoUrl, usedPhotos, people, prompt, durationSec, resolution, cfg.positions.slice(0, people));
     }
     // Step 1: a Character Sheet of each person (Kling image), then the video (getStatus sends it).
     if (people > 0 && !input.sheets) {
@@ -609,24 +609,34 @@ async function logSheet(orderId: string | null, t: SheetTask, result: string) {
   - wan_replace: Wan 2.2 Animate Replace: one photo per run (it replaces the main person), so with
     several people each run goes on the previous result.
 */
-type FalEngine = "seedance25" | "wan_replace";
+type FalEngine = "seedance25" | "wan_replace" | "minimax_recast";
 type FalRun = { stage: "fal"; engine: FalEngine; req: FalRequest; k: number; photos: string[]; people: number; resolution: "720p" | "1080p"; jobId?: string };
 
 const FAL_MODEL: Record<FalEngine, string> = {
   seedance25: "bytedance/seedance-2.5/reference-to-video",
   wan_replace: "fal-ai/wan/v2.2-14b/animate/replace",
+  minimax_recast: "minimax/h3-max/recast",
 };
 // Rough USD per second of video, for the order's cost line (fal bills by its own units).
-const FAL_USD_PER_SEC: Record<FalEngine, number> = { seedance25: 0.5, wan_replace: 0.16 };
+const FAL_USD_PER_SEC: Record<FalEngine, number> = { seedance25: 0.5, wan_replace: 0.16, minimax_recast: 0.12 };
 
 const toFalRefs = (prompt: string) => prompt.replace(/@video_(\d+)/g, "@Video$1").replace(/@image_(\d+)/g, "@Image$1");
 
-function falInput(engine: FalEngine, videoUrl: string, photos: string[], k: number, prompt: string, resolution: "720p" | "1080p") {
+function recastPrompt(positions: string[]) {
+  const who = positions.map((p, i) => `reference image ${i + 1} replaces the person ${findBy(p) || `number ${i + 1} from the left`}`);
+  return `${who.join("; ")}. Each new person keeps the exact face, hair and skin of their reference image in every shot. Keep everything else unchanged.`.slice(0, 1500);
+}
+
+function falInput(engine: FalEngine, videoUrl: string, photos: string[], k: number, prompt: string, resolution: "720p" | "1080p", people = 1, positions: string[] = []) {
   if (engine === "seedance25") {
     return {
       // Editing keeps the template's own framing and length (fal sets them to auto for this task).
       prompt: toFalRefs(prompt), task: "editing", video_urls: [videoUrl], image_urls: photos.slice(0, 30), resolution,
     };
+  }
+  if (engine === "minimax_recast") {
+    // One photo per person, matched left to right by default; the prompt names who is who.
+    return { video_url: videoUrl, reference_image_urls: photos.slice(0, Math.max(1, people)), prompt: recastPrompt(positions), resolution: "768P" };
   }
   return {
     video_url: videoUrl, image_url: photos[k],
@@ -636,18 +646,18 @@ function falInput(engine: FalEngine, videoUrl: string, photos: string[], k: numb
   };
 }
 
-async function startFal(jobId: string, engine: FalEngine, videoUrl: string, photos: string[], people: number, prompt: string, durationSec: number, resolution: "720p" | "1080p") {
+async function startFal(jobId: string, engine: FalEngine, videoUrl: string, photos: string[], people: number, prompt: string, durationSec: number, resolution: "720p" | "1080p", positions: string[]) {
   const { falSubmit } = await import("./fal");
-  const req = await falSubmit(FAL_MODEL[engine], falInput(engine, videoUrl, photos, 0, prompt, resolution));
+  const req = await falSubmit(FAL_MODEL[engine], falInput(engine, videoUrl, photos, 0, prompt, resolution, people, positions));
   const steps = engine === "wan_replace" ? Math.max(1, people) : 1;
-  await noteTask(jobId, req.requestId, engine === "seedance25" ? "fal · Seedance 2.5 · видео целиком" : `fal · Wan Replace · человек 1 из ${steps}`);
+  await noteTask(jobId, req.requestId, engine === "seedance25" ? "fal · Seedance 2.5 · видео целиком" : engine === "minimax_recast" ? `fal · MiniMax Recast · ${people} чел. за один раз` : `fal · Wan Replace · человек 1 из ${steps}`);
   const run: FalRun = { stage: "fal", engine, req, k: 0, photos, people: steps, resolution, jobId };
   return { providerJobId: req.requestId, cost: Math.round(FAL_USD_PER_SEC[engine] * durationSec * 100) / 100, state: run as unknown as ProviderState };
 }
 
 function falOf(state: ProviderState): FalRun | null {
   const s = state as Partial<FalRun> | null;
-  if (!s || s.stage !== "fal" || (s.engine !== "seedance25" && s.engine !== "wan_replace") || !s.req || typeof s.req.statusUrl !== "string") return null;
+  if (!s || s.stage !== "fal" || !s.engine || !(s.engine in FAL_MODEL) || !s.req || typeof s.req.statusUrl !== "string") return null;
   return { stage: "fal", engine: s.engine, req: s.req as FalRequest, k: Number(s.k) || 0, photos: Array.isArray(s.photos) ? s.photos.filter((x): x is string => typeof x === "string") : [],
     people: Number(s.people) || 1, resolution: s.resolution === "1080p" ? "1080p" : "720p", jobId: typeof s.jobId === "string" ? s.jobId : undefined };
 }
