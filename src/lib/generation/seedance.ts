@@ -135,12 +135,16 @@ export const seedanceProvider: GenerationProvider = {
       // With cuts: every shot goes through every person's run, then the shots are joined (TM-100038).
       const shotRun = await startShots(input.jobId, input.templateVideoUrl, passesFor(true), cfg.aspectRatio, resolution, pricing, cfg.shotMap);
       if (shotRun) return shotRun;
-      const providerJobId = await submitKlingOmni({ videoUrl: input.templateVideoUrl, mode: "edit", durationSec, aspectRatio: cfg.aspectRatio, resolution, ...withKeep(passes[0]) });
+      // Each later run edits the previous result. At 720p the next person was drawn on an already
+      // compressed copy and came out smeared ("1-ші адам таза, 2-ші шайылып қалады"): runs before the last
+      // one are made at 1080p, so the next run starts from a full-quality picture.
+      const midRes = (k: number): "720p" | "1080p" => (k < people - 1 ? "1080p" : resolution);
+      const providerJobId = await submitKlingOmni({ videoUrl: input.templateVideoUrl, mode: "edit", durationSec, aspectRatio: cfg.aspectRatio, resolution: midRes(0), ...withKeep(passes[0]) });
       console.log("[kling] person 1 of", people);
       await noteTask(input.jobId, providerJobId, `человек 1 из ${people}`);
       return {
         providerJobId,
-        cost: seedanceCostUsd(durationSec, pricing, {}, resolution),
+        cost: seedanceCostUsd(durationSec, pricing, {}, midRes(0)),
         state: { stage: "pass", k: 0, passes, durationSec, aspectRatio: cfg.aspectRatio, resolution, jobId: input.jobId },
       };
     }
@@ -175,12 +179,13 @@ export const seedanceProvider: GenerationProvider = {
       // One person per run: the next run edits the previous result.
       if (st.state !== "succeeded" || run.k + 1 >= run.passes.length) return st;
       const k = run.k + 1;
-      const id = await submitKlingOmni({ videoUrl: st.outputUrl, mode: "edit", durationSec: run.durationSec, aspectRatio: run.aspectRatio, resolution: run.resolution, ...withKeep(run.passes[k]) });
+      const res = k < run.passes.length - 1 ? "1080p" : run.resolution;
+      const id = await submitKlingOmni({ videoUrl: st.outputUrl, mode: "edit", durationSec: run.durationSec, aspectRatio: run.aspectRatio, resolution: res, ...withKeep(run.passes[k]) });
       console.log("[kling] person", k + 1, "of", run.passes.length);
       await noteTask(run.jobId, id, `человек ${k + 1} из ${run.passes.length}`);
       return {
         state: "processing",
-        next: { providerJobId: id, state: { ...run, k } as ProviderState, cost: seedanceCostUsd(run.durationSec, await seedancePricingSettings(), {}, run.resolution) },
+        next: { providerJobId: id, state: { ...run, k } as ProviderState, cost: seedanceCostUsd(run.durationSec, await seedancePricingSettings(), {}, res) },
       };
     }
     const fb = fallbackOf(ctx.state);
@@ -394,7 +399,8 @@ const sendShot = (run: ShotRun, k: number) => {
   return submitKlingOmni({
     videoUrl: (s.k ?? 0) > 0 && s.mid ? s.mid : s.url, photoUrls: [...pass.photoUrls, ...looks], mode: "edit",
     prompt: lookRefs.length ? `${pass.prompt} ${lookNote(lookRefs, pass)}` : pass.prompt,
-    durationSec: klingShotSec(s.len), aspectRatio: run.aspectRatio, resolution: run.resolution,
+    // A run that another run in this shot will edit is made at 1080p (see midRes in submit).
+    durationSec: klingShotSec(s.len), aspectRatio: run.aspectRatio, resolution: (s.k ?? 0) < runs.length - 1 ? "1080p" : run.resolution,
   });
 };
 
