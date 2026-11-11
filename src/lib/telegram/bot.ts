@@ -78,13 +78,21 @@ export async function notifyOrderOwner(orderId: string, key: "invoice_sent" | "p
 }
 
 /** Uploads a video file to a chat (multipart, up to 50 MB). Returns false on any error; never logs the token. */
-export async function sendVideoFile(chatId: number, file: Blob, fileName: string, caption?: string): Promise<boolean> {
+export async function sendVideoFile(chatId: number, file: Blob, fileName: string, caption?: string,
+  meta?: { width: number; height: number; duration: number; thumb?: Blob | null }): Promise<boolean> {
   const token = env().TELEGRAM_BOT_TOKEN;
   if (!token) return false;
   try {
     const fd = new FormData();
     fd.set("chat_id", String(chatId));
     fd.set("supports_streaming", "true");
+    // Without its size Telegram drew the video as a square (stretched); with it, as it is.
+    if (meta && meta.width > 0 && meta.height > 0) {
+      fd.set("width", String(meta.width));
+      fd.set("height", String(meta.height));
+      if (meta.duration > 0) fd.set("duration", String(Math.round(meta.duration)));
+      if (meta.thumb) fd.set("thumbnail", meta.thumb, "thumb.jpg");
+    }
     if (caption) fd.set("caption", caption);
     fd.set("video", file, fileName);
     const res = await fetch(`https://api.telegram.org/bot${token}/sendVideo`, { method: "POST", body: fd, signal: AbortSignal.timeout(90_000), cache: "no-store" });
