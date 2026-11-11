@@ -56,14 +56,6 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
     const { data } = await db.storage.from("user-uploads").createSignedUrl(a.private_storage_path, 600);
     return data ? { url: data.signedUrl, label: slotNames.get(a.face_slot_key) ?? a.face_slot_key, size: a.width && a.height ? `${a.width}×${a.height}` : "" } : null;
   }))).filter((x): x is { url: string; label: string; size: string } => !!x);
-  // Two people: the latest Kling run of each person alone (only that person replaced) can be kept,
-  // and only the other person made again (see remakeOrder).
-  const keepRuns = [0, 1].flatMap((person) => {
-    const re = new RegExp(`^человек ${person + 1} из 2( \\(параллельно\\)| — готовый, без изменений)?$`);
-    const l = (logs ?? []).filter((x) => x.action === "generation.kling_task").map((x) => x.metadata_json as { task?: string; step?: string } | null)
-      .filter((m) => m?.task && re.test(m.step ?? "") && (person === 0 || /параллельно|готовый/.test(m.step ?? "")))[0];
-    return l?.task ? [{ person, task: l.task }] : [];
-  });
   // Character Sheets made before the video (log entries with their files), newest run first.
   const sheetLogs = (logs ?? []).filter((l) => l.action === "generation.character_sheet")
     .map((l) => ({ at: l.created_at as string, ...(l.metadata_json as { person?: number; path?: string | null; result?: string; task?: string } | null ?? {}) }));
@@ -182,12 +174,6 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
           <ActionForm action={remakeOrder} fields={{ orderId: o.id }} label="↻ Пересоздать бесплатно"
             confirm={`Создать видео ${o.public_order_number} заново бесплатно? Новое видео заменит старое и придёт клиенту в Telegram.`} />
         )}
-        {can(u.role, "orders.retry") && o.payment_status === "succeeded" && ["completed", "failed", "cancelled"].includes(o.generation_status) && !o.photos_deleted_at && !(kids ?? []).length &&
-          keepRuns.map((r) => (
-            <ActionForm key={r.task} action={remakeOrder} fields={{ orderId: o.id, keepPerson: String(r.person), keepTask: r.task }}
-              label={`↻ Переделать только человека ${2 - r.person} (человек ${r.person + 1} готов)`}
-              confirm={`Человек ${r.person + 1} берётся из готовой задачи Kling ${r.task} без изменений, человек ${2 - r.person} делается заново на чистом шаблоне, потом оба объединяются. Новое видео заменит старое и придёт клиенту в Telegram. Продолжить?`} />
-          ))}
         {can(u.role, "orders.cancel") && activeJob && (
           <ActionForm action={cancelGeneration} fields={{ orderId: o.id }} label={A.cancel} confirm={A.cancelConfirm} />
         )}

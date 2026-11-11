@@ -19,7 +19,6 @@ type Job = {
   id: string; order_id: string; provider: string; provider_job_id: string | null; status: string;
   attempt_count: number; started_at: string | null; provider_cost: number | null;
   provider_state: Record<string, unknown> | null;
-  options_json?: Record<string, unknown> | null;
 };
 
 const POLL_EVERY_MS = 5_000;
@@ -193,8 +192,6 @@ async function submitJob(job: Job) {
     durationSec: Number(snap.video_duration_sec ?? snap.user_video_duration_sec) || null,
     ...(typeof snap.customer_wish === "string" ? { wish: snap.customer_wish } : {}),
     ...(snap.customer_outfit === "photo" || snap.customer_outfit === "template" ? { customerOutfit: snap.customer_outfit } : {}),
-    // Admin: keep one person's finished run, make only the other again.
-    ...(job.options_json?.reuse ? { reuse: job.options_json.reuse } : {}),
   };
   // Photo templates: the template's example photo (cover) is the composition reference.
   const templateFrameUrl = mediaUrl((snap.cover_asset_path as string) ?? null);

@@ -42,7 +42,9 @@ export const qualityCostFactor = (providerQuality?: string | null) => (providerQ
  * with 2–3 people is edited once per person: the Kling cost (and the automatic price) is × people.
  */
 export type CostOpts = { mode?: string; people?: number };
-export const klingPasses = (o: CostOpts = {}) => Math.max(1, Math.min(5, Math.round(o.people ?? 1)));
+// One Kling run per video, however many people (one run per person was dropped: TM-100058/62), so the
+// price is that of one run. CostOpts stays for callers.
+export const klingPasses = (_o: CostOpts = {}) => 1;
 
 /** Kling units for a template video of this length (720p). 1080p is this × HD1080_FACTOR. */
 export function klingUnits(durationSec: number, s: SeedancePricing): number {
