@@ -668,7 +668,7 @@ async function logSheet(orderId: string | null, t: SheetTask, result: string) {
 // ---------------------------------------------------------------- two people in parallel
 type SplitRun = {
   stage: "split"; ids: (string | null)[]; outs: (string | null)[]; passes: Pass[]; template: string;
-  durationSec: number; aspectRatio: string; resolution: "720p" | "1080p"; jobId?: string;
+  durationSec: number; aspectRatio: string; resolution: "720p" | "1080p"; jobId?: string; mergeTries?: number;
 };
 
 function splitOf(state: ProviderState): SplitRun | null {
@@ -678,6 +678,7 @@ function splitOf(state: ProviderState): SplitRun | null {
     stage: "split", ids: s.ids.map((x) => (typeof x === "string" ? x : null)), outs: (Array.isArray(s.outs) ? s.outs : [null, null]).map((x) => (typeof x === "string" ? x : null)),
     passes: s.passes as Pass[], template: s.template, durationSec: s.durationSec, aspectRatio: typeof s.aspectRatio === "string" ? s.aspectRatio : "adaptive",
     resolution: s.resolution === "1080p" ? "1080p" : "720p", jobId: typeof s.jobId === "string" ? s.jobId : undefined,
+    ...(typeof (s as { mergeTries?: unknown }).mergeTries === "number" ? { mergeTries: (s as { mergeTries: number }).mergeTries } : {}),
   };
 }
 
@@ -704,7 +705,14 @@ async function splitStatus(run: SplitRun): Promise<ProviderJobStatus> {
     if (st.state === "succeeded") { cur.outs[k] = st.outputUrl; changed = true; }
   }
   if (cur.outs[0] && cur.outs[1]) {
+    // A merge that takes the server down (out of memory) must not run again and again: the attempt is
+    // written down first; after two the second person goes on the first result instead.
+    const tries = run.mergeTries ?? 0;
+    if (run.jobId && tries < 2) {
+      await supabaseAdmin().from("generation_jobs").update({ provider_state: { ...cur, mergeTries: tries + 1 } }).eq("id", run.jobId);
+    }
     try {
+      if (tries >= 2) throw new Error("merge tried twice");
       const { mergeEdits } = await import("@/lib/media/merge-people");
       const bytes = await mergeEdits(cur.outs[0], cur.outs[1], run.template);
       console.log("[kling] 2 people merged", Math.round(bytes.length / 1024), "KB");

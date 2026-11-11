@@ -53,7 +53,10 @@ export async function mergeFiles(a: string, b: string, t: string, out: string): 
   const fps = Math.min(60, Math.max(12, fpsM ? Number(fpsM[1]) : 24));
   const dur = /Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/.exec(info);
   const sec = dur ? Number(dur[1]) * 3600 + Number(dur[2]) * 60 + Number(dur[3]) : 0;
-  await ffmpegLog([...q, "-loglevel", "error", "-i", a, "-i", b, "-i", t, "-filter_threads", "1",
+  // "-threads 1" before EACH input: a global one only covers the first decoder, and the others took a
+  // thread (and frame buffers) per host core — the 512 MB server was killed 4 s into the first merge.
+  const one = ["-threads", "1"];
+  await ffmpegLog([...q, "-loglevel", "error", ...one, "-i", a, ...one, "-i", b, ...one, "-i", t, "-filter_threads", "1", "-filter_complex_threads", "1",
     "-filter_complex", mergeGraph(W, H, fps), "-map", "[v]", "-map", "0:a:0?",
     ...x264, "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
     ...(sec > 0 ? ["-t", sec.toFixed(3)] : []), "-movflags", "+faststart", out], 300_000);
