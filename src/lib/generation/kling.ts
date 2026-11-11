@@ -223,13 +223,14 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
 /** Kling 4.0 takes up to 10 images in one task. */
 export const KLING_MAX_IMAGES = 10;
 
-export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: string[]; mode: KlingMode; prompt: string; durationSec: number; aspectRatio: string; resolution?: "720p" | "1080p" }): Promise<string> {
+export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: string[]; mode: KlingMode; prompt: string; durationSec: number; aspectRatio: string; resolution?: "720p" | "1080p"; flash?: boolean }): Promise<string> {
   const duration = Math.min(30, Math.max(3, Math.round(opts.durationSec)));
   // Edit: the template itself is edited (base_video), so place and motion stay 1:1. Reference: a new video following it.
   const videoType = opts.mode === "edit" ? "base_video" : "feature_video";
   const aspect = ["21:9", "16:9", "9:16", "1:1", "adaptive"].includes(opts.aspectRatio) ? opts.aspectRatio : "adaptive";
   const photos = opts.photoUrls.slice(0, KLING_MAX_IMAGES);
-  const d = await call<{ data?: { id?: string } }>("/omni-video/kling-4.0", {
+  // Flash: the cheaper, faster Kling 4.0 (720p only), same request.
+  const d = await call<{ data?: { id?: string } }>(opts.flash ? "/omni-video/kling-4.0-flash" : "/omni-video/kling-4.0", {
     method: "POST",
     body: JSON.stringify({
       contents: [
@@ -238,12 +239,12 @@ export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: strin
         ...photos.map((url, i) => ({ type: "refer_image", url, id: `image_${i + 1}` })),
       ],
       // original keeps the template video's soundtrack.
-      settings: { resolution: opts.resolution === "1080p" ? "1080p" : "720p", duration, aspect_ratio: aspect, audio: "original" },
+      settings: { resolution: opts.resolution === "1080p" && !opts.flash ? "1080p" : "720p", duration, aspect_ratio: aspect, audio: "original" },
     }),
   });
   const id = d.data?.id;
   if (!id) throw new ProviderError("provider_bad_response", false, "kling: missing task id");
-  console.log("[kling] video task", id, `video=${videoType} mode=${opts.mode} images=${photos.length}`);
+  console.log("[kling] video task", id, `${opts.flash ? "flash " : ""}video=${videoType} mode=${opts.mode} images=${photos.length}`);
   return id;
 }
 

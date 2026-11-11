@@ -94,7 +94,7 @@ export const seedanceProvider: GenerationProvider = {
       await noteTask(input.jobId, id, `Kling 3.0 Omni · ${people} чел. за один раз`);
       return { providerJobId: id, cost: seedanceCostUsd(durationSec, await seedancePricingSettings(), {}, resolution), state: { stage: "kv3" } };
     }
-    if (cfg.engine !== "kling") {
+    if (cfg.engine !== "kling" && cfg.engine !== "kling_flash") {
       const wish = cfg.allowWish ? cleanWish(extra.wish) : "";
       const prompt = buildKlingDirectPrompt("edit", outfit, cfg.prompt, wish, people, cfg.positions, objects, []);
       return startFal(input.jobId, cfg.engine, input.templateVideoUrl, usedPhotos, people, prompt, durationSec, resolution, cfg.positions.slice(0, people));
@@ -127,7 +127,8 @@ export const seedanceProvider: GenerationProvider = {
     const sheetList = sheetUrls.map((url, k) => ({ url, of: `@image_${k + 1}` }));
     const sheeted = (photoUrls: string[], p: string) => withSheets({ photoUrls, prompt: p }, sheetList, sheetOnly);
     const prompt = buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, wish, people, cfg.positions, objects, targetRefs);
-    const plain = { videoUrl: input.templateVideoUrl, photoUrls: usedPhotos, mode: cfg.klingMode, durationSec, aspectRatio: cfg.aspectRatio, resolution };
+    const flash = cfg.engine === "kling_flash";
+    const plain = { videoUrl: input.templateVideoUrl, photoUrls: usedPhotos, mode: cfg.klingMode, durationSec, aspectRatio: cfg.aspectRatio, resolution, ...(flash ? { flash } : {}) };
     // A template with cuts: Kling loses the face after a cut, so each shot is edited on its own (TM-100034).
     if (cfg.klingMode === "edit") {
       const shotPrompt = buildKlingDirectPrompt("edit", outfit, cfg.prompt, wish, people, cfg.positions, objects, targetRefs, true);
@@ -182,7 +183,7 @@ function fallbackOf(state: ProviderState): Fallback | null {
   const f = (state as { fallback?: Partial<Fallback> } | null)?.fallback;
   if (!f || typeof f.videoUrl !== "string" || !Array.isArray(f.photoUrls) || typeof f.prompt !== "string" || typeof f.durationSec !== "number") return null;
   return { videoUrl: f.videoUrl, photoUrls: f.photoUrls.filter((u): u is string => typeof u === "string"), prompt: f.prompt, durationSec: f.durationSec,
-    mode: f.mode === "reference" ? "reference" : "edit", aspectRatio: typeof f.aspectRatio === "string" ? f.aspectRatio : "adaptive", resolution: f.resolution === "1080p" ? "1080p" : "720p" };
+    mode: f.mode === "reference" ? "reference" : "edit", aspectRatio: typeof f.aspectRatio === "string" ? f.aspectRatio : "adaptive", resolution: f.resolution === "1080p" ? "1080p" : "720p", ...(f.flash ? { flash: true } : {}) };
 }
 
 /**
