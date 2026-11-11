@@ -631,7 +631,8 @@ function falInput(engine: FalEngine, videoUrl: string, photos: string[], k: numb
   return {
     video_url: videoUrl, image_url: photos[k],
     prompt: "Replace the main person in the video with the person from the image: the same face, hair and skin, natural and photorealistic. Keep the motion, camera, background and lighting.",
-    resolution: "720p", video_quality: "high",
+    // Turbo: 720p with 20 steps took over 8 minutes for 13 s (TM-100067).
+    resolution: "720p", video_quality: "high", use_turbo: true,
   };
 }
 
