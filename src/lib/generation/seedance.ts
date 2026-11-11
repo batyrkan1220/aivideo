@@ -603,6 +603,7 @@ async function sheetStatus(providerJobId: string, run: SheetRun): Promise<Provid
   } catch (err) {
     // Busy: try the video again on the next poll, with the sheets already stored.
     if (err instanceof ProviderError && err.retryable) return { state: "processing", next: { providerJobId, state: cur as unknown as ProviderState } };
+    console.error("[kling] video after sheets refused", err instanceof ProviderError ? `${err.code} ${err.message.slice(0, 300)}` : "error");
     return { state: "failed", errorCode: err instanceof ProviderError ? err.code : "provider_failed", retryable: false };
   }
 }
@@ -810,6 +811,8 @@ async function elementsStatus(providerJobId: string, run: ElRun): Promise<Provid
     return { state: "processing", next: { providerJobId: r.providerJobId, state: r.state ?? null, cost: r.cost } };
   } catch (err) {
     if (err instanceof ProviderError && err.retryable) return { state: "processing", next: { providerJobId, state: cur as unknown as ProviderState } };
+    // Kling's own reason (no keys or URLs in it), so a refused video can be understood from the log.
+    console.error("[kling] video with elements refused", err instanceof ProviderError ? `${err.code} ${err.message.slice(0, 300)}` : "error");
     const { deleteKlingElement } = await import("./kling");
     for (const e of elements) if (e) await deleteKlingElement(e);
     return { state: "failed", errorCode: err instanceof ProviderError ? err.code : "provider_failed", retryable: false };
