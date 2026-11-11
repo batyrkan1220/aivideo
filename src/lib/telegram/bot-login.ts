@@ -27,15 +27,16 @@ export const loginIdFromStart = (payload: string | null | undefined) => {
 };
 
 /** Webhook: the Telegram user tapped Start with our login payload. Returns true if confirmed. */
-export async function confirmLoginFromBot(id: string, from: { id: number; first_name?: string; last_name?: string; username?: string }): Promise<boolean> {
+/** Confirms the request; returns where the browser goes next (null = expired or used). */
+export async function confirmLoginFromBot(id: string, from: { id: number; first_name?: string; last_name?: string; username?: string }): Promise<string | null> {
   const { data } = await supabaseAdmin().from("telegram_logins")
     .update({
       telegram_id: from.id, tg_first_name: from.first_name?.slice(0, 80) ?? null, tg_last_name: from.last_name?.slice(0, 80) ?? null,
       tg_username: from.username?.slice(0, 64) ?? null, confirmed_at: new Date().toISOString(),
     })
     .eq("id", id).is("telegram_id", null).gt("expires_at", new Date().toISOString())
-    .select("id").maybeSingle();
-  return !!data;
+    .select("next_path").maybeSingle();
+  return data ? String(data.next_path ?? "/") : null;
 }
 
 type Row = { id: string; guest_user_id: string | null; next_path: string; telegram_id: number; tg_first_name: string | null; tg_last_name: string | null; tg_username: string | null };

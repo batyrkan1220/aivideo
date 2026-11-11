@@ -1,3 +1,4 @@
+import { supabaseAdmin } from "@/lib/supabase/server";
 import { NextResponse, type NextRequest } from "next/server";
 import { checkWebhookSecret, sendMessage, tg } from "@/lib/telegram/bot";
 import { handleAdminCallback, handleAdminMessage, isBotAdmin } from "@/lib/telegram/admin";
@@ -44,11 +45,19 @@ export async function POST(req: NextRequest) {
   // Website sign-in: /start l_<request id> confirms the waiting browser and sends a one-time link.
   const loginId = loginIdFromStart(msg.text?.startsWith("/start ") ? msg.text.slice(7).trim() : null);
   if (loginId && msg.from?.id) {
-    const ok = await confirmLoginFromBot(loginId, { id: msg.from.id, first_name: msg.from.first_name, last_name: msg.from.last_name, username: msg.from.username });
+    const next = await confirmLoginFromBot(loginId, { id: msg.from.id, first_name: msg.from.first_name, last_name: msg.from.last_name, username: msg.from.username });
     const site = env().NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
-    await tg("sendMessage", ok ? {
+    // "Заказ ждёт оплаты" only when the sign-in came from an order; a plain sign-in just says go back.
+    const orderId = next?.match(/^\/orders\/([0-9a-f-]{36})/i)?.[1];
+    const { data: ord } = orderId
+      ? await supabaseAdmin().from("orders").select("payment_status,amount_kzt").eq("id", orderId).maybeSingle()
+      : { data: null };
+    const forOrder = !!ord && ord.payment_status !== "succeeded" && Number(ord.amount_kzt) > 0;
+    await tg("sendMessage", next ? {
       chat_id: chatId,
-      text: "✅ Готово, вы вошли в TrendMe!\n\nВернитесь в браузер — заказ уже ждёт оплаты. Если страница закрылась, нажмите кнопку ниже.",
+      text: forOrder
+        ? "✅ Готово, вы вошли в TrendMe!\n\nВернитесь в браузер — заказ уже ждёт оплаты. Если страница закрылась, нажмите кнопку ниже."
+        : "✅ Готово, вы вошли в TrendMe!\n\nВернитесь в браузер — вход уже выполнен. Если страница закрылась, нажмите кнопку ниже.",
       reply_markup: { inline_keyboard: [[{ text: "Вернуться на сайт", url: `${site}/auth/tg/${loginId}` }]] },
     } : {
       chat_id: chatId,
