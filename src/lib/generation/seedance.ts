@@ -135,6 +135,30 @@ export const seedanceProvider: GenerationProvider = {
       // With cuts: every shot goes through every person's run, then the shots are joined (TM-100038).
       const shotRun = await startShots(input.jobId, input.templateVideoUrl, passesFor(true), cfg.aspectRatio, resolution, pricing, cfg.shotMap);
       if (shotRun) return shotRun;
+      // Two people at different places, nothing else to swap: each is replaced in their own run on the
+      // clean template, at the same time, and the two results are put together (see merge-people). A second
+      // run on Kling's own result smeared or kept the second person (TM-100058, TM-100062).
+      // Only when their places differ ("on the right" twice: who is who comes only from the order of runs).
+      const places = cfg.positions.slice(0, people).map((t) => findBy(t).toLowerCase().split(",")[0].trim());
+      if (people === 2 && !objects.length && places.every(Boolean) && places[0] !== places[1]) {
+        const split: Pass[] = [0, 1].map((k) => ({
+          ...withSheets({
+            photoUrls: [usedPhotos[k]],
+            prompt: buildKlingDirectPrompt("edit", outfit, cfg.prompt, k === 0 ? wish : "", 1, [cfg.positions[k].trim()], [], [], false),
+          }, [{ url: sheetUrls[k], of: "@image_1" }], sheetOnly),
+          who: cfg.positions[k].trim(), person: k,
+        }));
+        const ids: (string | null)[] = [];
+        for (const [k, p] of split.entries()) {
+          const id = await submitKlingOmni({ videoUrl: input.templateVideoUrl, mode: "edit", durationSec, aspectRatio: cfg.aspectRatio, resolution, ...p })
+            .catch((err) => { if (k > 0 && err instanceof ProviderError && err.retryable) return null; throw err; });
+          if (id) await noteTask(input.jobId, id, `человек ${k + 1} из 2 (параллельно)`);
+          ids.push(id);
+        }
+        console.log("[kling] 2 people in parallel", ids.filter(Boolean).length, "sent");
+        const run: SplitRun = { stage: "split", ids, outs: [null, null], passes: split, template: input.templateVideoUrl, durationSec, aspectRatio: cfg.aspectRatio, resolution, jobId: input.jobId };
+        return { providerJobId: ids[0]!, cost: seedanceCostUsd(durationSec, pricing, {}, resolution) * ids.filter(Boolean).length, state: run as unknown as ProviderState };
+      }
       // Each later run edits the previous result. At 720p the next person was drawn on an already
       // compressed copy and came out smeared ("1-ші адам таза, 2-ші шайылып қалады"): runs before the last
       // one are made at 1080p, so the next run starts from a full-quality picture.
@@ -171,6 +195,8 @@ export const seedanceProvider: GenerationProvider = {
   async getStatus(providerJobId, ctx) {
     const sheetRun = sheetsOf(ctx.state);
     if (sheetRun) return sheetStatus(providerJobId, sheetRun);
+    const splitRun = splitOf(ctx.state);
+    if (splitRun) return splitStatus(splitRun);
     const shotRun = shotsOf(ctx.state);
     if (shotRun) return shotStatus(shotRun);
     const st = await getKlingTask(providerJobId);
@@ -631,4 +657,65 @@ async function logSheet(orderId: string | null, t: SheetTask, result: string) {
     await supabaseAdmin().from("audit_logs").insert({ actor_id: null, action: "generation.character_sheet", resource_type: "order", resource_id: orderId,
       metadata_json: { person: t.person + 1, task: t.id, path: t.path ?? null, result } });
   } catch { /* the log is only a help */ }
+}
+
+// ---------------------------------------------------------------- two people in parallel
+type SplitRun = {
+  stage: "split"; ids: (string | null)[]; outs: (string | null)[]; passes: Pass[]; template: string;
+  durationSec: number; aspectRatio: string; resolution: "720p" | "1080p"; jobId?: string;
+};
+
+function splitOf(state: ProviderState): SplitRun | null {
+  const s = state as Partial<SplitRun> | null;
+  if (!s || s.stage !== "split" || !Array.isArray(s.ids) || !Array.isArray(s.passes) || s.passes.length !== 2 || typeof s.template !== "string" || typeof s.durationSec !== "number") return null;
+  return {
+    stage: "split", ids: s.ids.map((x) => (typeof x === "string" ? x : null)), outs: (Array.isArray(s.outs) ? s.outs : [null, null]).map((x) => (typeof x === "string" ? x : null)),
+    passes: s.passes as Pass[], template: s.template, durationSec: s.durationSec, aspectRatio: typeof s.aspectRatio === "string" ? s.aspectRatio : "adaptive",
+    resolution: s.resolution === "1080p" ? "1080p" : "720p", jobId: typeof s.jobId === "string" ? s.jobId : undefined,
+  };
+}
+
+/** Both runs done → the results are put together; a run not sent yet (Kling busy) is sent now. */
+async function splitStatus(run: SplitRun): Promise<ProviderJobStatus> {
+  const cur: SplitRun = { ...run, ids: [...run.ids], outs: [...run.outs] };
+  let changed = false, added = 0;
+  for (const k of [0, 1]) {
+    if (cur.outs[k]) continue;
+    if (!cur.ids[k]) {
+      try {
+        cur.ids[k] = await submitKlingOmni({ videoUrl: run.template, mode: "edit", durationSec: run.durationSec, aspectRatio: run.aspectRatio, resolution: run.resolution, photoUrls: run.passes[k].photoUrls, prompt: run.passes[k].prompt });
+        await noteTask(run.jobId, cur.ids[k]!, `человек ${k + 1} из 2 (параллельно)`);
+        added += seedanceCostUsd(run.durationSec, await seedancePricingSettings(), {}, run.resolution);
+        changed = true;
+      } catch (err) {
+        if (err instanceof ProviderError && err.retryable) continue;
+        return { state: "failed", errorCode: err instanceof ProviderError ? err.code : "provider_failed", retryable: false };
+      }
+      continue;
+    }
+    const st = await getKlingTask(cur.ids[k]!);
+    if (st.state === "failed") return st;
+    if (st.state === "succeeded") { cur.outs[k] = st.outputUrl; changed = true; }
+  }
+  if (cur.outs[0] && cur.outs[1]) {
+    try {
+      const { mergeEdits } = await import("@/lib/media/merge-people");
+      const bytes = await mergeEdits(cur.outs[0], cur.outs[1], run.template);
+      console.log("[kling] 2 people merged", Math.round(bytes.length / 1024), "KB");
+      await noteTask(run.jobId, "", "2 человека: результаты объединены", true);
+      return { state: "succeeded", outputUrl: cur.outs[0], outputBytes: bytes };
+    } catch (err) {
+      // Could not put them together: the second person goes on the first result, as before.
+      console.error("[kling] merge failed, second person on the first result", err instanceof Error ? err.message.slice(0, 160) : "error");
+      const keep = [{ person: 0, url: run.passes[0].photoUrls[0], where: findBy(run.passes[0].who ?? "") || "number 1 from the left" }];
+      const pass: Pass = { ...run.passes[1], keep };
+      const id = await submitKlingOmni({ videoUrl: cur.outs[0], mode: "edit", durationSec: run.durationSec, aspectRatio: run.aspectRatio, resolution: run.resolution, ...withKeep(pass) });
+      await noteTask(run.jobId, id, "человек 2 из 2 (на результате 1)");
+      const passRun: PassRun = { stage: "pass", k: 1, passes: [run.passes[0], pass], durationSec: run.durationSec, aspectRatio: run.aspectRatio, resolution: run.resolution, jobId: run.jobId };
+      return { state: "processing", next: { providerJobId: id, state: passRun as unknown as ProviderState, cost: seedanceCostUsd(run.durationSec, await seedancePricingSettings(), {}, run.resolution) } };
+    }
+  }
+  const firstId = cur.ids.find((x) => x) ?? "";
+  const done = cur.outs.filter(Boolean).length;
+  return { state: "processing", progress: 20 + done * 35, ...(changed ? { next: { providerJobId: firstId, state: cur as unknown as ProviderState, cost: added } } : {}) };
 }

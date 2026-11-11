@@ -4,6 +4,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/env", () => ({ env: () => ({ KLING_API_KEY: "g".repeat(20), NEXT_PUBLIC_SUPABASE_URL: "https://sb.test" }) }));
 vi.mock("@/lib/catalog/settings", () => ({ catalogSettings: async () => ({ multiPeople: true, requireAnalysis: true, splitShots: true }) }));
 const sceneMock = vi.hoisted(() => ({ split: null as null | { parts: { start: number; len: number; file: Buffer }[] }, joined: [] as string[][] }));
+vi.mock("@/lib/media/merge-people", () => ({ mergeEdits: vi.fn(async () => new Uint8Array([1, 2, 3])) }));
 vi.mock("@/lib/media/scene-parts", () => ({
   splitAtCuts: async () => sceneMock.split,
   grabFrames: async (_u: string, times: number[]) => times.map(() => Buffer.from("jpg")),
@@ -324,6 +325,31 @@ describe("two people in the same place (TM-100042)", () => {
   });
 });
 
+
+describe("two people at different places (TM-100062)", () => {
+  it("each is replaced on the clean template at the same time, then the results are merged", async () => {
+    const bodies: { contents: { type: string; url?: string; text?: string }[] }[] = [];
+    const done = (u: string) => ({ code: 0, data: [{ status: "succeeded", outputs: [{ type: "video", url: u }] }] });
+    const replies = [{ code: 0, data: { id: "p1" } }, { code: 0, data: { id: "p2" } }, done("https://k/p1.mp4"), done("https://k/p2.mp4")];
+    vi.stubGlobal("fetch", vi.fn(async (_u: string, init?: RequestInit) => {
+      if (init?.body) bodies.push(JSON.parse(String(init.body)));
+      return new Response(JSON.stringify(replies.shift()), { status: 200 });
+    }));
+    const faces = [{ slotKey: "face_1", providerInput: "img_1", imageUrl: "https://s/man.jpg" }, { slotKey: "face_2", providerInput: "img_2", imageUrl: "https://s/woman.jpg" }];
+    const r = await seedanceProvider.submit({ jobId: "jp", templateVideoUrl: "https://t/v.mp4", templateFrameUrl: null, quality: "720p", faces,
+      config: { durationSec: 8, people: 2, positions: ["on the left, man in dark suit", "on the right, woman in striped top"] } });
+    expect(bodies).toHaveLength(2);
+    for (const [k, b] of bodies.entries()) {
+      expect(b.contents.find((c) => c.type === "base_video")?.url).toBe("https://t/v.mp4");
+      expect(b.contents.filter((c) => c.type === "refer_image").map((c) => c.url)).toEqual([k === 0 ? "https://s/man.jpg" : "https://s/woman.jpg"]);
+    }
+    const st = await seedanceProvider.getStatus("p1", { startedAt: null, state: r.state ?? null });
+    expect(st.state).toBe("succeeded");
+    const { mergeEdits } = await import("@/lib/media/merge-people");
+    expect(mergeEdits).toHaveBeenCalledWith("https://k/p1.mp4", "https://k/p2.mp4", "https://t/v.mp4");
+    vi.unstubAllGlobals();
+  });
+});
 
 describe("things only (0 people)", () => {
   it("the customer's car photo goes as @image_1, no person run", async () => {
