@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabaseServer, supabaseAdmin } from "@/lib/supabase/server";
 import { sendVideoFile, sendPhotoFile, botConfigured } from "@/lib/telegram/bot";
 import { track } from "@/lib/analytics";
+import { videoMeta } from "@/lib/telegram/video-meta";
 
 const MAX_BYTES = 50 * 1024 * 1024; // Bot API upload limit
 
@@ -39,30 +40,4 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   if (!ok) return NextResponse.json({ ok: false, error: "failed" }, { status: 502 });
   await track("video_downloaded", { userId: user.id, orderId: id });
   return NextResponse.json({ ok: true });
-}
-
-/** The video's real size and length (and a small cover), so Telegram shows it in its own proportions. */
-async function videoMeta(blob: Blob) {
-  const { mkdtemp, readFile, rm, writeFile } = await import("node:fs/promises");
-  const { tmpdir } = await import("node:os");
-  const { join } = await import("node:path");
-  const { ffmpegLog } = await import("@/lib/templates/lite-preview");
-  const dir = await mkdtemp(join(tmpdir(), "tg-"));
-  try {
-    const src = join(dir, "v.mp4"), thumb = join(dir, "t.jpg");
-    await writeFile(src, new Uint8Array(await blob.arrayBuffer()));
-    const info = await ffmpegLog(["-hide_banner", "-y", "-loglevel", "info", "-i", src, "-ss", "0.5", "-frames:v", "1",
-      "-vf", "scale='if(gt(iw,ih),320,-2)':'if(gt(iw,ih),-2,320)'", "-q:v", "4", thumb], 60_000);
-    const m = /Video:.*?(\d{2,5})x(\d{2,5})/.exec(info);
-    const d = /Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/.exec(info);
-    // A rotated phone video: width and height swap.
-    const rot = /rotation of -?(90|270)|rotate\s*:\s*(90|270)/.test(info);
-    if (!m) return undefined;
-    const [w, h] = rot ? [Number(m[2]), Number(m[1])] : [Number(m[1]), Number(m[2])];
-    const thumbBytes = await readFile(thumb).catch(() => null);
-    return { width: w, height: h, duration: d ? Number(d[1]) * 3600 + Number(d[2]) * 60 + Number(d[3]) : 0,
-      thumb: thumbBytes ? new Blob([new Uint8Array(thumbBytes)], { type: "image/jpeg" }) : null };
-  } finally {
-    await rm(dir, { recursive: true, force: true }).catch(() => {});
-  }
 }

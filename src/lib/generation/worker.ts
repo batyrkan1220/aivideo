@@ -11,7 +11,7 @@ import { kk } from "@/lib/i18n/kk";
 import { generationProvider } from "./index";
 import { ProviderError } from "./types";
 import { isTestPaymentProvider } from "@/lib/payments/types";
-import { notifyOrderOwner } from "@/lib/telegram/bot";
+import { notifyOrderOwner, sendOrderResult } from "@/lib/telegram/bot";
 import { notifyAdmins } from "@/lib/telegram/admin";
 import { COMBO_PROVIDER, stepCombo } from "@/lib/combos/worker";
 
@@ -303,7 +303,8 @@ async function finalize(job: Job, outputUrl: string, cost?: number, ready?: Uint
     status: "completed", completed_at: now, provider_cost: cost ?? job.provider_cost, error_code: null, provider_state: null,
   }).eq("id", job.id);
   await db.from("orders").update({ generation_status: "completed", completed_at: now }).eq("id", job.order_id);
-  await notifyOrderOwner(job.order_id, "ready");
+  // The video itself straight into the customer's Telegram chat; the plain «ready» message if it cannot go.
+  if (!(await sendOrderResult(job.order_id, bytes, kind.type).catch(() => false))) await notifyOrderOwner(job.order_id, "ready");
   await notifyAdmins(job.order_id, "ready");
   await track("generation_succeeded", { userId: order.user_id, orderId: job.order_id });
 }

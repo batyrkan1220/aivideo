@@ -77,9 +77,35 @@ export async function notifyOrderOwner(orderId: string, key: "invoice_sent" | "p
   }
 }
 
+/**
+ * Order ready: the finished video itself goes into the owner's chat, with the «ready» text as its caption
+ * and the order button. False when it could not be sent (no Telegram, too big, a photo…): then the plain
+ * «ready» message goes instead.
+ */
+export async function sendOrderResult(orderId: string, bytes: Uint8Array, contentType: string): Promise<boolean> {
+  if (!botConfigured() || !contentType.startsWith("video/") || bytes.byteLength > 49 * 1024 * 1024) return false;
+  try {
+    const db = supabaseAdmin();
+    const { data: o } = await db.from("orders").select("user_id,public_order_number,template_snapshot_json,parent_order_id").eq("id", orderId).maybeSingle();
+    if (!o?.user_id || o.parent_order_id) return false;
+    const { data: p } = await db.from("profiles").select("telegram_id").eq("id", o.user_id).maybeSingle();
+    if (!p?.telegram_id) return false;
+    const title = (o.template_snapshot_json as { title_kk?: string } | null)?.title_kk ?? "TrendMe";
+    const m = await botMessage("ready", { title });
+    const blob = new Blob([new Uint8Array(bytes)], { type: contentType });
+    const { videoMeta } = await import("./video-meta");
+    const meta = await videoMeta(blob).catch(() => undefined);
+    return await sendVideoFile(Number(p.telegram_id), blob, `${o.public_order_number ?? "TrendMe"}.mp4`, m.text.slice(0, 1000), meta,
+      m.button ? { text: m.button, path: `/orders/${orderId}` } : null, true);
+  } catch {
+    console.error(JSON.stringify({ src: "telegram", event: "result_send_failed" }));
+    return false;
+  }
+}
+
 /** Uploads a video file to a chat (multipart, up to 50 MB). Returns false on any error; never logs the token. */
 export async function sendVideoFile(chatId: number, file: Blob, fileName: string, caption?: string,
-  meta?: { width: number; height: number; duration: number; thumb?: Blob | null }): Promise<boolean> {
+  meta?: { width: number; height: number; duration: number; thumb?: Blob | null }, button?: { text: string; path: string } | null, html = false): Promise<boolean> {
   const token = env().TELEGRAM_BOT_TOKEN;
   if (!token) return false;
   try {
@@ -94,6 +120,8 @@ export async function sendVideoFile(chatId: number, file: Blob, fileName: string
       if (meta.thumb) fd.set("thumbnail", meta.thumb, "thumb.jpg");
     }
     if (caption) fd.set("caption", caption);
+    if (caption && html) fd.set("parse_mode", "HTML");
+    if (button) fd.set("reply_markup", JSON.stringify(openAppButton(button.text, button.path)));
     fd.set("video", file, fileName);
     const res = await fetch(`https://api.telegram.org/bot${token}/sendVideo`, { method: "POST", body: fd, signal: AbortSignal.timeout(90_000), cache: "no-store" });
     const body = (await res.json().catch(() => null)) as { ok?: boolean; error_code?: number } | null;
