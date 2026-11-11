@@ -535,11 +535,10 @@ export function withSheets(base: { photoUrls: string[]; prompt: string }, list: 
 async function startSheets(input: SubmitInput, personPhotos: string[]) {
   const { catalogSettings } = await import("@/lib/catalog/settings");
   if (!(await catalogSettings()).characterSheet) return null;
-  const { sheetSettings, submitSheet } = await import("./sheet-settings");
-  const ss = await sheetSettings();
+  const { submitSheet } = await import("./sheet-settings");
   const tasks: SheetTask[] = [];
   for (const [person, url] of personPhotos.entries()) {
-    const id = await submitSheet(url, ss)
+    const id = await submitSheet(url)
       .catch((err) => { console.error("[kling] sheet not sent", err instanceof ProviderError ? err.code : "error"); return null; });
     tasks.push({ person, id });
   }
