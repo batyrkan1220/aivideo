@@ -453,6 +453,14 @@ export function TemplateEditor({
                   <option value="reference">{e.seedance.klingModeOptions.reference}</option>
                 </select>
               </Field>
+              <Field label="Модель (тест)" className="sm:col-span-2">
+                <select className={inputCls()} value={sd.engine} onChange={(ev) => setSd({ engine: ev.target.value as SeedanceConfig["engine"] })}>
+                  <option value="kling">Kling 4.0 — свой API (по умолчанию)</option>
+                  <option value="seedance25">Seedance 2.5 — fal.ai, редактирование видео, все люди за один раз</option>
+                  <option value="wan_replace">Wan 2.2 Animate Replace — fal.ai, по одному человеку</option>
+                </select>
+                <span className="mt-1 block text-xs text-muted">Для fal.ai нужен ключ FAL_KEY в Render. Видео этого шаблона будет делать выбранная модель; Character Sheet и сцены — только для Kling.</span>
+              </Field>
               <Field label={e.seedance.prompt} field="seedance.prompt" error={err("seedance.prompt")} className="sm:col-span-2">
                 <textarea className={`${inputCls(err("seedance.prompt"))} min-h-24`} value={sd.prompt} maxLength={1500} onChange={(ev) => setSd({ prompt: ev.target.value })} />
                 <span className="mt-1 block text-xs text-muted">{e.seedance.promptHint}</span>

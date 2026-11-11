@@ -3,6 +3,7 @@ import { seedanceConfigSchema, SEEDANCE_MAX_OBJECTS, SEEDANCE_MAX_PEOPLE, SEEDAN
 import { seedanceCostUsd } from "@/lib/pricing-seedance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { ProviderError, type GenerationProvider, type ProviderJobStatus, type ProviderState, type SubmitInput } from "./types";
+import type { FalRequest } from "./fal";
 import { buildKlingDirectPrompt, findBy, getKlingTask, KLING_MAX_IMAGES, submitKlingOmni } from "./kling";
 import { mediaUrl } from "@/lib/templates/queries";
 import { klingShotSec } from "@/lib/media/scene-plan";
@@ -83,6 +84,12 @@ export const seedanceProvider: GenerationProvider = {
     const usedPhotos = keyed
       ? [...(personKeyed.length ? personKeyed : photos.slice(0, people)), ...groups.flat()].slice(0, SEEDANCE_MAX_REFS)
       : photos.slice(0, people + objects.length);
+    // Another model on fal.ai, chosen on the template (tests): the same photos and prompt, its own call.
+    if (cfg.engine !== "kling") {
+      const wish = cfg.allowWish ? cleanWish(extra.wish) : "";
+      const prompt = buildKlingDirectPrompt("edit", outfit, cfg.prompt, wish, people, cfg.positions, objects, []);
+      return startFal(input.jobId, cfg.engine, input.templateVideoUrl, usedPhotos, people, prompt, durationSec, resolution);
+    }
     // Step 1: a Character Sheet of each person (Kling image), then the video (getStatus sends it).
     if (people > 0 && !input.sheets) {
       const started = await startSheets(input, usedPhotos.slice(0, people));
@@ -128,6 +135,8 @@ export const seedanceProvider: GenerationProvider = {
   },
 
   async getStatus(providerJobId, ctx) {
+    const falRun = falOf(ctx.state);
+    if (falRun) return falRunStatus(falRun);
     const sheetRun = sheetsOf(ctx.state);
     if (sheetRun) return sheetStatus(providerJobId, sheetRun);
     const shotRun = shotsOf(ctx.state);
@@ -590,4 +599,65 @@ async function logSheet(orderId: string | null, t: SheetTask, result: string) {
     await supabaseAdmin().from("audit_logs").insert({ actor_id: null, action: "generation.character_sheet", resource_type: "order", resource_id: orderId,
       metadata_json: { person: t.person + 1, task: t.id, path: t.path ?? null, result } });
   } catch { /* the log is only a help */ }
+}
+
+// ---------------------------------------------------------------- other models on fal.ai
+/*
+  Picked per template for testing (admin: «Модель»):
+  - seedance25: Seedance 2.5 reference-to-video, task "editing": the template is @Video1, the photos
+    @Image1…; the same prompt as for Kling with its references renamed. All people in one run.
+  - wan_replace: Wan 2.2 Animate Replace: one photo per run (it replaces the main person), so with
+    several people each run goes on the previous result.
+*/
+type FalEngine = "seedance25" | "wan_replace";
+type FalRun = { stage: "fal"; engine: FalEngine; req: FalRequest; k: number; photos: string[]; people: number; resolution: "720p" | "1080p"; jobId?: string };
+
+const FAL_MODEL: Record<FalEngine, string> = {
+  seedance25: "bytedance/seedance-2.5/reference-to-video",
+  wan_replace: "fal-ai/wan/v2.2-14b/animate/replace",
+};
+// Rough USD per second of video, for the order's cost line (fal bills by its own units).
+const FAL_USD_PER_SEC: Record<FalEngine, number> = { seedance25: 0.5, wan_replace: 0.16 };
+
+const toFalRefs = (prompt: string) => prompt.replace(/@video_(\d+)/g, "@Video$1").replace(/@image_(\d+)/g, "@Image$1");
+
+function falInput(engine: FalEngine, videoUrl: string, photos: string[], k: number, prompt: string, resolution: "720p" | "1080p") {
+  if (engine === "seedance25") {
+    return {
+      // Editing keeps the template's own framing and length (fal sets them to auto for this task).
+      prompt: toFalRefs(prompt), task: "editing", video_urls: [videoUrl], image_urls: photos.slice(0, 30), resolution,
+    };
+  }
+  return {
+    video_url: videoUrl, image_url: photos[k],
+    prompt: "Replace the main person in the video with the person from the image: the same face, hair and skin, natural and photorealistic. Keep the motion, camera, background and lighting.",
+    resolution: "720p", video_quality: "high",
+  };
+}
+
+async function startFal(jobId: string, engine: FalEngine, videoUrl: string, photos: string[], people: number, prompt: string, durationSec: number, resolution: "720p" | "1080p") {
+  const { falSubmit } = await import("./fal");
+  const req = await falSubmit(FAL_MODEL[engine], falInput(engine, videoUrl, photos, 0, prompt, resolution));
+  const steps = engine === "wan_replace" ? Math.max(1, people) : 1;
+  await noteTask(jobId, req.requestId, engine === "seedance25" ? "fal · Seedance 2.5 · видео целиком" : `fal · Wan Replace · человек 1 из ${steps}`);
+  const run: FalRun = { stage: "fal", engine, req, k: 0, photos, people: steps, resolution, jobId };
+  return { providerJobId: req.requestId, cost: Math.round(FAL_USD_PER_SEC[engine] * durationSec * 100) / 100, state: run as unknown as ProviderState };
+}
+
+function falOf(state: ProviderState): FalRun | null {
+  const s = state as Partial<FalRun> | null;
+  if (!s || s.stage !== "fal" || (s.engine !== "seedance25" && s.engine !== "wan_replace") || !s.req || typeof s.req.statusUrl !== "string") return null;
+  return { stage: "fal", engine: s.engine, req: s.req as FalRequest, k: Number(s.k) || 0, photos: Array.isArray(s.photos) ? s.photos.filter((x): x is string => typeof x === "string") : [],
+    people: Number(s.people) || 1, resolution: s.resolution === "1080p" ? "1080p" : "720p", jobId: typeof s.jobId === "string" ? s.jobId : undefined };
+}
+
+async function falRunStatus(run: FalRun): Promise<ProviderJobStatus> {
+  const { falStatus, falSubmit } = await import("./fal");
+  const st = await falStatus(run.req);
+  if (st.state !== "succeeded" || run.engine !== "wan_replace" || run.k + 1 >= run.people) return st;
+  // Wan: the next person on the result so far.
+  const k = run.k + 1;
+  const req = await falSubmit(FAL_MODEL.wan_replace, falInput("wan_replace", st.outputUrl, run.photos, k, "", run.resolution));
+  await noteTask(run.jobId, req.requestId, `fal · Wan Replace · человек ${k + 1} из ${run.people}`);
+  return { state: "processing", next: { providerJobId: req.requestId, state: { ...run, req, k } as unknown as ProviderState, cost: 0 } };
 }

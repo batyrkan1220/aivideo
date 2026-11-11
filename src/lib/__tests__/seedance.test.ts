@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/env", () => ({ env: () => ({ KLING_API_KEY: "g".repeat(20), NEXT_PUBLIC_SUPABASE_URL: "https://sb.test" }) }));
+vi.mock("@/lib/env", () => ({ env: () => ({ KLING_API_KEY: "g".repeat(20), FAL_KEY: "f".repeat(20), NEXT_PUBLIC_SUPABASE_URL: "https://sb.test" }) }));
 vi.mock("@/lib/catalog/settings", () => ({ catalogSettings: async () => ({ multiPeople: true, requireAnalysis: true, splitShots: true }) }));
 const sceneMock = vi.hoisted(() => ({ split: null as null | { parts: { start: number; len: number; file: Buffer }[] }, joined: [] as string[][] }));
 vi.mock("@/lib/media/scene-parts", () => ({
@@ -267,6 +267,29 @@ describe("shot helpers", () => {
     expect(mapFor(undefined, [0])).toBeNull();
     expect(pickAnchor([{ len: 9, runs: [1] }, { len: 3, runs: [0, 1] }, { len: 5, runs: [0, 1] }, { len: 9, runs: [] }])).toBe(2);
     expect(pickAnchor([{ len: 3, runs: [] }])).toBeNull();
+  });
+});
+
+describe("fal.ai models chosen on the template", () => {
+  const faces = [{ slotKey: "face_1", providerInput: "img_1", imageUrl: "https://s/man.jpg" }, { slotKey: "face_2", providerInput: "img_2", imageUrl: "https://s/woman.jpg" }];
+  it("Seedance 2.5: one editing run with the template and both photos, references renamed", async () => {
+    const calls: { url: string; body?: Record<string, unknown> }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (u: string, init?: RequestInit) => {
+      calls.push({ url: String(u), body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      if (String(u).endsWith("/status")) return new Response(JSON.stringify({ status: "COMPLETED" }), { status: 200 });
+      if (init?.method === "POST") return new Response(JSON.stringify({ request_id: "r1", status_url: "https://queue.fal.run/bytedance/seedance-2.5/requests/r1/status", response_url: "https://queue.fal.run/bytedance/seedance-2.5/requests/r1" }), { status: 200 });
+      return new Response(JSON.stringify({ video: { url: "https://v3.fal.media/out.mp4" } }), { status: 200 });
+    }));
+    const r = await seedanceProvider.submit({ jobId: "jf", templateVideoUrl: "https://t/v.mp4", templateFrameUrl: null, quality: "720p", faces,
+      config: { durationSec: 8, people: 2, engine: "seedance25", positions: ["on the left, man", "on the right, woman"] } });
+    expect(calls[0].url).toBe("https://queue.fal.run/bytedance/seedance-2.5/reference-to-video");
+    expect(calls[0].body).toMatchObject({ task: "editing", video_urls: ["https://t/v.mp4"], image_urls: ["https://s/man.jpg", "https://s/woman.jpg"] });
+    expect(String(calls[0].body?.prompt)).toContain("Edit @Video1");
+    expect(String(calls[0].body?.prompt)).toContain("@Image2");
+    expect(String(calls[0].body?.prompt)).not.toContain("@image_");
+    const st = await seedanceProvider.getStatus(r.providerJobId, { startedAt: null, state: r.state ?? null });
+    expect(st).toMatchObject({ state: "succeeded", outputUrl: "https://v3.fal.media/out.mp4" });
+    vi.unstubAllGlobals();
   });
 });
 
