@@ -192,3 +192,18 @@ export async function klingTaskVideo(taskId: string): Promise<{ url?: string; er
     return { error: "Kling не ответил" };
   }
 }
+
+/** Support: a Kling Element made for this order (its id, or why it failed). Elements are deleted after the video. */
+export async function klingElementInfo(taskId: string): Promise<{ text?: string; error?: string }> {
+  if (!(await staff("orders.view"))) return { error: "Нет доступа" };
+  if (!/^\d{6,30}$/.test(taskId.trim())) return { error: "Неверный номер задачи" };
+  try {
+    const { getKlingElementTask } = await import("@/lib/generation/kling");
+    const st = await getKlingElementTask(taskId.trim());
+    if (st.state === "done") return { text: `Элемент создан: ID ${st.elementId}. После готового видео он удаляется из Kling (в нём лицо клиента).` };
+    if (st.state === "failed") return { error: `Элемент не создан: ${st.reason || "ошибка Kling"}` };
+    return { text: "Элемент ещё создаётся" };
+  } catch {
+    return { error: "Kling не ответил" };
+  }
+}

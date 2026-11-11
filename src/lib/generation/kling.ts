@@ -256,7 +256,7 @@ export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: strin
   });
   const id = d.data?.id;
   if (!id) throw new ProviderError("provider_bad_response", false, "kling: missing task id");
-  console.log("[kling] video task", id, `${opts.flash ? "flash " : ""}video=${videoType} mode=${opts.mode} images=${photos.length}`);
+  console.log("[kling] video task", id, `${opts.flash ? "flash " : ""}video=${videoType} mode=${opts.mode} images=${photos.length} elements=${(opts.elementIds ?? []).slice(0, 7).length}`);
   return id;
 }
 
