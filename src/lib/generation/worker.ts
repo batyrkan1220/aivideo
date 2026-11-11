@@ -145,8 +145,26 @@ async function submitJob(job: Job) {
   let templateVideoUrl = mediaUrl((snap.preview_video_path as string) ?? null) ?? "";
   // Template videos under 700 px have an upscaled copy for Kling (Kling refuses them otherwise).
   if (typeof snap.preview_video_path === "string" && snap.preview_video_path) {
-    const { data: tv } = await db.from("templates").select("preview_video_path,kling_video_path").eq("id", order.template_id).maybeSingle();
+    const { data: tv } = await db.from("templates").select("preview_video_path,kling_video_path,video_px").eq("id", order.template_id).maybeSingle();
     if (tv?.kling_video_path && tv.preview_video_path === snap.preview_video_path) templateVideoUrl = mediaUrl(tv.kling_video_path) ?? templateVideoUrl;
+    // A template ordered right after upload may not be processed yet (no size, no Kling copy):
+    // make the copy here instead of sending a too-small video to Kling.
+    else if (tv && !tv.kling_video_path && !tv.video_px && tv.preview_video_path === snap.preview_video_path && templateVideoUrl) {
+      try {
+        const { klingReadyCopy } = await import("@/lib/media/kling-video");
+        const copy = await klingReadyCopy(templateVideoUrl);
+        if (copy) {
+          const path = `previews/kling1/${crypto.randomUUID()}.mp4`;
+          const { error: upErr } = await db.storage.from("template-media").upload(path, copy, { contentType: "video/mp4", cacheControl: "31536000", upsert: false });
+          if (!upErr) {
+            await db.from("templates").update({ kling_video_path: path }).eq("id", order.template_id).is("kling_video_path", null);
+            templateVideoUrl = mediaUrl(path) ?? templateVideoUrl;
+          }
+        }
+      } catch (err) {
+        console.error("[worker] template copy failed", job.id, err instanceof Error ? err.message.slice(0, 120) : "error");
+      }
+    }
   }
   if (typeof snap.user_video_path === "string" && snap.user_video_path) {
     // "Өз видеом": the customer's own private video, shared with the provider via a signed URL.
