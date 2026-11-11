@@ -732,7 +732,7 @@ async function falRunStatus(run: FalRun): Promise<ProviderJobStatus> {
   An Element that fails or takes too long is skipped: the video goes with the photo alone.
 */
 const EL_WAIT_MS = 5 * 60_000;
-type ElTask = { person: number; task: string | null; elementId?: string | null; done?: boolean };
+type ElTask = { person: number; task: string | null; elementId?: string | null; done?: boolean; face?: string | null; front?: string | null; reason?: string };
 type ElRun = { stage: "elements"; tasks: ElTask[]; input: SubmitInput; at: number };
 
 function elementsOf(state: ProviderState): ElRun | null {
@@ -742,7 +742,7 @@ function elementsOf(state: ProviderState): ElRun | null {
 }
 
 /** A close-up of the photo's upper middle (where the face is on a portrait), kept with the order's photos. */
-async function closeUp(photoUrl: string, jobId: string, k: number): Promise<string | null> {
+async function closeUp(photoUrl: string, jobId: string, k: number): Promise<{ url: string; path: string } | null> {
   const { mkdtemp, readFile, rm, writeFile } = await import("node:fs/promises");
   const { tmpdir } = await import("node:os");
   const { join } = await import("node:path");
@@ -761,7 +761,7 @@ async function closeUp(photoUrl: string, jobId: string, k: number): Promise<stri
     const { error } = await db.storage.from("user-uploads").upload(path, await readFile(out), { contentType: "image/jpeg", upsert: true });
     if (error) return null;
     const { data } = await db.storage.from("user-uploads").createSignedUrl(path, 24 * 3600);
-    return data?.signedUrl ?? null;
+    return data?.signedUrl ? { url: data.signedUrl, path } : null;
   } catch (err) {
     console.error("[kling] close-up failed", err instanceof Error ? err.message.slice(0, 120) : "error");
     return null;
@@ -776,11 +776,11 @@ async function startElements(input: SubmitInput, personPhotos: string[]) {
   for (const [person, url] of personPhotos.entries()) {
     const face = await closeUp(url, input.jobId, person);
     const task = face
-      ? await createKlingElement({ name: `tm-${input.jobId.slice(0, 8)}-${person + 1}`, frontal: url, refer: [face] })
+      ? await createKlingElement({ name: `tm-${input.jobId.slice(0, 8)}-${person + 1}`, frontal: url, refer: [face.url] })
         .catch((err) => { console.error("[kling] element not sent", err instanceof ProviderError ? err.code : "error"); return null; })
       : null;
     if (task) await noteTask(input.jobId, task, `Элемент Kling, человек ${person + 1}`);
-    tasks.push({ person, task });
+    tasks.push({ person, task, face: face?.path ?? null });
   }
   const first = tasks.find((t) => t.task)?.task;
   if (!first) return null;
@@ -797,8 +797,9 @@ async function elementsStatus(providerJobId: string, run: ElRun): Promise<Provid
     if (!t.task || t.done) continue;
     const st = await getKlingElementTask(t.task).catch(() => ({ state: "waiting" as const }));
     if (st.state === "done") { t.done = true; t.elementId = st.elementId; }
-    else if (st.state === "failed") { t.done = true; console.error("[kling] element failed", t.task, st.reason); }
-    else if (late) t.done = true;
+    else if (st.state === "failed") { t.done = true; t.reason = st.reason; console.error("[kling] element failed", t.task, st.reason); }
+    else if (late) { t.done = true; t.reason = "timeout"; }
+    if (t.done) await logElement(run.input.jobId, t);
     else waiting = true;
   }
   const cur: ElRun = { ...run, tasks };
@@ -819,4 +820,15 @@ async function elementsStatus(providerJobId: string, run: ElRun): Promise<Provid
     for (const e of elements) if (e) await deleteKlingElement(e);
     return { state: "failed", errorCode: err instanceof ProviderError ? err.code : "provider_failed", retryable: false };
   }
+}
+
+/** The order's log: the Element made for a person (its id and the close-up it was made from), for the admin order page. */
+async function logElement(jobId: string, t: ElTask) {
+  try {
+    const db = supabaseAdmin();
+    const { data: job } = await db.from("generation_jobs").select("order_id").eq("id", jobId).maybeSingle();
+    if (!job?.order_id) return;
+    await db.from("audit_logs").insert({ actor_id: null, action: "generation.kling_element", resource_type: "order", resource_id: job.order_id,
+      metadata_json: { person: t.person + 1, task: t.task, element_id: t.elementId ?? null, face_path: t.face ?? null, result: t.elementId ? "ok" : t.reason ?? "failed" } });
+  } catch { /* the log is only a help */ }
 }

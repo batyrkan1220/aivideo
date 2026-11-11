@@ -56,6 +56,13 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
     const { data } = await db.storage.from("user-uploads").createSignedUrl(a.private_storage_path, 600);
     return data ? { url: data.signedUrl, label: slotNames.get(a.face_slot_key) ?? a.face_slot_key, size: a.width && a.height ? `${a.width}×${a.height}` : "" } : null;
   }))).filter((x): x is { url: string; label: string; size: string } => !!x);
+  // Kling Elements made for this order (one per person): the customer photo (front) + the close-up sent with it.
+  const elements = await Promise.all((logs ?? []).filter((l) => l.action === "generation.kling_element").map(async (l) => {
+    const m = (l.metadata_json ?? {}) as { person?: number; element_id?: string | null; face_path?: string | null; result?: string; task?: string };
+    const face = m.face_path && !o.photos_deleted_at ? (await db.storage.from("user-uploads").createSignedUrl(m.face_path, 600)).data?.signedUrl ?? null : null;
+    const person = Number(m.person) || 1;
+    return { at: l.created_at as string, person, elementId: m.element_id ?? null, result: String(m.result ?? ""), task: String(m.task ?? ""), face, front: photos[person - 1]?.url ?? null };
+  }));
   // Character Sheets made before the video (log entries with their files), newest run first.
   const sheetLogs = (logs ?? []).filter((l) => l.action === "generation.character_sheet")
     .map((l) => ({ at: l.created_at as string, ...(l.metadata_json as { person?: number; path?: string | null; result?: string; task?: string } | null ?? {}) }));
@@ -118,6 +125,36 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
               ))}
             </div>
           ) : <p className="text-sm text-muted">{o.photos_deleted_at ? "Фото удалены по сроку хранения" : "Нет фото"}</p>}
+          {elements.length > 0 && (
+            <div className="mt-4 border-t border-line pt-3">
+              <h3 className="mb-1 text-sm font-semibold">Элементы Kling</h3>
+              <p className="mb-2 text-xs text-muted">Каждый человек — элемент Kling: фото клиента (спереди) + крупный план лица. После видео элемент удаляется из Kling.</p>
+              <div className="flex flex-wrap gap-4">
+                {elements.map((el, i) => (
+                  <div key={i} className="rounded-xl p-2 ring-1 ring-line">
+                    <div className="flex gap-2">
+                      {[{ u: el.front, t: "спереди" }, { u: el.face, t: "лицо" }].map((x) => (
+                        <div key={x.t} className="w-24">
+                          {x.u ? (
+                            <a href={x.u} target="_blank" rel="noreferrer">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={x.u} alt={x.t} className="aspect-[3/4] w-24 rounded-lg bg-mist object-cover ring-1 ring-line" />
+                            </a>
+                          ) : <div className="flex aspect-[3/4] w-24 items-center justify-center rounded-lg bg-mist text-center text-[11px] text-muted">удалено</div>}
+                          <span className="mt-1 block text-[11px] text-muted">{x.t}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <span className="mt-1 block text-xs font-semibold">Человек {el.person}</span>
+                    <span className="block text-[11px] text-muted">
+                      {el.elementId ? <>ID <span className="font-mono">{el.elementId}</span></> : el.result === "timeout" ? "Kling не успел — без элемента" : `Не создан: ${el.result || "ошибка"}`}
+                    </span>
+                    <span className="block text-[11px] text-muted">{fmt.format(new Date(el.at))}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {sheets.length > 0 && (
             <div className="mt-4 border-t border-line pt-3">
               <h3 className="mb-2 text-sm font-semibold">Character Sheet</h3>
