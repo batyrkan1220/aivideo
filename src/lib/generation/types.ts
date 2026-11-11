@@ -23,6 +23,8 @@ export type SubmitInput = {
   config: Record<string, unknown>;
   /** Character Sheet per person (index = person), made before the video; null = none for that person. */
   sheets?: (string | null)[];
+  /** Kling Element per person (index = person), made before the video; null = none for that person. */
+  elements?: (string | null)[];
 };
 
 /** Opaque provider-owned state persisted between polls (multi-step providers). */

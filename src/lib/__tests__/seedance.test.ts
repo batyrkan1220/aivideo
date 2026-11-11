@@ -270,6 +270,24 @@ describe("shot helpers", () => {
   });
 });
 
+describe("Kling + Elements", () => {
+  it("with the order's Elements: photos and elements go in one run, prompt ties each to its person", async () => {
+    const bodies: { contents: { type: string; url?: string; text?: string; element_id?: string; id?: string }[] }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_u: string, init?: RequestInit) => {
+      if (init?.body) bodies.push(JSON.parse(String(init.body)));
+      return new Response(JSON.stringify({ code: 0, data: { id: "e1" } }), { status: 200 });
+    }));
+    const faces = [{ slotKey: "face_1", providerInput: "img_1", imageUrl: "https://s/man.jpg" }, { slotKey: "face_2", providerInput: "img_2", imageUrl: "https://s/woman.jpg" }];
+    const r = await seedanceProvider.submit({ jobId: "je", templateVideoUrl: "https://t/v.mp4", templateFrameUrl: null, quality: "720p", faces, elements: ["111", "222"],
+      config: { durationSec: 8, people: 2, engine: "kling_flash_el", positions: ["on the left, man", "on the right, woman"] } });
+    expect(r.state).toMatchObject({ stage: "klingd", elements: ["111", "222"] });
+    const els = bodies[0].contents.filter((c) => c.type === "element");
+    expect(els).toEqual([{ type: "element", element_id: "111", id: "element_1" }, { type: "element", element_id: "222", id: "element_2" }]);
+    expect(bodies[0].contents[0].text).toContain("@element_2 is an Element of the person in @image_2");
+    vi.unstubAllGlobals();
+  });
+});
+
 describe("Kling 3.0 Omni on our Kling API", () => {
   it("one edit run: template as base video, photos as image_list, <<<refs>>>", async () => {
     const calls: { url: string; body?: Record<string, unknown> }[] = [];

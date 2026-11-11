@@ -223,7 +223,7 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
 /** Kling 4.0 takes up to 10 images in one task. */
 export const KLING_MAX_IMAGES = 10;
 
-export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: string[]; mode: KlingMode; prompt: string; durationSec: number; aspectRatio: string; resolution?: "720p" | "1080p"; flash?: boolean }): Promise<string> {
+export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: string[]; mode: KlingMode; prompt: string; durationSec: number; aspectRatio: string; resolution?: "720p" | "1080p"; flash?: boolean; elementIds?: string[] }): Promise<string> {
   const duration = Math.min(30, Math.max(3, Math.round(opts.durationSec)));
   // Edit: the template itself is edited (base_video), so place and motion stay 1:1. Reference: a new video following it.
   const videoType = opts.mode === "edit" ? "base_video" : "feature_video";
@@ -237,6 +237,8 @@ export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: strin
         { type: "prompt", text: opts.prompt },
         { type: videoType, url: opts.videoUrl, id: "video_1" },
         ...photos.map((url, i) => ({ type: "refer_image", url, id: `image_${i + 1}` })),
+        // Elements (one per person, made from their photo): referenced as @element_N.
+        ...(opts.elementIds ?? []).slice(0, 7).map((element_id, i) => ({ type: "element", element_id, id: `element_${i + 1}` })),
       ],
       // original keeps the template video's soundtrack.
       settings: { resolution: opts.resolution === "1080p" && !opts.flash ? "1080p" : "720p", duration, aspect_ratio: aspect, audio: "original" },
@@ -268,6 +270,45 @@ export async function getKlingTask(id: string): Promise<ProviderJobStatus & { vi
 }
 
 // ---------------------------------------------------------------- photos (omni-image)
+
+/**
+ * Kling Elements (official API): a person made from photos, held more firmly than a plain reference image.
+ *   POST /v1/general/advanced-custom-elements { element_name, element_description, reference_type: "image_refer",
+ *        element_image_list: { frontal_image, refer_images: [{ image_url }] } }   (1–3 refer images, unlike the front one)
+ *   GET  /v1/general/advanced-custom-elements/{task_id} → task_status, task_result.elements[0].element_id
+ *   POST /v1/general/delete-advanced-elements { element_id }
+ */
+export async function createKlingElement(o: { name: string; frontal: string; refer: string[] }): Promise<string> {
+  const d = await call<{ data?: { task_id?: string } }>("/v1/general/advanced-custom-elements", {
+    method: "POST",
+    body: JSON.stringify({
+      element_name: o.name.slice(0, 20), element_description: "Customer photo: this exact person, face and hair", reference_type: "image_refer",
+      element_image_list: { frontal_image: o.frontal, refer_images: o.refer.slice(0, 3).map((image_url) => ({ image_url })) },
+      tag_list: [{ tag_id: "o_102" }],
+    }),
+  });
+  const id = d.data?.task_id;
+  if (!id) throw new ProviderError("provider_bad_response", false, "kling element: no task_id");
+  console.log("[kling] element task", id);
+  return String(id);
+}
+
+export async function getKlingElementTask(id: string): Promise<{ state: "waiting" } | { state: "done"; elementId: string } | { state: "failed"; reason: string }> {
+  const d = await call<{ data?: { task_status?: string; task_status_msg?: string; task_result?: { elements?: { element_id?: string | number }[] } } }>(
+    `/v1/general/advanced-custom-elements/${encodeURIComponent(id)}`);
+  const status = String(d.data?.task_status ?? "");
+  if (status === "succeed" || status === "succeeded") {
+    const el = d.data?.task_result?.elements?.[0]?.element_id;
+    return el != null ? { state: "done", elementId: String(el) } : { state: "failed", reason: "no element_id" };
+  }
+  if (status === "failed") return { state: "failed", reason: String(d.data?.task_status_msg ?? "").slice(0, 200) };
+  return { state: "waiting" };
+}
+
+export async function deleteKlingElement(elementId: string) {
+  await call("/v1/general/delete-advanced-elements", { method: "POST", body: JSON.stringify({ element_id: elementId }) })
+    .catch((err) => console.error("[kling] element not deleted", err instanceof ProviderError ? err.code : "error"));
+}
 
 /**
  * Kling 3.0 Omni video (official API), for templates set to it:

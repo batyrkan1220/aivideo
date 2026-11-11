@@ -94,10 +94,16 @@ export const seedanceProvider: GenerationProvider = {
       await noteTask(input.jobId, id, `Kling 3.0 Omni · ${people} чел. за один раз`);
       return { providerJobId: id, cost: seedanceCostUsd(durationSec, await seedancePricingSettings(), {}, resolution), state: { stage: "kv3" } };
     }
-    if (cfg.engine !== "kling" && cfg.engine !== "kling_flash") {
+    if (cfg.engine === "seedance25" || cfg.engine === "wan_replace" || cfg.engine === "minimax_recast" || cfg.engine === "kling_o3") {
       const wish = cfg.allowWish ? cleanWish(extra.wish) : "";
       const prompt = buildKlingDirectPrompt("edit", outfit, cfg.prompt, wish, people, cfg.positions, objects, []);
       return startFal(input.jobId, cfg.engine, input.templateVideoUrl, usedPhotos, people, prompt, durationSec, resolution, cfg.positions.slice(0, people));
+    }
+    // Kling Elements: each person becomes an Element (photo + face close-up) before the video.
+    const useElements = cfg.engine === "kling_el" || cfg.engine === "kling_flash_el";
+    if (useElements && people > 0 && !input.elements) {
+      const started = await startElements(input, usedPhotos.slice(0, people));
+      if (started) return started;
     }
     // Step 1: a Character Sheet of each person (Kling image), then the video (getStatus sends it).
     if (people > 0 && !input.sheets) {
@@ -127,21 +133,27 @@ export const seedanceProvider: GenerationProvider = {
     const sheetList = sheetUrls.map((url, k) => ({ url, of: `@image_${k + 1}` }));
     const sheeted = (photoUrls: string[], p: string) => withSheets({ photoUrls, prompt: p }, sheetList, sheetOnly);
     const prompt = buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, wish, people, cfg.positions, objects, targetRefs);
-    const flash = cfg.engine === "kling_flash";
-    const plain = { videoUrl: input.templateVideoUrl, photoUrls: usedPhotos, mode: cfg.klingMode, durationSec, aspectRatio: cfg.aspectRatio, resolution, ...(flash ? { flash } : {}) };
+    const flash = cfg.engine === "kling_flash" || cfg.engine === "kling_flash_el";
+    // Elements made for this order (person k → its element), referenced as @element_N.
+    const elementOf = Array.from({ length: people }, (_, k) => input.elements?.[k] ?? null);
+    const elementIds = elementOf.filter((x): x is string => !!x);
+    const plain = { videoUrl: input.templateVideoUrl, photoUrls: usedPhotos, mode: cfg.klingMode, durationSec, aspectRatio: cfg.aspectRatio, resolution, ...(flash ? { flash } : {}), ...(elementIds.length ? { elementIds } : {}) };
+    const elementNote = elementIds.length ? " " + elementOf.map((el, k) => el
+      ? `@element_${elementIds.indexOf(el) + 1} is an Element of the person in @image_${k + 1} (the same person). The person ${findBy(cfg.positions[k]) || (people === 1 ? "to replace" : `number ${k + 1} from the left`)} must look exactly like @element_${elementIds.indexOf(el) + 1} in every frame: take their face, hair and skin only from it and @image_${k + 1}, never from another person.`
+      : "").filter(Boolean).join(" ") : "";
     // A template with cuts: Kling loses the face after a cut, so each shot is edited on its own (TM-100034).
     if (cfg.klingMode === "edit") {
       const shotPrompt = buildKlingDirectPrompt("edit", outfit, cfg.prompt, wish, people, cfg.positions, objects, targetRefs, true);
       const shotRun = await startShots(input.jobId, input.templateVideoUrl, [{ ...sheeted([...usedPhotos, ...cutouts], shotPrompt), who: people === 1 ? cfg.positions[0]?.trim() ?? "" : "", person: people === 1 ? 0 : -1 }], cfg.aspectRatio, resolution, pricing, cfg.shotMap);
       if (shotRun) return shotRun;
     }
-    const providerJobId = await submitKlingOmni({ ...plain, ...sheeted([...usedPhotos, ...cutouts], prompt) });
+    const providerJobId = await submitKlingOmni({ ...plain, ...sheeted([...usedPhotos, ...cutouts], prompt + elementNote) });
     await noteTask(input.jobId, providerJobId, "видео целиком");
     // If Kling refuses the task because of a cut-out (it charges nothing then), the same order goes again without them.
     const fallback = cutouts.length
       ? { ...plain, ...sheeted(usedPhotos, buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, wish, people, cfg.positions, objects)) }
       : null;
-    return { providerJobId, cost: seedanceCostUsd(durationSec, pricing, {}, resolution), state: { stage: "klingd", ...(fallback ? { fallback } : {}) } };
+    return { providerJobId, cost: seedanceCostUsd(durationSec, pricing, {}, resolution), state: { stage: "klingd", ...(fallback ? { fallback } : {}), ...(elementIds.length ? { elements: elementIds } : {}) } };
   },
 
   async getStatus(providerJobId, ctx) {
@@ -151,6 +163,8 @@ export const seedanceProvider: GenerationProvider = {
     }
     const falRun = falOf(ctx.state);
     if (falRun) return falRunStatus(falRun);
+    const elRun = elementsOf(ctx.state);
+    if (elRun) return elementsStatus(providerJobId, elRun);
     const sheetRun = sheetsOf(ctx.state);
     if (sheetRun) return sheetStatus(providerJobId, sheetRun);
     const shotRun = shotsOf(ctx.state);
@@ -171,7 +185,15 @@ export const seedanceProvider: GenerationProvider = {
       };
     }
     const fb = fallbackOf(ctx.state);
-    if (st.state !== "failed" || st.errorCode === "provider_content_rejected" || !fb) return st;
+    if (st.state !== "failed" || st.errorCode === "provider_content_rejected" || !fb) {
+      // The order's Elements hold the customer's face: removed from Kling once the video is done.
+      const els = (ctx.state as { elements?: unknown } | null)?.elements;
+      if ((st.state === "succeeded" || st.state === "failed") && Array.isArray(els)) {
+        const { deleteKlingElement } = await import("./kling");
+        for (const e of els) if (typeof e === "string") await deleteKlingElement(e);
+      }
+      return st;
+    }
     console.log("[kling] task", providerJobId, "failed with template cut-outs; sending again without them");
     const id = await submitKlingOmni(fb);
     return { state: "processing", next: { providerJobId: id, state: { stage: "klingd" } } };
@@ -697,4 +719,99 @@ async function falRunStatus(run: FalRun): Promise<ProviderJobStatus> {
   const req = await falSubmit(FAL_MODEL.wan_replace, falInput("wan_replace", st.outputUrl, run.photos, k, "", run.resolution));
   await noteTask(run.jobId, req.requestId, `fal · Wan Replace · человек ${k + 1} из ${run.people}`);
   return { state: "processing", next: { providerJobId: req.requestId, state: { ...run, req, k } as unknown as ProviderState, cost: 0 } };
+}
+
+// ---------------------------------------------------------------- Kling Elements (per order)
+/*
+  Template model «Kling + элементы»: before the video each person becomes a Kling Element made from
+  their photo (front) and a close-up of the upper part of it (Kling wants at least one more image).
+  The video then gets the photos and the Elements (@element_N); Elements are deleted when it is done.
+  An Element that fails or takes too long is skipped: the video goes with the photo alone.
+*/
+const EL_WAIT_MS = 5 * 60_000;
+type ElTask = { person: number; task: string | null; elementId?: string | null; done?: boolean };
+type ElRun = { stage: "elements"; tasks: ElTask[]; input: SubmitInput; at: number };
+
+function elementsOf(state: ProviderState): ElRun | null {
+  const s = state as Partial<ElRun> | null;
+  if (!s || s.stage !== "elements" || !Array.isArray(s.tasks) || !s.input) return null;
+  return { stage: "elements", tasks: s.tasks as ElTask[], input: s.input as SubmitInput, at: typeof s.at === "number" ? s.at : Date.now() };
+}
+
+/** A close-up of the photo's upper middle (where the face is on a portrait), kept with the order's photos. */
+async function closeUp(photoUrl: string, jobId: string, k: number): Promise<string | null> {
+  const { mkdtemp, readFile, rm, writeFile } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = await mkdtemp(join(tmpdir(), "el-"));
+  try {
+    const res = await fetch(photoUrl, { signal: AbortSignal.timeout(60_000) });
+    if (!res.ok) return null;
+    const src = join(dir, "in"), out = join(dir, "face.jpg");
+    await writeFile(src, new Uint8Array(await res.arrayBuffer()));
+    const { ffmpegLog } = await import("@/lib/templates/lite-preview");
+    await ffmpegLog(["-hide_banner", "-y", "-loglevel", "error", "-i", src, "-frames:v", "1",
+      "-vf", "crop=trunc(iw*0.7/2)*2:trunc(min(ih*0.55\\,iw*0.85)/2)*2:trunc(iw*0.15/2)*2:trunc(ih*0.04/2)*2,scale='max(400\\,iw)':-2", "-q:v", "3", out], 60_000);
+    const db = supabaseAdmin();
+    const { data: job } = await db.from("generation_jobs").select("order_id").eq("id", jobId).maybeSingle();
+    const path = `sheets/${(job?.order_id as string | undefined) ?? jobId}/face-${k + 1}-${Date.now()}.jpg`;
+    const { error } = await db.storage.from("user-uploads").upload(path, await readFile(out), { contentType: "image/jpeg", upsert: true });
+    if (error) return null;
+    const { data } = await db.storage.from("user-uploads").createSignedUrl(path, 24 * 3600);
+    return data?.signedUrl ?? null;
+  } catch (err) {
+    console.error("[kling] close-up failed", err instanceof Error ? err.message.slice(0, 120) : "error");
+    return null;
+  } finally {
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+async function startElements(input: SubmitInput, personPhotos: string[]) {
+  const { createKlingElement } = await import("./kling");
+  const tasks: ElTask[] = [];
+  for (const [person, url] of personPhotos.entries()) {
+    const face = await closeUp(url, input.jobId, person);
+    const task = face
+      ? await createKlingElement({ name: `tm-${input.jobId.slice(0, 8)}-${person + 1}`, frontal: url, refer: [face] })
+        .catch((err) => { console.error("[kling] element not sent", err instanceof ProviderError ? err.code : "error"); return null; })
+      : null;
+    if (task) await noteTask(input.jobId, task, `Элемент Kling, человек ${person + 1}`);
+    tasks.push({ person, task });
+  }
+  const first = tasks.find((t) => t.task)?.task;
+  if (!first) return null;
+  const run: ElRun = { stage: "elements", tasks, input: { ...input, elements: undefined }, at: Date.now() };
+  return { providerJobId: first, cost: 0, state: run as unknown as ProviderState };
+}
+
+async function elementsStatus(providerJobId: string, run: ElRun): Promise<ProviderJobStatus> {
+  const { getKlingElementTask } = await import("./kling");
+  const tasks = run.tasks.map((t) => ({ ...t }));
+  const late = Date.now() - run.at > EL_WAIT_MS;
+  let waiting = false;
+  for (const t of tasks) {
+    if (!t.task || t.done) continue;
+    const st = await getKlingElementTask(t.task).catch(() => ({ state: "waiting" as const }));
+    if (st.state === "done") { t.done = true; t.elementId = st.elementId; }
+    else if (st.state === "failed") { t.done = true; console.error("[kling] element failed", t.task, st.reason); }
+    else if (late) t.done = true;
+    else waiting = true;
+  }
+  const cur: ElRun = { ...run, tasks };
+  if (waiting) {
+    const changed = tasks.some((t, i) => t.done !== run.tasks[i].done);
+    return { state: "processing", progress: 5, ...(changed ? { next: { providerJobId, state: cur as unknown as ProviderState } } : {}) };
+  }
+  const elements = Array.from({ length: Math.max(0, ...tasks.map((t) => t.person + 1)) }, (_, k) => tasks.find((t) => t.person === k)?.elementId ?? null);
+  console.log("[kling] elements ready:", elements.filter(Boolean).length, "of", tasks.length, "· sending the video");
+  try {
+    const r = await seedanceProvider.submit({ ...run.input, elements });
+    return { state: "processing", next: { providerJobId: r.providerJobId, state: r.state ?? null, cost: r.cost } };
+  } catch (err) {
+    if (err instanceof ProviderError && err.retryable) return { state: "processing", next: { providerJobId, state: cur as unknown as ProviderState } };
+    const { deleteKlingElement } = await import("./kling");
+    for (const e of elements) if (e) await deleteKlingElement(e);
+    return { state: "failed", errorCode: err instanceof ProviderError ? err.code : "provider_failed", retryable: false };
+  }
 }

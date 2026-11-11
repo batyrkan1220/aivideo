@@ -49,7 +49,7 @@ export const seedanceConfigSchema = z.object({
   mode: z.literal("kd").catch("kd").default("kd"),
   klingMode: z.enum(["edit", "reference"]).catch("edit").default("edit"),
   /** Which model makes the video: Kling 4.0 (own API) or a model on fal.ai (test: Seedance 2.5, Wan 2.2 Animate Replace). */
-  engine: z.enum(["kling", "seedance25", "wan_replace", "minimax_recast", "kling_o3", "kling_v3", "kling_flash"]).catch("kling").default("kling"),
+  engine: z.enum(["kling", "seedance25", "wan_replace", "minimax_recast", "kling_o3", "kling_v3", "kling_flash", "kling_el", "kling_flash_el"]).catch("kling").default("kling"),
   /** How many people in the video are replaced (one customer photo each). 0 = only things (a car…), nobody is replaced. */
   people: z.number().int().min(0).max(SEEDANCE_MAX_PEOPLE).default(1),
   /** What photo the customer needs (shown on the order page). */
