@@ -251,7 +251,9 @@ export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: strin
         ...(opts.elementIds ?? []).slice(0, 7).map((element_id, i) => ({ type: "element", element_id, id: `element_${i + 1}` })),
       ],
       // original keeps the template video's soundtrack.
-      settings: { resolution: opts.resolution === "1080p" && !opts.flash ? "1080p" : "720p", duration, aspect_ratio: aspect, audio: "original" },
+      // With Elements Kling refused duration 21 for a 21 s template ("duration value '21' is invalid", TM-100074).
+      // Editing takes the template's own length when duration is left out (Kling docs), so it is left out there.
+      settings: { resolution: opts.resolution === "1080p" && !opts.flash ? "1080p" : "720p", ...(opts.elementIds?.length && videoType === "base_video" ? {} : { duration }), aspect_ratio: aspect, audio: "original" },
     }),
   });
   const id = d.data?.id;
