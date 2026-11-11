@@ -59,16 +59,17 @@ export function DownloadVideo({ orderId, photo = false }: { orderId: string; pho
 
   return (
     <div className="w-full space-y-2">
-      <div className="flex flex-wrap gap-2">
+      {/* One under the other: side by side «Отправить в чат Telegram» broke into 3 lines on a phone. */}
+      <div className="grid gap-2">
         <button type="button" onClick={sendToChat} disabled={state === "sending"}
-          className={`${btn} flex-1 bg-[#2AABEE] text-white shadow-[0_12px_28px_-12px_rgba(42,171,238,0.9)] hover:bg-[#229ED9] disabled:opacity-70`}>
+          className={`${btn} w-full whitespace-nowrap bg-[#2AABEE] text-white shadow-[0_12px_28px_-12px_rgba(42,171,238,0.9)] hover:bg-[#229ED9] disabled:opacity-70`}>
           {state === "sending" ? <><span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden />{r.sending}</> : <><Send size={18} aria-hidden />{r.sendToChat}</>}
         </button>
-        <button type="button" onClick={nativeDownload} className={`${btn} flex-1 border border-line bg-surface text-ink elev-xs hover:bg-mist`}>
+        <button type="button" onClick={nativeDownload} className={`${btn} w-full whitespace-nowrap border border-line bg-surface text-ink elev-xs hover:bg-mist`}>
           <Download size={18} aria-hidden />{label}
         </button>
       </div>
-      <p className={`t-small ${state === "sent" ? "font-medium text-success" : state === "error" || state === "too_large" ? "text-danger" : "text-muted"}`} aria-live="polite">
+      <p className={`t-small text-center md:text-left ${state === "sent" ? "font-medium text-success" : state === "error" || state === "too_large" ? "text-danger" : "text-muted"}`} aria-live="polite">
         {state === "sent" ? r.sentToChat : state === "error" ? r.sendFailed : state === "too_large" ? r.tooLarge : r.tgDownloadHint}
       </p>
     </div>
