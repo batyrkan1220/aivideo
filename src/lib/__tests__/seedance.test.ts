@@ -351,6 +351,28 @@ describe("two people at different places (TM-100062)", () => {
   });
 });
 
+describe("two people: keep person 1's finished run", () => {
+  it("sends only person 2 and merges with the kept task", async () => {
+    const bodies: { contents: { type: string; url?: string }[] }[] = [];
+    const done = (u: string) => ({ code: 0, data: [{ status: "succeeded", outputs: [{ type: "video", url: u }] }] });
+    const replies = [{ code: 0, data: { id: "n2" } }, done("https://k/old1.mp4"), done("https://k/n2.mp4")];
+    vi.stubGlobal("fetch", vi.fn(async (_u: string, init?: RequestInit) => {
+      if (init?.body) bodies.push(JSON.parse(String(init.body)));
+      return new Response(JSON.stringify(replies.shift()), { status: 200 });
+    }));
+    const faces = [{ slotKey: "face_1", providerInput: "img_1", imageUrl: "https://s/man.jpg" }, { slotKey: "face_2", providerInput: "img_2", imageUrl: "https://s/woman.jpg" }];
+    const r = await seedanceProvider.submit({ jobId: "jr", templateVideoUrl: "https://t/v.mp4", templateFrameUrl: null, quality: "720p", faces,
+      config: { durationSec: 8, people: 2, positions: ["on the left, man", "on the right, woman"], reuse: { person: 0, task: "old1" } } });
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0].contents.filter((c) => c.type === "refer_image").map((c) => c.url)).toEqual(["https://s/woman.jpg"]);
+    const st = await seedanceProvider.getStatus(r.providerJobId, { startedAt: null, state: r.state ?? null });
+    expect(st.state).toBe("succeeded");
+    const { mergeEdits } = await import("@/lib/media/merge-people");
+    expect(mergeEdits).toHaveBeenLastCalledWith("https://k/old1.mp4", "https://k/n2.mp4", "https://t/v.mp4");
+    vi.unstubAllGlobals();
+  });
+});
+
 describe("things only (0 people)", () => {
   it("the customer's car photo goes as @image_1, no person run", async () => {
     const bodies: { contents: { type: string; url?: string; text?: string }[] }[] = [];

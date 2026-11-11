@@ -148,8 +148,13 @@ export const seedanceProvider: GenerationProvider = {
           }, [{ url: sheetUrls[k], of: "@image_1" }], sheetOnly),
           who: cfg.positions[k].trim(), person: k,
         }));
+        // Admin "make only the other person again": that person's finished run is taken as it is.
+        const reuse = (input.config as { reuse?: { person?: unknown; task?: unknown } }).reuse;
+        const kept = reuse && (reuse.person === 0 || reuse.person === 1) && typeof reuse.task === "string" && /^[\w-]{1,80}$/.test(reuse.task)
+          ? { person: reuse.person, task: reuse.task } : null;
         const ids: (string | null)[] = [];
         for (const [k, p] of split.entries()) {
+          if (kept?.person === k) { ids.push(kept.task); await noteTask(input.jobId, kept.task, `человек ${k + 1} из 2 — готовый, без изменений`); continue; }
           const id = await submitKlingOmni({ videoUrl: input.templateVideoUrl, mode: "edit", durationSec, aspectRatio: cfg.aspectRatio, resolution, ...p })
             .catch((err) => { if (k > 0 && err instanceof ProviderError && err.retryable) return null; throw err; });
           if (id) await noteTask(input.jobId, id, `человек ${k + 1} из 2 (параллельно)`);
@@ -157,7 +162,8 @@ export const seedanceProvider: GenerationProvider = {
         }
         console.log("[kling] 2 people in parallel", ids.filter(Boolean).length, "sent");
         const run: SplitRun = { stage: "split", ids, outs: [null, null], passes: split, template: input.templateVideoUrl, durationSec, aspectRatio: cfg.aspectRatio, resolution, jobId: input.jobId };
-        return { providerJobId: ids[0]!, cost: seedanceCostUsd(durationSec, pricing, {}, resolution) * ids.filter(Boolean).length, state: run as unknown as ProviderState };
+        const sent = ids.filter((x, k) => x && kept?.person !== k).length;
+        return { providerJobId: ids.find(Boolean) ?? "", cost: seedanceCostUsd(durationSec, pricing, {}, resolution) * sent, state: run as unknown as ProviderState };
       }
       // Each later run edits the previous result. At 720p the next person was drawn on an already
       // compressed copy and came out smeared ("1-ші адам таза, 2-ші шайылып қалады"): runs before the last

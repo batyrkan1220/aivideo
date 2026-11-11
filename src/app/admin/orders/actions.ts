@@ -53,6 +53,11 @@ export async function remakeOrder(_: AdminState, fd: FormData): Promise<AdminSta
   if (!u) return { error: E.forbidden };
   const id = uuid(fd.get("orderId"));
   if (!id.success) return { error: E.generic };
+  // Two people: keep one person's finished Kling run and make only the other again.
+  const keepPerson = Number(fd.get("keepPerson"));
+  const keepTask = String(fd.get("keepTask") ?? "");
+  const options = (keepPerson === 0 || keepPerson === 1) && /^[\w-]{1,80}$/.test(keepTask)
+    ? { reuse: { person: keepPerson, task: keepTask } } : null;
   const db = supabaseAdmin();
   const { data: o } = await db.from("orders")
     .select("id,payment_status,generation_status,photos_deleted_at,template_snapshot_json").eq("id", id.data).single();
@@ -63,13 +68,22 @@ export async function remakeOrder(_: AdminState, fd: FormData): Promise<AdminSta
   const { count } = await db.from("orders").select("id", { count: "exact", head: true }).eq("parent_order_id", o.id);
   if (count) return { error: "Это фото-комбо: пересоздайте нужную фотографию в её заказе." };
   const provider = (o.template_snapshot_json as { provider_key?: string }).provider_key ?? "dev";
-  const { error } = await db.from("generation_jobs").insert({ order_id: o.id, provider, status: "queued" });
+  if (options) {
+    // Only a task of this order, logged as that person's own run (its result has nobody else replaced).
+    const { data: logged } = await db.from("audit_logs").select("metadata_json").eq("resource_id", o.id).eq("action", "generation.kling_task");
+    const ok = (logged ?? []).some((l) => {
+      const m = l.metadata_json as { task?: string; step?: string } | null;
+      return m?.task === keepTask && new RegExp(`^человек ${keepPerson + 1} из 2( \\(параллельно\\)| — готовый, без изменений)?$`).test(m?.step ?? "");
+    });
+    if (!ok) return { error: "Эту задачу Kling нельзя взять как готовую" };
+  }
+  const { error } = await db.from("generation_jobs").insert({ order_id: o.id, provider, status: "queued", ...(options ? { options_json: options } : {}) });
   if (error) return { error: E.generic };
   // The old still frame belongs to the old video.
   const { data: v } = await db.from("generated_videos").select("private_storage_path").eq("order_id", o.id).maybeSingle();
   if (v?.private_storage_path) await db.storage.from("generated-videos").remove([`${v.private_storage_path}.poster.webp`]);
   await db.from("orders").update({ generation_status: "queued", completed_at: null }).eq("id", o.id);
-  await audit(u.id, "order.remake", "order", o.id);
+  await audit(u.id, options ? "order.remake_person" : "order.remake", "order", o.id, options ?? undefined);
   revalidatePath(`/admin/orders/${o.id}`);
   revalidatePath("/admin/support", "layout");
   return { ok: "Поставлено в очередь — готовое видео придёт клиенту в Telegram" };
