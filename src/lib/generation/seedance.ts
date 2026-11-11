@@ -133,7 +133,9 @@ export const seedanceProvider: GenerationProvider = {
     const sheetList = sheetUrls.map((url, k) => ({ url, of: `@image_${k + 1}` }));
     const sheeted = (photoUrls: string[], p: string) => withSheets({ photoUrls, prompt: p }, sheetList, sheetOnly);
     const prompt = buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, wish, people, cfg.positions, objects, targetRefs);
-    const flash = cfg.engine === "kling_flash" || cfg.engine === "kling_flash_el";
+    // Flash takes a video of 3–20 s only (Kling docs; a 21 s template was refused, TM-100074): longer ones go to 4.0.
+    const flash = (cfg.engine === "kling_flash" || cfg.engine === "kling_flash_el") && durationSec <= 20.4;
+    if ((cfg.engine === "kling_flash" || cfg.engine === "kling_flash_el") && !flash) console.log("[kling] template over 20 s: Kling 4.0 instead of Flash");
     // Elements made for this order (person k → its element), referenced as @element_N.
     const elementOf = Array.from({ length: people }, (_, k) => input.elements?.[k] ?? null);
     const elementIds = elementOf.filter((x): x is string => !!x);
