@@ -303,6 +303,45 @@ export async function getKlingImageTask(id: string): Promise<ProviderJobStatus> 
   return { state: status === "submitted" ? "queued" : "processing" };
 }
 
+/**
+ * Kling image generation with a face/subject reference (official API): POST /v1/images/generations
+ *   { model_name: "kling-v2-1", prompt, image (url), image_reference: "subject"|"face", image_fidelity, human_fidelity, n, aspect_ratio }
+ * The reference keeps the person's identity much closer than omni-image. GET /v1/images/generations/{id}.
+ */
+export async function submitKlingFaceImage(o: { imageUrl: string; prompt: string; reference: "subject" | "face"; imageFidelity: number; humanFidelity: number; aspectRatio: string }): Promise<string> {
+  const clamp = (x: number) => Math.min(1, Math.max(0, Number.isFinite(x) ? x : 0.5));
+  const d = await call<{ data?: { task_id?: string; task_status?: string } }>("/v1/images/generations", {
+    method: "POST",
+    body: JSON.stringify({
+      model_name: "kling-v2-1", prompt: o.prompt.slice(0, 2400), image: o.imageUrl, image_reference: o.reference,
+      image_fidelity: clamp(o.imageFidelity), ...(o.reference === "subject" ? { human_fidelity: clamp(o.humanFidelity) } : {}),
+      n: 1, aspect_ratio: o.aspectRatio,
+    }),
+  });
+  const id = d.data?.task_id;
+  if (!id) throw new ProviderError("provider_bad_response", false, "no task_id");
+  console.log("[kling] face image task", id, d.data?.task_status ?? "");
+  return String(id);
+}
+
+export async function getKlingFaceImageTask(id: string): Promise<ProviderJobStatus> {
+  const d = await call<{ data?: { task_status?: string; task_status_msg?: string; task_result?: { images?: { url?: string }[] } } }>(
+    `/v1/images/generations/${encodeURIComponent(id)}`);
+  const t = d.data;
+  const status = String(t?.task_status ?? "");
+  if (status === "succeed" || status === "succeeded") {
+    const url = t?.task_result?.images?.find((x) => x.url)?.url;
+    return url ? { state: "succeeded", outputUrl: url } : { state: "failed", errorCode: "provider_no_output", retryable: false };
+  }
+  if (status === "failed") {
+    const reason = String(t?.task_status_msg ?? "").slice(0, 300);
+    console.error("[kling] face image task failed", id, reason);
+    const content = /risk|sensitive|policy|moderat|safety|inappropriate|violat/i.test(reason);
+    return { state: "failed", errorCode: content ? "provider_content_rejected" : /face/i.test(reason) ? "provider_no_face" : "provider_failed", retryable: false };
+  }
+  return { state: status === "submitted" ? "queued" : "processing" };
+}
+
 /** Startup check: does our key work for the image API? Logs the status only. */
 export async function klingImageProbe(): Promise<string> {
   try {

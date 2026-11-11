@@ -3,7 +3,7 @@ import { seedanceConfigSchema, SEEDANCE_MAX_OBJECTS, SEEDANCE_MAX_PEOPLE, SEEDAN
 import { seedanceCostUsd } from "@/lib/pricing-seedance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { ProviderError, type GenerationProvider, type ProviderJobStatus, type ProviderState, type SubmitInput } from "./types";
-import { buildKlingDirectPrompt, findBy, getKlingImageTask, getKlingTask, KLING_MAX_IMAGES, submitKlingImage, submitKlingOmni } from "./kling";
+import { buildKlingDirectPrompt, findBy, getKlingTask, KLING_MAX_IMAGES, submitKlingOmni } from "./kling";
 import { mediaUrl } from "@/lib/templates/queries";
 import { klingShotSec } from "@/lib/media/scene-plan";
 import { supabaseAdmin } from "@/lib/supabase/server";
@@ -507,13 +507,6 @@ async function noteTask(jobId: string | undefined, task: string, step: string, i
 
 const SHEET_BUCKET = "user-uploads";
 const SHEET_WAIT_MS = 6 * 60_000;
-export const SHEET_PROMPT =
-  "Character reference sheet of the person in <<<image_1>>>. It must be exactly the same person: the same face, facial features, " +
-  "eye shape, nose, lips, skin tone, age, hairstyle and hair colour, body type and the same clothing as in <<<image_1>>>. " +
-  "Show the person four times side by side on a plain light-grey studio background: full-body front view, three-quarter view, " +
-  "side profile, and a close-up portrait of the face. Neutral standing pose, even soft studio light, sharp photorealistic photo, " +
-  "no text, no labels, no frames, no other people.";
-
 type SheetTask = { person: number; id: string | null; path?: string | null; url?: string | null; done?: boolean };
 type SheetRun = { stage: "sheet"; tasks: SheetTask[]; input: SubmitInput; at: number; orderId: string | null };
 
@@ -542,9 +535,11 @@ export function withSheets(base: { photoUrls: string[]; prompt: string }, list: 
 async function startSheets(input: SubmitInput, personPhotos: string[]) {
   const { catalogSettings } = await import("@/lib/catalog/settings");
   if (!(await catalogSettings()).characterSheet) return null;
+  const { sheetSettings, submitSheet } = await import("./sheet-settings");
+  const ss = await sheetSettings();
   const tasks: SheetTask[] = [];
   for (const [person, url] of personPhotos.entries()) {
-    const id = await submitKlingImage({ photoUrls: [url], exampleUrl: null, prompt: SHEET_PROMPT, aspectRatio: "16:9" })
+    const id = await submitSheet(url, ss)
       .catch((err) => { console.error("[kling] sheet not sent", err instanceof ProviderError ? err.code : "error"); return null; });
     tasks.push({ person, id });
   }
@@ -565,7 +560,8 @@ async function sheetStatus(providerJobId: string, run: SheetRun): Promise<Provid
   let waiting = false;
   for (const t of tasks) {
     if (!t.id || t.done) continue;
-    const st = await getKlingImageTask(t.id).catch(() => ({ state: "processing" as const }));
+    const { sheetTask } = await import("./sheet-settings");
+    const st = await sheetTask(t.id).catch(() => ({ state: "processing" as const }));
     if (st.state === "succeeded") {
       t.done = true;
       const saved = await saveSheet(run, t, st.outputUrl);
