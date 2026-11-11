@@ -28,7 +28,10 @@ export async function runRetention() {
     await db.storage.from("user-uploads").remove(due.map((a) => a.private_storage_path));
     await db.from("order_assets").delete().in("id", due.map((a) => a.id));
     const orderIds = [...new Set(due.map((a) => a.order_id).filter(Boolean))] as string[];
-    if (orderIds.length) await db.from("orders").update({ photos_deleted_at: now }).in("id", orderIds).is("photos_deleted_at", null);
+    if (orderIds.length) {
+      await db.from("orders").update({ photos_deleted_at: now }).in("id", orderIds).is("photos_deleted_at", null);
+      await removeSheets(orderIds);
+    }
     out.photos += due.length;
     if (due.length < BATCH) break;
   }
@@ -88,6 +91,22 @@ async function sweepOrphans(): Promise<number> {
       }
     };
     try { await walk("", 0); } catch { continue; }
+    if (b.bucket === "user-uploads") {
+      // Character Sheets (sheets/<order>/…) live while their order still has its photos.
+      const sheets = files.filter((f) => f.startsWith("sheets/"));
+      const ids = [...new Set(sheets.map((f) => f.split("/")[1]))];
+      const live = new Set<string>();
+      for (let i = 0; i < ids.length; i += 100) {
+        const { data } = await db.from("orders").select("id").in("id", ids.slice(i, i + 100).filter((x) => /^[0-9a-f-]{36}$/i.test(x))).is("photos_deleted_at", null);
+        for (const r of data ?? []) live.add(r.id as string);
+      }
+      const stale = sheets.filter((f) => !live.has(f.split("/")[1]));
+      for (let i = 0; i < stale.length; i += 100) {
+        const { error } = await db.storage.from(b.bucket).remove(stale.slice(i, i + 100));
+        if (!error) removed += Math.min(100, stale.length - i);
+      }
+      files.splice(0, files.length, ...files.filter((f) => !f.startsWith("sheets/")));
+    }
     for (let i = 0; i < files.length; i += 100) {
       const chunk = files.slice(i, i + 100);
       // A video's still frame (".poster.webp") belongs to the video row.
@@ -102,4 +121,14 @@ async function sweepOrphans(): Promise<number> {
     }
   }
   return removed;
+}
+
+/** An order's Character Sheets go with its photos. */
+async function removeSheets(orderIds: string[]) {
+  const db = supabaseAdmin();
+  for (const id of orderIds) {
+    const { data } = await db.storage.from("user-uploads").list(`sheets/${id}`, { limit: 100 });
+    const paths = (data ?? []).filter((e) => e.id).map((e) => `sheets/${id}/${e.name}`);
+    if (paths.length) await db.storage.from("user-uploads").remove(paths).catch(() => {});
+  }
 }

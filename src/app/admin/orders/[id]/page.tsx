@@ -56,6 +56,13 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
     const { data } = await db.storage.from("user-uploads").createSignedUrl(a.private_storage_path, 600);
     return data ? { url: data.signedUrl, label: slotNames.get(a.face_slot_key) ?? a.face_slot_key, size: a.width && a.height ? `${a.width}×${a.height}` : "" } : null;
   }))).filter((x): x is { url: string; label: string; size: string } => !!x);
+  // Character Sheets made before the video (log entries with their files), newest run first.
+  const sheetLogs = (logs ?? []).filter((l) => l.action === "generation.character_sheet")
+    .map((l) => ({ at: l.created_at as string, ...(l.metadata_json as { person?: number; path?: string | null; result?: string; task?: string } | null ?? {}) }));
+  const sheets = await Promise.all(sheetLogs.map(async (m) => {
+    const url = m.path && !o.photos_deleted_at ? (await db.storage.from("user-uploads").createSignedUrl(m.path, 600)).data?.signedUrl ?? null : null;
+    return { at: m.at, person: Number(m.person) || 1, url, result: String(m.result ?? ""), task: String(m.task ?? "") };
+  }));
   if (photos.length) await db.from("audit_logs").insert({ actor_id: u.id, action: "order.photos_viewed", resource_type: "order", resource_id: id, metadata_json: { count: photos.length } });
   const kidCost = (kids ?? []).reduce((n, k) => n + ((Array.isArray(k.generation_jobs) ? k.generation_jobs : []) as { provider_cost: number | null }[]).reduce((m, j) => m + (Number(j.provider_cost) || 0), 0), 0);
   const costUsd = (jobs ?? []).filter((j) => j.provider !== "combo").reduce((n, j) => n + (Number(j.provider_cost) || 0), 0) + kidCost;
@@ -111,6 +118,29 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
               ))}
             </div>
           ) : <p className="text-sm text-muted">{o.photos_deleted_at ? "Фото удалены по сроку хранения" : "Нет фото"}</p>}
+          {sheets.length > 0 && (
+            <div className="mt-4 border-t border-line pt-3">
+              <h3 className="mb-2 text-sm font-semibold">Character Sheet</h3>
+              <div className="flex flex-wrap gap-3">
+                {sheets.map((sh, i) => (
+                  <div key={i} className="w-56">
+                    {sh.url ? (
+                      <a href={sh.url} target="_blank" rel="noreferrer">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={sh.url} alt={`Character Sheet, человек ${sh.person}`} className="aspect-video w-56 rounded-xl bg-mist object-cover ring-1 ring-line" />
+                      </a>
+                    ) : (
+                      <div className="flex aspect-video w-56 items-center justify-center rounded-xl bg-mist px-3 text-center text-xs text-muted ring-1 ring-line">
+                        {o.photos_deleted_at && sh.result === "ok" ? "Удалён вместе с фото" : SHEET_RESULT[sh.result] ?? `Не получился (${sh.result || "ошибка"})`}
+                      </div>
+                    )}
+                    <span className="mt-1 block text-xs font-semibold">Человек {sh.person}</span>
+                    <span className="block text-[11px] text-muted">{fmt.format(new Date(sh.at))}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
         <section className={card}>
           <h2 className="mb-3 font-semibold">Результат</h2>
@@ -224,10 +254,18 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
         <h2 className="mb-3 font-semibold">{A.log}</h2>
         {!logs?.length ? <p className="text-sm text-muted">{A.none}</p> : (
           <ul className="space-y-1 text-sm">{logs.map((l, i) => (
-            <li key={i}><span className="text-muted">{fmt.format(new Date(l.created_at))}</span> <span className="font-mono text-xs">{l.action}</span></li>
+            <li key={i}><span className="text-muted">{fmt.format(new Date(l.created_at))}</span> <span className="font-mono text-xs">{l.action}</span>
+              {l.action === "generation.character_sheet" && (() => { const m = l.metadata_json as { person?: number; result?: string } | null; return <span className="text-xs text-muted"> · Character Sheet, человек {m?.person ?? 1}: {m?.result === "ok" ? "готов" : SHEET_RESULT[m?.result ?? ""] ?? m?.result ?? "—"}</span>; })()}</li>
           ))}</ul>
         )}
       </section>
     </div>
   );
 }
+
+const SHEET_RESULT: Record<string, string> = {
+  timeout: "Kling не успел — видео сделано по фото",
+  not_saved: "Не сохранился — видео сделано по фото",
+  provider_content_rejected: "Kling отклонил фото — видео сделано по фото",
+  provider_failed: "Kling не сделал — видео сделано по фото",
+};

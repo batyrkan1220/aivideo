@@ -2,8 +2,8 @@ import "server-only";
 import { seedanceConfigSchema, SEEDANCE_MAX_OBJECTS, SEEDANCE_MAX_PEOPLE, SEEDANCE_MAX_REFS, SEEDANCE_MAX_SEC, SEEDANCE_MIN_SEC } from "@/lib/templates/seedance-config";
 import { seedanceCostUsd } from "@/lib/pricing-seedance";
 import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
-import { ProviderError, type GenerationProvider, type ProviderState } from "./types";
-import { buildKlingDirectPrompt, findBy, getKlingTask, KLING_MAX_IMAGES, submitKlingOmni } from "./kling";
+import { ProviderError, type GenerationProvider, type ProviderJobStatus, type ProviderState, type SubmitInput } from "./types";
+import { buildKlingDirectPrompt, findBy, getKlingImageTask, getKlingTask, KLING_MAX_IMAGES, submitKlingImage, submitKlingOmni } from "./kling";
 import { mediaUrl } from "@/lib/templates/queries";
 import { klingShotSec } from "@/lib/media/scene-plan";
 import { supabaseAdmin } from "@/lib/supabase/server";
@@ -83,6 +83,13 @@ export const seedanceProvider: GenerationProvider = {
     const usedPhotos = keyed
       ? [...(personKeyed.length ? personKeyed : photos.slice(0, people)), ...groups.flat()].slice(0, SEEDANCE_MAX_REFS)
       : photos.slice(0, people + objects.length);
+    // Step 1: a Character Sheet of each person (Kling image), then the video (getStatus sends it).
+    if (people > 0 && !input.sheets) {
+      const started = await startSheets(input, usedPhotos.slice(0, people));
+      if (started) return started;
+    }
+    const sheetUrls = Array.from({ length: people }, (_, k) => input.sheets?.[k] ?? null);
+    const sheetOnly = outfit === "template";
     // Optional cut-outs from the template, after the customer's photos, while Kling's 10 images last.
     const cutouts: string[] = [];
     // Person cut-outs are not sent: with them Kling mixed up or kept people (TM-100024, TM-100026).
@@ -114,8 +121,10 @@ export const seedanceProvider: GenerationProvider = {
           ? `who has not been replaced yet${mine ? ` (${mine})` : ""} — not the person already replaced in an earlier step`
           : cfg.positions[k]?.trim() || `number ${k + 1} from the left`;
         return {
-          photoUrls: [usedPhotos[k], ...(last ? objectPhotos : [])],
-          prompt: buildKlingDirectPrompt("edit", outfit, cfg.prompt, last ? wish : "", 1, [where], last ? objects : [], [], shot),
+          ...withSheets({
+            photoUrls: [usedPhotos[k], ...(last ? objectPhotos : [])],
+            prompt: buildKlingDirectPrompt("edit", outfit, cfg.prompt, last ? wish : "", 1, [where], last ? objects : [], [], shot),
+          }, [{ url: sheetUrls[k], of: "@image_1" }], sheetOnly),
           who: cfg.positions[k]?.trim() || "",
           person: k,
           // The people replaced in earlier runs: their photos go along (see withKeep).
@@ -135,24 +144,29 @@ export const seedanceProvider: GenerationProvider = {
         state: { stage: "pass", k: 0, passes, durationSec, aspectRatio: cfg.aspectRatio, resolution, jobId: input.jobId },
       };
     }
+    // Person k is @image_{k+1} (people come first); their sheet goes after every other photo.
+    const sheetList = sheetUrls.map((url, k) => ({ url, of: `@image_${k + 1}` }));
+    const sheeted = (photoUrls: string[], p: string) => withSheets({ photoUrls, prompt: p }, sheetList, sheetOnly);
     const prompt = buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, wish, people, cfg.positions, objects, targetRefs);
     const plain = { videoUrl: input.templateVideoUrl, photoUrls: usedPhotos, mode: cfg.klingMode, durationSec, aspectRatio: cfg.aspectRatio, resolution };
     // A template with cuts: Kling loses the face after a cut, so each shot is edited on its own (TM-100034).
     if (cfg.klingMode === "edit") {
       const shotPrompt = buildKlingDirectPrompt("edit", outfit, cfg.prompt, wish, people, cfg.positions, objects, targetRefs, true);
-      const shotRun = await startShots(input.jobId, input.templateVideoUrl, [{ photoUrls: [...usedPhotos, ...cutouts], prompt: shotPrompt, who: people === 1 ? cfg.positions[0]?.trim() ?? "" : "", person: people === 1 ? 0 : -1 }], cfg.aspectRatio, resolution, pricing, cfg.shotMap);
+      const shotRun = await startShots(input.jobId, input.templateVideoUrl, [{ ...sheeted([...usedPhotos, ...cutouts], shotPrompt), who: people === 1 ? cfg.positions[0]?.trim() ?? "" : "", person: people === 1 ? 0 : -1 }], cfg.aspectRatio, resolution, pricing, cfg.shotMap);
       if (shotRun) return shotRun;
     }
-    const providerJobId = await submitKlingOmni({ ...plain, photoUrls: [...usedPhotos, ...cutouts], prompt });
+    const providerJobId = await submitKlingOmni({ ...plain, ...sheeted([...usedPhotos, ...cutouts], prompt) });
     await noteTask(input.jobId, providerJobId, "видео целиком");
     // If Kling refuses the task because of a cut-out (it charges nothing then), the same order goes again without them.
     const fallback = cutouts.length
-      ? { ...plain, prompt: buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, wish, people, cfg.positions, objects) }
+      ? { ...plain, ...sheeted(usedPhotos, buildKlingDirectPrompt(cfg.klingMode, outfit, cfg.prompt, wish, people, cfg.positions, objects)) }
       : null;
     return { providerJobId, cost: seedanceCostUsd(durationSec, pricing, {}, resolution), state: { stage: "klingd", ...(fallback ? { fallback } : {}) } };
   },
 
   async getStatus(providerJobId, ctx) {
+    const sheetRun = sheetsOf(ctx.state);
+    if (sheetRun) return sheetStatus(providerJobId, sheetRun);
     const shotRun = shotsOf(ctx.state);
     if (shotRun) return shotStatus(shotRun);
     const st = await getKlingTask(providerJobId);
@@ -479,5 +493,135 @@ async function noteTask(jobId: string | undefined, task: string, step: string, i
     const db = supabaseAdmin();
     const { data: job } = await db.from("generation_jobs").select("order_id").eq("id", jobId).maybeSingle();
     if (job?.order_id) await db.from("audit_logs").insert({ actor_id: null, action: "generation.kling_task", resource_type: "order", resource_id: job.order_id, metadata_json: { task, step } });
+  } catch { /* the log is only a help */ }
+}
+
+// ---------------------------------------------------------------- Character Sheet
+/*
+  Before the video, Kling's image model draws a Character Sheet of each person from their photo: the same
+  person from the front, three-quarter, side and close-up. The sheet then goes to the video call after the
+  photo, so the face holds when the head turns. It is kept with the customer's photos (private bucket,
+  sheets/<order>/…, removed with them) and shown to support on the admin order page.
+  A sheet that fails or takes too long is skipped: the video goes with the photo alone.
+*/
+
+const SHEET_BUCKET = "user-uploads";
+const SHEET_WAIT_MS = 6 * 60_000;
+export const SHEET_PROMPT =
+  "Character reference sheet of the person in <<<image_1>>>. It must be exactly the same person: the same face, facial features, " +
+  "eye shape, nose, lips, skin tone, age, hairstyle and hair colour, body type and the same clothing as in <<<image_1>>>. " +
+  "Show the person four times side by side on a plain light-grey studio background: full-body front view, three-quarter view, " +
+  "side profile, and a close-up portrait of the face. Neutral standing pose, even soft studio light, sharp photorealistic photo, " +
+  "no text, no labels, no frames, no other people.";
+
+type SheetTask = { person: number; id: string | null; path?: string | null; url?: string | null; done?: boolean };
+type SheetRun = { stage: "sheet"; tasks: SheetTask[]; input: SubmitInput; at: number; orderId: string | null };
+
+function sheetsOf(state: ProviderState): SheetRun | null {
+  const s = state as Partial<SheetRun> | null;
+  if (!s || s.stage !== "sheet" || !Array.isArray(s.tasks) || !s.input || typeof s.input !== "object") return null;
+  return { stage: "sheet", tasks: s.tasks as SheetTask[], input: s.input as SubmitInput, at: typeof s.at === "number" ? s.at : Date.now(), orderId: typeof s.orderId === "string" ? s.orderId : null };
+}
+
+/** A sheet image after the run's other photos, while Kling's 10 images last, with a note on how to use it. */
+export function withSheets(base: { photoUrls: string[]; prompt: string }, list: { url: string | null | undefined; of: string }[], faceOnly = false): { photoUrls: string[]; prompt: string } {
+  const photoUrls = [...base.photoUrls];
+  const notes: string[] = [];
+  for (const s of list) {
+    if (!s.url || photoUrls.length >= KLING_MAX_IMAGES) continue;
+    photoUrls.push(s.url);
+    const ref = `@image_${photoUrls.length}`;
+    notes.push(`${ref} is a character reference sheet of the person in ${s.of}: the same person seen from several angles. ` +
+      `Use ${ref} only to keep that person's ${faceOnly ? "face, hair and skin" : "face, hair, skin and look"} accurate from every angle${faceOnly ? " (not their clothing)" : ""}. ` +
+      `Never show the sheet itself, its grey background, its layout or several copies of the person in the video.`);
+  }
+  return notes.length ? { photoUrls, prompt: `${base.prompt} ${notes.join(" ")}` } : base;
+}
+
+/** Sends one sheet task per person; null = off, or not one could be sent (the video goes straight away). */
+async function startSheets(input: SubmitInput, personPhotos: string[]) {
+  const { catalogSettings } = await import("@/lib/catalog/settings");
+  if (!(await catalogSettings()).characterSheet) return null;
+  const tasks: SheetTask[] = [];
+  for (const [person, url] of personPhotos.entries()) {
+    const id = await submitKlingImage({ photoUrls: [url], exampleUrl: null, prompt: SHEET_PROMPT, aspectRatio: "16:9" })
+      .catch((err) => { console.error("[kling] sheet not sent", err instanceof ProviderError ? err.code : "error"); return null; });
+    tasks.push({ person, id });
+  }
+  const first = tasks.find((t) => t.id)?.id;
+  if (!first) return null;
+  const { data: job } = await supabaseAdmin().from("generation_jobs").select("order_id").eq("id", input.jobId).maybeSingle();
+  for (const t of tasks) if (t.id) await noteTask(input.jobId, t.id, `Character Sheet, человек ${t.person + 1}`);
+  console.log("[kling] character sheets", tasks.filter((t) => t.id).length, "of", personPhotos.length);
+  const { photoCostUsd } = await seedancePricingSettings();
+  const run: SheetRun = { stage: "sheet", tasks, input: { ...input, sheets: undefined }, at: Date.now(), orderId: (job?.order_id as string | undefined) ?? null };
+  return { providerJobId: first, cost: photoCostUsd * tasks.filter((t) => t.id).length, state: run as unknown as ProviderState };
+}
+
+/** Polls the sheets; once all are done (or the wait is over) stores them and sends the video. */
+async function sheetStatus(providerJobId: string, run: SheetRun): Promise<ProviderJobStatus> {
+  const tasks = run.tasks.map((t) => ({ ...t }));
+  const late = Date.now() - run.at > SHEET_WAIT_MS;
+  let waiting = false;
+  for (const t of tasks) {
+    if (!t.id || t.done) continue;
+    const st = await getKlingImageTask(t.id).catch(() => ({ state: "processing" as const }));
+    if (st.state === "succeeded") {
+      t.done = true;
+      const saved = await saveSheet(run, t, st.outputUrl);
+      t.path = saved?.path ?? null; t.url = saved?.url ?? null;
+      await logSheet(run.orderId, t, saved ? "ok" : "not_saved");
+    } else if (st.state === "failed") {
+      t.done = true;
+      await logSheet(run.orderId, t, st.errorCode);
+    } else if (late) {
+      t.done = true;
+      await logSheet(run.orderId, t, "timeout");
+    } else waiting = true;
+  }
+  const cur: SheetRun = { ...run, tasks };
+  if (waiting) {
+    const changed = tasks.some((t, i) => t.done !== run.tasks[i].done);
+    return { state: "processing", progress: 5, ...(changed ? { next: { providerJobId, state: cur as unknown as ProviderState } } : {}) };
+  }
+  const sheets = Array.from({ length: Math.max(0, ...tasks.map((t) => t.person + 1)) }, (_, k) => tasks.find((t) => t.person === k)?.url ?? null);
+  console.log("[kling] character sheets ready:", sheets.filter(Boolean).length, "of", tasks.length, "· sending the video");
+  try {
+    const r = await seedanceProvider.submit({ ...run.input, sheets });
+    return { state: "processing", next: { providerJobId: r.providerJobId, state: r.state ?? null, cost: r.cost } };
+  } catch (err) {
+    // Busy: try the video again on the next poll, with the sheets already stored.
+    if (err instanceof ProviderError && err.retryable) return { state: "processing", next: { providerJobId, state: cur as unknown as ProviderState } };
+    return { state: "failed", errorCode: err instanceof ProviderError ? err.code : "provider_failed", retryable: false };
+  }
+}
+
+/** Copies Kling's sheet into the private bucket; a signed link (2 days) for the video call. */
+async function saveSheet(run: SheetRun, t: SheetTask, url: string): Promise<{ path: string; url: string } | null> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(60_000) });
+    const type = res.headers.get("content-type") ?? "";
+    if (!res.ok || !/^image\//.test(type)) return null;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if (!bytes.length || bytes.length > 20 * 1024 * 1024) return null;
+    const ext = /png/.test(type) ? "png" : /webp/.test(type) ? "webp" : "jpg";
+    const path = `sheets/${run.orderId ?? run.input.jobId}/${t.person + 1}-${Date.now()}.${ext}`;
+    const db = supabaseAdmin();
+    const { error } = await db.storage.from(SHEET_BUCKET).upload(path, bytes, { contentType: type, upsert: true });
+    if (error) return null;
+    const { data } = await db.storage.from(SHEET_BUCKET).createSignedUrl(path, 48 * 3600);
+    return data ? { path, url: data.signedUrl } : null;
+  } catch (err) {
+    console.error("[kling] sheet not saved", err instanceof Error ? err.message.slice(0, 120) : "error");
+    return null;
+  }
+}
+
+/** The order's log: which sheet was made (its file, for the admin order page) or why there is none. */
+async function logSheet(orderId: string | null, t: SheetTask, result: string) {
+  if (!orderId) return;
+  try {
+    await supabaseAdmin().from("audit_logs").insert({ actor_id: null, action: "generation.character_sheet", resource_type: "order", resource_id: orderId,
+      metadata_json: { person: t.person + 1, task: t.id, path: t.path ?? null, result } });
   } catch { /* the log is only a help */ }
 }

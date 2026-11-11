@@ -345,7 +345,7 @@ export async function orderShots(orderId: string) {
 
 /** Admin: show or hide templates with 2–3 people (one Kling run per person) to customers. */
 /** Changes one catalog switch and keeps the others. */
-async function setCatalogSwitch(key: "multiPeople" | "requireAnalysis" | "splitShots", on: boolean, action: string): Promise<{ ok: boolean }> {
+async function setCatalogSwitch(key: "multiPeople" | "requireAnalysis" | "splitShots" | "characterSheet", on: boolean, action: string): Promise<{ ok: boolean }> {
   const user = await guard("templates.manage");
   if (!user) return { ok: false };
   const { CATALOG_KEY } = await import("@/lib/catalog/settings");
@@ -366,3 +366,5 @@ export async function setMultiPeople(on: boolean) { return setCatalogSwitch("mul
 export async function setRequireAnalysis(on: boolean) { return setCatalogSwitch("requireAnalysis", on, "catalog.require_analysis"); }
 /** Templates with cuts: shot by shot (face kept after cuts, shots may differ) or the whole video at once. */
 export async function setSplitShots(on: boolean) { return setCatalogSwitch("splitShots", on, "catalog.split_shots"); }
+/** Character Sheet of each person (Kling image) before the video. */
+export async function setCharacterSheet(on: boolean) { return setCatalogSwitch("characterSheet", on, "catalog.character_sheet"); }

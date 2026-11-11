@@ -12,7 +12,9 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 export const CATALOG_KEY = "catalog";
 // splitShots: edit a template with cuts shot by shot (off: the whole video goes to Kling at once;
 // shot by shot kept the face after cuts but every shot came out a little different, TM-100040).
-const schema = z.object({ multiPeople: z.boolean().default(false), requireAnalysis: z.boolean().default(true), splitShots: z.boolean().default(false) });
+// characterSheet: before the video, Kling's image model draws a reference sheet of each person (several
+// angles) from their photo; it goes to the video call with the photo, so the face holds from every side.
+const schema = z.object({ multiPeople: z.boolean().default(false), requireAnalysis: z.boolean().default(true), splitShots: z.boolean().default(false), characterSheet: z.boolean().default(true) });
 export type CatalogSettings = z.infer<typeof schema>;
 
 export function catalogSettings(): Promise<CatalogSettings> {

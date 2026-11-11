@@ -21,6 +21,8 @@ export type SubmitInput = {
   faces: FaceInput[];           // already in deterministic slot order
   quality: string;
   config: Record<string, unknown>;
+  /** Character Sheet per person (index = person), made before the video; null = none for that person. */
+  sheets?: (string | null)[];
 };
 
 /** Opaque provider-owned state persisted between polls (multi-step providers). */

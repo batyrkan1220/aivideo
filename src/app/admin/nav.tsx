@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BarChart3, Bot, Clapperboard, MessageCircle, CreditCard, FolderTree, Handshake, Home, Images, LineChart, Receipt, ScrollText, Sparkles, Target, Users,
+  BarChart3, Bot, Clapperboard, MessageCircle, CreditCard, FolderTree, Handshake, Home, Images, LineChart, Receipt, ScanFace, ScrollText, Sparkles, Target, Users,
   type LucideIcon,
 } from "lucide-react";
 
@@ -11,7 +11,7 @@ export type NavGroup = { title: string; items: NavItem[] };
 
 const ICONS: Record<string, LucideIcon> = {
   overview: BarChart3, orders: Receipt, support: MessageCircle, funnel: Target, payments: CreditCard, templates: Clapperboard, categories: FolderTree,
-  combos: Images, home: Home, ai: Sparkles, users: Users, partners: Handshake, bot: Bot, pixels: LineChart, audit: ScrollText,
+  combos: Images, home: Home, ai: Sparkles, users: Users, partners: Handshake, bot: Bot, pixels: LineChart, audit: ScrollText, sheet: ScanFace,
 };
 
 const active = (path: string, href: string) => (href === "/admin" ? path === "/admin" : path === href || path.startsWith(`${href}/`));

@@ -55,6 +55,7 @@ async function Gate({ children }: { children: React.ReactNode }) {
     ] : [] },
     { title: "Сервисы", items: can(r, "templates.manage") ? [
       { href: "/admin/services", label: "ИИ и расходы", icon: "ai" },
+      { href: "/admin/character-sheet", label: "Character Sheet", icon: "sheet" },
     ] : [] },
     { title: "Люди", items: can(r, "users.manage") ? [
       { href: "/admin/users", label: "Пользователи", icon: "users" },
