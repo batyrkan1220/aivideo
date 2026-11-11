@@ -4,12 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/ensure-ffmpeg.mjs && next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:db": "bash scripts/test-db.sh",
-    "prebuild": "node scripts/ensure-ffmpeg.mjs"
+    "test:db": "bash scripts/test-db.sh"
   },
   "dependencies": {
     "@fontsource-variable/onest": "^5.3.1",
