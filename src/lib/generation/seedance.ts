@@ -216,9 +216,15 @@ export function withKeep(pass: Pass, inShot?: number[]): { photoUrls: string[]; 
   if (!keep.length) return { photoUrls: pass.photoUrls, prompt: pass.prompt };
   const notes = keep.map((p, n) => {
     const ref = `@image_${pass.photoUrls.length + n + 1}`;
-    return `${ref} is the person ${p.where}, already replaced: keep that person exactly as they are now, looking 100% like ${ref} in every frame. Do not change their face, hair, skin, body or clothing, and never give them the face from @image_1.`;
+    return `${ref} is the person ${p.where}, already replaced: keep that person exactly as they are now, looking 100% like ${ref} in every frame. Do not change their face, hair, skin, body or clothing, and never give them the face from @image_1. ` +
+      `${ref} is NOT the person to replace in this edit: never use ${ref} for anyone else.`;
   });
-  return { photoUrls: [...pass.photoUrls, ...keep.map((p) => p.url)], prompt: `${pass.prompt} ${notes.join(" ")}` };
+  // TM-100058: the person replaced in the later run came out mixed with the earlier one's photo. Who is who,
+  // said once more at the end, where Kling weighs it most.
+  const others = keep.map((_, n) => `@image_${pass.photoUrls.length + n + 1}`).join(", ");
+  const only = `In this edit replace only one person${pass.who ? `, the one ${findBy(pass.who) || pass.who}` : ""}: they must look 100% like @image_1 and nobody else. ` +
+    `@image_1 and ${others} are different people — do not blend, average or mix their faces; the face of the person you replace comes only from @image_1.`;
+  return { photoUrls: [...pass.photoUrls, ...keep.map((p) => p.url)], prompt: `${pass.prompt} ${notes.join(" ")} ${only}` };
 }
 type PassRun = { stage: "pass"; k: number; passes: Pass[]; durationSec: number; aspectRatio: string; resolution: "720p" | "1080p"; jobId?: string };
 function passOf(state: ProviderState): PassRun | null {

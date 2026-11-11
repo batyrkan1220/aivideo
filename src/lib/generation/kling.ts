@@ -202,8 +202,12 @@ export function buildKlingDirectPrompt(mode: KlingMode, outfit: "photo" | "templ
       "If that person is not in this shot at all, add no one and change no one: keep the shot exactly as it is. Never give the new face to a different person.",
     );
   } else {
+    // One person per run (2–3 people are edited one after another): "every replaced person is @image_1" also
+    // pointed at the person replaced in the earlier run, and the two faces blended (TM-100058).
     parts.push(
-      `Final check: every replaced person in the result is the person from ${photosRef}, with their face, hair, skin and body. ` +
+      (people === 1
+        ? `Final check: the person you replace in this edit is the person from ${photosRef}, with their face, hair, skin and body. `
+        : `Final check: every replaced person in the result is the person from ${photosRef}, with their face, hair, skin and body. `) +
       "The original person from @video_1 must not appear in any frame. Do not return @video_1 unchanged.",
     );
   }
