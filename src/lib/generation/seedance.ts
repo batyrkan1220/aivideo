@@ -609,16 +609,17 @@ async function logSheet(orderId: string | null, t: SheetTask, result: string) {
   - wan_replace: Wan 2.2 Animate Replace: one photo per run (it replaces the main person), so with
     several people each run goes on the previous result.
 */
-type FalEngine = "seedance25" | "wan_replace" | "minimax_recast";
+type FalEngine = "seedance25" | "wan_replace" | "minimax_recast" | "kling_o3";
 type FalRun = { stage: "fal"; engine: FalEngine; req: FalRequest; k: number; photos: string[]; people: number; resolution: "720p" | "1080p"; jobId?: string };
 
 const FAL_MODEL: Record<FalEngine, string> = {
   seedance25: "bytedance/seedance-2.5/reference-to-video",
   wan_replace: "fal-ai/wan/v2.2-14b/animate/replace",
   minimax_recast: "minimax/h3-max/recast",
+  kling_o3: "fal-ai/kling-video/o3/pro/video-to-video/edit",
 };
 // Rough USD per second of video, for the order's cost line (fal bills by its own units).
-const FAL_USD_PER_SEC: Record<FalEngine, number> = { seedance25: 0.5, wan_replace: 0.16, minimax_recast: 0.12 };
+const FAL_USD_PER_SEC: Record<FalEngine, number> = { seedance25: 0.5, wan_replace: 0.16, minimax_recast: 0.12, kling_o3: 0.17 };
 
 const toFalRefs = (prompt: string) => prompt.replace(/@video_(\d+)/g, "@Video$1").replace(/@image_(\d+)/g, "@Image$1");
 
@@ -634,6 +635,15 @@ function falInput(engine: FalEngine, videoUrl: string, photos: string[], k: numb
       prompt: toFalRefs(prompt), task: "editing", video_urls: [videoUrl], image_urls: photos.slice(0, 30), resolution,
     };
   }
+  if (engine === "kling_o3") {
+    // Each person is an element (@ElementN) with their photo as the front view; 4 at most with a video.
+    const faces = photos.slice(0, Math.min(4, Math.max(1, people)));
+    return {
+      prompt: prompt.replace(/@video_(\d+)/g, "@Video$1").replace(/@image_(\d+)/g, "@Element$1").slice(0, 2500),
+      video_url: videoUrl, keep_audio: true,
+      elements: faces.map((u) => ({ frontal_image_url: u, reference_image_urls: [u] })),
+    };
+  }
   if (engine === "minimax_recast") {
     // One photo per person, matched left to right by default; the prompt names who is who.
     return { video_url: videoUrl, reference_image_urls: photos.slice(0, Math.max(1, people)), prompt: recastPrompt(positions), resolution: "768P" };
@@ -647,10 +657,12 @@ function falInput(engine: FalEngine, videoUrl: string, photos: string[], k: numb
 }
 
 async function startFal(jobId: string, engine: FalEngine, videoUrl: string, photos: string[], people: number, prompt: string, durationSec: number, resolution: "720p" | "1080p", positions: string[]) {
+  // Kling O3 edit takes a 3–10 s video only.
+  if (engine === "kling_o3" && durationSec > 10.4) throw new ProviderError("provider_bad_params", false, "kling o3: video over 10 s");
   const { falSubmit } = await import("./fal");
   const req = await falSubmit(FAL_MODEL[engine], falInput(engine, videoUrl, photos, 0, prompt, resolution, people, positions));
   const steps = engine === "wan_replace" ? Math.max(1, people) : 1;
-  await noteTask(jobId, req.requestId, engine === "seedance25" ? "fal · Seedance 2.5 · видео целиком" : engine === "minimax_recast" ? `fal · MiniMax Recast · ${people} чел. за один раз` : `fal · Wan Replace · человек 1 из ${steps}`);
+  await noteTask(jobId, req.requestId, engine === "seedance25" ? "fal · Seedance 2.5 · видео целиком" : engine === "minimax_recast" ? `fal · MiniMax Recast · ${people} чел. за один раз` : engine === "kling_o3" ? `fal · Kling O3 Pro · ${people} чел. за один раз` : `fal · Wan Replace · человек 1 из ${steps}`);
   const run: FalRun = { stage: "fal", engine, req, k: 0, photos, people: steps, resolution, jobId };
   return { providerJobId: req.requestId, cost: Math.round(FAL_USD_PER_SEC[engine] * durationSec * 100) / 100, state: run as unknown as ProviderState };
 }

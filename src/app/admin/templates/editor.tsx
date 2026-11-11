@@ -459,6 +459,7 @@ export function TemplateEditor({
                   <option value="seedance25">Seedance 2.5 — fal.ai, редактирование видео, все люди за один раз</option>
                   <option value="wan_replace">Wan 2.2 Animate Replace — fal.ai, по одному человеку</option>
                   <option value="minimax_recast">MiniMax H3 Max Recast — fal.ai, все люди за один раз (видео 5–30 с)</option>
+                  <option value="kling_o3">Kling O3 Pro Edit — fal.ai, все люди за один раз (видео только 3–10 с)</option>
                 </select>
                 <span className="mt-1 block text-xs text-muted">Для fal.ai нужен ключ FAL_KEY в Render. Видео этого шаблона будет делать выбранная модель; Character Sheet и сцены — только для Kling.</span>
               </Field>
