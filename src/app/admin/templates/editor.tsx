@@ -456,6 +456,7 @@ export function TemplateEditor({
               <Field label="Модель (тест)" className="sm:col-span-2">
                 <select className={inputCls()} value={sd.engine} onChange={(ev) => setSd({ engine: ev.target.value as SeedanceConfig["engine"] })}>
                   <option value="kling">Kling 4.0 — свой API (по умолчанию)</option>
+                  <option value="kling_v3">Kling 3.0 Omni — свой API, все люди за один раз (до 4 фото)</option>
                   <option value="seedance25">Seedance 2.5 — fal.ai, редактирование видео, все люди за один раз</option>
                   <option value="wan_replace">Wan 2.2 Animate Replace — fal.ai, по одному человеку</option>
                   <option value="minimax_recast">MiniMax H3 Max Recast — fal.ai, все люди за один раз (видео 5–30 с)</option>

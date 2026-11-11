@@ -270,6 +270,28 @@ describe("shot helpers", () => {
   });
 });
 
+describe("Kling 3.0 Omni on our Kling API", () => {
+  it("one edit run: template as base video, photos as image_list, <<<refs>>>", async () => {
+    const calls: { url: string; body?: Record<string, unknown> }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (u: string, init?: RequestInit) => {
+      calls.push({ url: String(u), body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      if (init?.method === "POST") return new Response(JSON.stringify({ code: 0, data: { task_id: "v3t" } }), { status: 200 });
+      return new Response(JSON.stringify({ code: 0, data: { task_status: "succeed", task_result: { videos: [{ url: "https://k/v3.mp4" }] } } }), { status: 200 });
+    }));
+    const faces = [{ slotKey: "face_1", providerInput: "img_1", imageUrl: "https://s/man.jpg" }, { slotKey: "face_2", providerInput: "img_2", imageUrl: "https://s/woman.jpg" }];
+    const r = await seedanceProvider.submit({ jobId: "jv3", templateVideoUrl: "https://t/v.mp4", templateFrameUrl: null, quality: "720p", faces,
+      config: { durationSec: 8, people: 2, engine: "kling_v3", positions: ["on the left, man", "on the right, woman"] } });
+    expect(calls[0].url).toBe("https://api-singapore.klingai.com/v1/videos/omni-video");
+    expect(calls[0].body).toMatchObject({ model_name: "kling-v3-omni", mode: "std", image_list: [{ image_url: "https://s/man.jpg" }, { image_url: "https://s/woman.jpg" }],
+      video_list: [{ video_url: "https://t/v.mp4", refer_type: "base", keep_original_sound: "yes" }] });
+    expect(String(calls[0].body?.prompt)).toContain("<<<video_1>>>");
+    expect(String(calls[0].body?.prompt)).toContain("<<<image_2>>>");
+    const st = await seedanceProvider.getStatus(r.providerJobId, { startedAt: null, state: r.state ?? null });
+    expect(st).toMatchObject({ state: "succeeded", outputUrl: "https://k/v3.mp4" });
+    vi.unstubAllGlobals();
+  });
+});
+
 describe("fal.ai models chosen on the template", () => {
   const faces = [{ slotKey: "face_1", providerInput: "img_1", imageUrl: "https://s/man.jpg" }, { slotKey: "face_2", providerInput: "img_2", imageUrl: "https://s/woman.jpg" }];
   it("Seedance 2.5: one editing run with the template and both photos, references renamed", async () => {

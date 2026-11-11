@@ -269,6 +269,48 @@ export async function getKlingTask(id: string): Promise<ProviderJobStatus & { vi
 // ---------------------------------------------------------------- photos (omni-image)
 
 /**
+ * Kling 3.0 Omni video (official API), for templates set to it:
+ *   POST /v1/videos/omni-video { model_name: "kling-v3-omni", prompt (<<<video_1>>>, <<<image_N>>>),
+ *        image_list: [{ image_url }], video_list: [{ video_url, refer_type: "base", keep_original_sound: "yes" }], mode: std|pro, sound: off }
+ *   GET  /v1/videos/omni-video/{task_id} → data.task_status: submitted|processing|succeed|failed, task_result.videos[0].url
+ * With a video at most 4 images; editing ("base") keeps the video's own length and framing.
+ */
+export async function submitKlingV3Omni(o: { videoUrl: string; photoUrls: string[]; prompt: string; resolution: "720p" | "1080p" }): Promise<string> {
+  const prompt = o.prompt.replace(/@video_(\d+)/g, "<<<video_$1>>>").replace(/@image_(\d+)/g, "<<<image_$1>>>").slice(0, 2500);
+  const d = await call<{ data?: { task_id?: string; task_status?: string } }>("/v1/videos/omni-video", {
+    method: "POST",
+    body: JSON.stringify({
+      model_name: "kling-v3-omni", prompt,
+      image_list: o.photoUrls.slice(0, 4).map((url) => ({ image_url: url })),
+      video_list: [{ video_url: o.videoUrl, refer_type: "base", keep_original_sound: "yes" }],
+      mode: o.resolution === "1080p" ? "pro" : "std", sound: "off",
+    }),
+  });
+  const id = d.data?.task_id;
+  if (!id) throw new ProviderError("provider_bad_response", false, "kling v3: no task_id");
+  console.log("[kling] v3 omni task", id, `images=${Math.min(4, o.photoUrls.length)}`);
+  return String(id);
+}
+
+export async function getKlingV3OmniTask(id: string): Promise<ProviderJobStatus> {
+  const d = await call<{ data?: { task_status?: string; task_status_msg?: string; task_result?: { videos?: { url?: string }[] } } }>(
+    `/v1/videos/omni-video/${encodeURIComponent(id)}`);
+  const t = d.data;
+  const status = String(t?.task_status ?? "");
+  if (status === "succeed" || status === "succeeded") {
+    const url = t?.task_result?.videos?.find((v) => v.url)?.url;
+    return url ? { state: "succeeded", outputUrl: url } : { state: "failed", errorCode: "provider_no_output", retryable: false };
+  }
+  if (status === "failed") {
+    const reason = String(t?.task_status_msg ?? "").slice(0, 300);
+    console.error("[kling] v3 omni task failed", id, reason);
+    const content = /risk|sensitive|policy|moderat|safety|inappropriate|violat/i.test(reason);
+    return { state: "failed", errorCode: content ? "provider_content_rejected" : "provider_failed", retryable: false };
+  }
+  return { state: status === "submitted" ? "queued" : "processing" };
+}
+
+/**
  * Kling image model (official API): POST /v1/images/omni-image
  *   { model_name: "kling-image-o1", prompt (refs as <<<image_N>>>), image_list: [{image: url}], resolution, n, aspect_ratio }
  *   → { code: 0, data: { task_id, task_status } }

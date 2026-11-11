@@ -85,6 +85,15 @@ export const seedanceProvider: GenerationProvider = {
       ? [...(personKeyed.length ? personKeyed : photos.slice(0, people)), ...groups.flat()].slice(0, SEEDANCE_MAX_REFS)
       : photos.slice(0, people + objects.length);
     // Another model on fal.ai, chosen on the template (tests): the same photos and prompt, its own call.
+    // Kling 3.0 Omni on our own Kling API: all people in one edit of the template.
+    if (cfg.engine === "kling_v3") {
+      const wish = cfg.allowWish ? cleanWish(extra.wish) : "";
+      const prompt = buildKlingDirectPrompt("edit", outfit, cfg.prompt, wish, people, cfg.positions, objects, []);
+      const { submitKlingV3Omni } = await import("./kling");
+      const id = await submitKlingV3Omni({ videoUrl: input.templateVideoUrl, photoUrls: usedPhotos, prompt, resolution });
+      await noteTask(input.jobId, id, `Kling 3.0 Omni · ${people} чел. за один раз`);
+      return { providerJobId: id, cost: seedanceCostUsd(durationSec, await seedancePricingSettings(), {}, resolution), state: { stage: "kv3" } };
+    }
     if (cfg.engine !== "kling") {
       const wish = cfg.allowWish ? cleanWish(extra.wish) : "";
       const prompt = buildKlingDirectPrompt("edit", outfit, cfg.prompt, wish, people, cfg.positions, objects, []);
@@ -135,6 +144,10 @@ export const seedanceProvider: GenerationProvider = {
   },
 
   async getStatus(providerJobId, ctx) {
+    if ((ctx.state as { stage?: string } | null)?.stage === "kv3") {
+      const { getKlingV3OmniTask } = await import("./kling");
+      return getKlingV3OmniTask(providerJobId);
+    }
     const falRun = falOf(ctx.state);
     if (falRun) return falRunStatus(falRun);
     const sheetRun = sheetsOf(ctx.state);
