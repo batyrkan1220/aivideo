@@ -28,6 +28,8 @@ import { cleanWish } from "@/lib/generation/seedance";
 import { isPhotoProvider, parsePhotoConfig } from "@/lib/templates/photo-config";
 import { PHOTOS_SOON } from "@/lib/features";
 import { mediaUrl } from "@/lib/templates/queries";
+import { productPriceKzt, productVideoSettings } from "@/lib/product-video/settings";
+import { PRODUCT_ASPECTS, sceneFor } from "@/lib/product-video/scenes";
 
 type Fail<E extends string> = { ok: false; error: E | "unauthorized" | "generic" };
 const BUCKET = "user-uploads";
@@ -191,6 +193,13 @@ const orderSchema = z.object({
   wish: z.string().max(600).optional(),
   /** Templates with outfit "choice": what the customer picked. */
   outfit: z.enum(["photo", "template"]).optional(),
+  /** «Видео товара»: scene, length, format and whether a model photo is given. */
+  product: z.object({
+    scene: z.string().regex(/^[a-z_]{2,20}$/),
+    duration: z.union([z.literal(5), z.literal(10)]),
+    aspect: z.enum(PRODUCT_ASPECTS),
+    withModel: z.boolean(),
+  }).optional(),
 });
 
 export async function createOrder(raw: unknown): Promise<
@@ -242,6 +251,28 @@ export async function createOrder(raw: unknown): Promise<
     return { ok: false, error: "generic" };
   }
 
+  // «Видео товара»: the product photo (+ the model photo) and the scene; price from its own settings.
+  const productKind = tv.template.kind === "product";
+  let productPriceKztValue = 0;
+  if (productKind) {
+    const ps = await productVideoSettings();
+    const po = p.data.product;
+    if (!ps.enabled || !po || tv.snapshot.provider_key !== "kling_product") return { ok: false, error: "template_unavailable" };
+    const scene = sceneFor(po.scene, po.withModel);
+    if (!scene) return { ok: false, error: "generic" };
+    slots = tv.slots.filter((s) => po.withModel || s.providerInput === "product");
+    durationSec = po.duration;
+    productPriceKztValue = productPriceKzt(ps, po.duration);
+    const wish = cleanWish(p.data.wish);
+    snapshotExtra = {
+      face_slots_json: slots, required_face_count: slots.length, video_duration_sec: po.duration,
+      provider_config_json: { ...((tv.snapshot.provider_config_json as Record<string, unknown>) ?? {}), scene: scene.key, aspectRatio: po.aspect, withModel: po.withModel },
+      ...(wish ? { customer_wish: wish } : {}),
+    };
+  } else if (p.data.product) {
+    return { ok: false, error: "generic" };
+  }
+
   // Every slot must have exactly one verified, unattached, unexpired photo owned by this user.
   const slotKeys = slots.map((s) => s.key);
   const ids = slotKeys.map((k) => p.data.assets[k]);
@@ -261,13 +292,17 @@ export async function createOrder(raw: unknown): Promise<
 
   const photo = isPhotoProvider(tv.snapshot.provider_key as string);
   const combo = tv.snapshot.provider_key === "combo" && tv.template.kind === "combo";
-  if (tv.snapshot.provider_key !== "seedance" && tv.snapshot.provider_key !== "dev" && !photo && !combo) return { ok: false, error: "template_unavailable" };
+  if (tv.snapshot.provider_key !== "seedance" && tv.snapshot.provider_key !== "dev" && !photo && !combo && !productKind) return { ok: false, error: "template_unavailable" };
   // Photo combo: one selfie, the combo's computed price; its photos are made after payment.
   if ((photo || combo) && PHOTOS_SOON) return { ok: false, error: "template_unavailable" };
   if (combo && !(tv.pricing.basePriceKzt > 0)) return { ok: false, error: "template_unavailable" };
   // Seedance: one quality (720p), price from the reference video length (or a manual template price).
   let pricing = tv.pricing;
   let qualities = tv.qualities;
+  if (productKind) {
+    pricing = { ...pricing, basePriceKzt: productPriceKztValue, chargeExtraFaces: false, platformFeeKzt: 0, minPriceKzt: 0 };
+    snapshotExtra = { ...snapshotExtra, pricing_config_json: pricing };
+  }
   if (photo) {
     // Photo templates: the admin's fixed price; the customer may add a wish.
     if (!(tv.pricing.basePriceKzt > 0)) return { ok: false, error: "template_unavailable" };

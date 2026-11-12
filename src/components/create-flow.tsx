@@ -22,6 +22,24 @@ import { ensureGuestSession } from "@/lib/auth/guest";
 import { discounted } from "@/lib/engage/price";
 import { pixelEvent, pixelEventOnce } from "@/lib/pixels/client";
 import { TelegramBotLogin } from "./telegram-bot-login";
+import { PRODUCT_ASPECTS, PRODUCT_DURATIONS, PRODUCT_SCENES, type ProductAspect, type ProductDuration } from "@/lib/product-video/scenes";
+
+/** «Видео товара» texts (site language: Russian). */
+const P = {
+  stepBoth: "Фото товара и модели",
+  stepProduct: "Фото товара",
+  modelTitle: "Модель в видео",
+  withModel: "С моделью",
+  noModel: "Только товар",
+  tipsBoth: ["Товар — чёткое фото целиком, лучше на светлом фоне", "Модель — лицо и фигура хорошо видны, без очков и масок"],
+  tipsProduct: ["Чёткое фото товара целиком, лучше на светлом фоне", "Логотип и надписи видны крупно — так ИИ точнее их сохранит"],
+  sceneTitle: "Сцена",
+  lengthTitle: "Длительность",
+  formatTitle: "Формат",
+  formats: { "9:16": "Reels, TikTok", "1:1": "Kaspi, лента", "16:9": "YouTube, сайт" } as Record<ProductAspect, string>,
+  wishHint: "Что за товар и что важно показать: цвет, фон, настроение, надпись на экране.",
+  wishPlaceholder: "Например: белые кроссовки, фон — кофейня, лёгкое летнее настроение",
+};
 
 
 type SlotState =
@@ -101,7 +119,7 @@ function readVideoMeta(url: string): Promise<{ durationSec: number; aspect: numb
 }
 
 export function CreateFlow({
-  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, freeOrders = false, signedIn = true, needTelegram = false, noTabBar = false, discount = null, item, customVideo, seedancePricing, allowWish = false, seedanceMode = "wan", media = "video", wishRequired = false, outfit = "photo",
+  templateId, slots: baseSlots, qualities, pricing, maxUploadBytes, minDimension, maxDimension, supabaseUrl, anonKey, askPhone = false, freeOrders = false, signedIn = true, needTelegram = false, noTabBar = false, discount = null, item, customVideo, seedancePricing, allowWish = false, seedanceMode = "wan", media = "video", wishRequired = false, outfit = "photo", product,
 }: {
   templateId: string;
   slots: FaceSlot[];
@@ -142,6 +160,8 @@ export function CreateFlow({
   outfit?: "photo" | "template" | "choice";
   /** What photo the template needs (face / waist-up / full body); "auto" = like the person in the video. */
   framing?: Framing;
+  /** «Видео товара»: product photo (+ model photo), scene, length and format; price by length. */
+  product?: { prices: Record<ProductDuration, number> };
 }) {
   const router = useRouter();
   const [state, setState] = useState<Record<string, SlotState>>(() =>
@@ -217,7 +237,12 @@ export function CreateFlow({
   // "Өз видеом": the customer says how many people in their video to replace (photos left → right).
   const readyVideoId = video.phase === "ready" ? video.videoId : null;
   const [peopleCount, setPeopleCount] = useState(1);
-  const slots = customVideo ? seedanceSlots(peopleCount, "p_") : baseSlots;
+  // «Видео товара»: without a model only the product photo is needed.
+  const [withModel, setWithModel] = useState(true);
+  const [scene, setScene] = useState(PRODUCT_SCENES[0].key);
+  const [pDuration, setPDuration] = useState<ProductDuration>(5);
+  const [pAspect, setPAspect] = useState<ProductAspect>("9:16");
+  const slots = customVideo ? seedanceSlots(peopleCount, "p_") : product && !withModel ? baseSlots.filter((s) => s.providerInput === "product") : baseSlots;
   const [wish, setWish] = useState("");
   const [outfitPick, setOutfitPick] = useState<"template" | "photo">("template");
   const effOutfit = outfit === "choice" ? outfitPick : outfit;
@@ -292,7 +317,7 @@ export function CreateFlow({
   const dyn = customVideo && seedancePricing && video.phase === "ready"
     ? applySeedancePricing(pricing, seedanceAutoPriceKzt(video.durationSec, seedancePricing, { mode: seedanceMode, people: slots.length })) : null;
   const waitingForVideo = !!customVideo && !dyn;
-  const effPricing = dyn?.pricing ?? pricing;
+  const effPricing = product ? { ...pricing, basePriceKzt: product.prices[pDuration], chargeExtraFaces: false, platformFeeKzt: 0 } : dyn?.pricing ?? pricing;
   const effQualities = (dyn?.qualities ?? qualities).filter((q) => q.available);
   const selected = effQualities.find((q) => q.key === quality) ?? effQualities[0];
   const price = selected && !waitingForVideo ? calculatePrice(effPricing, selected, faceCount) : null;
@@ -350,7 +375,7 @@ export function CreateFlow({
     if (customVideo && video.phase !== "ready") { setFormError(cv.errors.missing); return; }
     // Mini App: the bot must be allowed to send the finished video — no permission, no order.
     if (!(await ensureBotCanWrite())) { haptic("error"); setNeedWrite(true); return; }
-    const r = await createOrder({ templateId, quality, assets, consent: true, ...(allowWish && wish.trim() ? { wish: wish.trim() } : {}), ...(outfit === "choice" ? { outfit: outfitPick } : {}), ...(customVideo && video.phase === "ready" ? { videoId: video.videoId } : {}) });
+    const r = await createOrder({ templateId, quality, assets, consent: true, ...(allowWish && wish.trim() ? { wish: wish.trim() } : {}), ...(outfit === "choice" ? { outfit: outfitPick } : {}), ...(customVideo && video.phase === "ready" ? { videoId: video.videoId } : {}), ...(product ? { product: { scene, duration: pDuration, aspect: pAspect, withModel } } : {}) });
     if (!r.ok) {
       if (r.error === "unauthorized") { router.push(customVideo ? "/login?next=/create" : `/login?next=/templates/${templateId}`); return; }
       if (r.error === "video_missing") { setVideo({ phase: "empty" }); setFormError(cv.errors.missing); return; }
@@ -448,9 +473,30 @@ export function CreateFlow({
 
       {/* Step: photos */}
       <section ref={photosRef} className={`rounded-card border bg-surface p-4 transition-shadow sm:p-5 ${nudge === "photo" ? "border-ink ring-4 ring-lavender" : "border-line"}`}>
-        <StepTitle n={++step} done={missing === 0}>{refPhoto ? c.stepRefPhotos : slots.length > 1 ? c.stepPhotos(slots.length) : c.stepPhoto}</StepTitle>
+        <StepTitle n={++step} done={missing === 0}>{product ? (withModel ? P.stepBoth : P.stepProduct) : refPhoto ? c.stepRefPhotos : slots.length > 1 ? c.stepPhotos(slots.length) : c.stepPhoto}</StepTitle>
         {slots.length > 1 && refPhoto && <p className="mt-1 text-sm text-muted">{c.refPhotosHint}</p>}
-        {!refPhoto && <PhotoTips />}
+        {product ? (
+          <>
+            <div className="mt-3 grid grid-cols-2 gap-1 rounded-full border border-line bg-paper p-1" role="radiogroup" aria-label={P.modelTitle}>
+              {([true, false] as const).map((on) => (
+                <button key={String(on)} type="button" role="radio" aria-checked={withModel === on}
+                  onClick={() => {
+                    if (on === withModel) return;
+                    if (!on) for (const s of baseSlots.filter((x) => x.providerInput !== "product")) onRemove(s);
+                    setWithModel(on);
+                    const ok = PRODUCT_SCENES.find((x) => x.key === scene && (x.who === "product" || on));
+                    if (!ok || (on && ok.who === "product")) setScene(PRODUCT_SCENES.find((x) => x.who === (on ? "model" : "product"))!.key);
+                  }}
+                  className={`h-11 rounded-full text-sm font-bold transition-colors ${withModel === on ? "bg-night text-white" : "text-muted active:text-ink"}`}>
+                  {on ? P.withModel : P.noModel}
+                </button>
+              ))}
+            </div>
+            <ul className="mt-3 space-y-1 text-[12.5px] text-muted">
+              {(withModel ? P.tipsBoth : P.tipsProduct).map((t) => <li key={t} className="flex gap-2"><span className="text-emerald-600" aria-hidden>✓</span>{t}</li>)}
+            </ul>
+          </>
+        ) : !refPhoto && <PhotoTips />}
         {customVideo && readyVideoId && !["kling", "wan", "k4", "kd"].includes(seedanceMode) && (
           <div className="mt-3">
             <p className="text-sm font-medium">{cv.howMany}</p>
@@ -520,9 +566,44 @@ export function CreateFlow({
         </section>
       )}
 
+      {/* «Видео товара»: scene, length and format. */}
+      {product && (
+        <section className="rounded-card border border-line bg-surface p-4 sm:p-5">
+          <StepTitle n={++step} done>{P.sceneTitle}</StepTitle>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3" role="radiogroup" aria-label={P.sceneTitle}>
+            {PRODUCT_SCENES.filter((x) => (withModel ? x.who === "model" : x.who === "product")).map((x) => (
+              <button key={x.key} type="button" role="radio" aria-checked={scene === x.key} onClick={() => setScene(x.key)}
+                className={`flex items-center gap-2 rounded-2xl border-2 px-3 py-2.5 text-left text-sm font-bold transition-colors ${scene === x.key ? "border-ink bg-paper" : "border-line bg-surface hover:border-muted"}`}>
+                <span className="text-lg" aria-hidden>{x.emoji}</span>{x.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-4 text-sm font-bold">{P.lengthTitle}</p>
+          <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label={P.lengthTitle}>
+            {PRODUCT_DURATIONS.map((d) => (
+              <button key={d} type="button" role="radio" aria-checked={pDuration === d} onClick={() => setPDuration(d)}
+                className={`rounded-2xl border-2 px-3 py-2.5 text-left transition-colors ${pDuration === d ? "border-ink bg-paper" : "border-line bg-surface hover:border-muted"}`}>
+                <span className="block text-[15px] font-extrabold">{d} сек</span>
+                <span className="block text-xs text-muted">{formatKzt(product.prices[d])}</span>
+              </button>
+            ))}
+          </div>
+          <p className="mt-4 text-sm font-bold">{P.formatTitle}</p>
+          <div className="mt-2 grid grid-cols-3 gap-2" role="radiogroup" aria-label={P.formatTitle}>
+            {PRODUCT_ASPECTS.map((a) => (
+              <button key={a} type="button" role="radio" aria-checked={pAspect === a} onClick={() => setPAspect(a)}
+                className={`rounded-2xl border-2 px-2 py-2.5 text-center transition-colors ${pAspect === a ? "border-ink bg-paper" : "border-line bg-surface hover:border-muted"}`}>
+                <span className="block text-[15px] font-extrabold">{a}</span>
+                <span className="block text-[11px] text-muted">{P.formats[a]}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Customer's wish for the AI: mood, style, details (optional, lower priority than the template rules). */}
       {allowWish && (() => {
-        const w = wishRequired ? c.photoBrief : c.wish;
+        const w = wishRequired ? c.photoBrief : product ? { ...c.wish, hint: P.wishHint, placeholder: P.wishPlaceholder } : c.wish;
         return (
         <section className={`rounded-card border bg-surface p-4 transition-shadow sm:p-5 ${nudge === "wish" ? "border-ink ring-4 ring-lavender" : "border-line"}`}>
           {wishRequired ? (
@@ -536,7 +617,7 @@ export function CreateFlow({
           )}
           {(wishRequired || promptOn) && (
             <>
-              <p className="mt-1 text-sm text-muted">{!wishRequired && media === "video" && !customVideo ? c.wishOutfitNote(effOutfit) : w.hint}</p>
+              <p className="mt-1 text-sm text-muted">{!wishRequired && media === "video" && !customVideo && !product ? c.wishOutfitNote(effOutfit) : w.hint}</p>
               <textarea ref={wishRef} value={wish} onChange={(e) => setWish(e.target.value.slice(0, 300))} maxLength={300} rows={wishRequired ? 3 : 2}
                 placeholder={w.placeholder} aria-label={w.title} required={wishRequired}
                 className="mt-3 w-full rounded-2xl border border-line bg-surface px-3 py-2 text-base outline-none focus:border-ink" />

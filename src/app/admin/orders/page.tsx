@@ -151,7 +151,7 @@ async function List({ searchParams }: { searchParams: Promise<SP> }) {
                 const st = orderState(o.payment_status, o.generation_status, o.amount_kzt, providers);
                 const jobs = (Array.isArray(o.generation_jobs) ? o.generation_jobs : o.generation_jobs ? [o.generation_jobs] : []) as { provider: string; provider_cost: number | null }[];
                 const usdCost = jobs.reduce((n, j) => n + (Number(j.provider_cost) || 0), 0);
-                const videoUsd = jobs.filter((j) => j.provider === "seedance").reduce((n, j) => n + (Number(j.provider_cost) || 0), 0);
+                const videoUsd = jobs.filter((j) => (j.provider === "seedance" || j.provider === "kling_product")).reduce((n, j) => n + (Number(j.provider_cost) || 0), 0);
                 const units = unitsFromUsd(videoUsd, ap);
                 const cost = Math.round(usdCost * ap.tengePerUsd);
                 const real = providers.some((p) => !["free", "sandbox", "tole_sandbox"].includes(p));

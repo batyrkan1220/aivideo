@@ -73,7 +73,7 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
   if (photos.length) await db.from("audit_logs").insert({ actor_id: u.id, action: "order.photos_viewed", resource_type: "order", resource_id: id, metadata_json: { count: photos.length } });
   const kidCost = (kids ?? []).reduce((n, k) => n + ((Array.isArray(k.generation_jobs) ? k.generation_jobs : []) as { provider_cost: number | null }[]).reduce((m, j) => m + (Number(j.provider_cost) || 0), 0), 0);
   const costUsd = (jobs ?? []).filter((j) => j.provider !== "combo").reduce((n, j) => n + (Number(j.provider_cost) || 0), 0) + kidCost;
-  const units = unitsFromUsd((jobs ?? []).filter((j) => j.provider === "seedance").reduce((n, j) => n + (Number(j.provider_cost) || 0), 0), ap);
+  const units = unitsFromUsd((jobs ?? []).filter((j) => (j.provider === "seedance" || j.provider === "kling_product")).reduce((n, j) => n + (Number(j.provider_cost) || 0), 0), ap);
   const costKzt = Math.round(costUsd * ap.tengePerUsd);
   const providers = (payments ?? []).filter((p) => p.status === "succeeded").map((p) => p.provider as string);
   const real = providers.some((p) => !["free", "sandbox", "tole_sandbox"].includes(p));
@@ -263,7 +263,7 @@ async function Detail({ params }: { params: Promise<{ id: string }> }) {
           <div className="overflow-x-auto"><table className="w-full text-left text-sm">
             <thead className="text-muted"><tr><th className={th}>{A.provider}</th><th className={th}>{A.providerRef}</th><th className={th}>{A.colStatus}</th><th className={th}>{A.attempts}</th><th className={th}>{A.error}</th><th className={th}>{A.cost}</th></tr></thead>
             <tbody className="divide-y divide-line">{jobs.map((j) => {
-              const jobUnits = j.provider === "seedance" ? unitsFromUsd(Number(j.provider_cost) || 0, ap) : null;
+              const jobUnits = (j.provider === "seedance" || j.provider === "kling_product") ? unitsFromUsd(Number(j.provider_cost) || 0, ap) : null;
               return (
               <tr key={j.id}>
                 <td className={td}>{j.provider}</td>

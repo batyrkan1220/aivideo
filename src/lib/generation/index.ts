@@ -2,6 +2,7 @@ import "server-only";
 import { devProvider } from "./dev";
 import { seedanceProvider } from "./seedance";
 import { klingPhotoProvider } from "./kling-photo";
+import { klingProductProvider } from "./kling-product";
 import type { GenerationProvider } from "./types";
 
 /**
@@ -15,6 +16,7 @@ const providers: Record<string, GenerationProvider> = {
   dev: devProvider,
   seedance: seedanceProvider,
   kling_photo: klingPhotoProvider,
+  kling_product: klingProductProvider,
 };
 
 export function generationProvider(key: string | null | undefined): GenerationProvider | null {

@@ -12,6 +12,8 @@ import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 import { customVideoSettings } from "@/lib/custom-video/settings";
 import { SeedancePricingForm } from "../seedance-pricing/form";
 import { CustomVideoForm } from "../custom-video/form";
+import { ProductVideoForm } from "../product-video/form";
+import { productVideoSettings } from "@/lib/product-video/settings";
 import { Badge, Card, PageHead, Stat, fmtDate, usd, nowMs } from "../ui";
 import { env } from "@/lib/env";
 import { geminiBilling } from "@/lib/ai/gemini-billing";
@@ -51,13 +53,14 @@ async function Body() {
     db.from("ai_usage").select("created_at,ok,http_status,cost_usd,input_tokens,output_tokens").eq("service", "gemini").gte("created_at", d30).order("created_at", { ascending: false }).limit(2000),
     db.from("ai_usage").select("created_at,ok,http_status,model").eq("service", "gemini").order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
-  const [kling, ap, cv, { data: jobs30 }, { data: recent }, bal] = await Promise.all([
+  const [kling, ap, cv, { data: jobs30 }, { data: recent }, bal, pv] = await Promise.all([
     klingStatus(), seedancePricingSettings(), customVideoSettings(),
     db.from("generation_jobs").select("provider,status,provider_cost,created_at").gte("created_at", d30).neq("provider", "combo"),
     db.from("generation_jobs").select("id,order_id,provider,status,provider_cost,error_code,created_at,completed_at,started_at,orders(public_order_number,amount_kzt,template_snapshot_json)")
       .neq("provider", "combo").order("created_at", { ascending: false }).limit(25),
-    klingBalanceSignal(),
+    klingBalanceSignal(), productVideoSettings(),
   ]);
+  const productCost = (sec: number) => Math.round(sec * ap.klingUnitsPerSec * ap.klingUnitUsd * ap.tengePerUsd);
   const packLeft = (kling.packs ?? []).filter((p) => p.for40).reduce((n, p) => n + p.remaining, 0);
   const rate = ap.tengePerUsd;
   const j = jobs30 ?? [];
@@ -168,7 +171,7 @@ async function Body() {
                   return (
                     <tr key={r.id}>
                       <td className="py-2 pr-2"><Link href={`/admin/orders/${r.order_id}`} className="font-semibold hover:underline">{o?.public_order_number}</Link><span className="block max-w-[11rem] truncate text-xs text-muted">{o?.template_snapshot_json?.title_kk}</span></td>
-                      <td className="py-2">{r.provider === "kling_photo" ? "📸 фото" : "🎬 видео"}</td>
+                      <td className="py-2">{r.provider === "kling_photo" ? "📸 фото" : r.provider === "kling_product" ? "🛍️ товар" : "🎬 видео"}</td>
                       <td className="py-2"><Badge color={st.color}>{st.label}</Badge>{r.error_code && <span className="block font-mono text-[11px] text-red-700">{r.error_code}</span>}</td>
                       <td className="py-2 text-xs text-muted">{fmtDate.format(new Date(r.created_at))}{mins !== null ? ` · ${mins} мин` : ""}</td>
                       <td className="py-2 text-right">{r.provider_cost ? <>{kz(Number(r.provider_cost))}<span className="block text-xs text-muted">{usd(Number(r.provider_cost))}</span></> : "—"}</td>
@@ -184,6 +187,7 @@ async function Body() {
 
       <SeedancePricingForm value={ap} />
       <CustomVideoForm value={cv} />
+      <ProductVideoForm value={pv} cost={{ 5: productCost(5), 10: productCost(10) }} />
     </div>
   );
 }

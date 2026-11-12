@@ -262,6 +262,30 @@ export async function submitKlingOmni(opts: { videoUrl: string; photoUrls: strin
   return id;
 }
 
+/**
+ * Kling 4.0 Omni without a video: a new video from reference images + prompt («Видео товара»).
+ * Sound is left to Kling's default (native audio); "original" needs a base video.
+ */
+export async function submitKlingRefVideo(o: { photoUrls: string[]; prompt: string; durationSec: number; aspectRatio: string; resolution?: "720p" | "1080p" }): Promise<string> {
+  const duration = Math.min(15, Math.max(3, Math.round(o.durationSec)));
+  const aspect = ["16:9", "9:16", "1:1"].includes(o.aspectRatio) ? o.aspectRatio : "9:16";
+  const photos = o.photoUrls.slice(0, KLING_MAX_IMAGES);
+  const d = await call<{ data?: { id?: string } }>("/omni-video/kling-4.0", {
+    method: "POST",
+    body: JSON.stringify({
+      contents: [
+        { type: "prompt", text: o.prompt },
+        ...photos.map((url, i) => ({ type: "refer_image", url, id: `image_${i + 1}` })),
+      ],
+      settings: { resolution: o.resolution === "1080p" ? "1080p" : "720p", duration, aspect_ratio: aspect },
+    }),
+  });
+  const id = d.data?.id;
+  if (!id) throw new ProviderError("provider_bad_response", false, "kling: missing task id");
+  console.log("[kling] product video task", id, `images=${photos.length} duration=${duration} aspect=${aspect}`);
+  return id;
+}
+
 export async function getKlingTask(id: string): Promise<ProviderJobStatus & { videoUrl?: string }> {
   const d = await call<{ data?: { status?: string; message?: string; outputs?: { type?: string; url?: string }[]; billing?: KlingBilling[]; usage?: unknown }[] }>(`/tasks?task_ids=${encodeURIComponent(id)}`);
   const t = d.data?.[0];
