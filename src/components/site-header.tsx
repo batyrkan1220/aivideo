@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { LayoutGrid, Plus, Shield, UserRound } from "lucide-react";
+import { LayoutGrid, Plus, Scissors, Shield, UserRound } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { kk } from "@/lib/i18n/kk";
 import { getSessionUser } from "@/lib/auth/session";
@@ -36,6 +36,7 @@ async function AccountNav() {
   return (
     <>
       {isStaff(user.role) && <HeaderLink href="/admin"><Shield {...I} />{kk.nav.admin}</HeaderLink>}
+      <HeaderLink href="/montage"><Scissors {...I} />Монтаж</HeaderLink>
       <HeaderLink href="/orders"><LayoutGrid {...I} />{kk.nav.myOrders}</HeaderLink>
       <HeaderLink href="/account"><UserRound {...I} />{kk.nav.account}</HeaderLink>
       <span className="hidden sm:block"><ButtonLink href="/create" variant="lime" icon={<Plus {...I} strokeWidth={2.4} />}>{kk.nav.createOwn}</ButtonLink></span>

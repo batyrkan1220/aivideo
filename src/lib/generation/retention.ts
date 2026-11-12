@@ -56,6 +56,14 @@ export async function runRetention() {
     out.videos = videos.length;
   }
 
+  // Автомонтаж: finished videos after their 30 days; drafts never started (their clips go with the orphans).
+  const { data: montages } = await db.from("montages").select("id,output_path").lt("expires_at", now).not("output_path", "is", null).limit(500);
+  if (montages?.length) {
+    await db.storage.from("generated-videos").remove(montages.map((m) => m.output_path as string));
+    await db.from("montages").update({ output_path: null }).in("id", montages.map((m) => m.id));
+  }
+  await db.from("montages").delete().eq("status", "draft").lt("created_at", new Date(Date.now() - 2 * 86400_000).toISOString());
+
   out.orphans = await sweepOrphans();
 
   await db.from("rate_limits").delete().lt("window_start", new Date(Date.now() - 86400_000).toISOString());
@@ -107,6 +115,8 @@ async function sweepOrphans(): Promise<number> {
       }
       files.splice(0, files.length, ...files.filter((f) => !f.startsWith("sheets/")));
     }
+    // Автомонтаж videos have their own rows (montages) and their own expiry above.
+    if (b.bucket === "generated-videos") files.splice(0, files.length, ...files.filter((f) => !/\/montage-[0-9a-f-]{36}\.mp4$/i.test(f)));
     for (let i = 0; i < files.length; i += 100) {
       const chunk = files.slice(i, i + 100);
       // A video's still frame (".poster.webp") belongs to the video row.

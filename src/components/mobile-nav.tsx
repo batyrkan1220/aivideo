@@ -3,16 +3,16 @@ import { haptic } from "@/lib/telegram/client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Clapperboard, Image as ImageIcon, LayoutGrid, Plus, UserRound } from "lucide-react";
+import { Clapperboard, Scissors, LayoutGrid, Plus, UserRound } from "lucide-react";
 import { kk } from "@/lib/i18n/kk";
-import { PHOTOS_SOON } from "@/lib/features";
 
 type Item = { href: string; label: string; icon: React.ReactNode; match: (p: string) => boolean; soon?: boolean; primary?: boolean };
 
 const I = { size: 22, strokeWidth: 1.8, "aria-hidden": true } as const;
 const items: Item[] = [
   { href: "/", label: kk.nav.tabHome, match: (p) => p === "/" || p.startsWith("/templates"), icon: <Clapperboard {...I} /> },
-  { href: "/photos", label: kk.nav.tabPhoto, match: (p) => p.startsWith("/photos"), soon: PHOTOS_SOON, icon: <ImageIcon {...I} /> },
+  // «Фото — скоро» gave way to Автомонтаж (the customer's own clips → one ролик).
+  { href: "/montage", label: "Монтаж", match: (p) => p.startsWith("/montage"), icon: <Scissors {...I} /> },
   { href: "/create", label: kk.nav.tabCreate, match: (p) => p.startsWith("/create"), primary: true, icon: <Plus {...I} strokeWidth={2.4} /> },
   { href: "/orders", label: kk.nav.tabGallery, match: (p) => p.startsWith("/orders"), icon: <LayoutGrid {...I} /> },
   { href: "/account", label: kk.nav.tabAccount, match: (p) => p.startsWith("/account"), icon: <UserRound {...I} /> },
