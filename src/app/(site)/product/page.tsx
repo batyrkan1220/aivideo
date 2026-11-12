@@ -11,7 +11,8 @@ import { ButtonLink } from "@/components/ui/button";
 import { isFreeOrderUser } from "@/lib/orders/free";
 import { activeDiscount } from "@/lib/engage/discount";
 import { adOffer } from "@/lib/engage/offer";
-import { productTemplate, productVideoSettings } from "@/lib/product-video/settings";
+import { productPriceKzt, productTemplate, productVideoSettings } from "@/lib/product-video/settings";
+import { seedancePricingSettings } from "@/lib/pricing-seedance/settings";
 
 export const metadata = { title: "Видео товара" };
 
@@ -46,7 +47,8 @@ export default function ProductPage() {
 
 async function Body() {
   await connection();
-  const [user, s, t] = await Promise.all([getSessionUser(), productVideoSettings(), productTemplate()]);
+  const [user, s, t, ap] = await Promise.all([getSessionUser(), productVideoSettings(), productTemplate(), seedancePricingSettings()]);
+  const prices = { 5: productPriceKzt(s, 5, ap), 10: productPriceKzt(s, 10, ap) };
   if (!s.enabled || !t) {
     return (
       <div className="rounded-[24px] border border-dashed border-line bg-surface px-6 py-12 text-center">
@@ -61,14 +63,14 @@ async function Body() {
   return (
     <CreateFlow
       templateId={t.id} slots={t.faceSlots} qualities={t.qualities} pricing={t.pricing}
-      allowWish product={{ prices: { 5: s.price5Kzt, 10: s.price10Kzt } }}
+      allowWish product={{ prices }}
       maxUploadBytes={Math.min(t.maxUploadBytes, e.UPLOAD_MAX_BYTES)} minDimension={e.UPLOAD_MIN_DIMENSION} maxDimension={e.UPLOAD_MAX_DIMENSION}
       supabaseUrl={e.NEXT_PUBLIC_SUPABASE_URL} anonKey={e.NEXT_PUBLIC_SUPABASE_ANON_KEY}
       askPhone={e.PAYMENT_PROVIDER === "tole" || e.PAYMENT_PROVIDER === "tole_sandbox"}
       freeOrders={await isFreeOrderUser(user.id)}
       discount={(await activeDiscount(user.id)) ?? (await adOffer(user.id))}
       signedIn needTelegram={false}
-      item={{ id: t.id, name: "Видео товара", price: s.price5Kzt }}
+      item={{ id: t.id, name: "Видео товара", price: prices[5] }}
     />
   );
 }

@@ -3,12 +3,14 @@ import { z } from "zod";
 import { memo } from "@/lib/cache/memo";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { getTemplateForAdmin, type TemplateDetail } from "@/lib/templates/queries";
+import { productAutoPriceKzt, type SeedancePricing } from "@/lib/pricing-seedance";
 
 export const PRODUCT_VIDEO_KEY = "product_video";
 export const productVideoSettingsSchema = z.object({
   enabled: z.boolean().default(true),
-  price5Kzt: z.number().int().min(100).max(1_000_000).default(1990),
-  price10Kzt: z.number().int().min(100).max(1_000_000).default(2990),
+  /** Manual prices; 0 = automatic (Kling cost × (1 + markup), like template videos). */
+  price5Kzt: z.number().int().min(0).max(1_000_000).default(0),
+  price10Kzt: z.number().int().min(0).max(1_000_000).default(0),
 });
 export type ProductVideoSettings = z.infer<typeof productVideoSettingsSchema>;
 
@@ -24,7 +26,10 @@ export async function productVideoSettings(): Promise<ProductVideoSettings> {
   }, { swr: true });
 }
 
-export const productPriceKzt = (s: ProductVideoSettings, durationSec: number) => (durationSec > 5 ? s.price10Kzt : s.price5Kzt);
+export function productPriceKzt(s: ProductVideoSettings, durationSec: number, ap: SeedancePricing): number {
+  const manual = durationSec > 5 ? s.price10Kzt : s.price5Kzt;
+  return manual > 0 ? manual : productAutoPriceKzt(durationSec, ap);
+}
 
 /** The hidden published template behind «Видео товара» (slots, quality, provider). */
 export async function productTemplate(): Promise<TemplateDetail | null> {

@@ -262,7 +262,7 @@ export async function createOrder(raw: unknown): Promise<
     if (!scene) return { ok: false, error: "generic" };
     slots = tv.slots.filter((s) => po.withModel || s.providerInput === "product");
     durationSec = po.duration;
-    productPriceKztValue = productPriceKzt(ps, po.duration);
+    productPriceKztValue = productPriceKzt(ps, po.duration, await seedancePricingSettings());
     const wish = cleanWish(p.data.wish);
     snapshotExtra = {
       face_slots_json: slots, required_face_count: slots.length, video_duration_sec: po.duration,

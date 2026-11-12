@@ -14,6 +14,7 @@ import { SeedancePricingForm } from "../seedance-pricing/form";
 import { CustomVideoForm } from "../custom-video/form";
 import { ProductVideoForm } from "../product-video/form";
 import { productVideoSettings } from "@/lib/product-video/settings";
+import { productAutoPriceKzt, productCostKzt } from "@/lib/pricing-seedance";
 import { Badge, Card, PageHead, Stat, fmtDate, usd, nowMs } from "../ui";
 import { env } from "@/lib/env";
 import { geminiBilling } from "@/lib/ai/gemini-billing";
@@ -60,7 +61,7 @@ async function Body() {
       .neq("provider", "combo").order("created_at", { ascending: false }).limit(25),
     klingBalanceSignal(), productVideoSettings(),
   ]);
-  const productCost = (sec: number) => Math.round(sec * ap.klingUnitsPerSec * ap.klingUnitUsd * ap.tengePerUsd);
+  const productInfo = (sec: 5 | 10) => ({ cost: productCostKzt(sec, ap), auto: productAutoPriceKzt(sec, ap) });
   const packLeft = (kling.packs ?? []).filter((p) => p.for40).reduce((n, p) => n + p.remaining, 0);
   const rate = ap.tengePerUsd;
   const j = jobs30 ?? [];
@@ -187,7 +188,7 @@ async function Body() {
 
       <SeedancePricingForm value={ap} />
       <CustomVideoForm value={cv} />
-      <ProductVideoForm value={pv} cost={{ 5: productCost(5), 10: productCost(10) }} />
+      <ProductVideoForm value={pv} markup={ap.markupPercent} info={{ 5: productInfo(5), 10: productInfo(10) }} />
     </div>
   );
 }

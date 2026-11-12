@@ -81,6 +81,18 @@ export function seedanceAutoPriceKzt(durationSec: number, s: SeedancePricing, o:
   return Math.max(s.minPriceKzt, Math.ceil(raw / s.roundToKzt) * s.roundToKzt);
 }
 
+/**
+ * «Видео товара»: no input video, so Kling bills only the result seconds. Same markup, rounding and
+ * minimum as the template videos.
+ */
+export function productCostKzt(durationSec: number, s: SeedancePricing): number {
+  return Math.round(durationSec * s.klingUnitsPerSec * s.klingUnitUsd * s.tengePerUsd);
+}
+export function productAutoPriceKzt(durationSec: number, s: SeedancePricing): number {
+  const raw = durationSec * s.klingUnitsPerSec * s.klingUnitUsd * s.tengePerUsd * (1 + s.markupPercent / 100);
+  return Math.max(s.minPriceKzt, Math.ceil(raw / s.roundToKzt) * s.roundToKzt);
+}
+
 /** Template price: a manual price (> 0) wins; otherwise automatic from the video length (null = unknown yet). */
 export function seedancePriceKzt(durationSec: number | null, manualKzt: number, s: SeedancePricing, o: CostOpts = {}): number | null {
   if (manualKzt > 0) return manualKzt;
