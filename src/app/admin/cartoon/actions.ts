@@ -101,6 +101,10 @@ export async function startCartoon(input: { path: string; parts?: number; style:
   } catch (err) {
     console.error("[cartoon] video copy failed", err instanceof Error ? err.message.slice(0, 120) : "error");
   }
+  if (await cancelled(input.path)) {
+    await db.storage.from("user-videos").remove([input.path, `${input.path}.kling.mp4`]).catch(() => {});
+    return { ok: false, error: "Отменено — в Kling ничего не отправлено" };
+  }
   try {
     const resolution = input.hd && !flash ? "1080p" : "720p";
     const prompt = cartoonPrompt(style, extra);
@@ -118,6 +122,20 @@ export async function startCartoon(input: { path: string; parts?: number; style:
     }
     return { ok: false, error: err instanceof ProviderError ? `Kling: ${err.code}${err.message ? ` — ${err.message.slice(0, 160)}` : ""}` : "Kling не принял задачу" };
   }
+}
+
+/** «Отмена» before Kling: noted here, startCartoon checks it right before sending the video. */
+export async function cancelCartoon(path: string): Promise<void> {
+  const user = await guard();
+  if (!user || !/^admin-cartoon\/[0-9a-f-]{36}\.(mp4|mov)$/.test(path)) return;
+  await audit(user.id, "cartoon.cancel", "kling", null, { path });
+  await supabaseAdmin().storage.from("user-videos").remove([path, `${path}.kling.mp4`]).catch(() => {});
+}
+
+async function cancelled(path: string): Promise<boolean> {
+  const { data } = await supabaseAdmin().from("audit_logs").select("id").eq("action", "cartoon.cancel")
+    .eq("metadata_json->>path", path).limit(1);
+  return !!data?.length;
 }
 
 export type CartoonCheck = { state: "waiting" } | { state: "done"; url: string; external?: boolean } | { state: "failed"; error: string };

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { readMediaDuration, uploadWithProgress } from "@/lib/uploads/direct";
-import { checkCartoon, requestCartoonUpload, startCartoon, type CartoonEngine, type CartoonRun } from "./actions";
+import { cancelCartoon, checkCartoon, requestCartoonUpload, startCartoon, type CartoonEngine, type CartoonRun } from "./actions";
 import { CARTOON_STYLES } from "./styles";
 
 type Run = CartoonRun & { url?: string; external?: boolean; error?: string; source?: string };
@@ -28,6 +28,15 @@ export function CartoonTool({ initialRuns, anonKey }: { initialRuns: CartoonRun[
   const [runs, setRuns] = useState<Run[]>(initialRuns);
   const [now, setNow] = useState(() => Date.now());
   const runsRef = useRef(runs);
+  // «Отмена»: stops the upload; while the server compresses, it is told not to send the video to Kling.
+  const abortRef = useRef<AbortController | null>(null);
+  const pathRef = useRef<string | null>(null);
+  async function cancel() {
+    abortRef.current?.abort();
+    if (pathRef.current) await cancelCartoon(pathRef.current);
+    setPhase("idle");
+    setError("Отменено — в Kling ничего не отправлено");
+  }
   useEffect(() => { runsRef.current = runs; }, [runs]);
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
 
@@ -66,22 +75,28 @@ export function CartoonTool({ initialRuns, anonKey }: { initialRuns: CartoonRun[
     if (sec > eng.max) { setError(`${eng.label} берёт видео ${eng.hint.split("· ").pop()} — обрежьте его или выберите другую модель`); return; }
     if (file.size > 500 * 1024 * 1024) { setError("Видео больше 500 МБ"); return; }
     setError(""); setPhase("upload"); setProgress(0);
+    const ac = new AbortController();
+    abortRef.current = ac; pathRef.current = null;
     try {
       const up = await requestCartoonUpload(file.type, file.size);
       if (!up.ok) { setError(up.error); return; }
+      pathRef.current = up.path;
       // Over 50 MB the file goes up in byte parts; the server joins and compresses them.
       for (let i = 0; i < up.urls.length; i++) {
         const part = up.urls.length === 1 ? file : new File([file.slice(i * up.partBytes, (i + 1) * up.partBytes)], `${file.name}.p${i}`, { type: file.type });
-        await uploadWithProgress(up.urls[i], part, anonKey, (p) => setProgress(Math.round(((i + p / 100) / up.urls.length) * 100)));
+        await uploadWithProgress(up.urls[i], part, anonKey, (p) => setProgress(Math.round(((i + p / 100) / up.urls.length) * 100)), ac.signal);
       }
+      if (ac.signal.aborted) return;
       setPhase(up.urls.length > 1 ? "compress" : "send");
       const r = await startCartoon({ path: up.path, parts: up.urls.length, style, extra, durationSec: sec, engine, hd });
+      if (ac.signal.aborted) return;
       if (!r.ok) { setError(r.error); return; }
       setRuns((all) => [{ ...r.run, source: preview ?? undefined }, ...all]);
     } catch {
-      setError("Видео не загрузилось — проверьте интернет и попробуйте ещё раз");
+      if (!ac.signal.aborted) setError("Видео не загрузилось — проверьте интернет и попробуйте ещё раз");
     } finally {
-      setPhase("idle");
+      if (abortRef.current === ac) { abortRef.current = null; pathRef.current = null; }
+      if (!ac.signal.aborted) setPhase("idle");
     }
   }
 
@@ -139,8 +154,13 @@ export function CartoonTool({ initialRuns, anonKey }: { initialRuns: CartoonRun[
             <button type="button" disabled={busy || !file} onClick={run} className="h-11 rounded-full bg-ink px-6 text-sm font-semibold text-paper disabled:opacity-60">
               {phase === "upload" ? `Загружаю… ${progress}%` : phase === "compress" ? "Сжимаю и отправляю в Kling… (1–3 мин)" : phase === "send" ? "Отправляю в Kling…" : "Сделать мультфильм"}
             </button>
+            {busy && (
+              <button type="button" onClick={() => void cancel()} className="ml-2 h-11 rounded-full border border-line px-5 text-sm font-semibold text-red-700 hover:border-red-700">
+                Отмена
+              </button>
+            )}
             {error && <p className="text-sm text-red-700">{error}</p>}
-            <p className="text-xs text-muted">Каждый запуск списывается в Kling (как видео той же длины). Обычно готово за 3–10 минут; страницу можно закрыть — результат останется здесь.</p>
+            <p className="text-xs text-muted">Отменить можно, пока видео загружается и сжимается; после отправки в Kling задачу остановить нельзя. Каждый запуск списывается в Kling (как видео той же длины). Обычно готово за 3–10 минут; страницу можно закрыть — результат останется здесь.</p>
           </div>
         </div>
       </section>

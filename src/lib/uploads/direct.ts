@@ -1,9 +1,11 @@
 "use client";
 
 /** PUT to a Supabase signed upload URL with real progress; a 45 s stall aborts (weak mobile network). */
-export function uploadWithProgress(url: string, file: File, anonKey: string, onProgress: (p: number) => void) {
+export function uploadWithProgress(url: string, file: File, anonKey: string, onProgress: (p: number) => void, signal?: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) { reject(new Error("cancelled")); return; }
     const xhr = new XMLHttpRequest();
+    signal?.addEventListener("abort", () => xhr.abort(), { once: true });
     xhr.open("PUT", url);
     xhr.setRequestHeader("apikey", anonKey);
     xhr.setRequestHeader("x-upsert", "false");
