@@ -2,6 +2,8 @@
 export const CARTOON_STYLES = [
   { key: "3d", label: "3D мультфильм", hint: "как современный анимационный фильм",
     look: "a modern 3D animated feature film: stylised 3D cartoon characters with soft rounded shapes, slightly larger expressive eyes, smooth subsurface skin shading, soft global illumination, rich colours" },
+  { key: "pixar", label: "Pixar", hint: "как мультфильмы Pixar",
+    look: "a Pixar-style 3D animated film: Pixar character design with appealing rounded features, big expressive eyes, soft stylised skin and hair, warm cinematic lighting with gentle rim light, rich saturated colours, polished feature-film render quality" },
   { key: "anime", label: "Аниме", hint: "японская 2D-анимация",
     look: "Japanese 2D anime: clean line art, cel shading with crisp shadows, vivid colours, painted anime backgrounds" },
   { key: "painted", label: "Акварельное аниме", hint: "мягкое, рисованное от руки",
