@@ -2,7 +2,7 @@
 import { randomUUID } from "node:crypto";
 import { audit, requirePermission, ForbiddenError } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { getKlingTask, submitKlingOmni } from "@/lib/generation/kling";
+import { getKlingTask, getKlingV3OmniTask, submitKlingOmni, submitKlingV3Omni } from "@/lib/generation/kling";
 import { ProviderError } from "@/lib/generation/types";
 import { CARTOON_STYLES, cartoonPrompt, type CartoonStyle } from "./styles";
 
@@ -31,10 +31,13 @@ export async function requestCartoonUpload(type: string, size: number): Promise<
   return { ok: true, path, url: data.signedUrl };
 }
 
-export type CartoonRun = { task: string; style: string; sec: number; at: string; flash: boolean };
+export type CartoonEngine = "o3" | "v4" | "flash";
+export type CartoonRun = { task: string; style: string; sec: number; at: string; flash: boolean; engine?: CartoonEngine };
+/** Kling 3.0 Omni (O3) tasks are kept as "v3:<id>": they are checked on their own endpoint. */
+const V3 = "v3:";
 export type CartoonStart = { ok: true; run: CartoonRun } | { ok: false; error: string };
 
-export async function startCartoon(input: { path: string; style: string; extra: string; durationSec: number; flash: boolean; hd: boolean }): Promise<CartoonStart> {
+export async function startCartoon(input: { path: string; style: string; extra: string; durationSec: number; engine: CartoonEngine; hd: boolean }): Promise<CartoonStart> {
   const user = await guard();
   if (!user) return { ok: false, error: "Нет доступа" };
   if (!/^admin-cartoon\/[0-9a-f-]{36}\.(mp4|mov)$/.test(input.path)) return { ok: false, error: "Неверный файл" };
@@ -42,8 +45,11 @@ export async function startCartoon(input: { path: string; style: string; extra: 
   if (!style) return { ok: false, error: "Выберите стиль" };
   const sec = Math.round(Number(input.durationSec) * 10) / 10;
   if (!(sec >= 3)) return { ok: false, error: "Видео короче 3 секунд" };
+  const engine: CartoonEngine = input.engine === "v4" || input.engine === "flash" ? input.engine : "o3";
+  if (engine === "o3" && sec > 15.4) return { ok: false, error: "Kling O3 берёт видео до 15 секунд" };
+  if (engine === "flash" && sec > 20.4) return { ok: false, error: "Flash берёт видео до 20 секунд" };
   if (sec > 30.4) return { ok: false, error: "Kling берёт видео до 30 секунд" };
-  const flash = !!input.flash && sec <= 20.4;
+  const flash = engine === "flash";
   const extra = String(input.extra ?? "").replace(/\s+/g, " ").trim().slice(0, 400);
 
   const db = supabaseAdmin();
@@ -64,15 +70,20 @@ export async function startCartoon(input: { path: string; style: string; extra: 
     console.error("[cartoon] video copy failed", err instanceof Error ? err.message.slice(0, 120) : "error");
   }
   try {
-    const task = await submitKlingOmni({
-      videoUrl, photoUrls: [], mode: "edit", prompt: cartoonPrompt(style, extra),
-      durationSec: sec, aspectRatio: "adaptive", resolution: input.hd && !flash ? "1080p" : "720p", flash,
-    });
-    const run: CartoonRun = { task, style, sec, at: new Date().toISOString(), flash };
+    const resolution = input.hd && !flash ? "1080p" : "720p";
+    const prompt = cartoonPrompt(style, extra);
+    // O3 = Kling 3.0 Omni on our own Kling account (needs a Kling 3.0 pack); 4.0 / Flash as before.
+    const task = engine === "o3"
+      ? V3 + await submitKlingV3Omni({ videoUrl, photoUrls: [], prompt, resolution })
+      : await submitKlingOmni({ videoUrl, photoUrls: [], mode: "edit", prompt, durationSec: sec, aspectRatio: "adaptive", resolution, flash });
+    const run: CartoonRun = { task, style, sec, at: new Date().toISOString(), flash, engine };
     await audit(user.id, "cartoon.run", "kling", null, { ...run, hd: input.hd && !flash, extra: extra.slice(0, 120) });
     return { ok: true, run };
   } catch (err) {
     console.error("[cartoon] kling refused", err instanceof ProviderError ? err.code : "error", err instanceof Error ? err.message.slice(0, 200) : "");
+    if (err instanceof ProviderError && err.code === "provider_no_balance" && engine === "o3") {
+      return { ok: false, error: "Kling: на аккаунте нет пакета для Kling 3.0 (O3). Купите пакет 3.0 в кабинете Kling API или выберите Kling 4.0." };
+    }
     return { ok: false, error: err instanceof ProviderError ? `Kling: ${err.code}${err.message ? ` — ${err.message.slice(0, 160)}` : ""}` : "Kling не принял задачу" };
   }
 }
@@ -81,9 +92,9 @@ export type CartoonCheck = { state: "waiting" } | { state: "done"; url: string; 
 
 export async function checkCartoon(task: string): Promise<CartoonCheck> {
   if (!(await guard())) return { state: "failed", error: "Нет доступа" };
-  if (!/^[\w-]{1,80}$/.test(task)) return { state: "failed", error: "Неверная задача" };
+  if (!/^(v3:)?[\w-]{1,80}$/.test(task)) return { state: "failed", error: "Неверная задача" };
   try {
-    const st = await getKlingTask(task);
+    const st = task.startsWith(V3) ? await getKlingV3OmniTask(task.slice(V3.length)) : await getKlingTask(task);
     if (st.state === "succeeded") {
       const url = await keepResult(task, st.outputUrl);
       // Not copied (e.g. over the 50 MB bucket limit): a plain link to Kling's file still opens.
@@ -102,10 +113,11 @@ export async function checkCartoon(task: string): Promise<CartoonCheck> {
  */
 async function keepResult(task: string, klingUrl: string): Promise<string | null> {
   const db = supabaseAdmin();
-  const path = `admin-cartoon/${task}.mp4`;
+  const name = task.replace(/[^\w-]/g, "_");
+  const path = `admin-cartoon/${name}.mp4`;
   const sign = async () => (await db.storage.from("generated-videos").createSignedUrl(path, 6 * 3600)).data?.signedUrl ?? null;
-  const { data: have } = await db.storage.from("generated-videos").list("admin-cartoon", { search: `${task}.mp4`, limit: 1 });
-  if (have?.some((f) => f.name === `${task}.mp4`)) return sign();
+  const { data: have } = await db.storage.from("generated-videos").list("admin-cartoon", { search: `${name}.mp4`, limit: 1 });
+  if (have?.some((f) => f.name === `${name}.mp4`)) return sign();
   try {
     const res = await fetch(klingUrl, { signal: AbortSignal.timeout(120_000), cache: "no-store" });
     if (!res.ok) throw new Error(`download ${res.status}`);

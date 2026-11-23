@@ -19,8 +19,9 @@ export type CartoonStyle = (typeof CARTOON_STYLES)[number]["key"];
 export function cartoonPrompt(style: CartoonStyle, extra: string): string {
   const s = CARTOON_STYLES.find((x) => x.key === style) ?? CARTOON_STYLES[0];
   return [
-    `Restyle the entire @video_1 into ${s.look}.`,
+    `Redraw @video_1 as ${s.look}.`,
     "This is a pure style transfer of @video_1, frame by frame. Keep 100% of the content: the same people, the same faces and facial features, expressions, hairstyles, skin tone, body shape and proportions, the same clothes and their colours, the same pose, every movement, gesture and lip movement at exactly the same moment, the same camera movement, framing and cuts, the same background, objects and lighting direction, the same timing and length.",
+    "Trace the original exactly like a rotoscope animator: the outlines of every person, garment, object and background element follow the original frame; nothing moves, appears or disappears that does not in @video_1.",
     "Every person stays clearly recognisable as the same person, now drawn as a cartoon character of this style. Do not add, remove, replace or move anything; do not change the story or the composition. Only the rendering style changes, consistently in every frame, with no flicker.",
     ...(extra ? [`Extra details from the editor (only about the look): ${extra}`] : []),
     "Keep the original sound. No subtitles, no text, no watermarks.",

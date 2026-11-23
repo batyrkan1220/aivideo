@@ -1,11 +1,17 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { readMediaDuration, uploadWithProgress } from "@/lib/uploads/direct";
-import { checkCartoon, requestCartoonUpload, startCartoon, type CartoonRun } from "./actions";
+import { checkCartoon, requestCartoonUpload, startCartoon, type CartoonEngine, type CartoonRun } from "./actions";
 import { CARTOON_STYLES } from "./styles";
 
 type Run = CartoonRun & { url?: string; external?: boolean; error?: string; source?: string };
 
+const ENGINES: { key: CartoonEngine; label: string; hint: string; max: number }[] = [
+  { key: "o3", label: "Kling O3", hint: "3.0 Omni · до 15 сек", max: 15.4 },
+  { key: "v4", label: "Kling 4.0", hint: "до 30 сек", max: 30.4 },
+  { key: "flash", label: "Kling 4.0 Flash", hint: "дешевле · 720p · до 20 сек", max: 20.4 },
+];
+const engineLabel = (r: CartoonRun) => ENGINES.find((e) => e.key === (r.engine ?? (r.flash ? "flash" : "v4")))?.label ?? "Kling";
 const styleLabel = (k: string) => CARTOON_STYLES.find((s) => s.key === k)?.label ?? k;
 
 export function CartoonTool({ initialRuns, anonKey }: { initialRuns: CartoonRun[]; anonKey: string }) {
@@ -14,7 +20,7 @@ export function CartoonTool({ initialRuns, anonKey }: { initialRuns: CartoonRun[
   const [sec, setSec] = useState<number | null>(null);
   const [style, setStyle] = useState<string>(CARTOON_STYLES[0].key);
   const [extra, setExtra] = useState("");
-  const [flash, setFlash] = useState(false);
+  const [engine, setEngine] = useState<CartoonEngine>("o3");
   const [hd, setHd] = useState(false);
   const [phase, setPhase] = useState<"idle" | "upload" | "send">("idle");
   const [progress, setProgress] = useState(0);
@@ -45,14 +51,19 @@ export function CartoonTool({ initialRuns, anonKey }: { initialRuns: CartoonRun[
     if (preview) URL.revokeObjectURL(preview);
     const url = f ? URL.createObjectURL(f) : null;
     setPreview(url);
-    if (url) setSec(await readMediaDuration(url));
+    if (!url) return;
+    const d = await readMediaDuration(url);
+    setSec(d);
+    // A video longer than the chosen model takes: move to one that takes it.
+    if (d != null) setEngine((cur) => (d <= ENGINES.find((e) => e.key === cur)!.max ? cur : (ENGINES.find((e) => d <= e.max)?.key ?? cur)));
   }
 
   async function run() {
     if (!file) { setError("Выберите видео"); return; }
     if (sec == null) { setError("Не удалось прочитать длительность видео"); return; }
     if (sec < 3) { setError("Видео короче 3 секунд"); return; }
-    if (sec > 30.4) { setError("Kling берёт видео до 30 секунд — обрежьте его"); return; }
+    const eng = ENGINES.find((e) => e.key === engine)!;
+    if (sec > eng.max) { setError(`${eng.label} берёт видео ${eng.hint.split("· ").pop()} — обрежьте его или выберите другую модель`); return; }
     if (file.size > 50 * 1024 * 1024) { setError("Видео больше 50 МБ — сожмите его"); return; }
     setError(""); setPhase("upload"); setProgress(0);
     try {
@@ -60,7 +71,7 @@ export function CartoonTool({ initialRuns, anonKey }: { initialRuns: CartoonRun[
       if (!up.ok) { setError(up.error); return; }
       await uploadWithProgress(up.url, file, anonKey, setProgress);
       setPhase("send");
-      const r = await startCartoon({ path: up.path, style, extra, durationSec: sec, flash, hd });
+      const r = await startCartoon({ path: up.path, style, extra, durationSec: sec, engine, hd });
       if (!r.ok) { setError(r.error); return; }
       setRuns((all) => [{ ...r.run, source: preview ?? undefined }, ...all]);
     } catch {
@@ -70,7 +81,6 @@ export function CartoonTool({ initialRuns, anonKey }: { initialRuns: CartoonRun[
     }
   }
 
-  const flashOk = sec == null || sec <= 20.4;
   const busy = phase !== "idle";
   const chip = (on: boolean) => `rounded-xl border-2 px-3 py-2 text-left text-sm transition-colors ${on ? "border-ink bg-paper" : "border-line bg-surface hover:border-muted"}`;
 
@@ -104,16 +114,24 @@ export function CartoonTool({ initialRuns, anonKey }: { initialRuns: CartoonRun[
               <input value={extra} onChange={(e) => setExtra(e.target.value)} maxLength={400} placeholder="Например: тёплые цвета, вечерний свет"
                 className="mt-1 h-10 w-full rounded-xl border border-line bg-paper px-3 text-base sm:text-sm" />
             </label>
-            <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
-              <label className={`flex items-center gap-2 ${flashOk ? "" : "opacity-50"}`}>
-                <input type="checkbox" checked={flash && flashOk} disabled={!flashOk} onChange={(e) => { setFlash(e.target.checked); if (e.target.checked) setHd(false); }} className="h-4 w-4 accent-brand" />
-                Kling 4.0 Flash — дешевле и быстрее (720p, до 20 сек)
-              </label>
-              <label className={`flex items-center gap-2 ${flash && flashOk ? "opacity-50" : ""}`}>
-                <input type="checkbox" checked={hd && !(flash && flashOk)} disabled={flash && flashOk} onChange={(e) => setHd(e.target.checked)} className="h-4 w-4 accent-brand" />
-                1080p (дороже)
-              </label>
+            <div>
+              <p className="mb-2 text-sm font-semibold">Модель</p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {ENGINES.map((e) => {
+                  const tooLong = sec != null && sec > e.max;
+                  return (
+                    <button key={e.key} type="button" disabled={tooLong} onClick={() => setEngine(e.key)} className={`${chip(engine === e.key)} disabled:opacity-40`} aria-pressed={engine === e.key}>
+                      <span className="block font-semibold">{e.label}</span>
+                      <span className="block text-xs text-muted">{tooLong ? "видео длиннее" : e.hint}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+            <label className={`flex items-center gap-2 text-sm ${engine === "flash" ? "opacity-50" : ""}`}>
+              <input type="checkbox" checked={hd && engine !== "flash"} disabled={engine === "flash"} onChange={(e) => setHd(e.target.checked)} className="h-4 w-4 accent-brand" />
+              1080p (дороже{engine === "o3" ? ", режим pro" : ""})
+            </label>
             <button type="button" disabled={busy || !file} onClick={run} className="h-11 rounded-full bg-ink px-6 text-sm font-semibold text-paper disabled:opacity-60">
               {phase === "upload" ? `Загружаю… ${progress}%` : phase === "send" ? "Отправляю в Kling…" : "Сделать мультфильм"}
             </button>
@@ -130,7 +148,7 @@ export function CartoonTool({ initialRuns, anonKey }: { initialRuns: CartoonRun[
             <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="font-semibold">
                 {r.url ? "Готово" : r.error ? "Ошибка" : `Kling рисует… ${Math.floor(waited / 60)}:${String(waited % 60).padStart(2, "0")}`}
-                <span className="ml-2 text-sm font-normal text-muted">{styleLabel(r.style)} · {Number(r.sec).toFixed(0)} сек{r.flash ? " · Flash" : ""}</span>
+                <span className="ml-2 text-sm font-normal text-muted">{styleLabel(r.style)} · {Number(r.sec).toFixed(0)} сек · {engineLabel(r)}</span>
               </h2>
               <span className="text-xs text-muted">{new Date(r.at).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" })}</span>
             </div>
