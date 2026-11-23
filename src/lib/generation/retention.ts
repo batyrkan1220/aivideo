@@ -117,6 +117,15 @@ async function sweepOrphans(): Promise<number> {
     }
     // Автомонтаж videos have their own rows (montages) and their own expiry above.
     if (b.bucket === "generated-videos") files.splice(0, files.length, ...files.filter((f) => !/\/montage-[0-9a-f-]{36}\.mp4$/i.test(f)));
+    // Admin «Мультфильм» results: kept 30 days, then removed.
+    if (b.bucket === "generated-videos") {
+      const cartoons = files.filter((f) => f.startsWith("admin-cartoon/"));
+      files.splice(0, files.length, ...files.filter((f) => !f.startsWith("admin-cartoon/")));
+      const { data } = await db.storage.from(b.bucket).list("admin-cartoon", { limit: 1000 });
+      const old = (data ?? []).filter((e) => e.id && Date.parse((e.created_at as string | undefined) ?? "") < Date.now() - 30 * 86400_000)
+        .map((e) => `admin-cartoon/${e.name}`).filter((f) => cartoons.includes(f));
+      if (old.length) { const { error } = await db.storage.from(b.bucket).remove(old); if (!error) removed += old.length; }
+    }
     for (let i = 0; i < files.length; i += 100) {
       const chunk = files.slice(i, i + 100);
       // A video's still frame (".poster.webp") belongs to the video row.

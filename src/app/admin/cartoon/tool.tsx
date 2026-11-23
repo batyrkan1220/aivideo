@@ -4,7 +4,7 @@ import { readMediaDuration, uploadWithProgress } from "@/lib/uploads/direct";
 import { checkCartoon, requestCartoonUpload, startCartoon, type CartoonRun } from "./actions";
 import { CARTOON_STYLES } from "./styles";
 
-type Run = CartoonRun & { url?: string; error?: string; source?: string };
+type Run = CartoonRun & { url?: string; external?: boolean; error?: string; source?: string };
 
 const styleLabel = (k: string) => CARTOON_STYLES.find((s) => s.key === k)?.label ?? k;
 
@@ -32,7 +32,7 @@ export function CartoonTool({ initialRuns, anonKey }: { initialRuns: CartoonRun[
       for (const r of runsRef.current.filter((x) => !x.url && !x.error)) {
         const st = await checkCartoon(r.task);
         if (stop || st.state === "waiting") continue;
-        setRuns((all) => all.map((x) => x.task === r.task ? { ...x, ...(st.state === "done" ? { url: st.url } : { error: st.error }) } : x));
+        setRuns((all) => all.map((x) => x.task === r.task ? { ...x, ...(st.state === "done" ? { url: st.url, external: st.external } : { error: st.error }) } : x));
       }
     };
     void tick();
@@ -136,7 +136,12 @@ export function CartoonTool({ initialRuns, anonKey }: { initialRuns: CartoonRun[
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               {r.source && <video src={r.source} className="max-h-[70vh] w-full rounded-xl bg-mist ring-1 ring-line" controls muted playsInline />}
-              {r.url ? (
+              {r.url && r.external ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted">Видео больше 50 МБ — здесь его не показать, откройте файл у Kling.</p>
+                  <a href={r.url} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center rounded-full bg-ink px-4 text-sm font-semibold text-paper">Открыть видео</a>
+                </div>
+              ) : r.url ? (
                 <div className="space-y-2">
                   <video src={r.url} className="max-h-[70vh] w-full rounded-xl bg-black ring-1 ring-line" controls playsInline />
                   <a href={r.url} target="_blank" rel="noreferrer" download className="inline-flex h-10 items-center rounded-full bg-ink px-4 text-sm font-semibold text-paper">Скачать</a>

@@ -77,17 +77,44 @@ export async function startCartoon(input: { path: string; style: string; extra: 
   }
 }
 
-export type CartoonCheck = { state: "waiting" } | { state: "done"; url: string } | { state: "failed"; error: string };
+export type CartoonCheck = { state: "waiting" } | { state: "done"; url: string; external?: boolean } | { state: "failed"; error: string };
 
 export async function checkCartoon(task: string): Promise<CartoonCheck> {
   if (!(await guard())) return { state: "failed", error: "Нет доступа" };
   if (!/^[\w-]{1,80}$/.test(task)) return { state: "failed", error: "Неверная задача" };
   try {
     const st = await getKlingTask(task);
-    if (st.state === "succeeded") return { state: "done", url: st.outputUrl };
+    if (st.state === "succeeded") {
+      const url = await keepResult(task, st.outputUrl);
+      // Not copied (e.g. over the 50 MB bucket limit): a plain link to Kling's file still opens.
+      return url ? { state: "done", url } : { state: "done", url: st.outputUrl, external: true };
+    }
     if (st.state === "failed") return { state: "failed", error: st.errorCode === "provider_content_rejected" ? "Kling отклонил видео (модерация)" : "Kling не сделал видео" };
     return { state: "waiting" };
   } catch {
     return { state: "waiting" };
+  }
+}
+
+/**
+ * The site's CSP plays video only from our own storage, so the finished cartoon is copied from Kling
+ * to generated-videos/admin-cartoon/<task>.mp4 once (kept 30 days) and shown by a signed link.
+ */
+async function keepResult(task: string, klingUrl: string): Promise<string | null> {
+  const db = supabaseAdmin();
+  const path = `admin-cartoon/${task}.mp4`;
+  const sign = async () => (await db.storage.from("generated-videos").createSignedUrl(path, 6 * 3600)).data?.signedUrl ?? null;
+  const { data: have } = await db.storage.from("generated-videos").list("admin-cartoon", { search: `${task}.mp4`, limit: 1 });
+  if (have?.some((f) => f.name === `${task}.mp4`)) return sign();
+  try {
+    const res = await fetch(klingUrl, { signal: AbortSignal.timeout(120_000), cache: "no-store" });
+    if (!res.ok) throw new Error(`download ${res.status}`);
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const { error } = await db.storage.from("generated-videos").upload(path, bytes, { contentType: "video/mp4", upsert: true });
+    if (error) throw new Error(error.message);
+    return sign();
+  } catch (err) {
+    console.error("[cartoon] copy failed", task, err instanceof Error ? err.message.slice(0, 120) : "error");
+    return null;
   }
 }
