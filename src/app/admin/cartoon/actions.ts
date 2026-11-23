@@ -16,19 +16,28 @@ async function guard() {
   try { return await requirePermission("templates.manage"); } catch (e) { if (e instanceof ForbiddenError) return null; throw e; }
 }
 
-// The user-videos bucket takes MP4/MOV up to 50 MB.
+// The user-videos bucket takes MP4/MOV up to 50 MB a file: a bigger video goes up in byte parts
+// (<path>.p0, .p1, …) and the server joins and re-encodes it before Kling.
 const TYPES: Record<string, string> = { "video/mp4": "mp4", "video/quicktime": "mov" };
 const MAX_BYTES = 50 * 1024 * 1024;
+const PART_BYTES = 45 * 1024 * 1024;
+const MAX_TOTAL = 500 * 1024 * 1024;
 
-export async function requestCartoonUpload(type: string, size: number): Promise<{ ok: true; path: string; url: string } | { ok: false; error: string }> {
+export async function requestCartoonUpload(type: string, size: number): Promise<{ ok: true; path: string; urls: string[]; partBytes: number } | { ok: false; error: string }> {
   if (!(await guard())) return { ok: false, error: "Нет доступа" };
   const ext = TYPES[type];
   if (!ext) return { ok: false, error: "Нужен MP4 или MOV" };
-  if (!(size > 0) || size > MAX_BYTES) return { ok: false, error: "Видео больше 50 МБ — сожмите его" };
+  if (!(size > 0) || size > MAX_TOTAL) return { ok: false, error: "Видео больше 500 МБ" };
   const path = `admin-cartoon/${randomUUID()}.${ext}`;
-  const { data, error } = await supabaseAdmin().storage.from("user-videos").createSignedUploadUrl(path);
-  if (error || !data) return { ok: false, error: "Не удалось начать загрузку" };
-  return { ok: true, path, url: data.signedUrl };
+  const parts = size > MAX_BYTES ? Math.ceil(size / PART_BYTES) : 1;
+  const names = parts === 1 ? [path] : Array.from({ length: parts }, (_, i) => `${path}.p${i}`);
+  const urls: string[] = [];
+  for (const n of names) {
+    const { data, error } = await supabaseAdmin().storage.from("user-videos").createSignedUploadUrl(n);
+    if (error || !data) return { ok: false, error: "Не удалось начать загрузку" };
+    urls.push(data.signedUrl);
+  }
+  return { ok: true, path, urls, partBytes: PART_BYTES };
 }
 
 export type CartoonEngine = "o3" | "v4" | "flash";
@@ -37,7 +46,7 @@ export type CartoonRun = { task: string; style: string; sec: number; at: string;
 const V3 = "v3:";
 export type CartoonStart = { ok: true; run: CartoonRun } | { ok: false; error: string };
 
-export async function startCartoon(input: { path: string; style: string; extra: string; durationSec: number; engine: CartoonEngine; hd: boolean }): Promise<CartoonStart> {
+export async function startCartoon(input: { path: string; parts?: number; style: string; extra: string; durationSec: number; engine: CartoonEngine; hd: boolean }): Promise<CartoonStart> {
   const user = await guard();
   if (!user) return { ok: false, error: "Нет доступа" };
   if (!/^admin-cartoon\/[0-9a-f-]{36}\.(mp4|mov)$/.test(input.path)) return { ok: false, error: "Неверный файл" };
@@ -53,11 +62,34 @@ export async function startCartoon(input: { path: string; style: string; extra: 
   const extra = String(input.extra ?? "").replace(/\s+/g, " ").trim().slice(0, 400);
 
   const db = supabaseAdmin();
-  const { data: signed } = await db.storage.from("user-videos").createSignedUrl(input.path, 24 * 3600);
-  if (!signed) return { ok: false, error: "Видео не загрузилось" };
-  let videoUrl = signed.signedUrl;
+  const parts = Math.max(1, Math.min(12, Math.floor(Number(input.parts) || 1)));
+  let videoUrl = "";
+  if (parts > 1) {
+    // Big video: join the parts, re-encode under 48 MB, keep it as <path>.kling.mp4, drop the parts.
+    const names = Array.from({ length: parts }, (_, i) => `${input.path}.p${i}`);
+    const { data: signedParts } = await db.storage.from("user-videos").createSignedUrls(names, 3600);
+    if (!signedParts || signedParts.some((x) => !x.signedUrl)) return { ok: false, error: "Видео не загрузилось" };
+    try {
+      const { assembleVideo } = await import("@/lib/media/assemble");
+      const bytes = await assembleVideo(signedParts.map((x) => x.signedUrl as string));
+      const copyPath = `${input.path}.kling.mp4`;
+      const { error } = await db.storage.from("user-videos").upload(copyPath, bytes, { contentType: "video/mp4", upsert: true });
+      const { data } = error ? { data: null } : await db.storage.from("user-videos").createSignedUrl(copyPath, 24 * 3600);
+      if (!data) return { ok: false, error: "Не удалось сохранить сжатое видео" };
+      videoUrl = data.signedUrl;
+      console.log("[cartoon] assembled", parts, "parts →", Math.round(bytes.length / 1048576), "MB");
+    } catch (err) {
+      console.error("[cartoon] assemble failed", err instanceof Error ? err.message.slice(0, 160) : "error");
+      return { ok: false, error: "Не удалось обработать видео — попробуйте файл поменьше" };
+    } finally {
+      await db.storage.from("user-videos").remove(names).catch(() => {});
+    }
+  }
+  const { data: signed } = videoUrl ? { data: null } : await db.storage.from("user-videos").createSignedUrl(input.path, 24 * 3600);
+  if (!videoUrl && !signed) return { ok: false, error: "Видео не загрузилось" };
+  if (signed) videoUrl = signed.signedUrl;
   // Kling refuses videos under 700 px: send an upscaled copy (next to the source, swept with it).
-  try {
+  if (parts === 1) try {
     const { klingReadyCopy } = await import("@/lib/media/kling-video");
     const copy = await klingReadyCopy(videoUrl, MAX_BYTES + 1);
     if (copy) {

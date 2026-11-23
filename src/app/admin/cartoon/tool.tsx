@@ -22,7 +22,7 @@ export function CartoonTool({ initialRuns, anonKey }: { initialRuns: CartoonRun[
   const [extra, setExtra] = useState("");
   const [engine, setEngine] = useState<CartoonEngine>("o3");
   const [hd, setHd] = useState(false);
-  const [phase, setPhase] = useState<"idle" | "upload" | "send">("idle");
+  const [phase, setPhase] = useState<"idle" | "upload" | "compress" | "send">("idle");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
   const [runs, setRuns] = useState<Run[]>(initialRuns);
@@ -64,14 +64,18 @@ export function CartoonTool({ initialRuns, anonKey }: { initialRuns: CartoonRun[
     if (sec < 3) { setError("Видео короче 3 секунд"); return; }
     const eng = ENGINES.find((e) => e.key === engine)!;
     if (sec > eng.max) { setError(`${eng.label} берёт видео ${eng.hint.split("· ").pop()} — обрежьте его или выберите другую модель`); return; }
-    if (file.size > 50 * 1024 * 1024) { setError("Видео больше 50 МБ — сожмите его"); return; }
+    if (file.size > 500 * 1024 * 1024) { setError("Видео больше 500 МБ"); return; }
     setError(""); setPhase("upload"); setProgress(0);
     try {
       const up = await requestCartoonUpload(file.type, file.size);
       if (!up.ok) { setError(up.error); return; }
-      await uploadWithProgress(up.url, file, anonKey, setProgress);
-      setPhase("send");
-      const r = await startCartoon({ path: up.path, style, extra, durationSec: sec, engine, hd });
+      // Over 50 MB the file goes up in byte parts; the server joins and compresses them.
+      for (let i = 0; i < up.urls.length; i++) {
+        const part = up.urls.length === 1 ? file : new File([file.slice(i * up.partBytes, (i + 1) * up.partBytes)], `${file.name}.p${i}`, { type: file.type });
+        await uploadWithProgress(up.urls[i], part, anonKey, (p) => setProgress(Math.round(((i + p / 100) / up.urls.length) * 100)));
+      }
+      setPhase(up.urls.length > 1 ? "compress" : "send");
+      const r = await startCartoon({ path: up.path, parts: up.urls.length, style, extra, durationSec: sec, engine, hd });
       if (!r.ok) { setError(r.error); return; }
       setRuns((all) => [{ ...r.run, source: preview ?? undefined }, ...all]);
     } catch {
@@ -89,7 +93,7 @@ export function CartoonTool({ initialRuns, anonKey }: { initialRuns: CartoonRun[
       <section className="rounded-card border border-line/80 bg-surface p-4 sm:p-5">
         <div className="grid gap-5 md:grid-cols-[14rem_minmax(0,1fr)]">
           <label className="block cursor-pointer">
-            <span className="mb-2 block text-sm font-semibold">Видео (3–30 сек, MP4/MOV до 50 МБ)</span>
+            <span className="mb-2 block text-sm font-semibold">Видео (3–30 сек, MP4/MOV до 500 МБ)</span>
             <span className="flex aspect-[9/16] w-full items-center justify-center overflow-hidden rounded-xl bg-mist text-center text-sm text-muted ring-1 ring-line hover:ring-ink">
               {preview ? <video src={preview} className="h-full w-full object-cover" muted playsInline loop autoPlay /> : "Нажмите, чтобы выбрать"}
             </span>
@@ -133,7 +137,7 @@ export function CartoonTool({ initialRuns, anonKey }: { initialRuns: CartoonRun[
               1080p (дороже{engine === "o3" ? ", режим pro" : ""})
             </label>
             <button type="button" disabled={busy || !file} onClick={run} className="h-11 rounded-full bg-ink px-6 text-sm font-semibold text-paper disabled:opacity-60">
-              {phase === "upload" ? `Загружаю… ${progress}%` : phase === "send" ? "Отправляю в Kling…" : "Сделать мультфильм"}
+              {phase === "upload" ? `Загружаю… ${progress}%` : phase === "compress" ? "Сжимаю и отправляю в Kling… (1–3 мин)" : phase === "send" ? "Отправляю в Kling…" : "Сделать мультфильм"}
             </button>
             {error && <p className="text-sm text-red-700">{error}</p>}
             <p className="text-xs text-muted">Каждый запуск списывается в Kling (как видео той же длины). Обычно готово за 3–10 минут; страницу можно закрыть — результат останется здесь.</p>
