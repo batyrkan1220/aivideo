@@ -21,9 +21,13 @@ async function Body() {
   if (!u) redirect("/login?next=/admin/cartoon");
   if (!can(u.role, "templates.manage")) return <p className="text-muted">{ru.admin.forbidden}</p>;
   // Earlier runs (results stay on Kling's link), so a refresh does not lose them.
-  const { data } = await supabaseAdmin().from("audit_logs").select("metadata_json")
-    .eq("action", "cartoon.run").order("created_at", { ascending: false }).limit(12);
-  const runs = (data ?? []).map((r) => r.metadata_json as CartoonRun).filter((r) => typeof r?.task === "string");
+  // Big videos still compressing ("cartoon.prep" without its "cartoon.run") show as pending too.
+  const { data } = await supabaseAdmin().from("audit_logs").select("action,metadata_json")
+    .in("action", ["cartoon.run", "cartoon.prep"]).order("created_at", { ascending: false }).limit(24);
+  const rows = (data ?? []).map((r) => ({ action: r.action as string, m: r.metadata_json as CartoonRun & { path?: string } }));
+  const started = new Set(rows.filter((r) => r.action === "cartoon.run" && r.m?.path).map((r) => r.m.path));
+  const runs = rows.filter((r) => typeof r.m?.task === "string" && (r.action === "cartoon.run" || !started.has(r.m.path)))
+    .map((r) => r.m as CartoonRun).slice(0, 12);
   const e = env();
   return (
     <div className="space-y-5">

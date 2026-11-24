@@ -47,6 +47,8 @@ export function CartoonTool({ initialRuns, anonKey }: { initialRuns: CartoonRun[
       for (const r of runsRef.current.filter((x) => !x.url && !x.error)) {
         const st = await checkCartoon(r.task);
         if (stop || st.state === "waiting") continue;
+        // A big video reached Kling: follow its Kling task from now on.
+        if (st.state === "moved") { setRuns((all) => all.map((x) => x.task === r.task ? { ...x, ...st.run } : x)); continue; }
         setRuns((all) => all.map((x) => x.task === r.task ? { ...x, ...(st.state === "done" ? { url: st.url, external: st.external } : { error: st.error }) } : x));
       }
     };
@@ -152,7 +154,7 @@ export function CartoonTool({ initialRuns, anonKey }: { initialRuns: CartoonRun[
               1080p (дороже{engine === "o3" ? ", режим pro" : ""})
             </label>
             <button type="button" disabled={busy || !file} onClick={run} className="h-11 rounded-full bg-ink px-6 text-sm font-semibold text-paper disabled:opacity-60">
-              {phase === "upload" ? `Загружаю… ${progress}%` : phase === "compress" ? "Сжимаю и отправляю в Kling… (1–3 мин)" : phase === "send" ? "Отправляю в Kling…" : "Сделать мультфильм"}
+              {phase === "upload" ? `Загружаю… ${progress}%` : phase === "compress" ? "Отправляю…" : phase === "send" ? "Отправляю в Kling…" : "Сделать мультфильм"}
             </button>
             {busy && (
               <button type="button" onClick={() => void cancel()} className="ml-2 h-11 rounded-full border border-line px-5 text-sm font-semibold text-red-700 hover:border-red-700">
@@ -171,10 +173,18 @@ export function CartoonTool({ initialRuns, anonKey }: { initialRuns: CartoonRun[
           <section key={r.task} className="rounded-card border border-line/80 bg-surface p-4 sm:p-5">
             <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="font-semibold">
-                {r.url ? "Готово" : r.error ? "Ошибка" : `Kling рисует… ${Math.floor(waited / 60)}:${String(waited % 60).padStart(2, "0")}`}
+                {r.url ? "Готово" : r.error ? "Ошибка" : r.task.startsWith("prep:") ? `Сжимаю видео… ${Math.floor(waited / 60)}:${String(waited % 60).padStart(2, "0")}` : `Kling рисует… ${Math.floor(waited / 60)}:${String(waited % 60).padStart(2, "0")}`}
                 <span className="ml-2 text-sm font-normal text-muted">{styleLabel(r.style)} · {Number(r.sec).toFixed(0)} сек · {engineLabel(r)}</span>
               </h2>
-              <span className="text-xs text-muted">{new Date(r.at).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" })}</span>
+              <span className="flex items-center gap-3 text-xs text-muted">
+                {r.task.startsWith("prep:") && !r.error && (
+                  <button type="button" className="font-semibold text-red-700 hover:underline"
+                    onClick={async () => { await cancelCartoon(r.task.slice(5)); setRuns((all) => all.map((x) => x.task === r.task ? { ...x, error: "Отменено — в Kling ничего не отправлено" } : x)); }}>
+                    Отмена
+                  </button>
+                )}
+                {new Date(r.at).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" })}
+              </span>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               {r.source && <video src={r.source} className="max-h-[70vh] w-full rounded-xl bg-mist ring-1 ring-line" controls muted playsInline />}

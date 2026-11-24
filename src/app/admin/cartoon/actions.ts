@@ -1,5 +1,6 @@
 "use server";
 import { randomUUID } from "node:crypto";
+import { after } from "next/server";
 import { audit, requirePermission, ForbiddenError } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { getKlingTask, getKlingV3OmniTask, submitKlingOmni, submitKlingV3Omni } from "@/lib/generation/kling";
@@ -60,9 +61,27 @@ export async function startCartoon(input: { path: string; parts?: number; style:
   if (sec > 30.4) return { ok: false, error: "Kling берёт видео до 30 секунд" };
   const flash = engine === "flash";
   const extra = String(input.extra ?? "").replace(/\s+/g, " ").trim().slice(0, 400);
-
-  const db = supabaseAdmin();
   const parts = Math.max(1, Math.min(12, Math.floor(Number(input.parts) || 1)));
+  const job: Job = { userId: user.id, path: input.path, parts, style, sec, engine, flash, extra, hd: !!input.hd };
+  if (parts === 1) return prepareAndSubmit(job);
+  // A big video: joining and compressing takes minutes, so it runs after the answer (no page waits on it,
+  // a closed tab or a slow phone does not break it). The page follows it as "prep:<path>".
+  const run: CartoonRun = { task: PREP + input.path, style, sec, at: new Date().toISOString(), flash, engine };
+  await audit(user.id, "cartoon.prep", "kling", null, { ...run, path: input.path });
+  after(async () => {
+    const r = await prepareAndSubmit(job).catch(() => ({ ok: false as const, error: "Не удалось обработать видео" }));
+    if (!r.ok) await audit(user.id, "cartoon.prep_failed", "kling", null, { path: input.path, error: r.error });
+  });
+  return { ok: true, run };
+}
+
+type Job = { userId: string; path: string; parts: number; style: CartoonStyle; sec: number; engine: CartoonEngine; flash: boolean; extra: string; hd: boolean };
+const PREP = "prep:";
+
+async function prepareAndSubmit(j: Job): Promise<CartoonStart> {
+  const input = { path: j.path, hd: j.hd };
+  const { style, sec, engine, flash, extra, parts } = j;
+  const db = supabaseAdmin();
   let videoUrl = "";
   if (parts > 1) {
     // Big video: join the parts, re-encode under 48 MB, keep it as <path>.kling.mp4, drop the parts.
@@ -113,7 +132,7 @@ export async function startCartoon(input: { path: string; parts?: number; style:
       ? V3 + await submitKlingV3Omni({ videoUrl, photoUrls: [], prompt, resolution })
       : await submitKlingOmni({ videoUrl, photoUrls: [], mode: "edit", prompt, durationSec: sec, aspectRatio: "adaptive", resolution, flash });
     const run: CartoonRun = { task, style, sec, at: new Date().toISOString(), flash, engine };
-    await audit(user.id, "cartoon.run", "kling", null, { ...run, hd: input.hd && !flash, extra: extra.slice(0, 120) });
+    await audit(j.userId, "cartoon.run", "kling", null, { ...run, path: j.path, hd: input.hd && !flash, extra: extra.slice(0, 120) });
     return { ok: true, run };
   } catch (err) {
     console.error("[cartoon] kling refused", err instanceof ProviderError ? err.code : "error", err instanceof Error ? err.message.slice(0, 200) : "");
@@ -138,10 +157,32 @@ async function cancelled(path: string): Promise<boolean> {
   return !!data?.length;
 }
 
-export type CartoonCheck = { state: "waiting" } | { state: "done"; url: string; external?: boolean } | { state: "failed"; error: string };
+export type CartoonCheck = { state: "waiting" } | { state: "moved"; run: CartoonRun } | { state: "done"; url: string; external?: boolean } | { state: "failed"; error: string };
+
+/** A big video still being joined/compressed: has it reached Kling, failed, or been lost (server restart)? */
+async function prepStatus(path: string): Promise<CartoonCheck> {
+  const db = supabaseAdmin();
+  const { data } = await db.from("audit_logs").select("action,created_at,metadata_json")
+    .in("action", ["cartoon.run", "cartoon.prep_failed", "cartoon.prep", "cartoon.cancel"]).eq("metadata_json->>path", path)
+    .order("created_at", { ascending: false }).limit(5);
+  const rows = data ?? [];
+  const run = rows.find((r) => r.action === "cartoon.run");
+  if (run) return { state: "moved", run: run.metadata_json as CartoonRun };
+  const failed = rows.find((r) => r.action === "cartoon.prep_failed");
+  if (failed) return { state: "failed", error: String((failed.metadata_json as { error?: string })?.error ?? "Не удалось обработать видео") };
+  if (rows.some((r) => r.action === "cartoon.cancel")) return { state: "failed", error: "Отменено — в Kling ничего не отправлено" };
+  const prep = rows.find((r) => r.action === "cartoon.prep");
+  if (prep && Date.now() - Date.parse(prep.created_at as string) > 20 * 60_000) return { state: "failed", error: "Сервер перезапустился во время сжатия — загрузите видео ещё раз" };
+  return { state: "waiting" };
+}
 
 export async function checkCartoon(task: string): Promise<CartoonCheck> {
   if (!(await guard())) return { state: "failed", error: "Нет доступа" };
+  if (task.startsWith(PREP)) {
+    const path = task.slice(PREP.length);
+    if (!/^admin-cartoon\/[0-9a-f-]{36}\.(mp4|mov)$/.test(path)) return { state: "failed", error: "Неверная задача" };
+    return prepStatus(path);
+  }
   if (!/^(v3:)?[\w-]{1,80}$/.test(task)) return { state: "failed", error: "Неверная задача" };
   try {
     const st = task.startsWith(V3) ? await getKlingV3OmniTask(task.slice(V3.length)) : await getKlingTask(task);
